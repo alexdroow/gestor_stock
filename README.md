@@ -1,1 +1,0 @@
-# sucree-stock-updater
