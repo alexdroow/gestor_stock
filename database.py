@@ -558,6 +558,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS productos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT NOT NULL,
+                foto TEXT,
                 icono TEXT DEFAULT 'cupcake',
                 stock REAL DEFAULT 0,
                 stock_minimo REAL DEFAULT 2,
@@ -674,6 +675,7 @@ def init_db():
                 canal_venta TEXT DEFAULT 'presencial',
                 codigo_operacion TEXT,
                 total_items INTEGER DEFAULT 0,
+                total_monto REAL DEFAULT 0,
                 estado TEXT DEFAULT 'completada'
             )
         ''')
@@ -1775,7 +1777,7 @@ def obtener_producto_detalle(producto_id):
         cursor.execute(
             """
             SELECT id, nombre, stock, stock_minimo, unidad, fecha_vencimiento,
-                   alerta_dias, precio, vida_util_dias, icono,
+                   alerta_dias, precio, vida_util_dias, icono, foto,
                    porcion_cantidad, porcion_unidad,
                     stock_dependencia_tipo, stock_dependencia_id, stock_dependencia_cantidad
             FROM productos
@@ -2563,6 +2565,7 @@ def procesar_venta_con_insumos(
             raise ValueError("Carrito vacío")
 
         items_directos = {}
+        precio_unitario_por_producto = {}
         for raw in items:
             if not isinstance(raw, dict):
                 raise ValueError("Formato de item inválido")
@@ -2581,6 +2584,16 @@ def procesar_venta_con_insumos(
                 raise ValueError("Producto inválido en carrito")
             if cantidad_porciones <= 0:
                 continue
+
+            precio_raw = raw.get("precio_unitario", raw.get("precio", None))
+            if precio_raw not in (None, ""):
+                try:
+                    precio_unitario = float(precio_raw)
+                except (TypeError, ValueError):
+                    raise ValueError(f"Precio inválido para producto ID {producto_id}")
+                if precio_unitario < 0:
+                    raise ValueError(f"Precio inválido para producto ID {producto_id}")
+                precio_unitario_por_producto[producto_id] = precio_unitario
 
             items_directos[producto_id] = items_directos.get(producto_id, 0) + cantidad_porciones
 
@@ -2623,8 +2636,8 @@ def procesar_venta_con_insumos(
         total_items = int(round(sum(float(v or 0) for v in items_directos.values())))
         cursor.execute(
             """
-            INSERT INTO ventas (fecha_hora, codigo_pedido, canal_venta, codigo_operacion, total_items, estado)
-            VALUES (?, ?, ?, ?, ?, 'completada')
+            INSERT INTO ventas (fecha_hora, codigo_pedido, canal_venta, codigo_operacion, total_items, total_monto, estado)
+            VALUES (?, ?, ?, ?, ?, 0, 'completada')
             """,
             (fecha_hora_str, codigo, canal, codigo_operacion, total_items),
         )
@@ -2632,6 +2645,7 @@ def procesar_venta_con_insumos(
 
         detalle_fifo = []
         detalle_productos = []
+        total_monto = 0.0
         detalle_insumos_venta = []
         detalle_insumo_lotes_venta = []
         productos_stock_modificados = set()
@@ -2724,12 +2738,22 @@ def procesar_venta_con_insumos(
             productos_stock_modificados.add(int(producto_id))
 
             if int(producto_id) in productos_directos_ids:
+                precio_unitario = precio_unitario_por_producto.get(int(producto_id))
+                if precio_unitario is None:
+                    try:
+                        precio_unitario = float(producto.get("precio") or 0)
+                    except (TypeError, ValueError):
+                        precio_unitario = 0.0
+                if precio_unitario < 0:
+                    precio_unitario = 0.0
+                subtotal = float(cantidad_porciones) * float(precio_unitario)
+                total_monto += subtotal
                 detalle_productos.append(
                     {
                         "producto_id": producto_id,
                         "nombre": producto["nombre"],
                         "cantidad": cantidad_porciones,
-                        "precio_unitario": 0.0,
+                        "precio_unitario": float(precio_unitario or 0),
                         "cantidad_stock": cantidad_stock,
                         "unidad_stock": info["unidad_stock"],
                     }
@@ -3064,6 +3088,13 @@ def procesar_venta_con_insumos(
                 (venta_id, prod["producto_id"], prod["nombre"], prod["cantidad"]),
             )
 
+        if total_monto < 0:
+            total_monto = 0.0
+        cursor.execute(
+            "UPDATE ventas SET total_monto = ? WHERE id = ?",
+            (float(total_monto), venta_id),
+        )
+
         for det in detalle_fifo:
             for lote in det.get("lotes_usados", []):
                 cursor.execute(
@@ -3198,6 +3229,7 @@ def procesar_venta_con_insumos(
             "alertas": alertas,
             "productos_actualizados": productos_actualizados,
             "insumos_consumidos": detalle_insumos_venta,
+            "total_monto": float(total_monto or 0),
         }
     except Exception as e:
         conn.rollback()
@@ -3932,9 +3964,15 @@ def obtener_historial_ventas(fecha_desde=None, fecha_hasta=None):
     
     query = """
         SELECT v.*, 
-               GROUP_CONCAT(vi.producto_nombre || ' (x' || vi.cantidad || ')', ', ') as productos
+               GROUP_CONCAT(vi.producto_nombre || ' (x' || vi.cantidad || ')', ', ') as productos,
+               COALESCE(v.total_monto, vt.total_monto, 0) AS total_monto_calc
         FROM ventas v
         LEFT JOIN venta_items vi ON v.id = vi.venta_id
+        LEFT JOIN (
+            SELECT venta_id, SUM(subtotal) AS total_monto
+            FROM venta_detalles
+            GROUP BY venta_id
+        ) vt ON vt.venta_id = v.id
     """
     params = []
     
@@ -3958,6 +3996,17 @@ def obtener_historial_ventas(fecha_desde=None, fecha_hasta=None):
     resultado = []
     for row in rows:
         venta = dict(row)
+        try:
+            total_monto = float(venta.get("total_monto") or 0)
+        except (TypeError, ValueError):
+            total_monto = 0.0
+        try:
+            total_monto_calc = float(venta.get("total_monto_calc") or 0)
+        except (TypeError, ValueError):
+            total_monto_calc = 0.0
+        if total_monto <= 0 and total_monto_calc > 0:
+            venta["total_monto"] = total_monto_calc
+
         try:
             # Parsear fecha
             fecha_str = row['fecha_hora']
@@ -3983,14 +4032,28 @@ def obtener_detalle_venta(venta_id):
     
     cursor.execute("SELECT * FROM ventas WHERE id = ?", (venta_id,))
     venta = cursor.fetchone()
-    
+
     cursor.execute("""
-        SELECT vi.*, p.stock as stock_actual 
-        FROM venta_items vi 
+        SELECT
+            vi.*,
+            vd.precio_unitario,
+            vd.subtotal,
+            p.stock as stock_actual
+        FROM venta_items vi
+        LEFT JOIN venta_detalles vd
+            ON vd.venta_id = vi.venta_id
+           AND vd.producto_id = vi.producto_id
         LEFT JOIN productos p ON vi.producto_id = p.id
         WHERE vi.venta_id = ?
     """, (venta_id,))
     items = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute(
+        "SELECT SUM(subtotal) AS total_monto FROM venta_detalles WHERE venta_id = ?",
+        (venta_id,),
+    )
+    total_row = cursor.fetchone()
+    total_monto_calc = float(total_row["total_monto"] or 0) if total_row else 0.0
 
     cursor.execute(
         """
@@ -4099,7 +4162,16 @@ def obtener_detalle_venta(venta_id):
         producto_id = int(item.get("producto_id") or 0)
         item["lotes_usados"] = lotes_por_producto.get(producto_id, [])
         item["insumos_asociados"] = insumos_por_producto.get(producto_id, [])
-    
+
+    if venta is not None:
+        venta = dict(venta)
+        try:
+            total_actual = float(venta.get("total_monto") or 0)
+        except (TypeError, ValueError):
+            total_actual = 0.0
+        if total_actual <= 0 and total_monto_calc > 0:
+            venta["total_monto"] = float(total_monto_calc)
+
     conn.close()
     return venta, items
 
@@ -6959,6 +7031,7 @@ def migrar_db():
         )
 
         # Columnas en productos/recetas/producciones
+        _ensure_column(conn, "productos", "foto", "TEXT")
         _ensure_column(conn, "productos", "precio", "REAL DEFAULT 0")
         _ensure_column(conn, "productos", "vida_util_dias", "INTEGER DEFAULT 0")
         _ensure_column(conn, "productos", "icono", "TEXT DEFAULT 'cupcake'")
@@ -6971,6 +7044,7 @@ def migrar_db():
         _ensure_column(conn, "ventas", "codigo_pedido", "TEXT")
         _ensure_column(conn, "ventas", "canal_venta", "TEXT DEFAULT 'presencial'")
         _ensure_column(conn, "ventas", "codigo_operacion", "TEXT")
+        _ensure_column(conn, "ventas", "total_monto", "REAL DEFAULT 0")
         _ensure_column(conn, "recetas", "rendimiento", "REAL DEFAULT 1")
         _ensure_column(conn, "producciones", "cantidad_resultado", "REAL DEFAULT 0")
         _ensure_column(conn, "producciones", "metadata_json", "TEXT")

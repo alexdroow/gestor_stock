@@ -322,6 +322,52 @@
             transform: none;
             box-shadow: none;
         }
+
+        .producto-media {
+            position: relative;
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 12px;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .producto-foto {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .producto-media .producto-icon {
+            margin-bottom: 0;
+        }
+
+        .btn-foto {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(15, 23, 42, 0.8);
+            color: #fff;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .input-foto {
+            display: none;
+        }
         
         .producto-icon {
             font-size: 40px;
@@ -333,6 +379,39 @@
             font-size: 14px;
             margin-bottom: 4px;
             color: #0f172a;
+        }
+
+        .producto-precio {
+            margin-top: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .producto-precio input {
+            width: 110px;
+            margin-left: 6px;
+            padding: 6px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .producto-precio input::-webkit-outer-spin-button,
+        .producto-precio input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .producto-precio input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .precio-texto {
+            cursor: pointer;
+            display: inline-block;
+            min-width: 60px;
         }
         
         .producto-stock {
@@ -464,7 +543,7 @@
             padding: 24px;
             display: flex;
             flex-direction: column;
-            max-height: 700px;
+            max-height: 860px;
         }
         
         .carrito-header {
@@ -547,6 +626,29 @@
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .carrito-item-precio {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .carrito-item-precio input {
+            width: 96px;
+            padding: 6px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .carrito-item-subtotal {
+            margin-left: auto;
+            font-weight: 700;
+            color: #0f172a;
         }
         
         .btn-cantidad {
@@ -1315,8 +1417,33 @@
                              data-desactivacion-confirmada="{{ 1 if p.desactivacion_manual_confirmada else 0 }}"
                              data-porciones="{{ p.porciones_disponibles }}"
                              onclick='agregarAlCarrito({{ p.id }})'>
-                            <div class="producto-icon" data-icono="{{ p.icono or 'cupcake' }}"></div>
+                            <div class="producto-media">
+                                {% if p.foto %}
+                                    <img class="producto-foto" src="{{ url_for('static', filename=p.foto) }}" alt="Foto {{ p.nombre }}">
+                                {% else %}
+                                    <div class="producto-icon" data-icono="{{ p.icono or 'cupcake' }}"></div>
+                                {% endif %}
+                                <button type="button" class="btn-foto" onclick="abrirFotoProducto(event, {{ p.id }})">&#128247;</button>
+                                <input type="file" class="input-foto" id="foto-input-{{ p.id }}" accept="image/*" onchange="subirFotoProducto(event, {{ p.id }})">
+                            </div>
                             <div class="producto-nombre">{{ p.nombre }}</div>
+                            <div class="producto-precio">
+                                Precio:
+                                <span class="precio-texto" ondblclick="activarEdicionPrecio(event, {{ p.id }})">
+                                    {{ '$' ~ '{:,.0f}'.format((p.precio or 0)|float) }}
+                                </span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value="{{ (p.precio or 0)|float }}"
+                                    oninput="actualizarPrecioBaseProducto(event, {{ p.id }}, this.value)"
+                                    onblur="finalizarEdicionPrecio(event, {{ p.id }})"
+                                    onkeydown="detectarEnterPrecio(event, {{ p.id }})"
+                                    onclick="event.stopPropagation()"
+                                    style="display:none;"
+                                >
+                            </div>
                             <div class="producto-stock {{ 'desactivado-confirmado' if p.desactivacion_manual_confirmada else 'bajo' if p.bajo_minimo or p.sin_porcion_disponible or p.dependencias_criticas else 'cerca' if (p.cerca_minimo or p.baja_porcion or p.dependencias_baja_porcion or p.dependencias_cerca_minimo) else '' }}">
                                 Stock: {{ p.stock_visual_label if p.stock_visual_label is defined else p.stock_label }} {{ p.stock_visual_unidad if p.stock_visual_unidad is defined else (p.unidad or 'unidad') }}
                             </div>
@@ -1393,6 +1520,10 @@
                         <div class="carrito-total">
                             <span>Total de items:</span>
                             <span id="total-items">0</span>
+                        </div>
+                        <div class="carrito-total">
+                            <span>Total venta:</span>
+                            <span id="total-monto">$0</span>
                         </div>
                         <button onclick="procesarVenta()" class="btn btn-success" id="btn-vender" disabled>
                             &#128176; Procesar Venta
@@ -1527,7 +1658,7 @@
         let carrito = [];
         let filtroStockActivo = 'todos';
         const VENTAS_UI_STATE_KEY = 'ventas_ui_state_v1';
-        const VENTAS_CART_KEY = 'ventas_cart_v2';
+        const VENTAS_CART_KEY = 'ventas_cart_v3';
         const agendaEventoActual = {{ agenda_evento|tojson if agenda_evento else 'null' }};
         const ICONOS_PRODUCTO = {
             cupcake: '\uD83E\uDDC1',
@@ -1572,7 +1703,8 @@
                     items: (Array.isArray(carrito) ? carrito : []).map(item => ({
                         id: Number(item.id || 0),
                         nombre: String(item.nombre || ''),
-                        cantidad: Math.max(1, Number(item.cantidad || 1))
+                        cantidad: Math.max(1, Number(item.cantidad || 1)),
+                        precio_unitario: normalizarPrecio(item.precio_unitario)
                     })).filter(item => item.id > 0),
                     codigo_pedido: (codigoPedidoInput ? codigoPedidoInput.value : '') || '',
                     fecha_venta: (fechaVentaInput ? fechaVentaInput.value : '') || '',
@@ -1609,7 +1741,10 @@
                     restaurado.push({
                         id,
                         nombre,
-                        cantidad: Math.min(cantidad, maxDisponible)
+                        cantidad: Math.min(cantidad, maxDisponible),
+                        precio_unitario: normalizarPrecio(
+                            it.precio_unitario !== undefined ? it.precio_unitario : (productosData[id].precio || 0)
+                        )
                     });
                 });
                 carrito = restaurado;
@@ -1649,6 +1784,12 @@
             const el = document.getElementById(id);
             if (!el) return 0;
             const n = Number(el.value || 0);
+            if (!Number.isFinite(n) || n < 0) return 0;
+            return n;
+        }
+
+        function normalizarPrecio(valor) {
+            const n = Number(valor || 0);
             if (!Number.isFinite(n) || n < 0) return 0;
             return n;
         }
@@ -1960,6 +2101,8 @@
             {{ p.id }}: {
                 nombre: {{ p.nombre|tojson }},
                 icono: {{ (p.icono or 'cupcake')|tojson }},
+                foto_url: {{ (url_for('static', filename=p.foto) if p.foto else '')|tojson }},
+                precio: {{ (p.precio or 0)|tojson }},
                 stock: {{ p.stock|tojson }},
                 unidad: {{ (p.unidad or 'unidad')|tojson }},
                 stock_visual: {{ (p.stock_visual if p.stock_visual is defined else p.stock)|tojson }},
@@ -2086,9 +2229,42 @@
             card.classList.toggle('desactivacion-confirmada', desactivacionConfirmada);
             card.setAttribute('onclick', `agregarAlCarrito(${id})`);
 
-            const iconEl = card.querySelector('.producto-icon');
-            if (iconEl) {
-                iconEl.textContent = obtenerIconoProducto(info.icono);
+            const mediaEl = card.querySelector('.producto-media');
+            if (mediaEl) {
+                const fotoUrl = String(info.foto_url || '').trim();
+                const imgEl = mediaEl.querySelector('.producto-foto');
+                const iconEl = mediaEl.querySelector('.producto-icon');
+                if (fotoUrl) {
+                    let img = imgEl;
+                    if (!img) {
+                        img = document.createElement('img');
+                        img.className = 'producto-foto';
+                        mediaEl.insertBefore(img, mediaEl.firstChild);
+                    }
+                    img.src = fotoUrl;
+                    img.alt = `Foto ${info.nombre || 'Producto'}`;
+                    if (iconEl) iconEl.remove();
+                } else {
+                    if (imgEl) imgEl.remove();
+                    if (!iconEl) {
+                        const icon = document.createElement('div');
+                        icon.className = 'producto-icon';
+                        mediaEl.insertBefore(icon, mediaEl.firstChild);
+                    }
+                    const iconTarget = mediaEl.querySelector('.producto-icon');
+                    if (iconTarget) {
+                        iconTarget.textContent = obtenerIconoProducto(info.icono);
+                    }
+                }
+            }
+
+            const precioInput = card.querySelector('.producto-precio input');
+            if (precioInput) {
+                precioInput.value = String(Number(info.precio || 0));
+            }
+            const precioTexto = card.querySelector('.precio-texto');
+            if (precioTexto) {
+                precioTexto.textContent = formatearMonedaCLP(normalizarPrecio(info.precio || 0));
             }
 
             const stockEl = card.querySelector('.producto-stock');
@@ -2298,6 +2474,101 @@
             });
         }
 
+        function activarEdicionPrecio(event, id) {
+            if (event) event.stopPropagation();
+            const card = document.querySelector(`.producto-card[data-id="${id}"]`);
+            if (!card) return;
+            const input = card.querySelector('.producto-precio input');
+            const texto = card.querySelector('.precio-texto');
+            if (!input || !texto) return;
+            texto.style.display = 'none';
+            input.style.display = 'inline-block';
+            input.focus();
+            input.select();
+        }
+
+        function finalizarEdicionPrecio(event, id) {
+            if (event) event.stopPropagation();
+            const card = document.querySelector(`.producto-card[data-id="${id}"]`);
+            if (!card) return;
+            const input = card.querySelector('.producto-precio input');
+            const texto = card.querySelector('.precio-texto');
+            if (!input || !texto) return;
+            texto.textContent = formatearMonedaCLP(normalizarPrecio(input.value));
+            input.style.display = 'none';
+            texto.style.display = 'inline-block';
+        }
+
+        function detectarEnterPrecio(event, id) {
+            if (event.key === 'Enter') {
+                finalizarEdicionPrecio(event, id);
+            }
+        }
+
+        let _precioBaseSaveTimer = null;
+
+        function actualizarPrecioBaseProducto(event, id, valor) {
+            if (event) event.stopPropagation();
+            const precio = normalizarPrecio(valor);
+            if (!productosData[id]) return;
+            productosData[id].precio = precio;
+            if (_precioBaseSaveTimer) {
+                clearTimeout(_precioBaseSaveTimer);
+            }
+            _precioBaseSaveTimer = setTimeout(() => {
+                guardarPrecioBaseProducto(id, precio);
+            }, 500);
+        }
+
+        async function guardarPrecioBaseProducto(id, precio) {
+            try {
+                const response = await fetch(`/api/producto/${id}/actualizar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ precio })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar el precio');
+                }
+            } catch (err) {
+                alert(err.message || 'Error guardando el precio');
+            }
+        }
+
+        function abrirFotoProducto(event, id) {
+            if (event) event.stopPropagation();
+            const input = document.getElementById(`foto-input-${id}`);
+            if (input) input.click();
+        }
+
+        async function subirFotoProducto(event, id) {
+            if (event) event.stopPropagation();
+            const input = event && event.target ? event.target : null;
+            const file = input && input.files ? input.files[0] : null;
+            if (!file) return;
+            try {
+                const form = new FormData();
+                form.append('foto', file);
+                const response = await fetch(`/api/producto/${id}/foto`, {
+                    method: 'POST',
+                    body: form
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo subir la foto');
+                }
+                if (productosData[id]) {
+                    productosData[id].foto_url = data.foto_url || '';
+                    actualizarTarjetaProducto(id);
+                }
+            } catch (err) {
+                alert(err.message || 'Error al subir la foto');
+            } finally {
+                if (input) input.value = '';
+            }
+        }
+
         function agregarAlCarrito(id) {
             const info = productosData[id];
             if (!info) return;
@@ -2307,6 +2578,7 @@
                 alert('Este producto no alcanza para una porcion completa.');
                 return;
             }
+            const precioBase = normalizarPrecio(info.precio || 0);
 
             const existente = carrito.find(item => item.id === id);
 
@@ -2318,7 +2590,7 @@
                     return;
                 }
             } else {
-                carrito.push({ id, nombre, cantidad: 1 });
+                carrito.push({ id, nombre, cantidad: 1, precio_unitario: precioBase });
             }
 
             actualizarCarrito();
@@ -2328,10 +2600,15 @@
             const container = document.getElementById('carrito-items');
             const count = document.getElementById('carrito-count');
             const totalItems = document.getElementById('total-items');
+            const totalMonto = document.getElementById('total-monto');
             const btnVender = document.getElementById('btn-vender');
             
             count.textContent = carrito.length;
             totalItems.textContent = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+            if (totalMonto) {
+                const total = carrito.reduce((sum, item) => sum + (item.cantidad * normalizarPrecio(item.precio_unitario)), 0);
+                totalMonto.textContent = formatearMonedaCLP(total);
+            }
             
             if (carrito.length === 0) {
                 container.innerHTML = `
@@ -2351,6 +2628,11 @@
                             ${(productosData[item.id] && (productosData[item.id].baja_porcion || productosData[item.id].bajo_minimo || productosData[item.id].dependencias_criticas || item.cantidad >= productosData[item.id].porciones_disponibles))
                                 ? `<div class="carrito-item-alerta">${productosData[item.id].dependencias_alerta_texto ? escapeHtmlLocal(productosData[item.id].dependencias_alerta_texto) : ('Stock bajo por porcion (' + escapeHtmlLocal(productosData[item.id].porcion || '') + ')')}</div>`
                                 : ''}
+                            <div class="carrito-item-precio">
+                                <span>Precio:</span>
+                                <input type="number" min="0" step="1" value="${normalizarPrecio(item.precio_unitario)}" oninput="actualizarPrecio(${item.id}, this.value)" onclick="event.stopPropagation()">
+                                <span class="carrito-item-subtotal" id="subtotal-${item.id}">${formatearMonedaCLP(item.cantidad * normalizarPrecio(item.precio_unitario))}</span>
+                            </div>
                         </div>
                         <div class="carrito-item-cantidad">
                             <button class="btn-cantidad" onclick="restarCantidad(${item.id})">-</button>
@@ -2361,8 +2643,31 @@
                     </div>
                 `).join('');
                 btnVender.disabled = false;
+                actualizarTotalesCarrito();
                 guardarCarritoPersistente();
             }
+        }
+
+        function actualizarTotalesCarrito() {
+            const totalMonto = document.getElementById('total-monto');
+            if (totalMonto) {
+                const total = carrito.reduce((sum, item) => sum + (item.cantidad * normalizarPrecio(item.precio_unitario)), 0);
+                totalMonto.textContent = formatearMonedaCLP(total);
+            }
+            carrito.forEach((item) => {
+                const subtotalEl = document.getElementById(`subtotal-${item.id}`);
+                if (subtotalEl) {
+                    subtotalEl.textContent = formatearMonedaCLP(item.cantidad * normalizarPrecio(item.precio_unitario));
+                }
+            });
+        }
+
+        function actualizarPrecio(id, valor) {
+            const item = carrito.find(i => i.id === id);
+            if (!item) return;
+            item.precio_unitario = normalizarPrecio(valor);
+            actualizarTotalesCarrito();
+            guardarCarritoPersistente();
         }
 
         function sumarCantidad(id) {
@@ -2418,7 +2723,8 @@
             
             const items = carrito.map(item => ({
                 id: item.id,
-                cantidad: item.cantidad
+                cantidad: item.cantidad,
+                precio_unitario: normalizarPrecio(item.precio_unitario)
             }));
             
             fetch('/api/venta/procesar', {

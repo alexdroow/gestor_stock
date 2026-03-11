@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import threading
 import sqlite3
+import imghdr
 from urllib.parse import urlencode, quote, unquote, urlparse
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError
@@ -1202,15 +1203,16 @@ def duplicar_producto(id):
         cursor.execute(
             """
             INSERT INTO productos (
-                nombre, icono, stock, stock_minimo, unidad, porcion_cantidad, porcion_unidad,
+                nombre, icono, foto, stock, stock_minimo, unidad, porcion_cantidad, porcion_unidad,
                 stock_dependencia_tipo, stock_dependencia_id, stock_dependencia_cantidad,
                 fecha_vencimiento, alerta_dias, precio, vida_util_dias
             )
-            VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 f"{original['nombre']} (Copia)",
                 _normalizar_icono_producto(original["icono"] if "icono" in original.keys() else "cupcake"),
+                original["foto"] if "foto" in original.keys() else None,
                 original['stock_minimo'],
                 original['unidad'] or 'unidad',
                 float(original['porcion_cantidad'] or 1) if 'porcion_cantidad' in original.keys() else 1,
@@ -1597,6 +1599,86 @@ def api_descartar_insumos_masivo():
         return jsonify(resultado)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/producto/<int:id>/foto', methods=['POST'])
+def api_actualizar_foto_producto(id):
+    conn = None
+    try:
+        if 'foto' not in request.files:
+            return jsonify({'success': False, 'error': 'No se recibió imagen'}), 400
+        archivo = request.files['foto']
+        if not archivo or not archivo.filename:
+            return jsonify({'success': False, 'error': 'Archivo inválido'}), 400
+
+        nombre_seguro = secure_filename(archivo.filename)
+        ext = os.path.splitext(nombre_seguro)[1].lower()
+        permitidas = {'.jpg', '.jpeg', '.png', '.webp'}
+        if ext not in permitidas:
+            return jsonify({'success': False, 'error': 'Formato no permitido (usa JPG, PNG o WebP)'}), 400
+
+        data = archivo.read()
+        if not data:
+            return jsonify({'success': False, 'error': 'Archivo vacío'}), 400
+        if len(data) > 4 * 1024 * 1024:
+            return jsonify({'success': False, 'error': 'Imagen demasiado grande (máx 4MB)'}), 400
+
+        tipo = imghdr.what(None, data)
+        if tipo not in {'jpeg', 'png', 'webp'}:
+            return jsonify({'success': False, 'error': 'No se pudo validar la imagen'}), 400
+        ext_normalizada = '.jpg' if tipo == 'jpeg' else f".{tipo}"
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, foto
+            FROM productos
+            WHERE id = ?
+              AND COALESCE(eliminado, 0) = 0
+            """,
+            (id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'Producto no encontrado'}), 404
+
+        carpeta_fotos = os.path.join(static_dir, 'productos')
+        os.makedirs(carpeta_fotos, exist_ok=True)
+        nombre_archivo = f"producto_{id}_{int(time.time())}{ext_normalizada}"
+        ruta_archivo = os.path.join(carpeta_fotos, nombre_archivo)
+        with open(ruta_archivo, 'wb') as f:
+            f.write(data)
+
+        foto_relativa = f"productos/{nombre_archivo}"
+        cursor.execute(
+            "UPDATE productos SET foto = ? WHERE id = ?",
+            (foto_relativa, id),
+        )
+        conn.commit()
+
+        foto_anterior = (row["foto"] if row and "foto" in row.keys() else None) or ""
+        if foto_anterior:
+            ruta_anterior = os.path.normpath(os.path.join(static_dir, foto_anterior.replace('/', os.sep)))
+            if ruta_anterior.startswith(os.path.normpath(carpeta_fotos)) and os.path.isfile(ruta_anterior):
+                try:
+                    os.remove(ruta_anterior)
+                except Exception:
+                    pass
+
+        return jsonify(
+            {
+                'success': True,
+                'foto': foto_relativa,
+                'foto_url': url_for('static', filename=foto_relativa),
+            }
+        )
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/insumo/<int:id>/detalle')
@@ -3383,6 +3465,7 @@ def procesar_venta():
             'codigo_pedido': codigo_pedido or None,
             'fecha_venta': fecha_venta_resp,
             'canal_venta': resultado.get('canal_venta') or canal_venta,
+            'total_monto': resultado.get('total_monto'),
             'mensaje': f"Venta #{venta_id} procesada{(' (pedido ' + codigo_pedido + ')') if codigo_pedido else ''}{segmento_fecha}: {len(items)} productos"
         })
         

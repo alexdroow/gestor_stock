@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historial de Ventas - Sucr&eacute;e Pasteler&iacute;a</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         
@@ -284,6 +285,19 @@
             max-width: 300px;
             font-size: 13px;
             color: #374151;
+        }
+
+        .detalle-precio {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .detalle-total {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
         }
         
         .acciones {
@@ -730,6 +744,7 @@
                                 <th>Codigo operación</th>
                                 <th>Productos</th>
                                 <th>Total Items</th>
+                                <th>Total</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
@@ -767,6 +782,13 @@
                                     <strong>{{ venta.total_items }}</strong> items
                                 </td>
                                 <td>
+                                    {% if (venta.canal_venta or 'presencial') == 'presencial' %}
+                                        <strong>${{ '{:,.0f}'.format((venta.total_monto or 0)|float) }}</strong>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
                                     <div class="acciones">
                                         <button onclick="verDetalle({{ venta.id }})" class="btn btn-primary btn-sm">
                                             Ver
@@ -782,7 +804,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="8">
+                                <td colspan="9">
                                     <div class="empty-state">
                                         <div class="empty-state-icon">&#128220;</div>
                                         <div>No hay ventas registradas</div>
@@ -893,6 +915,7 @@
         }
 
         restoreHistorialVentasUiStateIfNeeded();
+        let detalleVentaActual = null;
 
         function escapeHtml(value) {
             return String(value === null || value === undefined ? '' : value)
@@ -919,6 +942,12 @@
             if (!Number.isFinite(n)) return '0';
             if (Number.isInteger(n)) return String(n);
             return n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+        }
+
+        function formatearMonedaCLP(valor) {
+            const n = Number(valor || 0);
+            if (!Number.isFinite(n)) return '$0';
+            return `$${Math.round(n).toLocaleString('es-CL')}`;
         }
 
         function fechaTexto(valor, fallback) {
@@ -1003,9 +1032,11 @@
             return `<div class="detalle-insumos-list">${itemsHtml}</div>`;
         }
 
-        function renderDetalleProducto(item, index) {
+        function renderDetalleProducto(item, index, mostrarPrecios) {
             const nombreProducto = item.producto_nombre || 'Producto';
             const cantidad = formatearCantidad(item.cantidad || 0);
+            const precioUnitario = Number(item.precio_unitario || 0);
+            const subtotal = Number(item.subtotal || 0);
             const openAttr = index === 0 ? 'open' : '';
             return `
                 <details class="detalle-item" ${openAttr}>
@@ -1016,6 +1047,7 @@
                         </div>
                         <strong class="detalle-item-cantidad">x${escapeHtml(cantidad)}</strong>
                     </summary>
+                    ${mostrarPrecios ? `<div class="detalle-precio">Precio: <strong>${formatearMonedaCLP(precioUnitario)}</strong> · Subtotal: <strong>${formatearMonedaCLP(subtotal || (precioUnitario * Number(item.cantidad || 0)))}</strong></div>` : ''}
                     <div class="detalle-item-meta">
                         <div>
                             <div class="detalle-section-title">Lotes del producto vendido</div>
@@ -1036,8 +1068,12 @@
                 .then(data => {
                     if (!data.success) return;
 
+                    detalleVentaActual = data;
                     document.getElementById('detalle-venta-id').textContent = ventaId;
-                    const items = (data.items || []).map((item, index) => renderDetalleProducto(item, index)).join('');
+                    const canal = String(data.venta?.canal_venta || 'presencial');
+                    const mostrarPrecios = canal === 'presencial';
+                    const items = (data.items || []).map((item, index) => renderDetalleProducto(item, index, mostrarPrecios)).join('');
+                    const totalMonto = Number(data.venta?.total_monto || 0);
 
                     document.getElementById('detalle-contenido').innerHTML = `
                         <div style="margin-bottom: 16px; color: #64748b;">
@@ -1048,7 +1084,9 @@
                             Canal: <strong>${escapeHtml(data.venta?.canal_venta || 'presencial')}</strong>
                             <br>
                             Codigo operación: <strong>${escapeHtml(data.venta?.codigo_operacion || '-')}</strong>
+                            ${mostrarPrecios ? `<div class="detalle-total">Total: ${formatearMonedaCLP(totalMonto)}</div>` : ''}
                         </div>
+                        ${mostrarPrecios ? `<button class="btn btn-secondary btn-sm" onclick="generarTicketPdf()">Descargar ticket PDF</button>` : ''}
                         <h4 style="margin-bottom: 12px; font-size: 14px; color: #64748b;">PRODUCTOS Y TRAZABILIDAD:</h4>
                         ${items || '<div class="detalle-item"><span>Sin productos</span></div>'}
                     `;
@@ -1110,6 +1148,70 @@
                     `;
                     document.getElementById('modal-detalle').classList.add('active');
                 });
+        }
+
+        function generarTicketPdf() {
+            const data = detalleVentaActual;
+            if (!data || !data.venta) return;
+            const jspdf = window.jspdf || null;
+            if (!jspdf || !jspdf.jsPDF) {
+                alert('No se pudo cargar la librería PDF.');
+                return;
+            }
+
+            const items = Array.isArray(data.items) ? data.items : [];
+            const nombreLineas = items.reduce((acc, item) => {
+                const nombre = String(item.producto_nombre || 'Producto');
+                return acc + Math.max(1, Math.ceil(nombre.length / 26)) + 2;
+            }, 0);
+            const altura = Math.max(170, 110 + nombreLineas * 4 + 30);
+
+            const { jsPDF } = jspdf;
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, altura] });
+            const margin = 6;
+            let y = 8;
+
+            const headerColor = [141, 74, 28];
+            doc.setFillColor(...headerColor);
+            doc.rect(0, 0, 80, 24, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(12);
+            doc.text('Sucrée Pastelería', margin, 9);
+            doc.setFontSize(8);
+            doc.text('Comprobante de Venta', margin, 15);
+            doc.setTextColor(0, 0, 0);
+            y = 30;
+
+            doc.setFontSize(9);
+            const ventaId = data.venta?.id || '';
+            const fecha = String(data.venta?.fecha_hora || '').replace('T', ' ').slice(0, 16);
+            doc.text(`Venta: #${ventaId}`, margin, y); y += 4;
+            if (fecha) { doc.text(`Fecha: ${fecha}`, margin, y); y += 4; }
+            const codigoPedido = String(data.venta?.codigo_pedido || '').trim();
+            if (codigoPedido) { doc.text(`Pedido: ${codigoPedido}`, margin, y); y += 4; }
+            doc.text('-------------------------------', margin, y); y += 5;
+
+            items.forEach((item) => {
+                const nombre = String(item.producto_nombre || 'Producto');
+                const cantidad = Number(item.cantidad || 0);
+                const precio = Number(item.precio_unitario || 0);
+                const subtotal = Number(item.subtotal || (cantidad * precio));
+                const lineas = doc.splitTextToSize(nombre, 64);
+                lineas.forEach((linea) => {
+                    doc.text(linea, margin, y);
+                    y += 4;
+                });
+                doc.text(`x${cantidad}  ${formatearMonedaCLP(precio)}  ${formatearMonedaCLP(subtotal)}`, margin, y);
+                y += 5;
+            });
+
+            doc.text('-------------------------------', margin, y); y += 5;
+            const total = Number(data.venta?.total_monto || 0);
+            doc.setFontSize(10);
+            doc.text(`TOTAL: ${formatearMonedaCLP(total)}`, margin, y);
+
+            const nombreArchivo = `ticket_venta_${ventaId || 'venta'}.pdf`;
+            doc.save(nombreArchivo);
         }
 
         function cerrarModal() {
