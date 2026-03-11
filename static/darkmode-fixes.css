@@ -1,0 +1,196 @@
+/* Global readability fixes for dark mode across all screens */
+
+body.dark-mode {
+    --dm-bg-0: #0f172a;
+    --dm-bg-1: #1e293b;
+    --dm-bg-2: #334155;
+    --dm-border: #475569;
+    --dm-text: #e2e8f0;
+    --dm-muted: #94a3b8;
+    --dm-success-bg: #064e3b;
+    --dm-success-text: #bbf7d0;
+    --dm-warning-bg: #78350f;
+    --dm-warning-text: #fde68a;
+    --dm-danger-bg: #7f1d1d;
+    --dm-danger-text: #fecaca;
+}
+
+body.dark-mode .page-subtitle,
+body.dark-mode .modal-text,
+body.dark-mode .historial-fecha,
+body.dark-mode .receta-producto,
+body.dark-mode .vencimiento-info,
+body.dark-mode .empty-state-text,
+body.dark-mode .insumo-meta,
+body.dark-mode .stat-label,
+body.dark-mode .search-empty,
+body.dark-mode .form-group label {
+    color: var(--dm-muted) !important;
+}
+
+body.dark-mode .data-table tbody tr.alert {
+    background: rgba(127, 29, 29, 0.34) !important;
+}
+
+body.dark-mode .data-table tbody tr.warning {
+    background: rgba(120, 53, 15, 0.34) !important;
+}
+
+body.dark-mode .data-table tbody tr:hover {
+    background: rgba(51, 65, 85, 0.75) !important;
+}
+
+body.dark-mode .badge-success {
+    background: var(--dm-success-bg) !important;
+    color: var(--dm-success-text) !important;
+}
+
+body.dark-mode .badge-warning {
+    background: var(--dm-warning-bg) !important;
+    color: var(--dm-warning-text) !important;
+}
+
+body.dark-mode .badge-danger {
+    background: var(--dm-danger-bg) !important;
+    color: var(--dm-danger-text) !important;
+}
+
+body.dark-mode .pill:not(.active) {
+    background: var(--dm-bg-2) !important;
+    border-color: var(--dm-border) !important;
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode .alertas-lista {
+    background: rgba(127, 29, 29, 0.32) !important;
+    border: 1px solid #7f1d1d !important;
+}
+
+body.dark-mode .alerta-item {
+    color: var(--dm-danger-text) !important;
+}
+
+body.dark-mode .modal-icon.warning {
+    background: #78350f !important;
+    color: #fde68a !important;
+}
+
+body.dark-mode .modal-icon {
+    color: #bbf7d0;
+}
+
+body.dark-mode code {
+    background: var(--dm-bg-2) !important;
+    border: 1px solid var(--dm-border);
+    color: #f8fafc !important;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
+body.dark-mode .search-wrapper input,
+body.dark-mode .search-box input,
+body.dark-mode .search-input,
+body.dark-mode .form-control,
+body.dark-mode input[type="search"] {
+    background: var(--dm-bg-2) !important;
+    border-color: var(--dm-border) !important;
+    color: #f8fafc !important;
+    caret-color: #f8fafc !important;
+}
+
+body.dark-mode input:not([type="checkbox"]):not([type="radio"]),
+body.dark-mode textarea,
+body.dark-mode select {
+    color: #f8fafc !important;
+}
+
+body.dark-mode select option {
+    background: #1e293b !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .search-icon {
+    color: var(--dm-muted) !important;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+}
+
+body.dark-mode input:-webkit-autofill,
+body.dark-mode input:-webkit-autofill:hover,
+body.dark-mode input:-webkit-autofill:focus,
+body.dark-mode textarea:-webkit-autofill,
+body.dark-mode select:-webkit-autofill {
+    -webkit-text-fill-color: #f8fafc !important;
+    -webkit-box-shadow: 0 0 0 1000px #334155 inset !important;
+    transition: background-color 99999s ease-in-out 0s;
+}
+
+body.dark-mode .table-wrapper::-webkit-scrollbar-thumb,
+body.dark-mode .historial-list::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+/* Produccion: ingredientes legibles en modo oscuro */
+body.dark-mode .receta-insumos {
+    background: var(--dm-bg-1) !important;
+    border: 1px solid var(--dm-border) !important;
+    color: var(--dm-text) !important;
+}
+
+body.dark-mode .receta-insumos .insumo-item {
+    border-bottom-color: var(--dm-border) !important;
+    color: var(--dm-text) !important;
+}
+
+/* Inicio: accesos rapidos con contraste correcto */
+body.dark-mode .action-btn,
+body.dark-mode .action-btn .action-label,
+body.dark-mode .action-btn .action-icon {
+    color: #f8fafc !important;
+}
+
+/* Agenda: dia actual sin choque de contraste */
+body.dark-mode .calendar-day.today {
+    background: #78350f !important;
+}
+
+body.dark-mode .calendar-day.today .day-number {
+    color: #fde68a !important;
+    font-weight: 700;
+}
+
+/* Insumos: lote rapido con escaner (evita blanco sobre blanco) */
+body.dark-mode .lote-tabla td {
+    color: var(--dm-text) !important;
+    border-bottom-color: var(--dm-border) !important;
+}
+
+body.dark-mode .lote-tabla input,
+body.dark-mode .lote-tabla select {
+    background: var(--dm-bg-2) !important;
+    border-color: var(--dm-border) !important;
+    color: #f8fafc !important;
+}
+
+/* Modales de recetas/produccion: campos legibles en modo oscuro */
+body.dark-mode .modal input,
+body.dark-mode .modal select,
+body.dark-mode .modal textarea {
+    background: var(--dm-bg-2) !important;
+    border-color: var(--dm-border) !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .modal .form-group label {
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode #producir-receta-nombre {
+    background: var(--dm-bg-2) !important;
+    color: #f8fafc !important;
+}

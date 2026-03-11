@@ -1,0 +1,1139 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Ventas - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --secondary: #f97316;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #0f172a;
+        }
+        
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .logo-text span { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background: #fff7ed;
+            color: var(--primary-dark);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .nav-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .nav-badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+        }
+        
+        .sidebar-footer {
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 40px;
+            max-width: calc(100% - 260px);
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .page-subtitle {
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .data-table th {
+            text-align: left;
+            padding: 16px;
+            font-weight: 600;
+            color: #64748b;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .data-table td {
+            padding: 16px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+        
+        .data-table tbody tr:hover {
+            background: #f8fafc;
+        }
+        
+        .venta-id {
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .venta-fecha {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .venta-codigo {
+            font-size: 12px;
+            font-weight: 700;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        
+        .venta-productos {
+            max-width: 300px;
+            font-size: 13px;
+            color: #374151;
+        }
+        
+        .acciones {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #64748b;
+        }
+        
+        .detalle-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .detalle-item summary {
+            list-style: none;
+        }
+
+        .detalle-item summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .detalle-item-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .detalle-item-main:hover {
+            background: #f1f5f9;
+        }
+
+        .detalle-item-main-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .detalle-arrow {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #475569;
+            transition: transform 0.2s ease, background 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .detalle-item[open] .detalle-arrow {
+            transform: rotate(90deg);
+            background: #fff7ed;
+            border-color: #fdba74;
+            color: #c2410c;
+        }
+
+        .detalle-item-producto {
+            font-weight: 700;
+            color: #0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .detalle-item-cantidad {
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .detalle-item-meta {
+            border-top: 1px dashed #cbd5e1;
+            padding: 10px 14px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #ffffff;
+        }
+
+        .detalle-section-title {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 6px;
+        }
+
+        .detalle-empty {
+            border: 1px dashed #cbd5e1;
+            background: #f8fafc;
+            color: #64748b;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+
+        .detalle-lote-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .detalle-lote-row {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: #ffffff;
+            font-size: 12px;
+            color: #334155;
+            line-height: 1.45;
+        }
+
+        .detalle-insumos-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .detalle-insumo-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: #ffffff;
+        }
+
+        .detalle-insumo-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+
+        .detalle-insumo-nombre {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .detalle-insumo-total {
+            font-size: 12px;
+            color: #475569;
+            font-weight: 700;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            padding: 2px 8px;
+        }
+
+        .detalle-badge {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 999px;
+            padding: 3px 10px;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .logo-text {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .nav-item {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .nav-item:hover {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .main-content {
+            background: #0f172a;
+        }
+        
+        body.dark-mode .page-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .filters {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .form-group label {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .form-group input {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .card {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .data-table th {
+            background: #334155;
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .data-table td {
+            border-color: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .data-table tbody tr:hover {
+            background: #334155;
+        }
+        
+        body.dark-mode .venta-fecha {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .venta-codigo {
+            color: #cbd5e1;
+        }
+        
+        body.dark-mode .venta-productos {
+            color: #cbd5e1;
+        }
+        
+        body.dark-mode .btn-secondary {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .modal {
+            background: #1e293b;
+        }
+        
+        body.dark-mode .modal-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .detalle-item {
+            background: #334155;
+            color: #f1f5f9;
+            border-color: #475569;
+        }
+
+        body.dark-mode .detalle-item-main:hover {
+            background: #3b4a60;
+        }
+
+        body.dark-mode .detalle-arrow {
+            border-color: #64748b;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .detalle-item[open] .detalle-arrow {
+            background: #78350f;
+            border-color: #92400e;
+            color: #fcd34d;
+        }
+
+        body.dark-mode .detalle-item-producto,
+        body.dark-mode .detalle-item-cantidad,
+        body.dark-mode .detalle-insumo-nombre {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .detalle-item-meta {
+            border-top-color: #475569;
+            background: #1e293b;
+        }
+
+        body.dark-mode .detalle-section-title {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .detalle-empty {
+            border-color: #475569;
+            background: #334155;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .detalle-lote-row,
+        body.dark-mode .detalle-insumo-item {
+            border-color: #475569;
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .detalle-insumo-total {
+            color: #cbd5e1;
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .detalle-badge {
+            background: #1e293b;
+            border-color: #475569;
+            color: #cbd5e1;
+        }
+        
+        @media (max-width: 1024px) {
+            .sidebar { width: 240px; }
+            .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
+            .filters { flex-direction: column; }
+            .form-group { min-width: 100%; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display: flex; min-height: 100vh;">
+        <!-- Sidebar -->
+        {% include "_sidebar.html" %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Historial de Ventas</h1>
+                    <p class="page-subtitle">Revisa y gestiona las ventas realizadas</p>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <form class="filters" method="GET" action="/historial-ventas">
+                <div class="form-group">
+                    <label>Desde</label>
+                    <input type="date" name="desde" value="{{ fecha_desde }}">
+                </div>
+                <div class="form-group">
+                    <label>Hasta</label>
+                    <input type="date" name="hasta" value="{{ fecha_hasta }}">
+                </div>
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+                <a href="/historial-ventas" class="btn btn-secondary">Limpiar</a>
+            </form>
+
+            <!-- Tabla -->
+            <div class="card">
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Venta #</th>
+                                <th>Fecha y Hora</th>
+                                <th>Codigo pedido</th>
+                                <th>Canal</th>
+                                <th>Codigo operación</th>
+                                <th>Productos</th>
+                                <th>Total Items</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for venta in ventas %}
+                            <tr>
+                                <td>
+                                    <div class="venta-id">#{{ venta.id }}</div>
+                                </td>
+                                <td>
+                                    <div>{{ venta.fecha_formateada }}</div>
+                                </td>
+                                <td>
+                                    <div class="venta-codigo">{{ venta.codigo_pedido or '-' }}</div>
+                                </td>
+                                <td>
+                                    <div class="venta-codigo">
+                                        {% if (venta.canal_venta or 'presencial') == 'uber_eats' %}
+                                            Uber Eats
+                                        {% elif (venta.canal_venta or 'presencial') == 'pedidosya' %}
+                                            PedidosYa
+                                        {% else %}
+                                            Presencial
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="venta-codigo">{{ venta.codigo_operacion or '-' }}</div>
+                                </td>
+       
+                                <td>
+                                    <div class="venta-productos">{{ venta.productos or 'Sin productos' }}</div>
+                                </td>
+                                <td>
+                                    <strong>{{ venta.total_items }}</strong> items
+                                </td>
+                                <td>
+                                    <div class="acciones">
+                                        <button onclick="verDetalle({{ venta.id }})" class="btn btn-primary btn-sm">
+                                            Ver
+                                        </button>
+                                        <button onclick="anularVenta({{ venta.id }})" class="btn btn-danger btn-sm">
+                                            Anular
+                                        </button>
+                                        <button onclick="verCadena({{ venta.id }}, '{{ (venta.codigo_operacion or '')|e }}')" class="btn btn-secondary btn-sm">
+                                            Cadena
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">&#128220;</div>
+                                        <div>No hay ventas registradas</div>
+                                        <div style="color: #64748b; font-size: 14px; margin-top: 8px;">
+                                            Las ventas aparecerán aquí cuando proceses una
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Detalle -->
+    <div class="modal-overlay" id="modal-detalle">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalle de Venta #<span id="detalle-venta-id"></span></h3>
+                <button class="btn-close" onclick="cerrarModal()">×</button>
+            </div>
+            <div id="detalle-contenido"></div>
+        </div>
+    </div>
+
+    <!-- Botón Modo Oscuro -->
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    ">&#127769;</button>
+
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeBtn').textContent = '\u2600';
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const btn = document.getElementById('darkModeBtn');
+            
+            if (body.classList.contains('dark-mode')) {
+                body.classList.remove('dark-mode');
+                btn.textContent = '\uD83C\uDF19';
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                body.classList.add('dark-mode');
+                btn.textContent = '\u2600';
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        const HISTORIAL_VENTAS_UI_STATE_KEY = 'historial_ventas_ui_state_v1';
+
+        function saveHistorialVentasUiState() {
+            const filtros = document.querySelector('form.filters[method="GET"][action="/historial-ventas"]');
+            if (!filtros) return;
+            const state = {
+                desde: filtros.querySelector('[name="desde"]')?.value || '',
+                hasta: filtros.querySelector('[name="hasta"]')?.value || '',
+                scroll_y: window.scrollY || 0
+            };
+            sessionStorage.setItem(HISTORIAL_VENTAS_UI_STATE_KEY, JSON.stringify(state));
+        }
+
+        function restoreHistorialVentasUiStateIfNeeded() {
+            const raw = sessionStorage.getItem(HISTORIAL_VENTAS_UI_STATE_KEY);
+            if (!raw) return;
+            sessionStorage.removeItem(HISTORIAL_VENTAS_UI_STATE_KEY);
+
+            try {
+                const state = JSON.parse(raw) || {};
+                const filtros = document.querySelector('form.filters[method="GET"][action="/historial-ventas"]');
+                if (filtros) {
+                    const desde = filtros.querySelector('[name="desde"]');
+                    const hasta = filtros.querySelector('[name="hasta"]');
+                    if (desde && typeof state.desde === 'string') desde.value = state.desde;
+                    if (hasta && typeof state.hasta === 'string') hasta.value = state.hasta;
+                }
+
+                const y = Number(state.scroll_y || 0);
+                if (Number.isFinite(y) && y > 0) {
+                    window.requestAnimationFrame(() => window.scrollTo(0, y));
+                }
+            } catch (_) {
+                // Ignorar estado invalido
+            }
+        }
+
+        function reloadHistorialVentasKeepingState() {
+            saveHistorialVentasUiState();
+            location.reload();
+        }
+
+        restoreHistorialVentasUiStateIfNeeded();
+
+        function escapeHtml(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatearFechaCorta(valor) {
+            if (!valor) return '';
+            const str = String(valor);
+            const soloFecha = str.length >= 10 ? str.slice(0, 10) : str;
+            const partes = soloFecha.split('-');
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+            return str;
+        }
+
+        function formatearCantidad(valor) {
+            const n = Number(valor || 0);
+            if (!Number.isFinite(n)) return '0';
+            if (Number.isInteger(n)) return String(n);
+            return n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+        }
+
+        function fechaTexto(valor, fallback) {
+            const fmt = formatearFechaCorta(valor);
+            return fmt || fallback;
+        }
+
+        function renderLotesProducto(item) {
+            const lotes = Array.isArray(item.lotes_usados) ? item.lotes_usados : [];
+            if (!lotes.length) {
+                return '<div class="detalle-empty">Sin lotes de producto registrados en esta venta.</div>';
+            }
+
+            const rows = lotes.map((lote) => {
+                const idLote = lote.lote_id ? `Lote #${Number(lote.lote_id)}` : 'Lote historico';
+                const cantidad = formatearCantidad(lote.cantidad_usada || 0);
+                const agregado = fechaTexto(lote.fecha_agregado || lote.fecha_ingreso, 's/f');
+                const elaboracion = fechaTexto(lote.fecha_elaboracion, 's/f');
+                const vencimiento = fechaTexto(lote.fecha_vencimiento, 's/f');
+                return `
+                    <div class="detalle-lote-row">
+                        <strong>${escapeHtml(idLote)}</strong><br>
+                        Cantidad usada: <strong>${escapeHtml(cantidad)}</strong><br>
+                        Elaboracion: <strong>${escapeHtml(elaboracion)}</strong> | 
+                        Vencimiento: <strong>${escapeHtml(vencimiento)}</strong> | 
+                        Agregado: <strong>${escapeHtml(agregado)}</strong>
+                    </div>
+                `;
+            }).join('');
+
+            return `<div class="detalle-lote-list">${rows}</div>`;
+        }
+
+        function renderInsumosAsociados(item) {
+            const insumos = Array.isArray(item.insumos_asociados) ? item.insumos_asociados : [];
+            if (!insumos.length) {
+                return '<div class="detalle-empty">No hubo insumos asociados descontados.</div>';
+            }
+
+            const itemsHtml = insumos.map((insumo, index) => {
+                const nombre = insumo.insumo_nombre || `Insumo #${insumo.insumo_id}`;
+                const total = formatearCantidad(insumo.cantidad_total_asociada || 0);
+                const unidad = insumo.unidad_asociada || 'unidad';
+                const lotes = Array.isArray(insumo.lotes_usados) ? insumo.lotes_usados : [];
+
+                let lotesHtml = '<div class="detalle-empty">Sin detalle de lote para este insumo.</div>';
+                if (lotes.length) {
+                    lotesHtml = `
+                        <div class="detalle-lote-list">
+                            ${lotes.map((lote) => {
+                                const idLote = lote.lote_codigo || (lote.insumo_lote_id ? `Lote #${Number(lote.insumo_lote_id)}` : 'Sin lote');
+                                const cantidad = formatearCantidad(lote.cantidad_usada_stock || 0);
+                                const unidadLote = lote.unidad_stock || insumo.unidad_stock || unidad;
+                                const elaboracion = fechaTexto(lote.fecha_elaboracion, 's/f');
+                                const vencimiento = fechaTexto(lote.fecha_vencimiento, 's/f');
+                                const agregado = fechaTexto(lote.fecha_ingreso, 's/f');
+                                return `
+                                    <div class="detalle-lote-row">
+                                        <strong>${escapeHtml(idLote)}</strong><br>
+                                        Cantidad usada: <strong>${escapeHtml(cantidad)} ${escapeHtml(unidadLote)}</strong><br>
+                                        Elaboracion: <strong>${escapeHtml(elaboracion)}</strong> | 
+                                        Vencimiento: <strong>${escapeHtml(vencimiento)}</strong> | 
+                                        Agregado: <strong>${escapeHtml(agregado)}</strong>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="detalle-insumo-item">
+                        <div class="detalle-insumo-head">
+                            <span class="detalle-insumo-nombre">${escapeHtml(`${index + 1}. ${nombre}`)}</span>
+                            <span class="detalle-insumo-total">${escapeHtml(`${total} ${unidad}`)}</span>
+                        </div>
+                        ${lotesHtml}
+                    </div>
+                `;
+            }).join('');
+
+            return `<div class="detalle-insumos-list">${itemsHtml}</div>`;
+        }
+
+        function renderDetalleProducto(item, index) {
+            const nombreProducto = item.producto_nombre || 'Producto';
+            const cantidad = formatearCantidad(item.cantidad || 0);
+            const openAttr = index === 0 ? 'open' : '';
+            return `
+                <details class="detalle-item" ${openAttr}>
+                    <summary class="detalle-item-main">
+                        <div class="detalle-item-main-left">
+                            <span class="detalle-arrow">&#9654;</span>
+                            <span class="detalle-item-producto">${escapeHtml(nombreProducto)}</span>
+                        </div>
+                        <strong class="detalle-item-cantidad">x${escapeHtml(cantidad)}</strong>
+                    </summary>
+                    <div class="detalle-item-meta">
+                        <div>
+                            <div class="detalle-section-title">Lotes del producto vendido</div>
+                            ${renderLotesProducto(item)}
+                        </div>
+                        <div>
+                            <div class="detalle-section-title">Ingredientes / insumos descontados</div>
+                            ${renderInsumosAsociados(item)}
+                        </div>
+                    </div>
+                </details>
+            `;
+        }
+
+        function verDetalle(ventaId) {
+            fetch(`/api/venta/${ventaId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+
+                    document.getElementById('detalle-venta-id').textContent = ventaId;
+                    const items = (data.items || []).map((item, index) => renderDetalleProducto(item, index)).join('');
+
+                    document.getElementById('detalle-contenido').innerHTML = `
+                        <div style="margin-bottom: 16px; color: #64748b;">
+                            Fecha: ${escapeHtml(data.venta?.fecha_hora || '')}
+                            <br>
+                            Codigo pedido: <strong>${escapeHtml(data.venta?.codigo_pedido || '-')}</strong>
+                            <br>
+                            Canal: <strong>${escapeHtml(data.venta?.canal_venta || 'presencial')}</strong>
+                            <br>
+                            Codigo operación: <strong>${escapeHtml(data.venta?.codigo_operacion || '-')}</strong>
+                        </div>
+                        <h4 style="margin-bottom: 12px; font-size: 14px; color: #64748b;">PRODUCTOS Y TRAZABILIDAD:</h4>
+                        ${items || '<div class="detalle-item"><span>Sin productos</span></div>'}
+                    `;
+                    document.getElementById('modal-detalle').classList.add('active');
+                });
+        }
+
+        function anularVenta(ventaId) {
+            if (!confirm(`¿Anular la venta #${ventaId}?\\n\\nEsto devolverá el stock de los productos.`)) return;
+            
+            fetch(`/api/venta/${ventaId}/eliminar`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Venta anulada correctamente');
+                    reloadHistorialVentasKeepingState();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        function verCadena(ventaId, codigoOperacion) {
+            const endpoint = `/api/venta/${ventaId}/timeline`;
+            fetch(endpoint)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert(data.error || 'No se pudo obtener la cadena completa');
+                        return;
+                    }
+                    const timeline = Array.isArray(data.timeline) ? data.timeline : [];
+                    const items = timeline.map((ev, idx) => {
+                        const fecha = escapeHtml(ev.fecha || '-');
+                        const titulo = escapeHtml(ev.titulo || 'Evento');
+                        const origen = escapeHtml(ev.origen_modulo || ev.tipo || '-');
+                        const detalle = escapeHtml(ev.detalle || '-');
+                        return `
+                            <div class="detalle-item" style="margin-bottom:10px;">
+                                <div style="font-size:12px;color:#64748b;">#${idx + 1} · ${fecha} · ${origen}</div>
+                                <div style="font-weight:700;margin-top:4px;">${titulo}</div>
+                                <div style="margin-top:4px;color:#334155;">${detalle}</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    document.getElementById('detalle-venta-id').textContent = ventaId;
+                    document.getElementById('detalle-contenido').innerHTML = `
+                        <div style="margin-bottom: 16px; color: #64748b;">
+                            Venta: <strong>#${escapeHtml(ventaId)}</strong><br>
+                            Codigo operación: <strong>${escapeHtml(data.codigo_operacion || codigoOperacion || '-')}</strong><br>
+                            Eventos en cadena: <strong>${escapeHtml(data.total_eventos || 0)}</strong>
+                        </div>
+                        <h4 style="margin-bottom: 12px; font-size: 14px; color: #64748b;">CADENA COMPLETA:</h4>
+                        ${items || '<div class="detalle-item"><span>Sin eventos registrados para esta operación.</span></div>'}
+                    `;
+                    document.getElementById('modal-detalle').classList.add('active');
+                });
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal-detalle').classList.remove('active');
+        }
+
+        document.getElementById('modal-detalle').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModal();
+        });
+
+        fetch('/api/alertas/contador')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('nav-alertas');
+                badge.textContent = data.total;
+                badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
+            });
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>
+
+
+
+

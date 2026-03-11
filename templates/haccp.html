@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HACCP - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #f59e0b; --secondary: #f97316; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; color: #0f172a; min-height: 100vh; }
+        .sidebar { width: 260px; background: #fff; border-right: 1px solid #e2e8f0; padding: 24px; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100; }
+        .logo { display: flex; align-items: center; gap: 12px; padding-bottom: 32px; border-bottom: 1px solid #e2e8f0; margin-bottom: 24px; }
+        .logo-icon { width: 44px; height: 44px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+        .logo-text { font-size: 20px; font-weight: 700; color: #0f172a; }
+        .logo-text span { background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; text-decoration: none; color: #64748b; font-weight: 500; transition: all 0.2s ease; }
+        .nav-item:hover { background: #fff7ed; color: #d97706; }
+        .nav-item.active { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+        .nav-item .icon { font-size: 20px; width: 24px; text-align: center; }
+        .nav-badge { margin-left: auto; background: #ef4444; color: #fff; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; min-width: 28px; }
+        .sidebar-footer { padding-top: 24px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center; }
+        .main-content { margin-left: 260px; max-width: calc(100% - 260px); padding: 32px 40px; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .page-title { font-size: 32px; font-weight: 700; }
+        .page-subtitle { color: #64748b; margin-top: 4px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 700; text-decoration: none; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; }
+        .btn-secondary { background: #f1f5f9; color: #0f172a; border: 1px solid #e2e8f0; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #64748b; font-weight: 600; }
+        .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .stat { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
+        .stat-l { color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+        .stat-v { font-size: 30px; font-weight: 800; line-height: 1.1; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; margin-bottom: 18px; overflow: hidden; }
+        .card-h { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .card-t { font-size: 17px; font-weight: 700; }
+        .card-b { padding: 16px; }
+        .haccp-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+        .haccp-col { min-width: 0; }
+        .haccp-col-right .card { position: sticky; top: 22px; }
+        .haccp-col-right .card-b { max-height: calc(100vh - 230px); overflow: auto; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .fg { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .fg.full { grid-column: 1 / -1; }
+        .fg label { font-size: 12px; color: #64748b; font-weight: 700; }
+        .fg input, .fg select, .fg textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 11px; font-size: 14px; font-family: inherit; background: #fff; color: #0f172a; }
+        .fg textarea { min-height: 62px; resize: vertical; }
+        .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12); }
+        .hint { font-size: 12px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; }
+        .msg { margin-top: 8px; min-height: 18px; font-size: 13px; font-weight: 700; }
+        .ok { color: #059669; } .error { color: #dc2626; }
+        .table-wrap { overflow-x: auto; }
+        .table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .table th { background: #f8fafc; color: #64748b; border-bottom: 1px solid #e2e8f0; padding: 11px; text-align: left; font-size: 12px; text-transform: uppercase; }
+        .table td { border-bottom: 1px solid #e2e8f0; padding: 11px; vertical-align: top; }
+        .mini { color: #64748b; font-size: 12px; margin-top: 4px; }
+        .badge { display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .b-ok { background: #dcfce7; color: #166534; } .b-warn { background: #ffedd5; color: #9a3412; } .b-bad { background: #fee2e2; color: #991b1b; } .b-none { background: #e2e8f0; color: #334155; }
+        .empty { border: 1px dashed #cbd5e1; border-radius: 10px; background: #f8fafc; color: #64748b; padding: 14px; text-align: center; font-size: 13px; }
+        .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 1200; padding: 20px; }
+        .modal.open { display: flex; }
+        .modal-box { width: min(95vw, 680px); background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+        .modal-box.modal-tuya-wide { width: min(96vw, 1120px); }
+        .modal-box.modal-tuya-wide .modal-body { max-height: 82vh; overflow: auto; }
+        .modal-head { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .modal-title { font-size: 17px; font-weight: 700; }
+        .modal-body { padding: 14px; }
+        .actions { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
+        .tuya-status { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+        .tuya-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .tuya-qr-box { border: 1px dashed #cbd5e1; border-radius: 10px; padding: 10px; background: #f8fafc; min-height: 120px; }
+        .tuya-qr-svg { max-width: 260px; margin: 0 auto; }
+        .tuya-device-select { width: 100%; }
+        .tuya-last { margin-top: 8px; font-size: 12px; color: #64748b; }
+        .tuya-bindings-list { display: flex; flex-direction: column; gap: 8px; }
+        .tuya-binding-item { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #fff; }
+        .tuya-binding-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) 110px minmax(0, 1.8fr); gap: 8px; align-items: center; }
+        .tuya-range-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .tuya-chart { width: 100%; height: 220px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; margin-top: 8px; }
+        .traza-filtros { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .traza-filtros .fg { margin: 0; }
+        .traza-list { display: flex; flex-direction: column; gap: 10px; }
+        .traza-item { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fff; }
+        .traza-item summary { list-style: none; cursor: pointer; }
+        .traza-item summary::-webkit-details-marker { display: none; }
+        .traza-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; }
+        .traza-head:hover { background: #f8fafc; }
+        .traza-head-left { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .traza-arrow { width: 20px; height: 20px; border-radius: 999px; border: 1px solid #cbd5e1; color: #475569; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; transition: transform 0.2s ease; flex-shrink: 0; }
+        .traza-item[open] .traza-arrow { transform: rotate(90deg); }
+        .traza-title { font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .traza-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .traza-count { font-size: 12px; font-weight: 700; color: #334155; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 2px 9px; }
+        .traza-body { border-top: 1px dashed #e2e8f0; padding: 12px 14px; }
+        .traza-table-wrap { overflow-x: auto; }
+        .traza-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .traza-table th { background: #f8fafc; color: #64748b; border-bottom: 1px solid #e2e8f0; padding: 9px; text-align: left; font-size: 11px; text-transform: uppercase; }
+        .traza-table td { border-bottom: 1px solid #e2e8f0; padding: 9px; vertical-align: top; }
+        .traza-row-events { background: #f8fafc; }
+        .traza-chip { display: inline-flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 11px; padding: 2px 8px; margin: 0 5px 5px 0; }
+        .traza-chip.sale { background: #dcfce7; border-color: #86efac; color: #166534; }
+        .traza-chip.discard { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+        .traza-meta { font-size: 12px; color: #64748b; margin: 6px 0 10px; }
+        body.dark-mode { background: #0f172a; color: #f1f5f9; }
+        body.dark-mode .main-content { background: #0f172a; }
+        body.dark-mode .sidebar { background: #1e293b; border-color: #334155; }
+        body.dark-mode .logo-text { color: #f1f5f9; }
+        body.dark-mode .nav-item { color: #94a3b8; }
+        body.dark-mode .nav-item:hover { background: #334155; color: #f1f5f9; }
+        body.dark-mode .page-title, body.dark-mode .card-t, body.dark-mode .stat-v, body.dark-mode .modal-title { color: #f1f5f9; }
+        body.dark-mode .page-subtitle, body.dark-mode .mini, body.dark-mode .chk { color: #94a3b8; }
+        body.dark-mode .stat, body.dark-mode .card, body.dark-mode .modal-box { background: #1e293b; border-color: #334155; }
+        body.dark-mode .card-h, body.dark-mode .modal-head, body.dark-mode .table th, body.dark-mode .table td { border-color: #334155; }
+        body.dark-mode .table th { background: #334155; color: #94a3b8; }
+        body.dark-mode .fg label { color: #cbd5e1; }
+        body.dark-mode .fg input, body.dark-mode .fg select, body.dark-mode .fg textarea { background: #334155; border-color: #475569; color: #f1f5f9; }
+        body.dark-mode .hint, body.dark-mode .empty { background: #334155; border-color: #475569; color: #cbd5e1; }
+        body.dark-mode .btn-secondary { background: #334155; border-color: #475569; color: #e2e8f0; }
+        body.dark-mode .tuya-qr-box { background: #334155; border-color: #475569; }
+        body.dark-mode .tuya-last { color: #cbd5e1; }
+        body.dark-mode .tuya-binding-item { background: #334155; border-color: #475569; }
+        body.dark-mode .tuya-chart { background: #334155; border-color: #475569; }
+        body.dark-mode .traza-item { background: #1e293b; border-color: #334155; }
+        body.dark-mode .traza-head:hover { background: #334155; }
+        body.dark-mode .traza-arrow { border-color: #64748b; color: #cbd5e1; }
+        body.dark-mode .traza-title { color: #f1f5f9; }
+        body.dark-mode .traza-sub { color: #94a3b8; }
+        body.dark-mode .traza-count { background: #334155; border-color: #475569; color: #e2e8f0; }
+        body.dark-mode .traza-body, body.dark-mode .traza-table th, body.dark-mode .traza-table td { border-color: #334155; }
+        body.dark-mode .traza-table th { background: #334155; color: #94a3b8; }
+        body.dark-mode .traza-row-events { background: #334155; }
+        body.dark-mode .traza-meta { color: #94a3b8; }
+        body.dark-mode .traza-chip { border-color: #475569; }
+        body.dark-mode .traza-chip.sale { background: #14532d; border-color: #166534; color: #bbf7d0; }
+        body.dark-mode .traza-chip.discard { background: #7f1d1d; border-color: #991b1b; color: #fecaca; }
+        @media (max-width: 1200px) {
+            .haccp-layout { grid-template-columns: 1fr; }
+            .haccp-col-right .card { position: static; }
+            .haccp-col-right .card-b { max-height: none; overflow: visible; }
+            .traza-filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 1024px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 1024px) { .sidebar { width: 240px; } .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; } }
+        @media (max-width: 768px) { .sidebar { transform: translateX(-100%); } .main-content { margin-left: 0; max-width: 100%; padding: 20px; } .stats { grid-template-columns: 1fr; } .grid { grid-template-columns: 1fr; } .fg.full { grid-column: auto; } .traza-filtros { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .tuya-binding-grid { grid-template-columns: 1fr; } }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display:flex; min-height:100vh;">
+        {% include "_sidebar.html" %}
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">HACCP</h1>
+                    <p class="page-subtitle">Control preventivo y trazable de puntos criticos.</p>
+                </div>
+                <div class="toolbar">
+                    <label class="chk"><input type="checkbox" id="ver-inactivos" {% if incluir_inactivos %}checked{% endif %}> Ver inactivos</label>
+                    <button class="btn btn-secondary" type="button" onclick="abrirModalTuya()">Configurar sensor Tuya</button>
+                    <button class="btn btn-primary" onclick="abrirModalPunto()">+ Nuevo punto</button>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat"><div class="stat-l">Puntos activos</div><div class="stat-v" id="st-total">{{ resumen.total_puntos or 0 }}</div></div>
+                <div class="stat"><div class="stat-l">Controles hoy</div><div class="stat-v" id="st-controles">{{ resumen.controles_hoy or 0 }}</div></div>
+                <div class="stat"><div class="stat-l">Desvios hoy</div><div class="stat-v" id="st-desvios">{{ resumen.desvios_hoy or 0 }}</div></div>
+                <div class="stat"><div class="stat-l">Vencidos</div><div class="stat-v" id="st-vencidos">{{ resumen.puntos_vencidos or 0 }}</div></div>
+            </div>
+
+            <div class="haccp-layout">
+                <div class="haccp-col">
+                    <div class="card">
+                        <div class="card-h"><h3 class="card-t">Registrar control</h3></div>
+                        <div class="card-b">
+                            <form id="form-registro" onsubmit="registrarControl(event)">
+                                <div class="grid">
+                                    <div class="fg full"><label>Punto</label><select id="reg-punto" required onchange="actualizarModoRegistro()"></select></div>
+                                    <div class="fg" id="fg-valor"><label>Valor</label><input type="number" id="reg-valor" step="0.01"></div>
+                                    <div class="fg" id="fg-cumple" style="display:none;"><label>Checklist</label><select id="reg-cumple"><option value="1">Cumple</option><option value="0">No cumple</option></select></div>
+                                    <div class="fg"><label>Responsable</label><input type="text" id="reg-responsable" maxlength="80"></div>
+                                    <div class="fg full"><div class="hint" id="reg-hint">Selecciona un punto para ver reglas de control.</div></div>
+                                    <div class="fg full"><label>Observacion</label><textarea id="reg-observacion" maxlength="300"></textarea></div>
+                                    <div class="fg full"><label>Accion correctiva (obligatoria en desvio)</label><textarea id="reg-accion" maxlength="300"></textarea></div>
+                                </div>
+                                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                                    <button class="btn btn-primary" type="submit">&#128190; Guardar control</button>
+                                    <button class="btn btn-secondary" type="button" onclick="limpiarRegistro()">Limpiar</button>
+                                </div>
+                                <div id="msg-registro" class="msg"></div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-h"><h3 class="card-t">Puntos HACCP</h3><div class="hint" id="cumplimiento-hoy">Cumplimiento hoy: {{ resumen.cumplimiento_hoy or 100 }}%</div></div>
+                        <div class="card-b table-wrap">
+                            <table class="table">
+                                <thead><tr><th>Punto</th><th>Tipo / limites</th><th>Frecuencia</th><th>Ultimo control</th><th>Estado</th><th>Acciones</th></tr></thead>
+                                <tbody id="tb-puntos">
+                                    {% if puntos %}
+                                    {% for p in puntos %}
+                                    <tr>
+                                        <td><strong>{{ p.nombre }}</strong></td>
+                                        <td>{{ p.tipo_control }}</td>
+                                        <td>{{ p.frecuencia_horas }}h</td>
+                                        <td>{{ p.ultimo_registrado_en or 'Sin registro' }}</td>
+                                        <td>{{ p.estado }}</td>
+                                        <td>...</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                    <tr><td colspan="6"><div class="empty">No hay puntos HACCP.</div></td></tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                            <div id="lista-vencidos" style="margin-top:10px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="haccp-col haccp-col-right">
+                    <div class="card">
+                        <div class="card-h"><h3 class="card-t">Historial reciente</h3></div>
+                        <div class="card-b table-wrap">
+                            <table class="table">
+                                <thead><tr><th>Fecha</th><th>Punto</th><th>Valor</th><th>Resultado</th><th>Observacion</th><th>Accion correctiva</th></tr></thead>
+                                <tbody id="tb-registros">
+                                    {% if registros %}
+                                    {% for r in registros %}
+                                    <tr>
+                                        <td>{{ r.registrado_en }}</td>
+                                        <td>{{ r.punto_nombre }}</td>
+                                        <td>{{ r.valor if r.valor is not none else '-' }}</td>
+                                        <td>{{ 'Cumple' if r.cumple else 'Desvio' }}</td>
+                                        <td>{{ r.observacion or '-' }}</td>
+                                        <td>{{ r.accion_correctiva or '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                    <tr><td colspan="6"><div class="empty">Sin registros HACCP.</div></td></tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-h">
+                    <h3 class="card-t">Trazabilidad insumo &rarr; productos elaborados</h3>
+                    <div class="hint">Consulta por mes o fecha exacta qu&eacute; lotes de insumo se usaron y en qu&eacute; lotes de producto terminaron.</div>
+                </div>
+                <div class="card-b">
+                    <div class="traza-filtros">
+                        <div class="fg">
+                            <label>Mes</label>
+                            <select id="traza-mes">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label>Desde</label>
+                            <input type="date" id="traza-desde">
+                        </div>
+                        <div class="fg">
+                            <label>Hasta</label>
+                            <input type="date" id="traza-hasta">
+                        </div>
+                        <div class="fg">
+                            <label>Buscar insumo/lote</label>
+                            <input type="text" id="traza-q" placeholder="Ej: crema, LT-9999">
+                        </div>
+                        <div class="fg" style="justify-content:flex-end;">
+                            <label style="opacity:0;">Acci&oacute;n</label>
+                            <button class="btn btn-primary" type="button" onclick="cargarTrazabilidadInsumos()">Consultar</button>
+                        </div>
+                    </div>
+                    <div class="traza-meta" id="traza-meta">Cargando trazabilidad...</div>
+                    <div id="traza-msg" class="msg"></div>
+                    <div class="traza-list" id="traza-list">
+                        <div class="empty">Cargando trazabilidad HACCP...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="modal-punto">
+        <div class="modal-box">
+            <div class="modal-head">
+                <div class="modal-title" id="modal-title">Nuevo punto HACCP</div>
+                <button class="btn btn-secondary" type="button" onclick="cerrarModalPunto()">Cerrar</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-punto" onsubmit="guardarPunto(event)">
+                    <input type="hidden" id="p-id">
+                    <div class="grid">
+                        <div class="fg full"><label>Nombre</label><input type="text" id="p-nombre" maxlength="120" required></div>
+                        <div class="fg"><label>Categoria</label><input type="text" id="p-categoria" maxlength="60" value="General"></div>
+                        <div class="fg"><label>Frecuencia (h)</label><input type="number" id="p-frecuencia" min="1" max="168" value="4"></div>
+                        <div class="fg"><label>Tipo</label><select id="p-tipo" onchange="actualizarModoPunto()"><option value="rango">Rango numerico</option><option value="check">Checklist</option></select></div>
+                        <div class="fg"><label>Orden</label><input type="number" id="p-orden" min="0" max="9999" value="100"></div>
+                        <div class="fg" id="fg-p-min"><label>Limite minimo</label><input type="number" id="p-min" step="0.01"></div>
+                        <div class="fg" id="fg-p-max"><label>Limite maximo</label><input type="number" id="p-max" step="0.01"></div>
+                        <div class="fg" id="fg-p-unidad"><label>Unidad</label><input type="text" id="p-unidad" maxlength="20"></div>
+                        <div class="fg"><label>Estado</label><select id="p-activo"><option value="1">Activo</option><option value="0">Inactivo</option></select></div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" type="button" onclick="cerrarModalPunto()">Cancelar</button>
+                        <button class="btn btn-primary" type="submit">Guardar</button>
+                    </div>
+                    <div id="msg-punto" class="msg"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-tuya">
+        <div class="modal-box modal-tuya-wide">
+            <div class="modal-head">
+                <div class="modal-title">Sensor Tuya (Smart Life)</div>
+                <button class="btn btn-secondary" type="button" onclick="cerrarModalTuya()">Cerrar</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-tuya" onsubmit="guardarConfigTuya(event)">
+                    <div class="grid">
+                        <div class="fg full">
+                            <label class="chk"><input type="checkbox" id="tuya-habilitado"> Habilitar lectura en HACCP</label>
+                        </div>
+                        <div class="fg full">
+                            <label>User Code (Smart Life)</label>
+                            <input type="text" id="tuya-user-code" maxlength="80" placeholder="Ej: 12345678">
+                        </div>
+                        <div class="fg full">
+                            <div class="tuya-row">
+                                <button class="btn btn-secondary" type="button" onclick="iniciarLoginTuya()">Generar QR</button>
+                                <button class="btn btn-secondary" type="button" onclick="verificarLoginTuya()">Verificar escaneo</button>
+                            </div>
+                        </div>
+                        <div class="fg full">
+                            <label>Vinculación QR</label>
+                            <div id="tuya-qr-box" class="tuya-qr-box">
+                                <div class="mini">Genera el QR y escanéalo desde Smart Life para vincular.</div>
+                            </div>
+                            <input type="hidden" id="tuya-qr-token">
+                        </div>
+                        <div class="fg">
+                            <label>Endpoint</label>
+                            <input type="text" id="tuya-endpoint" readonly>
+                        </div>
+                        <div class="fg">
+                            <label>Terminal ID</label>
+                            <input type="text" id="tuya-terminal-id" readonly>
+                        </div>
+                        <div class="fg full">
+                            <div class="tuya-row">
+                                <button class="btn btn-secondary" type="button" onclick="cargarDispositivosTuya()">Cargar dispositivos</button>
+                            </div>
+                        </div>
+                        <div class="fg full">
+                            <label>Dispositivo (prueba manual)</label>
+                            <select id="tuya-device-id" class="tuya-device-select"></select>
+                        </div>
+                        <div class="fg full">
+                            <div class="tuya-row">
+                                <button class="btn btn-secondary" type="button" onclick="probarLecturaTuya()">Probar lectura</button>
+                                <button class="btn btn-secondary" type="button" onclick="sincronizarTuyaAhora()">Sincronizar ahora</button>
+                            </div>
+                            <div id="tuya-last-reading" class="tuya-last">Sin lectura reciente.</div>
+                        </div>
+                        <div class="fg full">
+                            <label>Vincular sensores a puntos HACCP (registro automatico)</label>
+                            <div id="tuya-bindings-list" class="tuya-bindings-list">
+                                <div class="mini">Carga dispositivos para configurar vinculaciones.</div>
+                            </div>
+                            <div class="tuya-row">
+                                <button class="btn btn-secondary" type="button" onclick="guardarVinculacionesTuya()">Guardar vinculaciones</button>
+                            </div>
+                        </div>
+                        <div class="fg full">
+                            <label>Historial semanal C vs hora</label>
+                            <div class="tuya-row">
+                                <select id="tuya-hist-device" class="tuya-device-select" onchange="cargarHistorialTuya()"></select>
+                                <button class="btn btn-secondary" type="button" onclick="cargarHistorialTuya()">Actualizar grafico</button>
+                            </div>
+                            <svg id="tuya-chart" class="tuya-chart" viewBox="0 0 620 220" preserveAspectRatio="none"></svg>
+                            <div id="tuya-chart-meta" class="mini">Sin datos de los ultimos 7 dias.</div>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" type="button" onclick="cerrarModalTuya()">Cancelar</button>
+                        <button class="btn btn-primary" type="submit">Guardar</button>
+                    </div>
+                    <div id="tuya-status" class="tuya-status"></div>
+                    <div id="msg-tuya" class="msg"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="position:fixed; bottom:24px; right:24px; width:56px; height:56px; border-radius:50%; border:none; background:linear-gradient(135deg, var(--primary), var(--secondary)); color:white; font-size:24px; cursor:pointer; box-shadow:0 4px 12px rgba(245,158,11,.4); z-index:1000;">&#127769;</button>
+
+    <script>
+        const STATE = {
+            puntos: [],
+            resumen: {},
+            registros: [],
+            trazabilidad: [],
+            mesesTrazabilidad: [],
+            inactivos: {{ 'true' if incluir_inactivos else 'false' }},
+            tuya: {
+                sdk_disponible: false,
+                sdk_error: '',
+                config: {},
+                devices: [],
+                bindings: [],
+                historial: [],
+            }
+        };
+        if (localStorage.getItem('darkMode') === 'true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeBtn').textContent = '\u2600'; }
+        function toggleDarkMode() { const b=document.body,btn=document.getElementById('darkModeBtn'); if (b.classList.contains('dark-mode')) { b.classList.remove('dark-mode'); btn.textContent='\uD83C\uDF19'; localStorage.setItem('darkMode','false'); } else { b.classList.add('dark-mode'); btn.textContent='\u2600'; localStorage.setItem('darkMode','true'); } }
+        function esc(v){ return String(v===null||v===undefined?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;'); }
+        function fmtDate(v){ const t=String(v||'').trim(); if(!t) return 'Sin registro'; const d=new Date(t.replace(' ','T')); return Number.isNaN(d.getTime()) ? t : d.toLocaleString('es-CL'); }
+        function fmtDateShort(v){ const t=String(v||'').trim(); if(!t) return '-'; const d=new Date(t.replace(' ','T')); return Number.isNaN(d.getTime()) ? t : d.toLocaleDateString('es-CL'); }
+        function fmtQty(v){ const n=Number(v||0); if(!Number.isFinite(n)) return '0'; if(Number.isInteger(n)) return String(n); return n.toFixed(4).replace(/0+$/,'').replace(/\.$/,''); }
+        function msg(id,tipo,texto){ const el=document.getElementById(id); el.textContent=texto||''; el.className='msg'; if(tipo) el.classList.add(tipo); }
+        function badgeEstado(estado){ const s=String(estado||'').toLowerCase(); if(s==='ok') return '<span class="badge b-ok">OK</span>'; if(s==='vencido') return '<span class="badge b-bad">Vencido</span>'; if(s==='desvio') return '<span class="badge b-warn">Desvio</span>'; return '<span class="badge b-none">Sin registro</span>'; }
+        function limites(p){ if((p.tipo_control||'rango')==='check') return 'Checklist'; const min=p.limite_min,max=p.limite_max,u=p.unidad?` ${esc(p.unidad)}`:''; if(min!==null&&min!==undefined&&max!==null&&max!==undefined) return `${min} a ${max}${u}`; if(min!==null&&min!==undefined) return `Min ${min}${u}`; if(max!==null&&max!==undefined) return `Max ${max}${u}`; return 'Sin limite'; }
+        function renderResumen(){ const r=STATE.resumen||{}; document.getElementById('st-total').textContent=String(r.total_puntos||0); document.getElementById('st-controles').textContent=String(r.controles_hoy||0); document.getElementById('st-desvios').textContent=String(r.desvios_hoy||0); document.getElementById('st-vencidos').textContent=String(r.puntos_vencidos||0); document.getElementById('cumplimiento-hoy').textContent=`Cumplimiento hoy: ${Number(r.cumplimiento_hoy||0).toFixed(1)}%`; const list=document.getElementById('lista-vencidos'); const v=Array.isArray(r.vencidos)?r.vencidos:[]; if(!v.length){ list.innerHTML='<div class="empty">No hay puntos vencidos en este momento.</div>'; return; } list.innerHTML=v.map(p=>`<div class="hint" style="margin-bottom:8px;"><strong>${esc(p.nombre||'')}</strong><div class="mini">Categoria: ${esc(p.categoria||'General')} | Frecuencia: ${esc(p.frecuencia_horas||0)}h | Ultimo: ${esc(fmtDate(p.ultimo_registrado_en))}</div></div>`).join(''); }
+        function renderSelectPuntos(){ const sel=document.getElementById('reg-punto'); const activos=STATE.puntos.filter(p=>Number(p.activo||0)===1); if(!activos.length){ sel.innerHTML='<option value="">No hay puntos activos</option>'; document.getElementById('reg-hint').textContent='No hay puntos activos para registrar.'; return; } sel.innerHTML=activos.map(p=>`<option value="${p.id}">${esc(p.nombre)} (${esc(p.categoria||'General')})</option>`).join(''); actualizarModoRegistro(); }
+        function renderPuntos(){ const tb=document.getElementById('tb-puntos'); if(!STATE.puntos.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty">No hay puntos HACCP.</div></td></tr>'; return; } tb.innerHTML=STATE.puntos.map(p=>`<tr><td><strong>${esc(p.nombre)}</strong><div class="mini">${esc(p.categoria||'General')}</div></td><td>${limites(p)}<div class="mini">Tipo: ${esc(p.tipo_control||'rango')}</div></td><td>${esc(p.frecuencia_horas||0)}h</td><td>${esc(fmtDate(p.ultimo_registrado_en))}${(p.horas_desde_ultimo!==null&&p.horas_desde_ultimo!==undefined)?`<div class="mini">${p.horas_desde_ultimo}h desde ultimo control</div>`:''}</td><td>${badgeEstado(p.estado)}</td><td><div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="btn btn-secondary" type="button" onclick="editarPunto(${p.id})">Editar</button><button class="btn ${Number(p.activo||0)?'btn-danger':'btn-primary'}" type="button" onclick="togglePunto(${p.id}, ${Number(p.activo||0)?0:1})">${Number(p.activo||0)?'Desactivar':'Activar'}</button></div></td></tr>`).join(''); }
+        function renderRegistros(){ const tb=document.getElementById('tb-registros'); if(!STATE.registros.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty">Sin registros HACCP.</div></td></tr>'; return; } tb.innerHTML=STATE.registros.map(r=>`<tr><td>${esc(fmtDate(r.registrado_en))}</td><td><strong>${esc(r.punto_nombre||'')}</strong><div class="mini">${esc(r.punto_categoria||'')}</div></td><td>${(r.valor!==null&&r.valor!==undefined)?esc(r.valor)+(r.unidad?` ${esc(r.unidad)}`:''):'-'}</td><td>${Number(r.cumple||0)?'<span class="badge b-ok">Cumple</span>':'<span class="badge b-warn">Desvio</span>'}</td><td>${esc(r.observacion||'-')}</td><td>${esc(r.accion_correctiva||'-')}</td></tr>`).join(''); }
+        function renderMesesTrazabilidad(){
+            const sel = document.getElementById('traza-mes');
+            if(!sel) return;
+            const actual = sel.value || '';
+            const options = ['<option value="">Todos</option>'].concat(
+                (STATE.mesesTrazabilidad || []).map(m => `<option value="${esc(m)}">${esc(m)}</option>`)
+            );
+            sel.innerHTML = options.join('');
+            if(actual && (STATE.mesesTrazabilidad || []).includes(actual)) sel.value = actual;
+        }
+        function chipsVentas(ventas){
+            const lista = Array.isArray(ventas) ? ventas : [];
+            if(!lista.length) return '<span class="mini">Sin ventas registradas para ese lote.</span>';
+            return lista.slice(0, 5).map(v => `<span class="traza-chip sale">Venta ${esc(fmtDate(v.fecha_hora))}${v.codigo_pedido?` | Pedido ${esc(v.codigo_pedido)}`:''}</span>`).join('');
+        }
+        function chipsMermas(mermas){
+            const lista = Array.isArray(mermas) ? mermas : [];
+            if(!lista.length) return '<span class="mini">Sin descarte activo para ese lote.</span>';
+            return lista.slice(0, 5).map(m => `<span class="traza-chip discard">Descarte ${esc(fmtDate(m.fecha_hora))}${m.motivo?` | ${esc(m.motivo)}`:''}</span>`).join('');
+        }
+        function renderTrazabilidad(){
+            const list = document.getElementById('traza-list');
+            const meta = document.getElementById('traza-meta');
+            if(!list || !meta) return;
+            const lotes = Array.isArray(STATE.trazabilidad) ? STATE.trazabilidad : [];
+            meta.textContent = `Lotes de insumo encontrados: ${lotes.length}`;
+            if(!lotes.length){
+                list.innerHTML = '<div class="empty">No hay trazabilidad para ese filtro.</div>';
+                return;
+            }
+            list.innerHTML = lotes.map((l, idx) => {
+                const loteTag = l.insumo_lote_codigo ? `Lote ${l.insumo_lote_codigo}` : (l.insumo_lote_id ? `Lote #${l.insumo_lote_id}` : 'Sin lote');
+                const fechas = `Elab: ${fmtDateShort(l.insumo_fecha_elaboracion)} | Vence: ${fmtDateShort(l.insumo_fecha_vencimiento)} | Ingreso: ${fmtDateShort(l.insumo_fecha_ingreso)}`;
+                const productos = Array.isArray(l.productos) ? l.productos : [];
+                const rows = productos.map((p) => `
+                    <tr>
+                        <td><strong>${esc(p.producto_nombre || 'Producto')}</strong><div class="mini">Prod. ${esc(fmtDate(p.producido_en))}</div></td>
+                        <td>${p.producto_lote_id ? `#${esc(p.producto_lote_id)}` : '-'}</td>
+                        <td>${esc(fmtDateShort(p.producto_fecha_elaboracion))}</td>
+                        <td>${esc(fmtDateShort(p.producto_fecha_vencimiento))}</td>
+                        <td>${esc(fmtDate(p.ultima_venta || '-'))}</td>
+                        <td>${esc(fmtDate(p.ultimo_descarte || '-'))}</td>
+                        <td>${esc(fmtQty(p.cantidad_insumo_usada || 0))} ${esc(p.unidad_insumo || l.unidad_referencia || 'unidad')}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="7" class="traza-row-events">
+                            <div style="margin-bottom:4px;">${chipsVentas(p.ventas)}</div>
+                            <div>${chipsMermas(p.mermas)}</div>
+                        </td>
+                    </tr>
+                `).join('');
+                return `
+                    <details class="traza-item" ${idx===0?'open':''}>
+                        <summary>
+                            <div class="traza-head">
+                                <div class="traza-head-left">
+                                    <span class="traza-arrow">&#9654;</span>
+                                    <div>
+                                        <div class="traza-title">${esc(l.insumo_nombre || 'Insumo')} - ${esc(loteTag)}</div>
+                                        <div class="traza-sub">${esc(fechas)}</div>
+                                    </div>
+                                </div>
+                                <span class="traza-count">${esc(fmtQty(l.cantidad_total_usada || 0))} ${esc(l.unidad_referencia || 'unidad')} | ${esc(l.productos_total || 0)} productos</span>
+                            </div>
+                        </summary>
+                        <div class="traza-body">
+                            <div class="traza-meta">Meses: ${esc((l.meses || []).join(', ') || '-')}</div>
+                            <div class="traza-table-wrap">
+                                <table class="traza-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Lote</th>
+                                            <th>Elaboraci&oacute;n</th>
+                                            <th>Vencimiento</th>
+                                            <th>&Uacute;lt. venta</th>
+                                            <th>&Uacute;lt. descarte</th>
+                                            <th>Insumo usado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${rows || '<tr><td colspan="7"><div class="empty">Sin productos vinculados.</div></td></tr>'}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+                `;
+            }).join('');
+        }
+        async function cargarTrazabilidadInsumos(){
+            msg('traza-msg','','');
+            const mes = (document.getElementById('traza-mes')?.value || '').trim();
+            const desde = (document.getElementById('traza-desde')?.value || '').trim();
+            const hasta = (document.getElementById('traza-hasta')?.value || '').trim();
+            const q = (document.getElementById('traza-q')?.value || '').trim();
+            const p = new URLSearchParams({ limit: '1200' });
+            if(mes) p.set('mes', mes);
+            if(desde) p.set('desde', desde);
+            if(hasta) p.set('hasta', hasta);
+            if(q) p.set('q', q);
+            try{
+                const r = await fetch(`/api/haccp/trazabilidad-insumos?${p.toString()}`);
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo cargar la trazabilidad');
+                STATE.trazabilidad = Array.isArray(d.lotes) ? d.lotes : [];
+                STATE.mesesTrazabilidad = Array.isArray(d.meses_disponibles) ? d.meses_disponibles : [];
+                renderMesesTrazabilidad();
+                renderTrazabilidad();
+            } catch(e){
+                STATE.trazabilidad = [];
+                renderTrazabilidad();
+                msg('traza-msg','error',String(e.message || e));
+            }
+        }
+
+        function tuyaStatus(tipo,texto){
+            const el = document.getElementById('tuya-status');
+            if(!el) return;
+            el.textContent = texto || '';
+            el.style.color = tipo === 'error' ? '#dc2626' : (tipo === 'ok' ? '#059669' : '');
+        }
+        function tuyaAlertaTexto(alerta){
+            const a = alerta || {};
+            if(!a.configurada || !a.fuera_rango) return '';
+            if(a.motivo) return String(a.motivo);
+            const t = Number(a.temperatura);
+            const mn = Number(a.min_temp);
+            const mx = Number(a.max_temp);
+            if(Number.isFinite(t) && Number.isFinite(mn) && t < mn){
+                return `Temperatura fuera de rango: ${t.toFixed(2)} C < ${mn.toFixed(2)} C`;
+            }
+            if(Number.isFinite(t) && Number.isFinite(mx) && t > mx){
+                return `Temperatura fuera de rango: ${t.toFixed(2)} C > ${mx.toFixed(2)} C`;
+            }
+            return 'Temperatura fuera de rango configurado.';
+        }
+        function renderTuyaLastReading(data){
+            const el = document.getElementById('tuya-last-reading');
+            if(!el) return;
+            const temp = data && data.ultimo_temp !== undefined ? data.ultimo_temp : null;
+            const hum = data && data.ultima_humedad !== undefined ? data.ultima_humedad : null;
+            const fecha = data && data.ultima_lectura_en ? data.ultima_lectura_en : '';
+            if(temp === null && hum === null){
+                el.textContent = 'Sin lectura reciente.';
+                return;
+            }
+            el.textContent = `Ultima lectura: ${temp ?? '-'} C | ${hum ?? '-'} % ${fecha ? `(${fecha})` : ''}`;
+        }
+        function tuyaPuntosMapeables(){
+            return (STATE.puntos || []).filter(p => Number(p.activo || 0) === 1 && (p.tipo_control || 'rango') === 'rango');
+        }
+        function tuyaBindingsDesdeUI(){
+            const rows = Array.from(document.querySelectorAll('#tuya-bindings-list .tuya-binding-item'));
+            return rows.map((row) => {
+                const deviceId = (row.dataset.deviceId || '').trim();
+                const deviceName = (row.dataset.deviceName || '').trim();
+                const activo = !!row.querySelector('.tuya-bind-activo')?.checked;
+                const puntoRaw = (row.querySelector('.tuya-bind-punto')?.value || '').trim();
+                const intervaloRaw = (row.querySelector('.tuya-bind-intervalo')?.value || '').trim();
+                const minRaw = (row.querySelector('.tuya-bind-alerta-min')?.value || '').trim();
+                const maxRaw = (row.querySelector('.tuya-bind-alerta-max')?.value || '').trim();
+                let minTemp = minRaw === '' ? null : Number(minRaw);
+                let maxTemp = maxRaw === '' ? null : Number(maxRaw);
+                minTemp = Number.isFinite(minTemp) ? minTemp : null;
+                maxTemp = Number.isFinite(maxTemp) ? maxTemp : null;
+                if(minTemp !== null && maxTemp !== null && minTemp > maxTemp){
+                    const tmp = minTemp;
+                    minTemp = maxTemp;
+                    maxTemp = tmp;
+                }
+                return {
+                    device_id: deviceId,
+                    device_name: deviceName,
+                    activo: activo,
+                    punto_id: puntoRaw ? Number(puntoRaw) : null,
+                    intervalo_min: intervaloRaw ? Number(intervaloRaw) : 15,
+                    alerta_min_temp: minTemp,
+                    alerta_max_temp: maxTemp,
+                };
+            }).filter(x => x.device_id);
+        }
+        function syncTuyaBindingsDraft(){
+            const draft = tuyaBindingsDesdeUI();
+            if(Array.isArray(draft) && draft.length){
+                STATE.tuya.bindings = draft;
+            }
+            return draft;
+        }
+        function renderTuyaBindings(){
+            const box = document.getElementById('tuya-bindings-list');
+            if(!box) return;
+            const hadRows = box.querySelector('.tuya-binding-item');
+            if(hadRows){
+                syncTuyaBindingsDraft();
+            }
+            const devices = (STATE.tuya.devices || []).filter(d => !!d.has_temp_humidity);
+            const bindings = Array.isArray(STATE.tuya.bindings) ? STATE.tuya.bindings : [];
+            const bindMap = new Map(bindings.map(b => [String(b.device_id || ''), b || {}]));
+            const puntos = tuyaPuntosMapeables();
+            if(!devices.length){
+                box.innerHTML = '<div class="mini">No hay dispositivos con temperatura/humedad cargados.</div>';
+                return;
+            }
+            box.innerHTML = devices.map((d) => {
+                const b = bindMap.get(String(d.id || '')) || {};
+                const activo = (b.activo === undefined) ? true : !!b.activo;
+                const puntoSel = b.punto_id ? Number(b.punto_id) : 0;
+                const intervalo = Number(b.intervalo_min || (STATE.tuya.config?.auto_interval_min || 15));
+                const alertaMin = (b.alerta_min_temp === null || b.alerta_min_temp === undefined || b.alerta_min_temp === '') ? '' : Number(b.alerta_min_temp);
+                const alertaMax = (b.alerta_max_temp === null || b.alerta_max_temp === undefined || b.alerta_max_temp === '') ? '' : Number(b.alerta_max_temp);
+                const opts = ['<option value="">Sin punto HACCP</option>']
+                    .concat(puntos.map(p => `<option value="${p.id}" ${Number(p.id)===puntoSel?'selected':''}>${esc(p.nombre)} (${esc(p.categoria || 'General')})</option>`))
+                    .join('');
+                const name = d.name || d.id || '';
+                return `
+                    <div class="tuya-binding-item" data-device-id="${esc(d.id)}" data-device-name="${esc(name)}">
+                        <div class="tuya-binding-grid">
+                            <div>
+                                <label class="chk"><input type="checkbox" class="tuya-bind-activo" ${activo ? 'checked' : ''}> Activo</label>
+                                <div class="mini"><strong>${esc(name)}</strong> ${d.category ? `(${esc(d.category)})` : ''}</div>
+                                <div class="mini">ID: ${esc(d.id)}</div>
+                            </div>
+                            <div>
+                                <label>Punto HACCP</label>
+                                <select class="tuya-bind-punto">${opts}</select>
+                            </div>
+                            <div>
+                                <label>Intervalo (min)</label>
+                                <input type="number" class="tuya-bind-intervalo" min="1" max="720" value="${Number.isFinite(intervalo) ? Math.max(1, Math.min(720, intervalo)) : 15}">
+                            </div>
+                            <div>
+                                <label>Rango alerta temp (C)</label>
+                                <div class="tuya-range-row">
+                                    <input type="number" class="tuya-bind-alerta-min" step="0.1" placeholder="Min" value="${Number.isFinite(alertaMin) ? alertaMin : ''}">
+                                    <input type="number" class="tuya-bind-alerta-max" step="0.1" placeholder="Max" value="${Number.isFinite(alertaMax) ? alertaMax : ''}">
+                                </div>
+                                <div class="mini">Vacio = sin alerta.</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        function renderTuyaDevices(){
+            const sel = document.getElementById('tuya-device-id');
+            const histSel = document.getElementById('tuya-hist-device');
+            const devices = Array.isArray(STATE.tuya.devices) ? STATE.tuya.devices : [];
+            const selectedId = String((STATE.tuya.config || {}).device_id || '');
+            if(!devices.length){
+                if(sel){
+                    sel.innerHTML = '<option value="">Sin dispositivos cargados</option>';
+                    sel.value = '';
+                }
+                if(histSel){
+                    histSel.innerHTML = '<option value="">Sin dispositivos</option>';
+                    histSel.value = '';
+                }
+                renderTuyaBindings();
+                return;
+            }
+            const options = devices.map(d => {
+                const label = `${d.name || d.id}${d.category ? ` (${d.category})` : ''}${d.has_temp_humidity ? ' [temp/hum]' : ''}`;
+                return `<option value="${esc(d.id)}" data-name="${esc(d.name || '')}">${esc(label)}</option>`;
+            }).join('');
+            if(sel){
+                sel.innerHTML = options;
+                if(selectedId && devices.some(d => String(d.id) === selectedId)){
+                    sel.value = selectedId;
+                }
+            }
+            if(histSel){
+                const usable = devices.filter(d => !!d.has_temp_humidity);
+                if(!usable.length){
+                    histSel.innerHTML = '<option value="">Sin sensores temp/hum</option>';
+                } else {
+                    histSel.innerHTML = usable.map(d => {
+                        const label = `${d.name || d.id}${d.category ? ` (${d.category})` : ''}`;
+                        return `<option value="${esc(d.id)}">${esc(label)}</option>`;
+                    }).join('');
+                    const prefer = selectedId && usable.some(d => String(d.id) === selectedId) ? selectedId : String(usable[0].id || '');
+                    histSel.value = prefer;
+                }
+            }
+            renderTuyaBindings();
+        }
+        function renderTuyaChart(){
+            const svg = document.getElementById('tuya-chart');
+            const meta = document.getElementById('tuya-chart-meta');
+            if(!svg || !meta) return;
+            const rows = Array.isArray(STATE.tuya.historial) ? STATE.tuya.historial : [];
+            const puntos = rows
+                .map(r => ({ hora: String(r.hora || '').trim(), temp: Number(r.temperatura) }))
+                .filter(p => p.hora && Number.isFinite(p.temp))
+                .sort((a,b) => a.hora.localeCompare(b.hora));
+            if(!puntos.length){
+                svg.innerHTML = '<text x="20" y="36" fill="#64748b" font-size="13">Sin datos para graficar.</text>';
+                meta.textContent = 'Sin datos de los ultimos 7 dias.';
+                return;
+            }
+            let minT = Math.min(...puntos.map(p => p.temp));
+            let maxT = Math.max(...puntos.map(p => p.temp));
+            if(minT === maxT){
+                minT -= 0.5;
+                maxT += 0.5;
+            }
+            const left = 44, right = 606, top = 18, bottom = 196;
+            const width = Math.max(1, right - left);
+            const height = Math.max(1, bottom - top);
+            const tempRange = Math.max(0.0001, maxT - minT);
+            const toX = (idx) => left + ((puntos.length <= 1 ? 0 : idx / (puntos.length - 1)) * width);
+            const toY = (t) => top + (((maxT - t) / tempRange) * height);
+            const poly = puntos.map((p, idx) => `${toX(idx).toFixed(2)},${toY(p.temp).toFixed(2)}`).join(' ');
+            let grid = '';
+            for(let i=0; i<=4; i++){
+                const y = top + (height * i / 4);
+                const v = (maxT - ((maxT - minT) * i / 4)).toFixed(1);
+                grid += `<line x1="${left}" y1="${y.toFixed(2)}" x2="${right}" y2="${y.toFixed(2)}" stroke="#e2e8f0" stroke-width="1"/>`;
+                grid += `<text x="4" y="${(y+4).toFixed(2)}" fill="#64748b" font-size="10">${esc(v)} C</text>`;
+            }
+            const firstLbl = puntos[0].hora.slice(5, 13);
+            const midLbl = puntos[Math.floor((puntos.length - 1) / 2)].hora.slice(5, 13);
+            const lastLbl = puntos[puntos.length - 1].hora.slice(5, 13);
+            svg.innerHTML = `
+                <rect x="0" y="0" width="620" height="220" fill="transparent"></rect>
+                ${grid}
+                <line x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" stroke="#94a3b8" stroke-width="1.2"/>
+                <line x1="${left}" y1="${top}" x2="${left}" y2="${bottom}" stroke="#94a3b8" stroke-width="1.2"/>
+                <polyline points="${poly}" fill="none" stroke="#f97316" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                <text x="${left}" y="214" fill="#64748b" font-size="10">${esc(firstLbl)}</text>
+                <text x="${((left+right)/2-26).toFixed(2)}" y="214" fill="#64748b" font-size="10">${esc(midLbl)}</text>
+                <text x="${(right-52).toFixed(2)}" y="214" fill="#64748b" font-size="10">${esc(lastLbl)}</text>
+            `;
+            const last = puntos[puntos.length - 1];
+            meta.textContent = `Muestras por hora: ${puntos.length} | Min: ${minT.toFixed(2)} C | Max: ${maxT.toFixed(2)} C | Ultimo: ${last.temp.toFixed(2)} C (${fmtDate(last.hora)})`;
+        }
+        async function cargarHistorialTuya(){
+            const sel = document.getElementById('tuya-hist-device');
+            const deviceId = (sel && sel.value ? String(sel.value) : '').trim();
+            try{
+                const p = new URLSearchParams({ dias: '7', agrupado_hora: '1' });
+                if(deviceId) p.set('device_id', deviceId);
+                const r = await fetch(`/api/haccp/tuya/historial?${p.toString()}`);
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo cargar historial Tuya');
+                STATE.tuya.historial = Array.isArray(d.puntos) ? d.puntos : [];
+                renderTuyaChart();
+            } catch(e){
+                STATE.tuya.historial = [];
+                renderTuyaChart();
+                msg('msg-tuya','error', String(e.message || e));
+            }
+        }
+        function renderTuyaConfig(){
+            const cfg = STATE.tuya.config || {};
+            document.getElementById('tuya-habilitado').checked = !!cfg.habilitado;
+            document.getElementById('tuya-user-code').value = cfg.user_code || '';
+            document.getElementById('tuya-endpoint').value = cfg.endpoint || '';
+            document.getElementById('tuya-terminal-id').value = cfg.terminal_id || '';
+            STATE.tuya.bindings = Array.isArray(cfg.device_bindings) ? cfg.device_bindings : (STATE.tuya.bindings || []);
+            if(!STATE.tuya.sdk_disponible){
+                tuyaStatus('error', STATE.tuya.sdk_error || 'SDK Tuya no disponible en este entorno.');
+            } else if(cfg.token_disponible){
+                tuyaStatus('ok', 'Cuenta Smart Life vinculada.');
+            } else {
+                tuyaStatus('', 'Sin vincular. Usa "Generar QR" para conectar.');
+            }
+            renderTuyaLastReading(cfg);
+            renderTuyaDevices();
+        }
+        async function cargarConfigTuya(){
+            try{
+                const r = await fetch('/api/haccp/tuya/config');
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo cargar configuracion Tuya');
+                STATE.tuya.sdk_disponible = !!d.sdk_disponible;
+                STATE.tuya.sdk_error = d.sdk_error || '';
+                STATE.tuya.config = d.config || {};
+                STATE.tuya.bindings = Array.isArray((d.config || {}).device_bindings) ? d.config.device_bindings : [];
+                renderTuyaConfig();
+            } catch(e){
+                tuyaStatus('error', String(e.message || e));
+            }
+        }
+        async function abrirModalTuya(){
+            const modal = document.getElementById('modal-tuya');
+            if(modal) modal.classList.add('open');
+            msg('msg-tuya','','');
+            try{
+                await cargarConfigTuya();
+                await cargarDispositivosTuya();
+                await cargarHistorialTuya();
+            } catch(_e){
+                // errores ya gestionados
+            }
+        }
+        function cerrarModalTuya(){
+            const modal = document.getElementById('modal-tuya');
+            if(modal) modal.classList.remove('open');
+        }
+        async function guardarConfigTuya(ev){
+            ev.preventDefault();
+            const sel = document.getElementById('tuya-device-id');
+            const selected = sel && sel.selectedOptions && sel.selectedOptions.length ? sel.selectedOptions[0] : null;
+            const draftBindings = syncTuyaBindingsDraft();
+            const payload = {
+                habilitado: document.getElementById('tuya-habilitado').checked,
+                user_code: (document.getElementById('tuya-user-code').value || '').trim(),
+                device_id: sel ? (sel.value || '').trim() : '',
+                device_name: selected ? (selected.dataset.name || selected.textContent || '') : '',
+            };
+            if(Array.isArray(draftBindings) && draftBindings.length){
+                payload.device_bindings = draftBindings;
+            }
+            try{
+                const r = await fetch('/api/haccp/tuya/config', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(payload),
+                });
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo guardar configuracion Tuya');
+                STATE.tuya.config = d.config || {};
+                STATE.tuya.bindings = Array.isArray((d.config || {}).device_bindings) ? d.config.device_bindings : (STATE.tuya.bindings || []);
+                renderTuyaConfig();
+                msg('msg-tuya','ok','Configuracion guardada.');
+            } catch(e){
+                msg('msg-tuya','error', String(e.message || e));
+            }
+        }
+        async function guardarVinculacionesTuya(silent){
+            const payload = { bindings: syncTuyaBindingsDraft() };
+            try{
+                const r = await fetch('/api/haccp/tuya/vinculaciones', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(payload),
+                });
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo guardar vinculaciones Tuya');
+                STATE.tuya.config = d.config || {};
+                STATE.tuya.bindings = Array.isArray((d.config || {}).device_bindings) ? d.config.device_bindings : [];
+                renderTuyaConfig();
+                if(!silent){
+                    msg('msg-tuya','ok','Vinculaciones guardadas.');
+                }
+            } catch(e){
+                if(!silent){
+                    msg('msg-tuya','error', String(e.message || e));
+                }
+                throw e;
+            }
+        }
+        async function iniciarLoginTuya(){
+            if(!STATE.tuya.sdk_disponible){
+                msg('msg-tuya','error', STATE.tuya.sdk_error || 'SDK Tuya no disponible.');
+                return;
+            }
+            const userCode = (document.getElementById('tuya-user-code').value || '').trim();
+            if(!userCode){
+                msg('msg-tuya','error','Ingresa primero el User Code.');
+                return;
+            }
+            const box = document.getElementById('tuya-qr-box');
+            try{
+                const r = await fetch('/api/haccp/tuya/login/start', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({user_code: userCode}),
+                });
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo generar QR');
+                document.getElementById('tuya-qr-token').value = d.qr_token || '';
+                if(box){
+                    const payload = d.qr_payload || '';
+                    if(d.qr_svg){
+                        box.innerHTML = `<div class="tuya-qr-svg">${d.qr_svg}</div><div class="mini">Escanea en Smart Life: + > Scan</div><div class="mini" style="word-break:break-all;">${esc(payload)}</div>`;
+                    } else {
+                        box.innerHTML = `<div class="mini">No se pudo renderizar QR localmente. Escanea este payload:</div><div class="mini" style="word-break:break-all;">${esc(payload)}</div>`;
+                    }
+                }
+                msg('msg-tuya','ok','QR generado. Escanealo en Smart Life y luego presiona "Verificar escaneo".');
+            } catch(e){
+                msg('msg-tuya','error', String(e.message || e));
+            }
+        }
+        async function verificarLoginTuya(){
+            if(!STATE.tuya.sdk_disponible){
+                msg('msg-tuya','error', STATE.tuya.sdk_error || 'SDK Tuya no disponible.');
+                return;
+            }
+            const qrToken = (document.getElementById('tuya-qr-token').value || '').trim();
+            const userCode = (document.getElementById('tuya-user-code').value || '').trim();
+            if(!qrToken){
+                msg('msg-tuya','error','Genera primero el QR.');
+                return;
+            }
+            try{
+                const r = await fetch('/api/haccp/tuya/login/poll', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({qr_token: qrToken, user_code: userCode}),
+                });
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo verificar login');
+                if(!d.authenticated){
+                    msg('msg-tuya','error', d.message || 'Aun no autenticado. Escanea y confirma en Smart Life.');
+                    return;
+                }
+                STATE.tuya.config = d.config || {};
+                STATE.tuya.bindings = Array.isArray((d.config || {}).device_bindings) ? d.config.device_bindings : [];
+                renderTuyaConfig();
+                msg('msg-tuya','ok','Cuenta Smart Life vinculada correctamente.');
+                await cargarDispositivosTuya();
+            } catch(e){
+                msg('msg-tuya','error', String(e.message || e));
+            }
+        }
+        async function cargarDispositivosTuya(){
+            try{
+                const r = await fetch('/api/haccp/tuya/devices');
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudieron cargar dispositivos');
+                STATE.tuya.devices = Array.isArray(d.devices) ? d.devices : [];
+                STATE.tuya.bindings = Array.isArray(d.bindings) ? d.bindings : (STATE.tuya.bindings || []);
+                if(d.selected_device_id){
+                    STATE.tuya.config = { ...(STATE.tuya.config || {}), device_id: d.selected_device_id };
+                }
+                renderTuyaDevices();
+                await cargarHistorialTuya();
+                msg('msg-tuya','ok', `Dispositivos cargados: ${STATE.tuya.devices.length}.`);
+            } catch(e){
+                msg('msg-tuya','error', String(e.message || e));
+            }
+        }
+        async function sincronizarTuyaAhora(){
+            try{
+                await guardarVinculacionesTuya(true);
+            } catch(_e){
+                return;
+            }
+            try{
+                const r = await fetch('/api/haccp/tuya/sync', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ force: true }),
+                });
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo sincronizar Tuya');
+                await cargarConfigTuya();
+                await cargarHistorialTuya();
+                await cargarTodo();
+                const alertas = Number(d.alertas_fuera_rango || 0);
+                if(alertas > 0){
+                    msg('msg-tuya','error', `Sincronizacion completada. Dispositivos leidos: ${Number(d.total || 0)}. Alertas fuera de rango: ${alertas}.`);
+                } else {
+                    msg('msg-tuya','ok', `Sincronizacion completada. Dispositivos leidos: ${Number(d.total || 0)}.`);
+                }
+            } catch(e){
+                msg('msg-tuya','error', String(e.message || e));
+            }
+        }
+        async function probarLecturaTuya(){
+            const sel = document.getElementById('tuya-device-id');
+            const deviceId = sel ? (sel.value || '').trim() : '';
+            const params = new URLSearchParams();
+            if(deviceId) params.set('device_id', deviceId);
+            const qs = params.toString();
+            try{
+                const r = await fetch(`/api/haccp/tuya/lectura${qs ? `?${qs}` : ''}`);
+                const d = await r.json();
+                if(!r.ok || !d.success) throw new Error(d.error || 'No se pudo leer el sensor');
+                const temp = d.temperatura && d.temperatura.valor !== null ? d.temperatura.valor : '-';
+                const hum = d.humedad && d.humedad.valor !== null ? d.humedad.valor : '-';
+                const last = document.getElementById('tuya-last-reading');
+                if(last){
+                    last.textContent = `Lectura actual: ${temp} ${d.temperatura?.unidad || 'C'} | ${hum} ${d.humedad?.unidad || '%'} (${d.ultima_lectura_en || ''})`;
+                }
+                if(d.device && d.device.id){
+                    STATE.tuya.config = {
+                        ...(STATE.tuya.config || {}),
+                        device_id: d.device.id,
+                        device_name: d.device.name || '',
+                        ultimo_temp: d.temperatura?.valor ?? null,
+                        ultima_humedad: d.humedad?.valor ?? null,
+                        ultima_lectura_en: d.ultima_lectura_en || null,
+                    };
+                }
+                await cargarHistorialTuya();
+                const alertaTxt = tuyaAlertaTexto(d.alerta_temp);
+                if(alertaTxt){
+                    msg('msg-tuya','error', `Lectura obtenida con alerta: ${alertaTxt}`);
+                } else {
+                    msg('msg-tuya','ok','Lectura obtenida correctamente.');
+                }
+            } catch(e){
+                msg('msg-tuya','error', String(e.message || e));
+            }
+        }
+
+
+        function puntoSeleccionado(){ const id=Number(document.getElementById('reg-punto').value||0); return STATE.puntos.find(p=>Number(p.id||0)===id)||null; }
+        function actualizarModoRegistro(){ const p=puntoSeleccionado(); const fgV=document.getElementById('fg-valor'); const fgC=document.getElementById('fg-cumple'); if(!p){ fgV.style.display='flex'; fgC.style.display='none'; document.getElementById('reg-hint').textContent='Selecciona un punto para ver reglas.'; return; } if((p.tipo_control||'rango')==='check'){ fgV.style.display='none'; fgC.style.display='flex'; document.getElementById('reg-valor').value=''; document.getElementById('reg-hint').textContent=`Checklist | Frecuencia ${p.frecuencia_horas||0}h`; } else { fgV.style.display='flex'; fgC.style.display='none'; document.getElementById('reg-hint').textContent=`Limites: ${limites(p)} | Frecuencia: ${p.frecuencia_horas||0}h`; } }
+        function limpiarRegistro(){ document.getElementById('reg-valor').value=''; document.getElementById('reg-cumple').value='1'; document.getElementById('reg-responsable').value=''; document.getElementById('reg-observacion').value=''; document.getElementById('reg-accion').value=''; msg('msg-registro','',''); }
+        async function cargarTodo(){ const inactivos=STATE.inactivos?'1':'0'; const [rp,rr,rg]=await Promise.all([fetch(`/api/haccp/puntos?inactivos=${inactivos}`),fetch('/api/haccp/resumen'),fetch('/api/haccp/registros?limit=120')]); const dp=await rp.json(), dr=await rr.json(), dg=await rg.json(); STATE.puntos=Array.isArray(dp.puntos)?dp.puntos:[]; STATE.resumen=dr.resumen||{}; STATE.resumen.vencidos=Array.isArray(dr.vencidos)?dr.vencidos:[]; STATE.registros=Array.isArray(dg.registros)?dg.registros:[]; renderResumen(); renderPuntos(); renderSelectPuntos(); renderRegistros(); }
+        async function registrarControl(ev){ ev.preventDefault(); const p=puntoSeleccionado(); if(!p){ msg('msg-registro','error','Selecciona un punto HACCP.'); return; } const payload={ punto_id:Number(p.id), responsable:document.getElementById('reg-responsable').value.trim(), observacion:document.getElementById('reg-observacion').value.trim(), accion_correctiva:document.getElementById('reg-accion').value.trim() }; if((p.tipo_control||'rango')==='check'){ payload.cumple=document.getElementById('reg-cumple').value==='1'; } else { payload.valor=document.getElementById('reg-valor').value; } try { const r=await fetch('/api/haccp/registro',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const d=await r.json(); if(!r.ok||!d.success) throw new Error(d.error||'No se pudo registrar'); msg('msg-registro','ok','Control HACCP registrado.'); limpiarRegistro(); await cargarTodo(); } catch(e){ msg('msg-registro','error',String(e.message||e)); } }
+        function abrirModalPunto(){ document.getElementById('modal-title').textContent='Nuevo punto HACCP'; document.getElementById('form-punto').reset(); document.getElementById('p-id').value=''; document.getElementById('p-categoria').value='General'; document.getElementById('p-frecuencia').value='4'; document.getElementById('p-orden').value='100'; document.getElementById('p-activo').value='1'; msg('msg-punto','',''); actualizarModoPunto(); document.getElementById('modal-punto').classList.add('open'); }
+        function cerrarModalPunto(){ document.getElementById('modal-punto').classList.remove('open'); }
+        function editarPunto(id){ const p=STATE.puntos.find(x=>Number(x.id||0)===Number(id)); if(!p) return; document.getElementById('modal-title').textContent='Editar punto HACCP'; document.getElementById('p-id').value=String(p.id||''); document.getElementById('p-nombre').value=p.nombre||''; document.getElementById('p-categoria').value=p.categoria||'General'; document.getElementById('p-tipo').value=p.tipo_control||'rango'; document.getElementById('p-frecuencia').value=String(p.frecuencia_horas||4); document.getElementById('p-min').value=(p.limite_min!==null&&p.limite_min!==undefined)?p.limite_min:''; document.getElementById('p-max').value=(p.limite_max!==null&&p.limite_max!==undefined)?p.limite_max:''; document.getElementById('p-unidad').value=p.unidad||''; document.getElementById('p-orden').value=String(p.orden||100); document.getElementById('p-activo').value=Number(p.activo||0)?'1':'0'; msg('msg-punto','',''); actualizarModoPunto(); document.getElementById('modal-punto').classList.add('open'); }
+        function actualizarModoPunto(){ const tipo=document.getElementById('p-tipo').value; const show=tipo==='rango'; ['fg-p-min','fg-p-max','fg-p-unidad'].forEach(id=>document.getElementById(id).style.display=show?'flex':'none'); if(!show){ document.getElementById('p-min').value=''; document.getElementById('p-max').value=''; document.getElementById('p-unidad').value=''; } }
+        async function guardarPunto(ev){ ev.preventDefault(); const id=Number(document.getElementById('p-id').value||0); const payload={ nombre:document.getElementById('p-nombre').value.trim(), categoria:document.getElementById('p-categoria').value.trim(), tipo_control:document.getElementById('p-tipo').value, frecuencia_horas:document.getElementById('p-frecuencia').value, limite_min:document.getElementById('p-min').value, limite_max:document.getElementById('p-max').value, unidad:document.getElementById('p-unidad').value.trim(), orden:document.getElementById('p-orden').value, activo:document.getElementById('p-activo').value==='1' }; const ep=id>0?`/api/haccp/punto/${id}/actualizar`:'/api/haccp/punto'; try { const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const d=await r.json(); if(!r.ok||!d.success) throw new Error(d.error||'No se pudo guardar punto'); msg('msg-punto','ok','Punto guardado correctamente.'); await cargarTodo(); setTimeout(cerrarModalPunto,350); } catch(e){ msg('msg-punto','error',String(e.message||e)); } }
+        async function togglePunto(id,activo){ try { const r=await fetch(`/api/haccp/punto/${id}/estado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activo:Boolean(activo)})}); const d=await r.json(); if(!r.ok||!d.success) throw new Error(d.error||'No se pudo cambiar estado'); await cargarTodo(); } catch(e){ alert('[ERROR] '+String(e.message||e)); } }
+        document.getElementById('modal-punto').addEventListener('click', function(e){ if(e.target===this) cerrarModalPunto(); });
+        document.getElementById('modal-tuya').addEventListener('click', function(e){ if(e.target===this) cerrarModalTuya(); });
+        const tuyaBindingsRoot = document.getElementById('tuya-bindings-list');
+        if(tuyaBindingsRoot){
+            const syncDraft = () => { try { syncTuyaBindingsDraft(); } catch(_e) {} };
+            tuyaBindingsRoot.addEventListener('change', syncDraft);
+            tuyaBindingsRoot.addEventListener('input', function(e){
+                const t = e && e.target;
+                if(!t || !t.classList) return;
+                if(
+                    t.classList.contains('tuya-bind-intervalo') ||
+                    t.classList.contains('tuya-bind-alerta-min') ||
+                    t.classList.contains('tuya-bind-alerta-max')
+                ){
+                    syncDraft();
+                }
+            });
+        }
+        document.getElementById('ver-inactivos').addEventListener('change', function(){ STATE.inactivos=this.checked; cargarTodo().catch(e=>alert('[ERROR] '+String(e.message||e))); });
+        const trazaBusqueda = document.getElementById('traza-q');
+        if(trazaBusqueda){ trazaBusqueda.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); cargarTrazabilidadInsumos(); } }); }
+        Promise.all([cargarTodo(), cargarTrazabilidadInsumos(), cargarConfigTuya()]).catch(e=>alert('[ERROR] No se pudo cargar HACCP: '+String(e.message||e)));
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

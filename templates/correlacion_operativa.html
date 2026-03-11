@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Correlaci&oacute;n Operativa - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary:#f59e0b; --secondary:#f97316; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background:#f8fafc;
+            min-height:100vh;
+            color:#0f172a;
+        }
+
+        .sidebar {
+            width:260px;
+            background:white;
+            border-right:1px solid #e2e8f0;
+            padding:24px;
+            display:flex;
+            flex-direction:column;
+            position:fixed;
+            height:100vh;
+            z-index:100;
+        }
+
+        .logo { display:flex; align-items:center; gap:12px; padding-bottom:32px; border-bottom:1px solid #e2e8f0; margin-bottom:24px; }
+        .logo-icon { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--primary),var(--secondary)); display:flex; align-items:center; justify-content:center; font-size:24px; }
+        .logo-text { font-size:20px; font-weight:700; color:#0f172a; }
+        .logo-text span { background:linear-gradient(135deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+        .nav-menu { display:flex; flex-direction:column; gap:8px; flex:1; }
+        .nav-item { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; text-decoration:none; color:#64748b; font-weight:500; transition:all .2s ease; }
+        .nav-item:hover { background:#fff7ed; color:#d97706; }
+        .nav-item.active { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:white; }
+        .nav-item .icon { font-size:20px; width:24px; text-align:center; }
+        .nav-badge { margin-left:auto; background:#ef4444; color:white; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; min-width:28px; }
+        .sidebar-footer { padding-top:24px; border-top:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center; }
+
+        .main-content { margin-left:260px; padding:28px 32px; width:calc(100vw - 260px); max-width:none; }
+        .page-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+        .page-title { font-size:32px; font-weight:700; color:#0f172a; }
+        .page-subtitle { color:#64748b; margin-top:4px; }
+        .page-meta { color:#64748b; font-size:13px; margin-bottom:14px; }
+
+        .btn { border:none; border-radius:10px; padding:10px 14px; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+        .btn-primary { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:white; }
+        .btn-secondary { background:#f1f5f9; border:1px solid #e2e8f0; color:#334155; }
+
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
+        .stat-card { background:white; border:1px solid #e2e8f0; border-radius:14px; padding:14px; }
+        .stat-label { font-size:12px; color:#64748b; margin-bottom:8px; text-transform:uppercase; font-weight:700; }
+        .stat-value { font-size:40px; font-weight:800; color:#0f172a; line-height:1; }
+
+        .card { background:white; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; margin-bottom:14px; }
+        .card-header { padding:16px 20px; border-bottom:1px solid #e2e8f0; font-weight:700; font-size:20px; }
+        .card-body { padding:14px 20px; }
+
+        .table-wrapper { overflow-x:auto; }
+        .data-table { width:100%; border-collapse:collapse; min-width:760px; font-size:13px; }
+        .data-table th { text-align:left; padding:11px 12px; border-bottom:1px solid #e2e8f0; background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; }
+        .data-table td { padding:11px 12px; border-bottom:1px solid #f1f5f9; }
+
+        .risk-text { color:#b91c1c; font-weight:700; }
+        .empty-state { text-align:center; color:#64748b; padding:18px 10px; border:1px dashed #cbd5e1; border-radius:10px; background:#f8fafc; font-style:italic; }
+
+        .quick-actions { display:flex; flex-wrap:wrap; gap:8px; }
+
+        body.dark-mode { background:#0f172a; color:#f1f5f9; }
+        body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
+        body.dark-mode .logo-text { color:#f1f5f9; }
+        body.dark-mode .nav-item { color:#94a3b8; }
+        body.dark-mode .nav-item:hover { background:#334155; color:#f1f5f9; }
+        body.dark-mode .main-content { background:#0f172a; }
+        body.dark-mode .page-title { color:#f1f5f9; }
+        body.dark-mode .page-subtitle, body.dark-mode .page-meta, body.dark-mode .stat-label { color:#94a3b8; }
+        body.dark-mode .card, body.dark-mode .stat-card { background:#1e293b; border-color:#334155; }
+        body.dark-mode .stat-value { color:#f8fafc; }
+        body.dark-mode .btn-secondary { background:#334155; border-color:#475569; color:#e2e8f0; }
+        body.dark-mode .data-table th { background:#334155; border-color:#475569; color:#94a3b8; }
+        body.dark-mode .data-table td { border-color:#334155; color:#f1f5f9; }
+        body.dark-mode .risk-text { color:#fca5a5; }
+        body.dark-mode .empty-state { background:#334155; border-color:#475569; color:#cbd5e1; }
+
+        @media (max-width: 1024px) {
+            .sidebar { width:240px; }
+            .main-content { margin-left:240px; width:calc(100vw - 240px); padding:24px; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { transform:translateX(-100%); }
+            .main-content { margin-left:0; width:100vw; padding:20px; }
+            .page-header { flex-direction:column; align-items:flex-start; }
+            .stats-grid { grid-template-columns:1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    {% set comp = panel.comparativo_operativo or {} %}
+
+    <div style="display: flex; min-height: 100vh;">
+        {% include "_sidebar.html" %}
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Correlaci&oacute;n Operativa</h1>
+                    <p class="page-subtitle">Cruce unificado entre agenda, disponibilidad real, HACCP y ventas/compras.</p>
+                </div>
+                <a href="/" class="btn btn-secondary">&#127968; Volver a inicio</a>
+            </div>
+
+            <div class="page-meta">
+                Generado: {{ panel.generado_en }} &bull; Horizonte: {{ panel.horizonte_horas }} horas
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Eventos agenda pr&oacute;ximos</div>
+                    <div class="stat-value">{{ panel.agenda_proxima_total }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Cruces agenda vs stock</div>
+                    <div class="stat-value">{{ panel.cruces_agenda_stock|length }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Productos en riesgo</div>
+                    <div class="stat-value">{{ panel.productos_riesgo_dependencias|length }}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Agenda pr&oacute;xima vs disponibilidad real</div>
+                <div class="card-body">
+                    {% if panel.cruces_agenda_stock %}
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Evento</th>
+                                    <th>Producto</th>
+                                    <th>Riesgo</th>
+                                    <th>Acci&oacute;n</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in panel.cruces_agenda_stock %}
+                                <tr>
+                                    <td>{{ r.fecha }} {{ r.hora_inicio or '' }}</td>
+                                    <td>
+                                        {{ r.titulo }}
+                                        {% if r.cliente %}<br><span style="color:#64748b;">Cliente: {{ r.cliente }}</span>{% endif %}
+                                    </td>
+                                    <td>{{ r.producto_nombre }}</td>
+                                    <td class="risk-text">{{ r.motivo }}</td>
+                                    <td><a class="btn btn-secondary" href="/ventas">Gestionar en ventas</a></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">Sin cruces cr&iacute;ticos para la agenda pr&oacute;xima.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Productos en riesgo por dependencias</div>
+                <div class="card-body">
+                    {% if panel.productos_riesgo_dependencias %}
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Estado</th>
+                                    <th>Detalle</th>
+                                    <th>Acci&oacute;n</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in panel.productos_riesgo_dependencias %}
+                                <tr>
+                                    <td>{{ p.nombre }}</td>
+                                    <td>
+                                        {% if p.sin_porcion_disponible %}<span class="risk-text">Sin porci&oacute;n</span>{% endif %}
+                                        {% if p.bajo_minimo %}<span class="risk-text"> Bajo m&iacute;nimo</span>{% endif %}
+                                        {% if p.dependencias_criticas %}<span class="risk-text"> Dependencia cr&iacute;tica</span>{% endif %}
+                                    </td>
+                                    <td>{{ p.dependencias_alerta_texto or '-' }}</td>
+                                    <td><a class="btn btn-secondary" href="/ventas">Abrir ventas</a></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">No hay productos cr&iacute;ticos por dependencias.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Lotes HACCP comprometidos</div>
+                <div class="card-body">
+                    {% if panel.haccp_lotes_comprometidos %}
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Insumo</th>
+                                    <th>Lote</th>
+                                    <th>Vence</th>
+                                    <th>Acci&oacute;n</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for l in panel.haccp_lotes_comprometidos %}
+                                <tr>
+                                    <td>{{ l.producto_nombre or '-' }}</td>
+                                    <td>{{ l.insumo_nombre or '-' }}</td>
+                                    <td>{{ l.insumo_lote_codigo or 'Sin lote' }}</td>
+                                    <td class="risk-text">{{ l.insumo_fecha_vencimiento or '-' }}</td>
+                                    <td><a class="btn btn-secondary" href="/haccp">Revisar HACCP</a></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">Sin lotes HACCP en riesgo inmediato.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Ventas por canal vs compras facturadas (30 d&iacute;as)</div>
+                <div class="card-body">
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-label">Local</div><div class="stat-value">${{ '{:,.0f}'.format((comp.ventas_local or 0)|float) }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Uber</div><div class="stat-value">${{ '{:,.0f}'.format((comp.ventas_uber or 0)|float) }}</div></div>
+                        <div class="stat-card"><div class="stat-label">PedidosYa</div><div class="stat-value">${{ '{:,.0f}'.format((comp.ventas_pedidosya or 0)|float) }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Ventas brutas</div><div class="stat-value">${{ '{:,.0f}'.format((comp.ventas_brutas or 0)|float) }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Compras facturadas</div><div class="stat-value">${{ '{:,.0f}'.format((comp.compras_facturadas or 0)|float) }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Margen neto estimado</div><div class="stat-value">${{ '{:,.0f}'.format((comp.margen_neto_estimado or 0)|float) }}</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Acciones r&aacute;pidas</div>
+                <div class="card-body">
+                    <div class="quick-actions">
+                        {% for a in panel.acciones_rapidas %}
+                        <a class="btn btn-primary" href="{{ a.href }}">{{ a.label }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(245,158,11,.4);z-index:1000;transition:all .3s ease;">&#127769;</button>
+
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeBtn').innerHTML = '&#9728;';
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const btn = document.getElementById('darkModeBtn');
+            const isDark = body.classList.toggle('dark-mode');
+            btn.innerHTML = isDark ? '&#9728;' : '&#127769;';
+            localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+        }
+    </script>
+
+    <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+    <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

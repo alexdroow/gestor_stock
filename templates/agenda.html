@@ -1,0 +1,3454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda - Sucr&eacute;e Pasteler&iacute;a</title>
+    
+    <!-- Librerías para generar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --secondary: #f97316;
+            --danger: #ef4444;
+            --success: #10b981;
+            --info: #3b82f6;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #0f172a;
+        }
+        
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .logo-text span { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background: #fff7ed;
+            color: var(--primary-dark);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .nav-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+        }
+        
+        .sidebar-footer {
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 40px;
+            max-width: calc(100% - 260px);
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        /* LAYOUT PRINCIPAL */
+        .agenda-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .agenda-main-column {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            min-width: 0;
+        }
+        
+        /* CALENDARIO */
+        .calendar-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 620px;
+        }
+        
+        .calendar-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .calendar-nav h2 {
+            font-size: 20px;
+            font-weight: 600;
+            min-width: 200px;
+            text-align: center;
+        }
+        
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .btn-icon:hover {
+            background: #fff7ed;
+            border-color: var(--primary);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .calendar-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: 40px repeat(6, 1fr);
+        }
+        
+        .calendar-day-header {
+            padding: 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 13px;
+            color: #64748b;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .calendar-day {
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px;
+            min-height: 100px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .calendar-day:hover:not(.blocked):not(.empty) {
+            background: #fff7ed;
+        }
+        
+        .calendar-day.empty {
+            background: #f8fafc;
+            cursor: default;
+        }
+        
+        .calendar-day.blocked {
+            background: #fee2e2;
+            cursor: not-allowed;
+        }
+        
+        .calendar-day.blocked::after {
+            content: '\26D4';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            opacity: 0.3;
+        }
+        
+        .calendar-day.today {
+            background: #fef3c7;
+        }
+        
+        .calendar-day.selected {
+            box-shadow: inset 0 0 0 2px var(--primary);
+        }
+        
+        .day-number {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .day-events {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .day-event {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .day-event.torta {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .day-event.pedido {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .day-event.bloqueo {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* PANEL LATERAL */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .panel-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .panel-body {
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .day-hours-card .panel-body {
+            max-height: none;
+            overflow: visible;
+        }
+
+        .day-hours-card .panel-collapsible-toggle {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: left;
+            cursor: pointer;
+            justify-content: space-between;
+            transition: background-color 0.2s ease;
+        }
+
+        .day-hours-card .panel-collapsible-toggle:hover {
+            background: #f8fafc;
+        }
+
+        .day-hours-card .panel-collapsible-toggle:focus-visible {
+            outline: 2px solid #f59e0b;
+            outline-offset: -2px;
+        }
+
+        .panel-chevron {
+            margin-left: auto;
+            font-size: 14px;
+            color: #64748b;
+            transition: transform 0.2s ease;
+        }
+
+        .day-hours-card.collapsed .panel-collapsible-body {
+            display: none;
+        }
+
+        .day-hours-card.collapsed .panel-collapsible-toggle {
+            border-bottom: none;
+        }
+
+        .day-hours-card.collapsed .panel-chevron {
+            transform: rotate(-90deg);
+        }
+
+        .hours-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .hours-meta {
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .hours-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .hour-slot {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #f8fafc;
+        }
+
+        .hour-slot-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .hour-slot-time {
+            font-weight: 700;
+            font-size: 13px;
+            color: #0f172a;
+        }
+
+        .hour-slot-status {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-radius: 999px;
+            padding: 2px 9px;
+            line-height: 1.5;
+            white-space: nowrap;
+        }
+
+        .hour-slot-status.disponible {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .hour-slot-status.ocupado {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .hour-slot-status.bloqueado {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .hour-slot-events {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 12px;
+            color: #334155;
+        }
+
+        .hour-slot-event {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 8px;
+        }
+
+        .hour-slot-event-main {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hour-slot-event-title {
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .hour-slot-event-time {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .hour-slot-empty {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .btn-hour {
+            border: 1px solid #cbd5e1;
+            background: white;
+            color: #0f172a;
+            border-radius: 7px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            line-height: 1.2;
+        }
+
+        .btn-hour:hover {
+            border-color: var(--primary);
+            color: var(--primary-dark);
+            background: #fff7ed;
+        }
+
+        .hours-unassigned {
+            margin-bottom: 10px;
+            padding: 9px 10px;
+            border-radius: 10px;
+            border: 1px dashed #cbd5e1;
+            background: #fff;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .hours-unassigned strong {
+            color: #0f172a;
+        }
+        
+        .event-item {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        
+        .event-item:hover {
+            background: #f8fafc;
+        }
+        
+        .event-item.torta {
+            border-left-color: var(--info);
+            background: #eff6ff;
+        }
+        
+        .event-item.pedido {
+            border-left-color: var(--success);
+            background: #f0fdf4;
+        }
+        
+        .event-item.bloqueo {
+            border-left-color: var(--danger);
+            background: #fef2f2;
+        }
+        
+        .event-time {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 600;
+        }
+        
+        .event-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+        
+        .event-client {
+            font-size: 12px;
+            color: #64748b;
+        }
+        
+        .event-badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+        
+        .event-badge.pendiente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .event-badge.pagado {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        /* NOTIFICACIONES */
+        .notif-card {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 1px solid #fcd34d;
+        }
+        
+        .notif-card.urgent {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            border-color: #f87171;
+        }
+        
+        .notif-item {
+            padding: 12px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .notif-item:last-child {
+            border-bottom: none;
+        }
+        
+        .notif-when {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #92400e;
+            margin-bottom: 4px;
+        }
+        
+        .notif-card.urgent .notif-when {
+            color: #991b1b;
+        }
+        
+        .notif-text {
+            font-size: 13px;
+            color: #78350f;
+        }
+
+        .notas-board {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 18px;
+        }
+
+        .notas-board-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .notas-board-title {
+            font-size: 21px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .notas-board-sub {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 14px;
+        }
+
+        .notas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .nota-card {
+            border-radius: 14px;
+            padding: 12px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+            min-height: 170px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nota-card.amarilla { background: #fef9c3; }
+        .nota-card.naranja { background: #ffedd5; }
+        .nota-card.verde { background: #dcfce7; }
+        .nota-card.azul { background: #dbeafe; }
+        .nota-card.rosa { background: #fce7f3; }
+        .nota-card.lila { background: #ede9fe; }
+
+        .nota-card.completada {
+            opacity: 0.7;
+            filter: grayscale(0.2);
+        }
+
+        .nota-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .nota-title {
+            font-weight: 700;
+            font-size: 15px;
+            color: #0f172a;
+            word-break: break-word;
+        }
+
+        .nota-badges {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .nota-badge {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.08);
+            color: #0f172a;
+        }
+
+        .nota-content {
+            font-size: 13px;
+            color: #334155;
+            white-space: pre-wrap;
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .nota-checklist-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+            min-height: 56px;
+        }
+
+        .nota-checklist-item {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            font-size: 13px;
+            color: #334155;
+            line-height: 1.35;
+        }
+
+        .nota-checklist-item input {
+            margin-top: 2px;
+            accent-color: var(--primary);
+        }
+
+        .nota-checklist-item.done span {
+            text-decoration: line-through;
+            opacity: 0.72;
+        }
+
+        .nota-foot {
+            font-size: 11px;
+            color: #475569;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nota-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 2px;
+        }
+
+        .nota-empty {
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            color: #64748b;
+            padding: 24px;
+            text-align: center;
+            background: #f8fafc;
+            font-size: 13px;
+        }
+        
+        /* MODAL */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #64748b;
+        }
+        
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .form-hint {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .checkbox-group input {
+            width: auto;
+        }
+
+        .nota-checklist-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nota-checklist-editor-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .nota-checklist-editor-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+        }
+
+        .nota-checklist-editor-row input[type="text"] {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            width: 100%;
+        }
+
+        .nota-checklist-editor-row input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+        .nota-checklist-remove {
+            border: 1px solid #fecaca;
+            background: #fff1f2;
+            color: #b91c1c;
+            border-radius: 8px;
+            height: 34px;
+            width: 34px;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .nota-checklist-add {
+            margin-top: 8px;
+            width: 100%;
+        }
+        
+        .money-display {
+            background: #f0fdf4;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .money-label {
+            font-size: 12px;
+            color: #166534;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        .money-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #047857;
+        }
+
+        .map-preview {
+            margin-top: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            overflow: hidden;
+        }
+
+        .map-preview-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #fff;
+        }
+
+        .map-status {
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .map-status.loading {
+            color: #92400e;
+        }
+
+        .map-status.error {
+            color: #b91c1c;
+        }
+
+        .map-link {
+            font-size: 12px;
+            text-decoration: none;
+            color: #1d4ed8;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .map-frame {
+            width: 100%;
+            height: 220px;
+            border: 0;
+            display: block;
+            background: #e2e8f0;
+        }
+
+        .map-preview .form-hint {
+            margin: 0;
+            padding: 8px 12px 10px;
+        }
+        
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+        }
+        
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-pdf {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        /* CONFIGURACION */
+        .config-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .config-row:last-child {
+            border-bottom: none;
+        }
+        
+        .config-label {
+            font-size: 14px;
+        }
+        
+        .config-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* MODO OSCURO */
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar,
+        body.dark-mode .calendar-card,
+        body.dark-mode .panel-card,
+        body.dark-mode .modal {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .calendar-day-header,
+        body.dark-mode .form-group input,
+        body.dark-mode .form-group select,
+        body.dark-mode .form-group textarea {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .calendar-day.empty {
+            background: #1e293b;
+        }
+
+        body.dark-mode .event-item:hover {
+            background: #334155;
+        }
+
+        body.dark-mode .hours-meta,
+        body.dark-mode .hour-slot-empty,
+        body.dark-mode .hour-slot-event-time,
+        body.dark-mode .hours-unassigned {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .hour-slot {
+            background: #0f172a;
+            border-color: #334155;
+        }
+
+        body.dark-mode .day-hours-card .panel-collapsible-toggle:hover {
+            background: #334155;
+        }
+
+        body.dark-mode .panel-chevron {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .hour-slot-time,
+        body.dark-mode .hours-unassigned strong {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .hour-slot-event {
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        body.dark-mode .hour-slot-event-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .hours-unassigned {
+            background: #0f172a;
+            border-color: #475569;
+        }
+
+        body.dark-mode .btn-hour {
+            background: #1e293b;
+            color: #f8fafc;
+            border-color: #475569;
+        }
+
+        body.dark-mode .btn-hour:hover {
+            background: #334155;
+            border-color: #f59e0b;
+            color: #fde68a;
+        }
+
+        body.dark-mode .map-preview,
+        body.dark-mode .map-preview-head {
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .map-status {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .map-status.loading {
+            color: #fcd34d;
+        }
+
+        body.dark-mode .map-status.error {
+            color: #fda4af;
+        }
+
+        body.dark-mode .map-link {
+            color: #93c5fd;
+        }
+
+        body.dark-mode .notas-board {
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        body.dark-mode .notas-board-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .nota-card {
+            border-color: rgba(148, 163, 184, 0.35);
+            box-shadow: none;
+        }
+
+        body.dark-mode .nota-title {
+            color: #0f172a;
+        }
+
+        body.dark-mode .nota-content {
+            color: #1e293b;
+        }
+
+        body.dark-mode .nota-checklist-item {
+            color: #1e293b;
+        }
+
+        body.dark-mode .nota-checklist-editor-row input[type="text"] {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .nota-checklist-remove {
+            background: #450a0a;
+            border-color: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        body.dark-mode .nota-foot {
+            color: #334155;
+        }
+
+        body.dark-mode .nota-empty {
+            border-color: #475569;
+            background: #0f172a;
+            color: #cbd5e1;
+        }
+
+        @media (max-width: 1220px) {
+            .agenda-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        #darkModeBtn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+            z-index: 1000;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e8f0;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <script>
+        // Aplicar tema antes de renderizar para evitar parpadeo en modo oscuro.
+        (function () {
+            try {
+                if (localStorage.getItem('darkMode') === 'true') {
+                    document.body.classList.add('dark-mode');
+                }
+            } catch (_) {}
+        })();
+    </script>
+    <div style="display: flex; min-height: 100vh;">
+        <!-- Sidebar -->
+        {% include "_sidebar.html" %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Agenda</h1>
+                </div>
+                <button onclick="abrirConfig()" class="btn-icon" title="Configuración">&#9998;</button>
+            </div>
+            
+            <div class="agenda-layout">
+                <div class="agenda-main-column">
+                    <!-- Calendario -->
+                    <div class="calendar-card">
+                        <div class="calendar-header">
+                            <div class="calendar-nav">
+                                <button onclick="cambiarMes(-1)" class="btn-icon">&larr;</button>
+                                <h2 id="mes-actual">Noviembre 2025</h2>
+                                <button onclick="cambiarMes(1)" class="btn-icon">-></button>
+                            </div>
+                            <button onclick="nuevoEvento()" class="btn-primary">
+                                + Nuevo Evento
+                            </button>
+                        </div>
+                        <div class="calendar-grid" id="calendario">
+                            <!-- Se genera con JS -->
+                        </div>
+                    </div>
+
+                    <div class="panel-card day-hours-card collapsed" id="day-hours-panel">
+                        <button
+                            type="button"
+                            class="panel-header panel-collapsible-toggle"
+                            id="day-hours-toggle"
+                            onclick="toggleDayHoursPanel()"
+                            aria-expanded="false"
+                        >
+                            <span id="detalle-dia-header">&#9200; Detalle por hora</span>
+                            <span class="panel-chevron">&#9662;</span>
+                        </button>
+                        <div class="panel-body panel-collapsible-body" id="detalle-dia-horario">
+                            <p style="color:#64748b; text-align:center; padding:12px;">
+                                Selecciona un d&iacute;a del calendario para ver horas disponibles.
+                            </p>
+                        </div>
+                    </div>
+
+                    <section class="notas-board">
+                        <div class="notas-board-head">
+                            <div class="notas-board-title">&#128221; Tablero de Notas</div>
+                            <button onclick="nuevaNotaAgenda()" class="btn-primary">+ Nueva nota</button>
+                        </div>
+                        <p class="notas-board-sub">
+                            Notas rápidas estilo tablero. Al completar, la nota se archiva automáticamente por 7 días.
+                        </p>
+                        <div id="notas-grid" class="notas-grid">
+                            <div class="nota-empty">Aún no hay notas. Crea la primera nota para organizar pendientes.</div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Panel Lateral -->
+                <div class="side-panel">
+                    <!-- Notificaciones -->
+                    <div class="panel-card notif-card" id="notificaciones-card" style="display: none;">
+                        <div class="panel-header">
+                            &#128276; Alertas
+                        </div>
+                        <div class="panel-body" id="notificaciones-list">
+                        </div>
+                    </div>
+
+                    <!-- Próximos Eventos -->
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            &#128203; Pr&oacute;ximos Eventos
+                        </div>
+                        <div class="panel-body" id="proximos-eventos">
+                            <p style="color: #64748b; text-align: center; padding: 20px;">
+                                Cargando...
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            &#9940; Bloqueos Activos
+                        </div>
+                        <div class="panel-body" id="bloqueos-activos">
+                            <p style="color: #64748b; text-align: center; padding: 12px;">
+                                Sin bloqueos registrados.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Leyenda -->
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            &#127991; Leyenda
+                        </div>
+                        <div class="panel-body">
+                            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="width: 12px; height: 12px; background: #dbeafe; border-radius: 3px;"></span>
+                                    <span>&#127874; Torta</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="width: 12px; height: 12px; background: #dcfce7; border-radius: 3px;"></span>
+                                    <span>&#128230; Pedido</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="width: 12px; height: 12px; background: #fee2e2; border-radius: 3px;"></span>
+                                    <span>&#9940; D&iacute;a Bloqueado</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <div>Cargando...</div>
+    </div>
+
+    <!-- Modal Evento -->
+    <div class="modal-overlay" id="modal-evento">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-titulo">Nuevo Evento</h3>
+                <button onclick="cerrarModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="evento-id">
+                
+                <div class="form-group">
+                    <label>Tipo de Evento</label>
+                    <select id="evento-tipo" onchange="cambiarTipo()">
+                        <option value="torta">&#127874; Torta</option>
+                        <option value="pedido">&#128230; Pedido</option>
+                        <option value="bloqueo">&#9940; Bloquear D&iacute;a/Horario</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Título / Descripción</label>
+                    <input type="text" id="evento-titulo" placeholder="Ej: Torta de cumpleaños">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="evento-fecha">
+                    </div>
+                    <div class="form-group" id="grupo-hora-inicio">
+                        <label>Hora Inicio</label>
+                        <input type="time" id="evento-hora-inicio">
+                    </div>
+                </div>
+                
+                <div class="form-row" id="grupo-hora-fin">
+                    <div class="form-group">
+                        <label>Hora Fin (opcional)</label>
+                        <input type="time" id="evento-hora-fin">
+                    </div>
+                    <div class="form-group" id="grupo-entrega">
+                        <label>Hora Entrega/Retiro</label>
+                        <input type="time" id="evento-entrega">
+                    </div>
+                </div>
+                
+                <!-- Campos solo para tortas/pedidos -->
+                <div id="campos-cliente">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cliente</label>
+                            <input type="text" id="evento-cliente" placeholder="Nombre">
+                        </div>
+                        <div class="form-group">
+                            <label>Teléfono</label>
+                            <input type="tel" id="evento-telefono" placeholder="300 123 4567">
+                        </div>
+                    </div>
+                    
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="evento-envio" onchange="toggleEnvio()">
+                        <span>&#128666; Es env&iacute;o a domicilio</span>
+                    </label>
+                    
+                    <div class="form-group" id="grupo-direccion" style="display: none;">
+                        <label>Dirección de Entrega</label>
+                        <input type="text" id="evento-direccion" placeholder="Calle, número, barrio">
+                        <div id="mapa-preview" class="map-preview" style="display: none;">
+                            <div class="map-preview-head">
+                                <span id="mapa-status" class="map-status">Escribe una dirección para ver el mapa.</span>
+                                <a id="mapa-open-link" class="map-link" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">
+                                    Abrir mapa ->
+                                </a>
+                            </div>
+                            <iframe id="mapa-iframe" class="map-frame" title="Vista previa de dirección" loading="lazy"></iframe>
+                            <p class="form-hint">Vista referencial de calles cercanas según OpenStreetMap.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Ingredientes / Detalles</label>
+                        <textarea id="evento-ingredientes" rows="3" placeholder="Sabor, decoración, etc."></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Total ($)</label>
+                            <input type="number" id="evento-total" placeholder="0" onchange="calcularRestante()">
+                        </div>
+                        <div class="form-group">
+                            <label>Abono ($)</label>
+                            <input type="number" id="evento-abono" placeholder="0" onchange="calcularRestante()">
+                        </div>
+                    </div>
+                    
+                    <div class="money-display">
+                        <div class="money-label">Resta por pagar</div>
+                        <div class="money-value" id="evento-restante">$0</div>
+                    </div>
+                </div>
+                
+                <!-- Campos solo para bloqueos -->
+                <div id="campos-bloqueo" style="display: none;">
+                    <div class="form-group">
+                        <label>Motivo (opcional)</label>
+                        <input type="text" id="bloqueo-motivo" placeholder="Ej: Día de descanso">
+                    </div>
+                    <p class="form-hint">
+                        &#128161; Deja "Hora Fin" vac&iacute;o para bloquear todo el d&iacute;a
+                    </p>
+                </div>
+                
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>&#128276; Recordarme</label>
+                    <select id="evento-alerta">
+                        <option value="60">1 hora antes</option>
+                        <option value="180">3 horas antes</option>
+                        <option value="720">12 horas antes</option>
+                        <option value="1440" selected>24 horas antes</option>
+                        <option value="2880">2 días antes</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="eliminarEvento()" class="btn btn-danger" id="btn-eliminar" style="display: none;">Eliminar</button>
+                <button onclick="cerrarModal()" class="btn btn-secondary">Cancelar</button>
+                <button onclick="generarPDF()" class="btn btn-pdf" id="btn-pdf" style="display: none;">&#128196; PDF</button>
+                <button onclick="guardarEvento()" class="btn btn-success">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configuración -->
+    <div class="modal-overlay" id="modal-config">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Configuración de Agenda</h3>
+                <button onclick="cerrarConfig()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-row">
+                    <div>
+                        <div class="config-label">Zona Horaria</div>
+                        <div class="form-hint">Ajusta automáticamente según tu ubicación</div>
+                    </div>
+                    <div class="config-value" id="zona-horaria">
+                        Detectando...
+                    </div>
+                </div>
+                <div class="config-row">
+                    <div>
+                        <div class="config-label">Alerta por defecto</div>
+                        <div class="form-hint">Tiempo de anticipación para nuevos eventos</div>
+                    </div>
+                    <select id="config-alerta-default" onchange="guardarConfig()">
+                        <option value="60">1 hora</option>
+                        <option value="180">3 horas</option>
+                        <option value="720">12 horas</option>
+                        <option value="1440" selected>24 horas</option>
+                        <option value="2880">2 días</option>
+                    </select>
+                </div>
+                <div class="config-row">
+                    <div>
+                        <div class="config-label">Horario laboral</div>
+                        <div class="form-hint">Solo para referencia visual</div>
+                    </div>
+                    <div class="config-value">
+                        <input type="time" id="config-hora-inicio" value="09:00" style="width: 100px;" onchange="guardarConfig()">
+                        <span>a</span>
+                        <input type="time" id="config-hora-fin" value="18:00" style="width: 100px;" onchange="guardarConfig()">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-nota">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="nota-modal-title">Nueva nota</h3>
+                <button onclick="cerrarModalNota()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="nota-id">
+                <div class="form-group">
+                    <label>Titulo</label>
+                    <input type="text" id="nota-titulo" placeholder="Ej: Comprar cajas para despacho">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de nota</label>
+                    <select id="nota-tipo" onchange="cambiarTipoNotaUI()">
+                        <option value="texto">Texto</option>
+                        <option value="checklist">Checklist</option>
+                    </select>
+                </div>
+                <div class="form-group" id="nota-contenido-group">
+                    <label>Contenido</label>
+                    <textarea id="nota-contenido" rows="4" placeholder="Detalle de la nota..."></textarea>
+                </div>
+                <div class="form-group" id="nota-checklist-group" style="display:none;">
+                    <label>Tareas</label>
+                    <div id="nota-checklist-items" class="nota-checklist-editor"></div>
+                    <button type="button" class="btn btn-secondary nota-checklist-add" onclick="agregarItemChecklistNota('', false)">
+                        + Agregar tarea
+                    </button>
+                    <div class="form-hint">Marca cada tarea al completarla.</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Color</label>
+                        <select id="nota-color">
+                            <option value="amarilla">Amarilla</option>
+                            <option value="naranja">Naranja</option>
+                            <option value="verde">Verde</option>
+                            <option value="azul">Azul</option>
+                            <option value="rosa">Rosa</option>
+                            <option value="lila">Lila</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select id="nota-estado">
+                            <option value="activa">Activa</option>
+                            <option value="completada">Completada</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Recordatorio (opcional)</label>
+                    <input type="datetime-local" id="nota-recordatorio">
+                </div>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="nota-fijada">
+                    <span>&#128204; Mantener fijada arriba</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button onclick="eliminarNotaAgenda()" class="btn btn-danger" id="btn-nota-eliminar" style="display:none;">Eliminar</button>
+                <button onclick="cerrarModalNota()" class="btn btn-secondary">Cancelar</button>
+                <button onclick="guardarNotaAgenda()" class="btn btn-success">Guardar nota</button>
+            </div>
+        </div>
+    </div>
+
+    <button onclick="toggleDarkMode()" id="darkModeBtn">&#127769;</button>
+
+    <script>
+        // ESTADO
+        let fechaActual = new Date();
+        let eventos = [];
+        let notasAgenda = [];
+        let eventoEditando = null;
+        let notaEditando = null;
+        let notaChecklistDraft = [];
+        let fechaSeleccionada = '';
+        let geocodeDebounceTimer = null;
+        let geocodeRequestId = 0;
+        let loadingTimer = null;
+        let loadingVisible = false;
+        let mapaEvento = {
+            lat: null,
+            lon: null,
+            direccionNormalizada: '',
+            direccionOrigen: ''
+        };
+        
+        // CONFIGURACIÓN
+        let config = {
+            alertaDefault: 1440,
+            horaInicio: '09:00',
+            horaFin: '18:00',
+            zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+        const AGENDA_DAY_HOURS_OPEN_KEY = 'agenda_day_hours_open_v1';
+
+        function setDayHoursPanelOpen(isOpen, persist = true) {
+            const panel = document.getElementById('day-hours-panel');
+            const toggle = document.getElementById('day-hours-toggle');
+            if (!panel || !toggle) return;
+            panel.classList.toggle('collapsed', !isOpen);
+            toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            if (persist) {
+                try {
+                    localStorage.setItem(AGENDA_DAY_HOURS_OPEN_KEY, isOpen ? '1' : '0');
+                } catch (_) {}
+            }
+        }
+
+        function toggleDayHoursPanel(forceOpen = null) {
+            const panel = document.getElementById('day-hours-panel');
+            if (!panel) return;
+            const abierto = !panel.classList.contains('collapsed');
+            const nextOpen = (typeof forceOpen === 'boolean') ? forceOpen : !abierto;
+            setDayHoursPanelOpen(nextOpen, true);
+        }
+
+        function cargarEstadoDayHoursPanel() {
+            let abierto = false; // Comprimido por defecto.
+            try {
+                abierto = localStorage.getItem(AGENDA_DAY_HOURS_OPEN_KEY) === '1';
+            } catch (_) {}
+            setDayHoursPanelOpen(abierto, false);
+        }
+
+        function escapeHtml(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizarChecklistNota(items) {
+            let source = items;
+            if (typeof source === 'string') {
+                const raw = source.trim();
+                if (!raw) return [];
+                try {
+                    source = JSON.parse(raw);
+                } catch (error) {
+                    return [];
+                }
+            }
+            if (!Array.isArray(source)) return [];
+
+            return source
+                .map(item => {
+                    if (item && typeof item === 'object') {
+                        return {
+                            texto: String(item.texto ?? item.titulo ?? '').trim(),
+                            completada: Boolean(item.completada)
+                        };
+                    }
+                    return {
+                        texto: String(item ?? '').trim(),
+                        completada: false
+                    };
+                })
+                .filter(item => item.texto)
+                .slice(0, 120);
+        }
+
+        function renderizarChecklistEditorNota() {
+            const contenedor = document.getElementById('nota-checklist-items');
+            if (!contenedor) return;
+
+            if (!Array.isArray(notaChecklistDraft) || !notaChecklistDraft.length) {
+                contenedor.innerHTML = '<div class="form-hint">Sin tareas aún.</div>';
+                return;
+            }
+
+            contenedor.innerHTML = notaChecklistDraft.map((item, index) => `
+                <div class="nota-checklist-editor-row">
+                    <input type="checkbox"
+                           ${item.completada ? 'checked' : ''}
+                           onchange="toggleChecklistNotaEditor(${index}, this.checked)">
+                    <input type="text"
+                           value="${escapeHtml(item.texto || '')}"
+                           placeholder="Escribe una tarea"
+                           oninput="cambiarTextoChecklistNota(${index}, this.value)">
+                    <button type="button"
+                            class="nota-checklist-remove"
+                            onclick="eliminarItemChecklistNota(${index})"
+                            title="Eliminar tarea">
+                        ×
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function cambiarTipoNotaUI() {
+            const tipo = (document.getElementById('nota-tipo')?.value || 'texto') === 'checklist' ? 'checklist' : 'texto';
+            const contenidoGroup = document.getElementById('nota-contenido-group');
+            const checklistGroup = document.getElementById('nota-checklist-group');
+
+            if (contenidoGroup) {
+                contenidoGroup.style.display = tipo === 'texto' ? '' : 'none';
+            }
+            if (checklistGroup) {
+                checklistGroup.style.display = tipo === 'checklist' ? '' : 'none';
+            }
+
+            if (tipo === 'checklist' && (!Array.isArray(notaChecklistDraft) || !notaChecklistDraft.length)) {
+                notaChecklistDraft = [{ texto: '', completada: false }];
+                renderizarChecklistEditorNota();
+            }
+        }
+
+        function agregarItemChecklistNota(texto = '', completada = false) {
+            if (!Array.isArray(notaChecklistDraft)) {
+                notaChecklistDraft = [];
+            }
+            if (notaChecklistDraft.length >= 120) return;
+            notaChecklistDraft.push({
+                texto: String(texto || ''),
+                completada: Boolean(completada)
+            });
+            renderizarChecklistEditorNota();
+        }
+
+        function cambiarTextoChecklistNota(index, valor) {
+            if (!Array.isArray(notaChecklistDraft) || !notaChecklistDraft[index]) return;
+            notaChecklistDraft[index].texto = String(valor ?? '');
+        }
+
+        function toggleChecklistNotaEditor(index, checked) {
+            if (!Array.isArray(notaChecklistDraft) || !notaChecklistDraft[index]) return;
+            notaChecklistDraft[index].completada = Boolean(checked);
+        }
+
+        function eliminarItemChecklistNota(index) {
+            if (!Array.isArray(notaChecklistDraft) || index < 0 || index >= notaChecklistDraft.length) return;
+            notaChecklistDraft.splice(index, 1);
+            renderizarChecklistEditorNota();
+        }
+
+        function parseFechaISO(fechaStr) {
+            const raw = String(fechaStr || '').trim();
+            const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!m) return null;
+            const y = Number(m[1]);
+            const mo = Number(m[2]) - 1;
+            const d = Number(m[3]);
+            const dt = new Date(y, mo, d);
+            if (Number.isNaN(dt.getTime())) return null;
+            return dt;
+        }
+
+        function horaAMinutos(hora, fallback = null) {
+            if (hora === null || hora === undefined || hora === '') return fallback;
+            const raw = String(hora).trim();
+            const m = raw.match(/^(\d{1,2}):(\d{2})/);
+            if (!m) return fallback;
+            const hh = Number(m[1]);
+            const mm = Number(m[2]);
+            if (!Number.isFinite(hh) || !Number.isFinite(mm)) return fallback;
+            if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return fallback;
+            return (hh * 60) + mm;
+        }
+
+        function minutosAHora(minutos) {
+            const n = Math.max(0, Math.min(24 * 60, Number(minutos || 0)));
+            const hh = String(Math.floor(n / 60)).padStart(2, '0');
+            const mm = String(n % 60).padStart(2, '0');
+            return `${hh}:${mm}`;
+        }
+
+        function normalizarHorarioLaboral() {
+            let inicio = horaAMinutos(config.horaInicio, 9 * 60);
+            let fin = horaAMinutos(config.horaFin, 18 * 60);
+            if (!Number.isFinite(inicio)) inicio = 9 * 60;
+            if (!Number.isFinite(fin)) fin = 18 * 60;
+            inicio = Math.max(0, Math.min(23 * 60 + 59, inicio));
+            fin = Math.max(1, Math.min(24 * 60, fin));
+            if (fin <= inicio) {
+                fin = Math.min(24 * 60, inicio + (8 * 60));
+            }
+            return { inicio, fin };
+        }
+
+        function hayCruceRangos(aInicio, aFin, bInicio, bFin) {
+            return aInicio < bFin && bInicio < aFin;
+        }
+
+        function obtenerRangoEventoMinutos(evento) {
+            if (!evento) return null;
+            if (evento.tipo === 'bloqueo') {
+                const inicio = horaAMinutos(evento.hora_inicio, 0);
+                const fin = horaAMinutos(evento.hora_fin, 24 * 60);
+                const finNorm = fin <= inicio ? 24 * 60 : fin;
+                return { inicio, fin: finNorm };
+            }
+
+            const inicio = horaAMinutos(evento.hora_inicio, null);
+            if (inicio === null) return null;
+            const fin = horaAMinutos(evento.hora_fin, inicio + 60);
+            const finNorm = fin <= inicio ? inicio + 60 : fin;
+            return { inicio, fin: Math.min(24 * 60, finNorm) };
+        }
+
+        function formatearFechaLarga(fechaStr) {
+            const dt = parseFechaISO(fechaStr);
+            if (!dt) return fechaStr || '-';
+            return dt.toLocaleDateString('es-CL', {
+                weekday: 'long',
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+        
+        function applyDarkModePreference() {
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            document.body.classList.toggle('dark-mode', isDark);
+            const btn = document.getElementById('darkModeBtn');
+            if (btn) btn.textContent = isDark ? '\u2600' : '\uD83C\uDF19';
+        }
+
+        // INICIALIZACIÓN
+        document.addEventListener('DOMContentLoaded', () => {
+            applyDarkModePreference();
+            inicializarBusquedaDireccion();
+            cargarEstadoDayHoursPanel();
+            fechaSeleccionada = formatearFecha(new Date());
+            cargarConfig();
+            cargarEventos({ silent: true }); // Evita parpadeo al entrar a Agenda
+            cargarNotasAgenda();
+             
+            // Actualizar cada minuto
+            setInterval(verificarNotificaciones, 60000);
+        });
+
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'darkMode') {
+                applyDarkModePreference();
+            }
+        });
+        
+        // ============================================================================
+        // CARGAR EVENTOS DESDE LA BASE DE DATOS (REEMPLAZA localStorage)
+        // ============================================================================
+        
+        async function cargarEventos(options = {}) {
+            const showLoading = !options || options.silent !== true;
+            if (showLoading) mostrarLoading(true);
+            try {
+                const response = await fetch('/api/agenda/eventos');
+                const data = await response.json();
+                
+                if (data.success) {
+                    eventos = data.eventos.map(e => ({
+                        ...e,
+                        es_envio: Boolean(e.es_envio) // Convertir a boolean
+                    }));
+                    if (!fechaSeleccionada) {
+                        fechaSeleccionada = formatearFecha(new Date());
+                    }
+                    console.log('Eventos cargados:', eventos.length);
+                    renderizarCalendario();
+                    renderizarDetalleHorarioDia();
+                    renderizarProximos();
+                    renderizarBloqueosActivos();
+                    verificarNotificaciones();
+                } else {
+                    console.error('Error cargando eventos:', data.error);
+                    alert('Error al cargar eventos: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+                alert('Error de conexión al cargar eventos');
+            } finally {
+                if (showLoading) mostrarLoading(false);
+            }
+        }
+        
+        // ============================================================================
+        // GUARDAR EVENTO EN BASE DE DATOS (REEMPLAZA localStorage)
+        // ============================================================================
+        
+        async function guardarEvento() {
+            const tipo = document.getElementById('evento-tipo').value;
+            const fecha = document.getElementById('evento-fecha').value;
+            const horaInicio = document.getElementById('evento-hora-inicio').value || '00:00';
+            const esEnvio = document.getElementById('evento-envio').checked;
+            const direccionEntrega = (document.getElementById('evento-direccion').value || '').trim();
+            
+            // Validar que haya fecha
+            if (!fecha) {
+                alert('Selecciona una fecha');
+                return;
+            }
+
+            if (tipo !== 'bloqueo' && esEnvio && !direccionEntrega) {
+                alert('Ingresa la dirección de entrega para pedidos a domicilio.');
+                return;
+            }
+            
+            // Validar bloqueos (solo para tortas y pedidos)
+            if (tipo !== 'bloqueo') {
+                const horaFinEvento = document.getElementById('evento-hora-fin').value || horaInicio || '00:00';
+                const bloqueos = eventos.filter(e => {
+                    if (e.tipo !== 'bloqueo' || e.fecha !== fecha) return false;
+                    if (eventoEditando && e.id === eventoEditando.id) return false;
+                    const inicioBloqueo = e.hora_inicio || '00:00';
+                    const finBloqueo = e.hora_fin || '23:59';
+                    const inicioEvento = horaInicio || '00:00';
+                    const finEvento = horaFinEvento || inicioEvento;
+                    return !(finEvento < inicioBloqueo || inicioEvento > finBloqueo);
+                });
+                
+                if (bloqueos.length > 0) {
+                    alert('\u26D4 No se puede agendar: este horario está bloqueado');
+                    return;
+                }
+            }
+            
+            const evento = {
+                id: eventoEditando ? eventoEditando.id : null,
+                tipo: tipo,
+                titulo: document.getElementById('evento-titulo').value || 'Sin título',
+                fecha: fecha,
+                hora_inicio: document.getElementById('evento-hora-inicio').value || null,
+                hora_fin: document.getElementById('evento-hora-fin').value || null,
+                hora_entrega: document.getElementById('evento-entrega').value || null,
+                cliente: document.getElementById('evento-cliente').value || null,
+                telefono: document.getElementById('evento-telefono').value || null,
+                es_envio: esEnvio,
+                direccion: esEnvio ? direccionEntrega : null,
+                ingredientes: document.getElementById('evento-ingredientes').value || null,
+                total: parseFloat(document.getElementById('evento-total').value) || 0,
+                abono: parseFloat(document.getElementById('evento-abono').value) || 0,
+                motivo: document.getElementById('bloqueo-motivo').value || null,
+                alerta_minutos: parseInt(document.getElementById('evento-alerta').value) || 1440
+            };
+
+            mostrarLoading(true);
+            try {
+                const response = await fetch('/api/agenda/evento', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(evento)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    cerrarModal();
+                    await cargarEventos(); // Recargar desde BD
+                    alert('\u2705 Evento guardado correctamente');
+                } else {
+                    alert('[ERROR] Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('[ERROR] Error de conexión al guardar');
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+        
+        // ============================================================================
+        // ELIMINAR EVENTO DE BASE DE DATOS
+        // ============================================================================
+        
+        async function eliminarEvento() {
+            if (!eventoEditando || !eventoEditando.id) return;
+            if (!confirm('¿Eliminar este evento permanentemente?')) return;
+            
+            mostrarLoading(true);
+            try {
+                const response = await fetch(`/api/agenda/evento/${eventoEditando.id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    cerrarModal();
+                    await cargarEventos(); // Recargar desde BD
+                } else {
+                    alert('[ERROR] Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('[ERROR] Error de conexión al eliminar');
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+        
+        // ============================================================================
+        // RESTO DE FUNCIONES (sin cambios importantes)
+        // ============================================================================
+        
+        function cargarConfig() {
+            const guardada = localStorage.getItem('agenda_config');
+            if (guardada) {
+                config = {...config, ...JSON.parse(guardada)};
+            }
+            document.getElementById('config-alerta-default').value = config.alertaDefault;
+            document.getElementById('config-hora-inicio').value = config.horaInicio;
+            document.getElementById('config-hora-fin').value = config.horaFin;
+            document.getElementById('zona-horaria').textContent = config.zonaHoraria;
+            renderizarDetalleHorarioDia();
+        }
+        
+        function guardarConfig() {
+            config.alertaDefault = parseInt(document.getElementById('config-alerta-default').value);
+            config.horaInicio = document.getElementById('config-hora-inicio').value;
+            config.horaFin = document.getElementById('config-hora-fin').value;
+            localStorage.setItem('agenda_config', JSON.stringify(config));
+            renderizarDetalleHorarioDia();
+        }
+
+        function formatoFechaHoraNota(value) {
+            const txt = (value || '').toString().trim();
+            if (!txt) return '';
+            const normal = txt.replace(' ', 'T');
+            if (normal.length >= 16) return normal.slice(0, 16);
+            return normal;
+        }
+
+        function textoRecordatorioNota(value) {
+            const raw = formatoFechaHoraNota(value);
+            if (!raw) return '';
+            const fecha = new Date(raw);
+            if (Number.isNaN(fecha.getTime())) return '';
+            return fecha.toLocaleString('es-CL');
+        }
+
+        async function cargarNotasAgenda() {
+            try {
+                const response = await fetch('/api/agenda/notas');
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'No se pudieron cargar las notas');
+                }
+                notasAgenda = Array.isArray(data.notas) ? data.notas : [];
+                renderizarNotasAgenda();
+                verificarNotificaciones();
+            } catch (error) {
+                const grid = document.getElementById('notas-grid');
+                if (grid) {
+                    grid.innerHTML = `<div class="nota-empty">Error cargando notas: ${error.message}</div>`;
+                }
+            }
+        }
+
+        function renderizarNotasAgenda() {
+            const grid = document.getElementById('notas-grid');
+            if (!grid) return;
+
+            const visibles = (Array.isArray(notasAgenda) ? notasAgenda : [])
+                .filter(nota => (nota?.estado || 'activa') === 'activa');
+
+            if (!visibles.length) {
+                grid.innerHTML = '<div class="nota-empty">No hay notas activas. Las completadas se archivan por 7 días.</div>';
+                return;
+            }
+
+            const ordenadas = [...visibles].sort((a, b) => {
+                const aFijada = a.fijada ? 0 : 1;
+                const bFijada = b.fijada ? 0 : 1;
+                if (aFijada !== bFijada) return aFijada - bFijada;
+                return String(b.actualizada || '').localeCompare(String(a.actualizada || ''));
+            });
+
+            grid.innerHTML = ordenadas.map(nota => {
+                const color = nota.color || 'amarilla';
+                const estado = nota.estado || 'activa';
+                const recordatorioTxt = textoRecordatorioNota(nota.recordatorio);
+                const tipo = (nota.tipo || 'texto') === 'checklist' ? 'checklist' : 'texto';
+                const checklist = normalizarChecklistNota(nota.checklist);
+                const checklistCompletadas = checklist.filter(item => item.completada).length;
+                const contenido = (nota.contenido || '').trim();
+                const resumen = contenido.length > 280 ? `${contenido.slice(0, 280)}...` : contenido || 'Sin detalle';
+                const contenidoHtml = tipo === 'checklist'
+                    ? `
+                        <div class="nota-checklist-list">
+                            ${checklist.length ? checklist.map((item, index) => `
+                                <label class="nota-checklist-item ${item.completada ? 'done' : ''}">
+                                    <input type="checkbox"
+                                           ${item.completada ? 'checked' : ''}
+                                           onchange="toggleItemChecklistNota(${Number(nota.id)}, ${index}, this.checked)">
+                                    <span>${escapeHtml(item.texto)}</span>
+                                </label>
+                            `).join('') : '<div class="nota-content">Sin tareas</div>'}
+                        </div>
+                      `
+                    : `<div class="nota-content">${escapeHtml(resumen)}</div>`;
+                return `
+                    <article class="nota-card ${color} ${estado === 'completada' ? 'completada' : ''}">
+                        <div class="nota-head">
+                            <div class="nota-title">${escapeHtml(nota.titulo || 'Nota')}</div>
+                            <div class="nota-badges">
+                                ${nota.fijada ? '<span class="nota-badge">fijada</span>' : ''}
+                                ${tipo === 'checklist' ? `<span class="nota-badge">${checklistCompletadas}/${checklist.length}</span>` : ''}
+                            </div>
+                        </div>
+                        ${contenidoHtml}
+                        <div class="nota-foot">
+                            <span>${recordatorioTxt ? '\uD83D\uDD52 ' + escapeHtml(recordatorioTxt) : 'Sin recordatorio'}</span>
+                        </div>
+                        <div class="nota-actions">
+                            <button class="btn btn-secondary" onclick="editarNotaAgenda(${nota.id})">&#9998; Editar</button>
+                            <button class="btn btn-success" onclick="toggleEstadoNotaAgenda(${nota.id})">\u2713 Completar</button>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        function nuevaNotaAgenda() {
+            notaEditando = null;
+            document.getElementById('nota-modal-title').textContent = 'Nueva nota';
+            document.getElementById('btn-nota-eliminar').style.display = 'none';
+            document.getElementById('nota-id').value = '';
+            document.getElementById('nota-titulo').value = '';
+            document.getElementById('nota-contenido').value = '';
+            document.getElementById('nota-tipo').value = 'texto';
+            document.getElementById('nota-color').value = 'amarilla';
+            document.getElementById('nota-estado').value = 'activa';
+            document.getElementById('nota-recordatorio').value = '';
+            document.getElementById('nota-fijada').checked = false;
+            notaChecklistDraft = [];
+            renderizarChecklistEditorNota();
+            cambiarTipoNotaUI();
+            document.getElementById('modal-nota').classList.add('active');
+        }
+
+        function editarNotaAgenda(id) {
+            const nota = notasAgenda.find(n => Number(n.id) === Number(id));
+            if (!nota) return;
+            notaEditando = nota;
+            document.getElementById('nota-modal-title').textContent = 'Editar nota';
+            document.getElementById('btn-nota-eliminar').style.display = 'inline-block';
+            document.getElementById('nota-id').value = nota.id;
+            document.getElementById('nota-titulo').value = nota.titulo || '';
+            document.getElementById('nota-contenido').value = nota.contenido || '';
+            document.getElementById('nota-tipo').value = (nota.tipo || 'texto') === 'checklist' ? 'checklist' : 'texto';
+            document.getElementById('nota-color').value = nota.color || 'amarilla';
+            document.getElementById('nota-estado').value = nota.estado || 'activa';
+            document.getElementById('nota-recordatorio').value = formatoFechaHoraNota(nota.recordatorio);
+            document.getElementById('nota-fijada').checked = Boolean(nota.fijada);
+            notaChecklistDraft = normalizarChecklistNota(nota.checklist);
+            renderizarChecklistEditorNota();
+            cambiarTipoNotaUI();
+            document.getElementById('modal-nota').classList.add('active');
+        }
+
+        function cerrarModalNota() {
+            document.getElementById('modal-nota').classList.remove('active');
+            notaEditando = null;
+            notaChecklistDraft = [];
+        }
+
+        async function guardarNotaAgenda() {
+            const tipo = (document.getElementById('nota-tipo').value || 'texto') === 'checklist' ? 'checklist' : 'texto';
+            const checklist = normalizarChecklistNota(notaChecklistDraft);
+            const payload = {
+                id: document.getElementById('nota-id').value || null,
+                titulo: document.getElementById('nota-titulo').value.trim() || 'Nota',
+                contenido: tipo === 'checklist' ? '' : document.getElementById('nota-contenido').value,
+                tipo,
+                checklist: tipo === 'checklist' ? checklist : [],
+                color: document.getElementById('nota-color').value,
+                estado: document.getElementById('nota-estado').value,
+                recordatorio: document.getElementById('nota-recordatorio').value || null,
+                fijada: document.getElementById('nota-fijada').checked
+            };
+
+            try {
+                const response = await fetch('/api/agenda/nota', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'No se pudo guardar la nota');
+                }
+                cerrarModalNota();
+                await cargarNotasAgenda();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            }
+        }
+
+        async function eliminarNotaAgenda() {
+            const id = document.getElementById('nota-id').value;
+            if (!id) return;
+            if (!confirm('¿Eliminar esta nota?')) return;
+
+            try {
+                const response = await fetch(`/api/agenda/nota/${id}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'No se pudo eliminar la nota');
+                }
+                cerrarModalNota();
+                await cargarNotasAgenda();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            }
+        }
+
+        async function toggleEstadoNotaAgenda(id) {
+            const nota = notasAgenda.find(n => Number(n.id) === Number(id));
+            if (!nota) return;
+            const nuevoEstado = nota.estado === 'completada' ? 'activa' : 'completada';
+            const payload = {
+                id: nota.id,
+                titulo: nota.titulo || 'Nota',
+                contenido: nota.contenido || '',
+                tipo: (nota.tipo || 'texto') === 'checklist' ? 'checklist' : 'texto',
+                checklist: normalizarChecklistNota(nota.checklist),
+                color: nota.color || 'amarilla',
+                estado: nuevoEstado,
+                recordatorio: formatoFechaHoraNota(nota.recordatorio) || null,
+                fijada: Boolean(nota.fijada)
+            };
+            try {
+                const response = await fetch('/api/agenda/nota', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar la nota');
+                }
+                await cargarNotasAgenda();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            }
+        }
+
+        async function toggleItemChecklistNota(id, index, checked) {
+            const nota = notasAgenda.find(n => Number(n.id) === Number(id));
+            if (!nota) return;
+
+            const checklist = normalizarChecklistNota(nota.checklist);
+            if (index < 0 || index >= checklist.length) return;
+            checklist[index].completada = Boolean(checked);
+
+            const payload = {
+                id: nota.id,
+                titulo: nota.titulo || 'Nota',
+                contenido: '',
+                tipo: 'checklist',
+                checklist,
+                color: nota.color || 'amarilla',
+                estado: nota.estado || 'activa',
+                recordatorio: formatoFechaHoraNota(nota.recordatorio) || null,
+                fijada: Boolean(nota.fijada)
+            };
+
+            try {
+                const response = await fetch('/api/agenda/nota', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar la tarea');
+                }
+                await cargarNotasAgenda();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            }
+        }
+        
+        function mostrarLoading(mostrar) {
+            const overlay = document.getElementById('loading');
+            if (!overlay) return;
+
+            if (mostrar) {
+                if (loadingVisible || loadingTimer) return;
+                loadingTimer = window.setTimeout(() => {
+                    overlay.classList.add('active');
+                    loadingVisible = true;
+                    loadingTimer = null;
+                }, 180);
+                return;
+            }
+
+            if (loadingTimer) {
+                window.clearTimeout(loadingTimer);
+                loadingTimer = null;
+            }
+            overlay.classList.remove('active');
+            loadingVisible = false;
+        }
+
+        function inicializarBusquedaDireccion() {
+            const input = document.getElementById('evento-direccion');
+            if (!input) return;
+
+            input.addEventListener('input', () => {
+                if (!document.getElementById('evento-envio').checked) return;
+                window.clearTimeout(geocodeDebounceTimer);
+                geocodeDebounceTimer = window.setTimeout(() => {
+                    actualizarMapaDesdeDireccion();
+                }, 650);
+            });
+
+            input.addEventListener('blur', () => {
+                if (!document.getElementById('evento-envio').checked) return;
+                actualizarMapaDesdeDireccion();
+            });
+        }
+
+        function limpiarMapaEstado(mensaje = 'Escribe una dirección para ver el mapa.', tipo = '') {
+            const statusEl = document.getElementById('mapa-status');
+            const iframe = document.getElementById('mapa-iframe');
+            const link = document.getElementById('mapa-open-link');
+            if (statusEl) {
+                statusEl.textContent = mensaje;
+                statusEl.classList.remove('loading', 'error');
+                if (tipo) statusEl.classList.add(tipo);
+            }
+            if (iframe) iframe.src = 'about:blank';
+            if (link) {
+                link.style.display = 'none';
+                link.href = '#';
+            }
+            mapaEvento = {
+                lat: null,
+                lon: null,
+                direccionNormalizada: '',
+                direccionOrigen: ''
+            };
+        }
+
+        function construirLinkMapa(lat, lon, zoom = 17) {
+            return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=${zoom}/${lat}/${lon}`;
+        }
+
+        function construirEmbedMapa(lat, lon) {
+            const delta = 0.0035;
+            const left = (lon - delta).toFixed(6);
+            const right = (lon + delta).toFixed(6);
+            const top = (lat + delta).toFixed(6);
+            const bottom = (lat - delta).toFixed(6);
+            const marker = `${lat.toFixed(6)}%2C${lon.toFixed(6)}`;
+            return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${marker}`;
+        }
+
+        function blobADataURL(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function cargarMapaEstaticoDataURL(lat, lon) {
+            const params = new URLSearchParams({
+                lat: lat.toFixed(6),
+                lon: lon.toFixed(6),
+                zoom: '16',
+                w: '700',
+                h: '320'
+            });
+            const url = `/api/mapa/static?${params.toString()}`;
+            const response = await fetch(url, { cache: 'no-store' });
+            if (!response.ok) {
+                throw new Error('No se pudo descargar el mapa');
+            }
+            const blob = await response.blob();
+            if (!blob || blob.size < 1000) {
+                throw new Error('Mapa vacío');
+            }
+            return blobADataURL(blob);
+        }
+
+        function renderizarMapa(lat, lon, nombreDireccion) {
+            const statusEl = document.getElementById('mapa-status');
+            const iframe = document.getElementById('mapa-iframe');
+            const link = document.getElementById('mapa-open-link');
+            if (statusEl) {
+                statusEl.textContent = nombreDireccion || 'Ubicación encontrada';
+                statusEl.classList.remove('loading', 'error');
+            }
+            if (iframe) iframe.src = construirEmbedMapa(lat, lon);
+            if (link) {
+                link.href = construirLinkMapa(lat, lon);
+                link.style.display = 'inline-block';
+            }
+        }
+
+        async function geocodificarDireccion(direccion) {
+            const query = (direccion || '').trim();
+            if (!query) return null;
+            const endpoint = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`;
+            const response = await fetch(endpoint, {
+                headers: { 'Accept-Language': 'es' }
+            });
+            if (!response.ok) {
+                throw new Error('No se pudo consultar el mapa');
+            }
+            const data = await response.json();
+            if (!Array.isArray(data) || data.length === 0) return null;
+            const top = data[0];
+            return {
+                lat: parseFloat(top.lat),
+                lon: parseFloat(top.lon),
+                nombre: top.display_name || query
+            };
+        }
+
+        async function actualizarMapaDesdeDireccion() {
+            const envioActivo = document.getElementById('evento-envio').checked;
+            const preview = document.getElementById('mapa-preview');
+            const input = document.getElementById('evento-direccion');
+            if (!preview || !input) return;
+
+            if (!envioActivo) {
+                preview.style.display = 'none';
+                limpiarMapaEstado();
+                return;
+            }
+
+            preview.style.display = 'block';
+            const direccion = (input.value || '').trim();
+            if (!direccion) {
+                limpiarMapaEstado('Escribe una dirección para ver el mapa.');
+                return;
+            }
+
+            if (mapaEvento.lat && mapaEvento.lon && mapaEvento.direccionOrigen.toLowerCase() === direccion.toLowerCase()) {
+                renderizarMapa(mapaEvento.lat, mapaEvento.lon, mapaEvento.direccionNormalizada || direccion);
+                return;
+            }
+
+            const reqId = ++geocodeRequestId;
+            const statusEl = document.getElementById('mapa-status');
+            if (statusEl) {
+                statusEl.textContent = 'Buscando dirección...';
+                statusEl.classList.remove('error');
+                statusEl.classList.add('loading');
+            }
+
+            try {
+                const resultado = await geocodificarDireccion(direccion);
+                if (reqId !== geocodeRequestId) return;
+
+                if (!resultado || !Number.isFinite(resultado.lat) || !Number.isFinite(resultado.lon)) {
+                    limpiarMapaEstado('No se encontró la dirección. Ajusta calle/número/comuna.', 'error');
+                    return;
+                }
+
+                mapaEvento = {
+                    lat: resultado.lat,
+                    lon: resultado.lon,
+                    direccionNormalizada: resultado.nombre,
+                    direccionOrigen: direccion
+                };
+                renderizarMapa(resultado.lat, resultado.lon, resultado.nombre);
+            } catch (error) {
+                if (reqId !== geocodeRequestId) return;
+                limpiarMapaEstado('Sin conexión al mapa. Revisa internet e inténtalo de nuevo.', 'error');
+            }
+        }
+
+        async function asegurarMapaParaPDF(evento) {
+            if (!evento || !evento.es_envio || !evento.direccion) return;
+            if (mapaEvento.lat && mapaEvento.lon) return;
+            try {
+                const resultado = await geocodificarDireccion(evento.direccion);
+                if (!resultado) return;
+                mapaEvento = {
+                    lat: resultado.lat,
+                    lon: resultado.lon,
+                    direccionNormalizada: resultado.nombre,
+                    direccionOrigen: evento.direccion
+                };
+            } catch (error) {
+                // No interrumpir PDF si falla geocodificación
+            }
+        }
+        
+        // CALENDARIO
+        function renderizarCalendario() {
+            const grid = document.getElementById('calendario');
+            grid.innerHTML = '';
+            
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            document.getElementById('mes-actual').textContent = 
+                `${meses[fechaActual.getMonth()]} ${fechaActual.getFullYear()}`;
+            
+            // Headers días
+            const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+            diasSemana.forEach(dia => {
+                const header = document.createElement('div');
+                header.className = 'calendar-day-header';
+                header.textContent = dia;
+                grid.appendChild(header);
+            });
+            
+            // Días del mes
+            const primerDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
+            const ultimoDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0);
+            const hoy = new Date();
+            
+            // Espacios vacíos antes
+            for (let i = 0; i < primerDia.getDay(); i++) {
+                const empty = document.createElement('div');
+                empty.className = 'calendar-day empty';
+                grid.appendChild(empty);
+            }
+            
+            // Días
+            for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
+                const celda = document.createElement('div');
+                celda.className = 'calendar-day';
+                
+                const fechaCelda = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), dia);
+                const fechaStr = formatearFecha(fechaCelda);
+                if (fechaStr === fechaSeleccionada) {
+                    celda.classList.add('selected');
+                }
+                
+                // ¿Es hoy?
+                if (dia === hoy.getDate() && fechaActual.getMonth() === hoy.getMonth() && 
+                    fechaActual.getFullYear() === hoy.getFullYear()) {
+                    celda.classList.add('today');
+                }
+                
+                // Buscar eventos del día
+                const eventosDia = eventos.filter(e => e.fecha === fechaStr);
+                const tieneBloqueo = eventosDia.some(e => e.tipo === 'bloqueo');
+                
+                if (tieneBloqueo) {
+                    celda.classList.add('blocked');
+                }
+                
+                celda.innerHTML = `<div class="day-number">${dia}</div>`;
+                
+                // Mostrar eventos
+                if (eventosDia.length > 0) {
+                    const contenedor = document.createElement('div');
+                    contenedor.className = 'day-events';
+                    
+                    eventosDia.slice(0, 3).forEach(ev => {
+                        const span = document.createElement('span');
+                        span.className = `day-event ${ev.tipo}`;
+                        span.textContent = ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : ev.titulo;
+                        contenedor.appendChild(span);
+                    });
+                    
+                    if (eventosDia.length > 3) {
+                        const mas = document.createElement('span');
+                        mas.className = 'day-event';
+                        mas.style.background = '#e2e8f0';
+                        mas.style.color = '#475569';
+                        mas.textContent = `+${eventosDia.length - 3} más`;
+                        contenedor.appendChild(mas);
+                    }
+                    
+                    celda.appendChild(contenedor);
+                }
+                
+                celda.onclick = () => seleccionarDia(fechaStr);
+                grid.appendChild(celda);
+            }
+        }
+
+        function renderizarDetalleHorarioDia() {
+            const body = document.getElementById('detalle-dia-horario');
+            const header = document.getElementById('detalle-dia-header');
+            if (!body || !header) return;
+
+            if (!fechaSeleccionada) {
+                header.innerHTML = '&#9200; Detalle por hora';
+                body.innerHTML = '<p style="color:#64748b; text-align:center; padding:12px;">Selecciona un d&iacute;a para ver detalle horario.</p>';
+                return;
+            }
+
+            const eventosDia = eventos
+                .filter(e => e.fecha === fechaSeleccionada)
+                .sort((a, b) => {
+                    const ha = String(a.hora_inicio || a.hora_entrega || '');
+                    const hb = String(b.hora_inicio || b.hora_entrega || '');
+                    return ha.localeCompare(hb);
+                });
+
+            const horario = normalizarHorarioLaboral();
+            const horaInicioTxt = minutosAHora(horario.inicio);
+            const horaFinTxt = minutosAHora(horario.fin);
+
+            header.innerHTML = `&#9200; ${escapeHtml(formatearFechaLarga(fechaSeleccionada))}`;
+
+            const bloqueos = eventosDia
+                .filter(e => e.tipo === 'bloqueo')
+                .map(e => ({ evento: e, rango: obtenerRangoEventoMinutos(e) }))
+                .filter(x => x.rango);
+
+            const eventosConHora = eventosDia
+                .filter(e => e.tipo !== 'bloqueo')
+                .map(e => ({ evento: e, rango: obtenerRangoEventoMinutos(e) }))
+                .filter(x => x.rango);
+
+            const eventosSinHora = eventosDia
+                .filter(e => e.tipo !== 'bloqueo' && horaAMinutos(e.hora_inicio, null) === null);
+
+            const bloquesHtml = [];
+            for (let inicio = horario.inicio; inicio < horario.fin; inicio += 60) {
+                const fin = Math.min(inicio + 60, horario.fin);
+                const bloqueosSlot = bloqueos.filter(b => hayCruceRangos(inicio, fin, b.rango.inicio, b.rango.fin));
+                const bloqueado = bloqueosSlot.length > 0;
+                const eventosSlot = bloqueado
+                    ? []
+                    : eventosConHora.filter(x => hayCruceRangos(inicio, fin, x.rango.inicio, x.rango.fin));
+
+                let statusClass = 'disponible';
+                let statusText = 'Disponible';
+                let detalleHtml = '';
+
+                if (bloqueado) {
+                    statusClass = 'bloqueado';
+                    statusText = 'Bloqueado';
+                    const bloqueoPrincipal = bloqueosSlot[0].evento;
+                    const motivo = bloqueoPrincipal.motivo || bloqueoPrincipal.titulo || 'Horario bloqueado';
+                    detalleHtml = `<div class="hour-slot-empty">&#9940; ${escapeHtml(motivo)}</div>`;
+                } else if (eventosSlot.length > 0) {
+                    statusClass = 'ocupado';
+                    statusText = `Ocupado (${eventosSlot.length})`;
+                    detalleHtml = eventosSlot.map(({ evento }) => {
+                        const icono = evento.tipo === 'torta' ? '&#127874;' : '&#128230;';
+                        const horaTxt = (evento.hora_inicio || '').slice(0, 5) || 'Sin hora';
+                        return `
+                            <div class="hour-slot-event">
+                                <div class="hour-slot-event-main">
+                                    <span>${icono}</span>
+                                    <span class="hour-slot-event-title">${escapeHtml(evento.titulo || 'Sin t&iacute;tulo')}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span class="hour-slot-event-time">${escapeHtml(horaTxt)}</span>
+                                    <button class="btn-hour" onclick="editarEvento(${Number(evento.id || 0)})">Editar</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    detalleHtml = `
+                        <div class="hour-slot-empty">Sin eventos en este tramo.</div>
+                        <div>
+                            <button class="btn-hour" onclick="seleccionarDia('${fechaSeleccionada}', '${minutosAHora(inicio)}')">+ Agendar ${minutosAHora(inicio)}</button>
+                        </div>
+                    `;
+                }
+
+                bloquesHtml.push(`
+                    <div class="hour-slot">
+                        <div class="hour-slot-head">
+                            <span class="hour-slot-time">${minutosAHora(inicio)} - ${minutosAHora(fin)}</span>
+                            <span class="hour-slot-status ${statusClass}">${escapeHtml(statusText)}</span>
+                        </div>
+                        <div class="hour-slot-events">${detalleHtml}</div>
+                    </div>
+                `);
+            }
+
+            const resumenEventos = eventosDia.filter(e => e.tipo !== 'bloqueo').length;
+            const sinHoraHtml = eventosSinHora.length
+                ? `
+                    <div class="hours-unassigned">
+                        <strong>Eventos sin hora:</strong>
+                        ${eventosSinHora.map(e => escapeHtml(e.titulo || 'Sin t&iacute;tulo')).join(', ')}
+                    </div>
+                `
+                : '';
+
+            body.innerHTML = `
+                <div class="hours-toolbar">
+                    <div class="hours-meta">
+                        Horario laboral: <strong>${horaInicioTxt}</strong> a <strong>${horaFinTxt}</strong> &middot; Eventos del d&iacute;a: <strong>${resumenEventos}</strong>
+                    </div>
+                    <button class="btn-hour" onclick="seleccionarDia('${fechaSeleccionada}', '${horaInicioTxt}')">+ Nuevo evento del d&iacute;a</button>
+                </div>
+                ${sinHoraHtml}
+                <div class="hours-grid">
+                    ${bloquesHtml.join('')}
+                </div>
+            `;
+        }
+        
+        function formatearFecha(fecha) {
+            const anio = fecha.getFullYear();
+            const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            const dia = String(fecha.getDate()).padStart(2, '0');
+            return `${anio}-${mes}-${dia}`;
+        }
+        
+        function cambiarMes(delta) {
+            fechaActual.setMonth(fechaActual.getMonth() + delta);
+            const seleccion = parseFechaISO(fechaSeleccionada);
+            if (!seleccion || seleccion.getFullYear() !== fechaActual.getFullYear() || seleccion.getMonth() !== fechaActual.getMonth()) {
+                fechaSeleccionada = formatearFecha(new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1));
+            }
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+        }
+
+        function seleccionarDiaCalendario(fecha) {
+            fechaSeleccionada = fecha;
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+        }
+        
+        function seleccionarDia(fecha, horaInicioSugerida = null) {
+            fechaSeleccionada = fecha;
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+            eventoEditando = null;
+            document.getElementById('btn-eliminar').style.display = 'none';
+            document.getElementById('evento-fecha').value = fecha;
+            document.getElementById('evento-hora-inicio').value = horaInicioSugerida || config.horaInicio;
+            actualizarVisibilidadBotonPdf();
+            abrirModal();
+        }
+        
+        // MODALES
+        function abrirModal() {
+            document.getElementById('modal-evento').classList.add('active');
+        }
+        
+        function cerrarModal() {
+            document.getElementById('modal-evento').classList.remove('active');
+            eventoEditando = null;
+            document.getElementById('evento-id').value = '';
+            document.getElementById('evento-envio').checked = false;
+            document.getElementById('grupo-direccion').style.display = 'none';
+            const mapaWrap = document.getElementById('mapa-preview');
+            if (mapaWrap) mapaWrap.style.display = 'none';
+            limpiarMapaEstado();
+        }
+        
+        function abrirConfig() {
+            document.getElementById('modal-config').classList.add('active');
+        }
+
+        function cerrarConfig() {
+            document.getElementById('modal-config').classList.remove('active');
+        }
+
+        function actualizarVisibilidadBotonPdf() {
+            const btnPdf = document.getElementById('btn-pdf');
+            const tipoEl = document.getElementById('evento-tipo');
+            if (!btnPdf || !tipoEl) return;
+            const tipo = String(tipoEl.value || '').trim().toLowerCase();
+            btnPdf.style.display = (tipo === 'bloqueo') ? 'none' : 'inline-block';
+        }
+
+        // FORMULARIO
+        function nuevoEvento() {
+            eventoEditando = null;
+            document.getElementById('modal-titulo').textContent = 'Nuevo Evento';
+            document.getElementById('btn-eliminar').style.display = 'none';
+
+            // Limpiar formulario
+            document.getElementById('evento-id').value = '';
+            document.getElementById('evento-tipo').value = 'torta';
+            document.getElementById('evento-titulo').value = '';
+            document.getElementById('evento-fecha').value = formatearFecha(new Date());
+            document.getElementById('evento-hora-inicio').value = config.horaInicio;
+            document.getElementById('evento-hora-fin').value = '';
+            document.getElementById('evento-entrega').value = '';
+            document.getElementById('evento-cliente').value = '';
+            document.getElementById('evento-telefono').value = '';
+            document.getElementById('evento-envio').checked = false;
+            document.getElementById('evento-direccion').value = '';
+            document.getElementById('evento-ingredientes').value = '';
+            document.getElementById('evento-total').value = '';
+            document.getElementById('evento-abono').value = '';
+            document.getElementById('bloqueo-motivo').value = '';
+            document.getElementById('evento-alerta').value = config.alertaDefault;
+            document.getElementById('evento-restante').textContent = '$0';
+
+            cambiarTipo();
+            toggleEnvio();
+            actualizarVisibilidadBotonPdf();
+            abrirModal();
+        }
+        
+        async function editarEvento(id) {
+            const idNum = Number(id || 0);
+            const evento = eventos.find(e => Number(e.id || 0) === idNum);
+            if (!evento) return;
+            
+            eventoEditando = evento;
+            document.getElementById('modal-titulo').textContent = 'Editar Evento';
+            document.getElementById('btn-eliminar').style.display = 'inline-block';
+
+            document.getElementById('evento-id').value = evento.id;
+            document.getElementById('evento-tipo').value = evento.tipo;
+            document.getElementById('evento-titulo').value = evento.titulo;
+            document.getElementById('evento-fecha').value = evento.fecha;
+            document.getElementById('evento-hora-inicio').value = evento.hora_inicio || '';
+            document.getElementById('evento-hora-fin').value = evento.hora_fin || '';
+            document.getElementById('evento-entrega').value = evento.hora_entrega || '';
+            document.getElementById('evento-cliente').value = evento.cliente || '';
+            document.getElementById('evento-telefono').value = evento.telefono || '';
+            document.getElementById('evento-envio').checked = evento.es_envio || false;
+            document.getElementById('evento-direccion').value = evento.direccion || '';
+            document.getElementById('evento-ingredientes').value = evento.ingredientes || '';
+            document.getElementById('evento-total').value = evento.total || '';
+            document.getElementById('evento-abono').value = evento.abono || '';
+            document.getElementById('bloqueo-motivo').value = evento.motivo || '';
+            document.getElementById('evento-alerta').value = evento.alerta_minutos || 1440;
+            
+            calcularRestante();
+            cambiarTipo();
+            toggleEnvio();
+            actualizarVisibilidadBotonPdf();
+            abrirModal();
+        }
+        
+        function cambiarTipo() {
+            const tipo = document.getElementById('evento-tipo').value;
+            const esBloqueo = tipo === 'bloqueo';
+            
+            document.getElementById('campos-cliente').style.display = esBloqueo ? 'none' : 'block';
+            document.getElementById('campos-bloqueo').style.display = esBloqueo ? 'block' : 'none';
+            document.getElementById('grupo-entrega').style.display = esBloqueo ? 'none' : 'block';
+            
+            if (esBloqueo) {
+                document.getElementById('grupo-hora-inicio').style.display = 'block';
+                document.getElementById('grupo-hora-fin').style.display = 'block';
+                document.getElementById('evento-envio').checked = false;
+                document.getElementById('grupo-direccion').style.display = 'none';
+                const mapaWrap = document.getElementById('mapa-preview');
+                if (mapaWrap) mapaWrap.style.display = 'none';
+                limpiarMapaEstado();
+            } else {
+                toggleEnvio();
+            }
+            actualizarVisibilidadBotonPdf();
+        }
+        
+        function toggleEnvio() {
+            const esEnvio = document.getElementById('evento-envio').checked;
+            const grupo = document.getElementById('grupo-direccion');
+            const mapaWrap = document.getElementById('mapa-preview');
+            grupo.style.display = esEnvio ? 'block' : 'none';
+
+            if (!esEnvio) {
+                if (mapaWrap) mapaWrap.style.display = 'none';
+                limpiarMapaEstado();
+                return;
+            }
+
+            if (mapaWrap) mapaWrap.style.display = 'block';
+            actualizarMapaDesdeDireccion();
+        }
+        
+        function calcularRestante() {
+            const total = parseFloat(document.getElementById('evento-total').value) || 0;
+            const abono = parseFloat(document.getElementById('evento-abono').value) || 0;
+            const restante = Math.max(0, total - abono);
+            document.getElementById('evento-restante').textContent = `$${restante.toLocaleString()}`;
+        }
+        
+        // PRÓXIMOS EVENTOS
+        function renderizarProximos() {
+            const contenedor = document.getElementById('proximos-eventos');
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            
+            const proximos = eventos
+                .filter(e => {
+                    const fechaEvento = parseFechaISO(e.fecha);
+                    if (!fechaEvento) return false;
+                    const tipo = String(e.tipo || '').trim().toLowerCase();
+                    return fechaEvento >= hoy && tipo !== 'bloqueo';
+                })
+                .sort((a, b) => {
+                    const fechaA = parseFechaISO(a.fecha);
+                    const fechaB = parseFechaISO(b.fecha);
+                    const minutosA = horaAMinutos(a.hora_inicio, 0) || 0;
+                    const minutosB = horaAMinutos(b.hora_inicio, 0) || 0;
+                    const keyA = (fechaA ? fechaA.getTime() : 0) + (minutosA * 60000);
+                    const keyB = (fechaB ? fechaB.getTime() : 0) + (minutosB * 60000);
+                    return keyA - keyB;
+                })
+                .slice(0, 5);
+            
+            if (proximos.length === 0) {
+                contenedor.innerHTML = `
+                    <p style="color: #64748b; text-align: center; padding: 20px;">
+                        No hay eventos próximos
+                    </p>
+                `;
+                return;
+            }
+            
+            contenedor.innerHTML = proximos.map(e => {
+                const fecha = parseFechaISO(e.fecha);
+                const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+                const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                
+                const fechaStr = fecha
+                    ? `${dias[fecha.getDay()]} ${fecha.getDate()} ${meses[fecha.getMonth()]}`
+                    : (e.fecha || '-');
+                const horaStr = e.hora_inicio ? e.hora_inicio.substring(0, 5) : '';
+                
+                return `
+                    <div class="event-item ${e.tipo}" onclick="editarEvento(${e.id})">
+                        <div class="event-time">${fechaStr} ${horaStr}</div>
+                        <div class="event-title">${e.titulo}</div>
+                        <div class="event-client">${e.cliente || 'Sin cliente'}</div>
+                        ${e.total ? `<span class="event-badge ${e.abono >= e.total ? 'pagado' : 'pendiente'}">
+                            ${e.abono >= e.total ? '\u2713 Pagado' : `$${(e.total - (e.abono || 0)).toLocaleString()} restante`}
+                        </span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderizarBloqueosActivos() {
+            const container = document.getElementById('bloqueos-activos');
+            if (!container) return;
+
+            const bloqueos = eventos
+                .filter(e => e.tipo === 'bloqueo')
+                .sort((a, b) => {
+                    const ka = `${a.fecha} ${a.hora_inicio || ''}`;
+                    const kb = `${b.fecha} ${b.hora_inicio || ''}`;
+                    return ka.localeCompare(kb);
+                });
+
+            if (!bloqueos.length) {
+                container.innerHTML = '<p style=\"color:#64748b; text-align:center; padding:12px;\">Sin bloqueos registrados.</p>';
+                return;
+            }
+
+            container.innerHTML = bloqueos.map(b => {
+                const tramo = (b.hora_inicio || b.hora_fin)
+                    ? `${b.hora_inicio || '00:00'} - ${b.hora_fin || 'fin del día'}`
+                    : 'Día completo';
+                return `
+                    <div class=\"event-item bloqueo\" style=\"margin-bottom:8px;\">
+                        <div class=\"event-time\">${b.fecha}</div>
+                        <div class=\"event-title\">${b.motivo || b.titulo || 'Bloqueo'}</div>
+                        <div class=\"event-client\">${tramo}</div>
+                        <div style=\"display:flex; gap:8px; margin-top:8px;\">
+                            <button class=\"btn-icon\" onclick=\"editarEvento(${b.id})\" title=\"Editar bloqueo\">&#9998;</button>
+                            <button class=\"btn-icon\" onclick=\"eliminarBloqueoDirecto(${b.id})\" title=\"Eliminar bloqueo\">&#128465;</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function eliminarBloqueoDirecto(id) {
+            if (!confirm('¿Quitar este bloqueo?')) return;
+            try {
+                mostrarLoading(true);
+                const response = await fetch(`/api/agenda/evento/${id}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (!data.success) {
+                    alert('[ERROR] ' + (data.error || 'No se pudo eliminar el bloqueo'));
+                    return;
+                }
+                await cargarEventos();
+            } catch (error) {
+                alert('[ERROR] Error de conexión al eliminar bloqueo');
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+        
+        // NOTIFICACIONES
+        function verificarNotificaciones() {
+            const ahora = new Date();
+            const notificaciones = [];
+
+            const obtenerTextoTiempo = (minutosHasta) => {
+                const horas = Math.floor(minutosHasta / 60);
+                const minutos = Math.floor(minutosHasta % 60);
+                if (horas > 24) return `En ${Math.floor(horas / 24)} días`;
+                if (horas > 0) return `En ${horas}h ${minutos}m`;
+                return `En ${Math.max(0, minutos)} minutos`;
+            };
+             
+            eventos.forEach(e => {
+                if (e.tipo === 'bloqueo') return;
+                 
+                const fechaEvento = new Date(e.fecha + 'T' + (e.hora_inicio || '00:00'));
+                const minutosHasta = (fechaEvento - ahora) / (1000 * 60);
+                const minutosAlerta = e.alerta_minutos || 1440;
+                 
+                if (minutosHasta > 0 && minutosHasta <= minutosAlerta) {
+                    notificaciones.push({
+                        urgente: minutosHasta < 180,
+                        cuando: obtenerTextoTiempo(minutosHasta),
+                        texto: `${e.tipo === 'torta' ? '\uD83C\uDF82' : '\uD83D\uDCE6'} ${e.titulo} - ${e.cliente || 'Sin cliente'}`
+                    });
+                }
+            });
+
+            notasAgenda.forEach(nota => {
+                if (!nota || nota.estado === 'completada' || !nota.recordatorio) return;
+                const fechaNota = new Date(formatoFechaHoraNota(nota.recordatorio));
+                if (Number.isNaN(fechaNota.getTime())) return;
+                const minutosHasta = (fechaNota - ahora) / (1000 * 60);
+                if (minutosHasta < 0 || minutosHasta > 180) return;
+                notificaciones.push({
+                    urgente: minutosHasta <= 45,
+                    cuando: obtenerTextoTiempo(minutosHasta),
+                    texto: `\uD83D\uDCDD Nota: ${nota.titulo || 'Sin título'}`
+                });
+            });
+             
+            const card = document.getElementById('notificaciones-card');
+            const lista = document.getElementById('notificaciones-list');
+            
+            if (notificaciones.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            
+            card.style.display = 'block';
+            card.className = `panel-card notif-card ${notificaciones.some(n => n.urgente) ? 'urgent' : ''}`;
+            
+            lista.innerHTML = notificaciones.map(n => `
+                <div class="notif-item">
+                    <div class="notif-when">${n.cuando}</div>
+                    <div class="notif-text">${n.texto}</div>
+                </div>
+            `).join('');
+        }
+        
+        function construirEventoDesdeFormularioParaPdf() {
+            const toNumber = (value) => {
+                const n = parseFloat(value);
+                return Number.isFinite(n) ? n : 0;
+            };
+            const eventoId = (document.getElementById('evento-id').value || '').trim();
+            return {
+                id: eventoId || (eventoEditando && eventoEditando.id) || 'BORRADOR',
+                tipo: (document.getElementById('evento-tipo').value || (eventoEditando && eventoEditando.tipo) || 'torta'),
+                titulo: (document.getElementById('evento-titulo').value || (eventoEditando && eventoEditando.titulo) || ''),
+                fecha: (document.getElementById('evento-fecha').value || (eventoEditando && eventoEditando.fecha) || ''),
+                hora_inicio: (document.getElementById('evento-hora-inicio').value || (eventoEditando && eventoEditando.hora_inicio) || ''),
+                hora_fin: (document.getElementById('evento-hora-fin').value || (eventoEditando && eventoEditando.hora_fin) || ''),
+                hora_entrega: (document.getElementById('evento-entrega').value || (eventoEditando && eventoEditando.hora_entrega) || ''),
+                cliente: (document.getElementById('evento-cliente').value || (eventoEditando && eventoEditando.cliente) || ''),
+                telefono: (document.getElementById('evento-telefono').value || (eventoEditando && eventoEditando.telefono) || ''),
+                es_envio: !!document.getElementById('evento-envio').checked,
+                direccion: (document.getElementById('evento-direccion').value || (eventoEditando && eventoEditando.direccion) || ''),
+                ingredientes: (document.getElementById('evento-ingredientes').value || (eventoEditando && eventoEditando.ingredientes) || ''),
+                total: toNumber(document.getElementById('evento-total').value || (eventoEditando && eventoEditando.total)),
+                abono: toNumber(document.getElementById('evento-abono').value || (eventoEditando && eventoEditando.abono)),
+                motivo: (document.getElementById('bloqueo-motivo').value || (eventoEditando && eventoEditando.motivo) || ''),
+            };
+        }
+
+        // PDF
+        async function generarPDF() {
+            const e = construirEventoDesdeFormularioParaPdf();
+            if (!e || String(e.tipo || '').trim().toLowerCase() === 'bloqueo') {
+                alert('El PDF solo est\u00e1 disponible para pedidos, no para bloqueos.');
+                return;
+            }
+            await asegurarMapaParaPDF(e);
+
+            let mapaImagenDataURL = null;
+            if (e.es_envio && mapaEvento.lat && mapaEvento.lon) {
+                try {
+                    mapaImagenDataURL = await cargarMapaEstaticoDataURL(mapaEvento.lat, mapaEvento.lon);
+                } catch (error) {
+                    mapaImagenDataURL = null;
+                }
+            }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 14;
+            const contentWidth = pageWidth - (margin * 2);
+            let y = margin;
+
+            const colors = {
+                primary: [245, 158, 11],
+                dark: [15, 23, 42],
+                muted: [100, 116, 139],
+                border: [226, 232, 240],
+                card: [248, 250, 252],
+                successBg: [236, 253, 245],
+                successText: [6, 95, 70]
+            };
+
+            const safe = (value, fallback = '-') => {
+                const txt = (value ?? '').toString().trim();
+                return txt ? txt : fallback;
+            };
+
+            const money = (value) => {
+                const n = Number(value || 0);
+                return `$${Math.max(0, n).toLocaleString('es-CL')}`;
+            };
+
+            const limpiarNombreArchivo = (texto) => {
+                const raw = (texto || 'evento').toString().trim();
+                const limpio = raw
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+                    .replace(/_+/g, '_')
+                    .replace(/^_+|_+$/g, '')
+                    .toLowerCase();
+                return limpio || 'evento';
+            };
+            const ensurePage = (needed = 10) => {
+                if (y + needed > pageHeight - 16) {
+                    doc.addPage();
+                    y = 16;
+                }
+            };
+
+            const drawSectionTitle = (title) => {
+                ensurePage(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.setTextColor(...colors.dark);
+                doc.text(title, margin, y);
+                y += 2;
+                doc.setDrawColor(...colors.border);
+                doc.line(margin, y + 1, margin + contentWidth, y + 1);
+                y += 7;
+            };
+
+            const drawField = (label, value, maxWidth = contentWidth) => {
+                const texto = safe(value);
+                const wrapped = doc.splitTextToSize(texto, maxWidth);
+                ensurePage(10 + (wrapped.length * 4.7));
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.setTextColor(...colors.muted);
+                doc.text(label.toUpperCase(), margin, y);
+                y += 4.8;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(12);
+                doc.setTextColor(...colors.dark);
+                doc.text(wrapped, margin, y);
+                y += (wrapped.length * 5.2) + 2;
+            };
+
+            const drawLink = (label, url) => {
+                drawField(label, url);
+                try {
+                    const linkY = y - 6;
+                    doc.link(margin, linkY, contentWidth, 6, { url });
+                } catch (error) {
+                    // ignora si la versión no soporta links
+                }
+            };
+            // Header elegante
+            doc.setFillColor(...colors.primary);
+            doc.rect(margin, y, contentWidth, 33, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(19);
+            doc.text('Sucrée Pastelería', margin + 4, y + 10.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(11);
+            doc.text('Comprobante de Pedido', margin + 4, y + 17.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.text(safe(e.titulo, 'Pedido sin título'), margin + 4, y + 25);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.text('Generado: ' + new Date().toLocaleString('es-CL'), margin + 4, y + 30);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.text((e.tipo || 'evento').toString().toUpperCase(), margin + contentWidth - 4, y + 10, { align: 'right' });
+            y += 39;
+
+            // Tarjeta resumen rápida
+            const total = Number(e.total || 0);
+            const abono = Number(e.abono || 0);
+            const restante = Math.max(0, total - abono);
+            ensurePage(20);
+            doc.setFillColor(...colors.card);
+            doc.setDrawColor(...colors.border);
+            doc.rect(margin, y, contentWidth, 16, 'FD');
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...colors.dark);
+            doc.setFontSize(10);
+            doc.text(`Entrega: ${safe(e.fecha)} ${safe(e.hora_entrega || e.hora_inicio, '')}`.trim(), margin + 4, y + 6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(...colors.muted);
+            doc.text(`Modalidad: ${e.es_envio ? 'Envío a domicilio' : 'Retiro en local'}`, margin + 4, y + 12);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.setTextColor(...colors.successText);
+            doc.text(`Saldo: ${money(restante)}`, margin + contentWidth - 4, y + 10, { align: 'right' });
+            y += 22;
+
+            drawSectionTitle('Datos del Cliente');
+            drawField('Cliente', e.cliente);
+            drawField('Teléfono', e.telefono);
+
+            if (e.es_envio) {
+                drawSectionTitle('Entrega y Ubicación');
+                drawField('Dirección informada por cliente', e.direccion);
+                if (mapaEvento.lat && mapaEvento.lon) {
+                    drawField('Coordenadas', `${mapaEvento.lat.toFixed(6)}, ${mapaEvento.lon.toFixed(6)}`);
+                    drawField('Dirección georeferenciada', mapaEvento.direccionNormalizada || e.direccion || '-');
+                    drawLink('Mapa de referencia (OpenStreetMap)', construirLinkMapa(mapaEvento.lat, mapaEvento.lon));
+                } else if (e.direccion) {
+                    drawLink('Mapa de referencia (búsqueda)', `https://www.openstreetmap.org/search?query=${encodeURIComponent(e.direccion)}`);
+                }
+
+                if (mapaImagenDataURL) {
+                    ensurePage(84);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(9);
+                    doc.setTextColor(...colors.muted);
+                    doc.text('Vista previa del mapa', margin, y);
+                    y += 3;
+                    doc.setDrawColor(...colors.border);
+                    doc.rect(margin, y + 1, contentWidth, 72, 'S');
+                    const tipoImg = mapaImagenDataURL.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                    try {
+                        doc.addImage(mapaImagenDataURL, tipoImg, margin + 1.5, y + 2.5, contentWidth - 3, 69, undefined, 'FAST');
+                    } catch (error) {
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(9);
+                        doc.setTextColor(...colors.muted);
+                        doc.text('No fue posible incrustar la imagen del mapa.', margin + 4, y + 10);
+                    }
+                    y += 78;
+                }
+            } else {
+                drawField('Entrega', 'Retiro en local Sucrée');
+            }
+
+            drawSectionTitle('Detalle del Pedido');
+            drawField('Descripción', e.titulo);
+            drawField('Ingredientes / Detalles', e.ingredientes);
+
+            drawSectionTitle('Resumen de Pago');
+            ensurePage(34);
+            doc.setFillColor(...colors.successBg);
+            doc.setDrawColor(167, 243, 208);
+            doc.rect(margin, y, contentWidth, 28, 'FD');
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(...colors.dark);
+            doc.text('Total', margin + 4, y + 8);
+            doc.text('Abono', margin + 4, y + 15);
+            doc.text('Saldo pendiente', margin + 4, y + 22);
+            doc.setFont('helvetica', 'bold');
+            doc.text(money(total), margin + contentWidth - 4, y + 8, { align: 'right' });
+            doc.text(money(abono), margin + contentWidth - 4, y + 15, { align: 'right' });
+            doc.setTextColor(...colors.successText);
+            doc.text(money(restante), margin + contentWidth - 4, y + 22, { align: 'right' });
+            y += 34;
+
+            drawSectionTitle('T\u00e9rminos y Condiciones');
+            const terminosPedido = [
+                'Una vez iniciado el proceso de elaboraci\u00f3n del pedido, el abono no es reembolsable.',
+                'Las im\u00e1genes de referencia compartidas por el cliente son orientativas. El producto final puede presentar variaciones de dise\u00f1o, color o terminaciones.',
+                'La modalidad principal es retiro en local. En caso de solicitar despacho, este se gestiona mediante Uber Entregas. Sucr\u00e9e Pasteler\u00eda entrega el pedido en condiciones \u00f3ptimas, pero no se responsabiliza por da\u00f1os, demoras o deterioros ocasionados durante el transporte.',
+                'Al realizar el abono, el cliente declara conocer y aceptar estas condiciones.'
+            ];
+            ensurePage(20);
+            doc.setFillColor(255, 251, 235);
+            doc.setDrawColor(253, 230, 138);
+            doc.rect(margin, y, contentWidth, 8, 'FD');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9.5);
+            doc.setTextColor(120, 53, 15);
+            doc.text('Aplicable a todos los pedidos confirmados mediante abono.', margin + 4, y + 5.5);
+            y += 11;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9.6);
+            doc.setTextColor(...colors.dark);
+            terminosPedido.forEach((texto, idx) => {
+                const wrapped = doc.splitTextToSize(`${idx + 1}. ${texto}`, contentWidth - 4);
+                ensurePage((wrapped.length * 4.6) + 4);
+                doc.text(wrapped, margin + 2, y);
+                y += (wrapped.length * 4.6) + 2;
+            });
+
+            // Footer
+            ensurePage(14);
+            doc.setDrawColor(...colors.border);
+            doc.line(margin, pageHeight - 16, margin + contentWidth, pageHeight - 16);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            doc.setTextColor(...colors.muted);
+            doc.text('Documento de confirmación para cliente. Verifica datos antes de enviar.', margin, pageHeight - 10.5);
+            doc.text('Sucrée Pastelería', margin + contentWidth, pageHeight - 10.5, { align: 'right' });
+
+            const baseNombre = limpiarNombreArchivo(e.titulo || e.cliente || 'evento');
+            const baseFecha = limpiarNombreArchivo(e.fecha || new Date().toISOString().slice(0, 10));
+            doc.save(`orden_${baseNombre}_${baseFecha}.pdf`);
+        }
+        
+        // MODO OSCURO
+        function toggleDarkMode() {
+            const isDark = !document.body.classList.contains('dark-mode');
+            document.body.classList.toggle('dark-mode', isDark);
+            localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+            const btn = document.getElementById('darkModeBtn');
+            if (btn) btn.textContent = isDark ? '\u2600' : '\uD83C\uDF19';
+        }
+        
+        // Cerrar modales al hacer click fuera
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>               
+                
+
+

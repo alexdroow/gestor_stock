@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facturas - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary:#f59e0b; --secondary:#f97316; --success:#10b981; --danger:#ef4444; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:#f8fafc; color:#0f172a; min-height:100vh; }
+        .sidebar { width:260px; background:#fff; border-right:1px solid #e2e8f0; padding:24px; display:flex; flex-direction:column; position:fixed; height:100vh; z-index:100; }
+        .logo { display:flex; align-items:center; gap:12px; padding-bottom:32px; border-bottom:1px solid #e2e8f0; margin-bottom:24px; }
+        .logo-icon { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--primary),var(--secondary)); display:flex; align-items:center; justify-content:center; font-size:24px; }
+        .logo-text { font-size:20px; font-weight:700; color:#0f172a; }
+        .logo-text span { background:linear-gradient(135deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .nav-menu { display:flex; flex-direction:column; gap:8px; flex:1; }
+        .nav-item { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; text-decoration:none; color:#64748b; font-weight:500; transition:all .2s ease; }
+        .nav-item:hover { background:#fff7ed; color:#d97706; }
+        .nav-item.active { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:#fff; }
+        .nav-item .icon { font-size:20px; width:24px; text-align:center; }
+        .nav-badge { margin-left:auto; background:#ef4444; color:white; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; min-width:28px; }
+        .sidebar-footer { padding-top:24px; border-top:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center; }
+
+        .main-content { flex:1; margin-left:260px; min-height:100vh; padding:32px 40px; max-width:calc(100% - 260px); }
+        .page-header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
+        .page-title { font-size:32px; font-weight:700; color:#0f172a; line-height:1.1; }
+        .page-subtitle { color:#64748b; margin-top:6px; }
+        .storage-path { font-size:12px; color:#64748b; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; max-width:48%; text-align:right; }
+
+        .grid-top { display:grid; grid-template-columns:1.3fr 1fr; gap:14px; margin-bottom:14px; }
+        .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; }
+        .card-header { padding:14px 18px; border-bottom:1px solid #e2e8f0; font-weight:700; }
+        .card-body { padding:16px 18px; }
+
+        .form-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
+        .form-group label { display:block; font-size:12px; color:#64748b; margin-bottom:6px; font-weight:700; text-transform:uppercase; }
+        .form-group input, .form-group select, .form-group textarea { width:100%; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:14px; background:#fff; color:#0f172a; }
+        .form-group textarea { min-height:84px; resize:vertical; }
+        .full { grid-column:1 / -1; }
+
+        .btn-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+        .btn { border:none; border-radius:10px; padding:11px 15px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+        .btn-primary { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:#fff; }
+        .btn-success { background:linear-gradient(135deg,#16a34a,#10b981); color:#fff; }
+        .btn-light { background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; }
+        .btn-danger { background:#ef4444; color:#fff; }
+        .upload-msg { font-size:13px; color:#64748b; }
+        .upload-msg.error { color:#dc2626; }
+        .upload-msg.ok { color:#059669; }
+
+        .stats-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+        .stat { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; }
+        .stat label { display:block; color:#64748b; font-size:12px; text-transform:uppercase; font-weight:700; margin-bottom:8px; }
+        .stat strong { font-size:28px; color:#0f172a; }
+
+        .sii-toolbar { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+        .sii-kpis { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+        .sii-kpi { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; }
+        .sii-kpi label { display:block; color:#64748b; font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:6px; }
+        .sii-kpi strong { font-size:22px; color:#0f172a; }
+        .sii-kpi .sub { font-size:12px; color:#64748b; margin-top:4px; }
+        .sii-note { font-size:12px; color:#475569; line-height:1.45; margin-top:4px; }
+        .sii-guide {
+            margin-top: 10px;
+            margin-bottom: 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .sii-guide-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        .sii-guide-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .sii-guide-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
+            padding: 8px 10px;
+            font-size: 12px;
+            color: #334155;
+            line-height: 1.35;
+        }
+        .sii-guide-item strong {
+            display: block;
+            color: #0f172a;
+            margin-bottom: 3px;
+        }
+        .sii-guide-formula {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #475569;
+            line-height: 1.45;
+        }
+        .sii-guide-formula code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 11px;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 6px;
+            padding: 2px 6px;
+            color: #3730a3;
+        }
+        .sii-alerts { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 12px; }
+        .sii-alert-chip { display:inline-flex; align-items:center; gap:6px; border-radius:999px; border:1px solid #fbbf24; background:#fffbeb; color:#92400e; padding:6px 10px; font-size:12px; font-weight:600; }
+        .sii-iva-badge { display:inline-flex; align-items:center; border-radius:999px; padding:4px 9px; font-size:11px; font-weight:700; text-transform:uppercase; }
+        .sii-iva-badge.pagar { background:#fee2e2; color:#991b1b; }
+        .sii-iva-badge.remanente { background:#dcfce7; color:#166534; }
+        .sii-iva-badge.sin-movimiento { background:#e2e8f0; color:#334155; }
+        .sii-meta-line { font-size:12px; color:#64748b; margin-bottom:8px; }
+        .sii-edit-input {
+            width: 100%;
+            min-width: 120px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 12px;
+            background: #fff;
+            color: #0f172a;
+        }
+        .sii-edit-input.readonly {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+        }
+        .sii-row-manual td { background: #fff7ed; }
+        .sii-manual-chip {
+            display: inline-flex;
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #9a3412;
+            background: #ffedd5;
+            border: 1px solid #fdba74;
+            border-radius: 999px;
+            padding: 2px 7px;
+            text-transform: uppercase;
+        }
+
+        .table-wrap { overflow:auto; }
+        .data-table { width:100%; border-collapse:collapse; min-width:980px; font-size:13px; }
+        .data-table th { text-align:left; padding:11px 12px; border-bottom:1px solid #e2e8f0; background:#f8fafc; color:#64748b; text-transform:uppercase; font-size:11px; }
+        .data-table td { padding:11px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+        .file-chip { display:inline-flex; border-radius:999px; background:#e2e8f0; color:#334155; padding:4px 10px; font-size:11px; font-weight:700; text-transform:uppercase; }
+        .actions { display:flex; gap:6px; flex-wrap:wrap; }
+        .empty { border:1px dashed #cbd5e1; border-radius:10px; background:#f8fafc; color:#64748b; text-align:center; padding:22px 12px; }
+
+        .modal-overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.55); backdrop-filter:blur(4px); z-index:1100; opacity:0; visibility:hidden; transition:all .2s ease; }
+        .modal-overlay.active { opacity:1; visibility:visible; }
+        .modal-card { width:min(680px, 94vw); max-height:88vh; overflow:auto; background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:18px; }
+        .modal-header-inline { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+        .modal-title { font-size:22px; font-weight:700; color:#0f172a; }
+        .modal-close { border:none; background:#f1f5f9; color:#334155; width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:18px; font-weight:700; }
+
+        body.dark-mode { background:#0f172a; color:#f1f5f9; }
+        body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
+        body.dark-mode .logo-text { color:#f1f5f9; }
+        body.dark-mode .nav-item { color:#94a3b8; }
+        body.dark-mode .nav-item:hover { background:#334155; color:#f1f5f9; }
+        body.dark-mode .page-title { color:#f1f5f9; }
+        body.dark-mode .page-subtitle, body.dark-mode .storage-path { color:#cbd5e1; }
+        body.dark-mode .storage-path, body.dark-mode .card, body.dark-mode .stat { background:#1e293b; border-color:#334155; }
+        body.dark-mode .form-group input, body.dark-mode .form-group select, body.dark-mode .form-group textarea { background:#334155; border-color:#475569; color:#f8fafc; }
+        body.dark-mode .btn-light { background:#334155; color:#e2e8f0; border-color:#475569; }
+        body.dark-mode .data-table th { background:#334155; border-color:#475569; color:#94a3b8; }
+        body.dark-mode .data-table td { border-color:#334155; }
+        body.dark-mode .empty { background:#334155; border-color:#475569; color:#cbd5e1; }
+        body.dark-mode .modal-card { background:#1e293b; border-color:#334155; }
+        body.dark-mode .modal-title { color:#f8fafc; }
+        body.dark-mode .modal-close { background:#334155; color:#e2e8f0; }
+        body.dark-mode .sii-kpi { background:#334155; border-color:#475569; }
+        body.dark-mode .sii-kpi strong { color:#f8fafc; }
+        body.dark-mode .sii-kpi .sub, body.dark-mode .sii-note, body.dark-mode .sii-meta-line { color:#cbd5e1; }
+        body.dark-mode .sii-guide { background:#334155; border-color:#475569; }
+        body.dark-mode .sii-guide-title { color:#f8fafc; }
+        body.dark-mode .sii-guide-item { background:#1e293b; border-color:#475569; color:#cbd5e1; }
+        body.dark-mode .sii-guide-item strong { color:#f8fafc; }
+        body.dark-mode .sii-guide-formula { color:#cbd5e1; }
+        body.dark-mode .sii-guide-formula code { background:#1e1b4b; border-color:#4f46e5; color:#e0e7ff; }
+        body.dark-mode .sii-alert-chip { background:#422006; border-color:#92400e; color:#fde68a; }
+        body.dark-mode .sii-iva-badge.sin-movimiento { background:#475569; color:#e2e8f0; }
+        body.dark-mode .sii-edit-input { background:#334155; border-color:#475569; color:#f8fafc; }
+        body.dark-mode .sii-edit-input.readonly { background:#1e293b; color:#e2e8f0; }
+        body.dark-mode .sii-row-manual td { background: rgba(180, 83, 9, 0.22); }
+        body.dark-mode .sii-manual-chip { color:#fed7aa; background:#7c2d12; border-color:#b45309; }
+
+        @media (max-width: 1200px) {
+            .grid-top { grid-template-columns:1fr; }
+            .storage-path { max-width:100%; text-align:left; }
+            .form-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
+            .sii-toolbar { grid-template-columns:repeat(2, minmax(0,1fr)); }
+            .sii-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
+            .sii-guide-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { transform:translateX(-100%); }
+            .main-content { margin-left:0; max-width:100%; padding:20px; }
+            .page-title { font-size:30px; }
+            .stats-grid, .form-grid { grid-template-columns:1fr; }
+            .sii-toolbar, .sii-kpis { grid-template-columns:1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body data-facturas-view="{{ 'sii' if modo_sii else 'archivo' }}">
+    {% include "_sidebar.html" %}
+
+    <main class="main-content">
+        <section class="page-header">
+            <div>
+                <h1 class="page-title">Facturas</h1>
+                <p class="page-subtitle">
+                    {% if modo_sii %}
+                    Asistente tributario referencial para F29 / F22.
+                    {% else %}
+                    Archivo digital por proveedor y por mes.
+                    {% endif %}
+                </p>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
+                {% if modo_sii %}
+                <a href="/facturas" class="btn btn-light">&larr; Volver a Facturas</a>
+                {% else %}
+                <a href="/facturas/sii" class="btn btn-light">Asistente SII</a>
+                {% endif %}
+                <div class="storage-path">Carpeta local: {{ facturas_dir }}</div>
+            </div>
+        </section>
+
+        {% if not modo_sii %}
+        <section class="grid-top">
+            <article class="card">
+                <div class="card-header">Cargar facturas (PDF o imagen)</div>
+                <div class="card-body">
+                    <form id="uploadFacturaForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Proveedor *</label>
+                                <input type="text" name="proveedor" required placeholder="Ej: Distribuidora Central">
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha factura *</label>
+                                <input type="date" name="fecha_factura" id="fechaFacturaInput" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Numero factura</label>
+                                <input type="text" name="numero_factura" placeholder="F001-1234">
+                            </div>
+                            <div class="form-group">
+                                <label>Monto total</label>
+                                <input type="number" name="monto_total" min="0" step="0.01" placeholder="0">
+                            </div>
+                            <div class="form-group full">
+                                <label>Archivos *</label>
+                                <input type="file" name="archivos" id="facturaFiles" accept=".pdf,image/*" multiple required>
+                            </div>
+                            <div class="form-group full">
+                                <label>Observacion</label>
+                                <textarea name="observacion" placeholder="Notas internas, tipo de compra, etc."></textarea>
+                            </div>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn btn-primary" id="btnSubirFacturas">Guardar facturas</button>
+                            <span class="upload-msg" id="uploadFacturaMsg">Selecciona uno o varios archivos para el mismo proveedor/fecha.</span>
+                        </div>
+                    </form>
+                </div>
+            </article>
+
+            <article class="card">
+                <div class="card-header">Filtros</div>
+                <div class="card-body">
+                    <form method="GET" action="/facturas" id="filtrosFacturasForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Proveedor</label>
+                                <select name="proveedor" id="filtro-proveedor">
+                                    <option value="">Todos</option>
+                                    {% for p in proveedores %}
+                                    <option value="{{ p }}" {% if p == filtro_proveedor %}selected{% endif %}>{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Mes</label>
+                                <select name="mes" id="filtro-mes">
+                                    <option value="">Todos</option>
+                                    {% for m in meses %}
+                                    <option value="{{ m }}" {% if m == filtro_mes %}selected{% endif %}>{{ m }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Buscar</label>
+                                <input type="text" name="q" id="filtro-q" value="{{ filtro_q or '' }}" placeholder="Proveedor, numero o nota">
+                            </div>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn btn-success">Aplicar filtros</button>
+                            <button type="button" class="btn btn-light" onclick="limpiarFiltrosFacturas()">Limpiar</button>
+                        </div>
+                    </form>
+                </div>
+            </article>
+        </section>
+
+        <section class="stats-grid">
+            <article class="stat">
+                <label>Total archivos</label>
+                <strong id="facturas-total-archivos">{{ total_archivos }}</strong>
+            </article>
+            <article class="stat">
+                <label>Peso total</label>
+                <strong id="facturas-total-bytes">{{ '%.1f'|format((total_bytes / 1048576.0)|float) }} MB</strong>
+            </article>
+            <article class="stat">
+                <label>Monto acumulado</label>
+                <strong id="facturas-total-monto">${{ '{:,.0f}'.format(total_monto|float) }}</strong>
+            </article>
+        </section>
+        {% endif %}
+
+        {% if modo_sii %}
+        <section class="card">
+            <div class="card-header">Asistente SII (estimado F29 / F22)</div>
+            <div class="card-body">
+                <div class="sii-note">
+                    Este panel es referencial y se calcula con tus ventas semanales + facturas cargadas.
+                    No reemplaza la declaracion oficial en SII ni revision contable.
+                </div>
+                <div class="sii-guide">
+                    <div class="sii-guide-title">Como rellenar la tabla SII (guia rapida)</div>
+                    <div class="sii-guide-grid">
+                        <div class="sii-guide-item">
+                            <strong>1) Ventas brutas</strong>
+                            Ingresa el total vendido del mes (local + apps) con IVA incluido.
+                        </div>
+                        <div class="sii-guide-item">
+                            <strong>2) Compras sin IVA</strong>
+                            Ingresa base imponible de compras. Si solo tienes monto con IVA, usa columna referencia para dividir por 1 + IVA.
+                        </div>
+                        <div class="sii-guide-item">
+                            <strong>3) IVA debito / credito</strong>
+                            Puedes ajustarlos manualmente. IVA neto se calcula automaticamente para evitar errores.
+                        </div>
+                    </div>
+                    <div class="sii-guide-formula">
+                        Formulas usadas por el asistente:
+                        <code>Comision apps = (Uber + PedidosYa) x % comision</code>,
+                        <code>IVA neto = max(0, IVA debito - IVA credito)</code>,
+                        <code>Resultado operacional = Ventas netas s/IVA - Compras s/IVA</code>.
+                    </div>
+                </div>
+
+                <div class="sii-toolbar">
+                    <div class="form-group">
+                        <label>A&ntilde;o</label>
+                        <select id="sii-anio">
+                            {% for anio in sii_anios %}
+                            <option value="{{ anio }}" {% if anio == sii_params.anio %}selected{% endif %}>{{ anio }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>IVA (%)</label>
+                        <input type="number" id="sii-iva-pct" min="0" step="0.01" value="{{ '%.4f'|format((sii_params.iva_pct or 19)|float) }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Comision Apps (%)</label>
+                        <input type="number" id="sii-comision-apps-pct" min="0" step="0.01" value="{{ '%.4f'|format((sii_params.comision_apps_pct or 30)|float) }}">
+                    </div>
+                    <div class="form-group">
+                        <label>PPM (%)</label>
+                        <input type="number" id="sii-ppm-pct" min="0" step="0.01" value="{{ '%.4f'|format((sii_params.ppm_pct or 0)|float) }}">
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button type="button" class="btn btn-primary" id="btnRecalcularSii">Recalcular estimado</button>
+                    <button type="button" class="btn btn-success" id="btnGuardarTablaSii">Guardar tabla editable</button>
+                    <button type="button" class="btn btn-light" id="btnLimpiarAjustesSii">Limpiar ajustes manuales</button>
+                    <a class="btn btn-light" id="btnDescargarSiiCsv" href="#">Descargar CSV SII</a>
+                    <span class="upload-msg" id="sii-msg">Listo para estimar.</span>
+                </div>
+
+                <div class="sii-meta-line" id="sii-meta-line">
+                    Periodo {{ sii_resumen.periodo.desde }} a {{ sii_resumen.periodo.hasta }} -
+                    semanas: {{ sii_resumen.meta.semanas_consideradas }} -
+                    documentos compra: {{ sii_resumen.meta.facturas_registradas }} -
+                    meses manuales: {{ sii_resumen.meta.meses_con_ajuste_manual or 0 }}
+                </div>
+
+                <section class="sii-kpis">
+                    <article class="sii-kpi">
+                        <label>Base ventas sin IVA</label>
+                        <strong id="sii-kpi-ventas">${{ '{:,.0f}'.format((sii_resumen.totales.ventas_netas_sin_iva or 0)|float) }}</strong>
+                        <div class="sub">Despues de comision apps e IVA debito</div>
+                    </article>
+                    <article class="sii-kpi">
+                        <label>Base compras sin IVA</label>
+                        <strong id="sii-kpi-compras">${{ '{:,.0f}'.format((sii_resumen.totales.compras_sin_iva or 0)|float) }}</strong>
+                        <div class="sub">Base imponible estimada desde facturas</div>
+                    </article>
+                    <article class="sii-kpi">
+                        <label>IVA neto estimado</label>
+                        <strong id="sii-kpi-iva">${{ '{:,.0f}'.format((sii_resumen.totales.iva_neto_estimado or 0)|float) }}</strong>
+                        <div class="sub">Debito - credito (sin remanente)</div>
+                    </article>
+                    <article class="sii-kpi">
+                        <label>PPM estimado</label>
+                        <strong id="sii-kpi-ppm">${{ '{:,.0f}'.format((sii_resumen.totales.ppm_estimado or 0)|float) }}</strong>
+                        <div class="sub">Tasa configurable</div>
+                    </article>
+                    <article class="sii-kpi">
+                        <label>Resultado operacional</label>
+                        <strong id="sii-kpi-resultado">${{ '{:,.0f}'.format((sii_resumen.totales.resultado_operacional or 0)|float) }}</strong>
+                        <div class="sub">Base ventas s/IVA - base compras s/IVA</div>
+                    </article>
+                </section>
+
+                <div class="sii-alerts" id="sii-alerts">
+                    {% if sii_resumen.alertas %}
+                        {% for alerta in sii_resumen.alertas %}
+                        <span class="sii-alert-chip">{{ alerta }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span class="sii-alert-chip">Sin alertas tributarias detectadas para este periodo.</span>
+                    {% endif %}
+                </div>
+
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Mes</th>
+                                <th>Ventas Brutas</th>
+                                <th>Base ventas s/IVA (auto)</th>
+                                <th>Compras con IVA (ref)</th>
+                                <th>Compras sin IVA</th>
+                                <th>IVA Debito (auto)</th>
+                                <th>IVA Credito</th>
+                                <th>IVA Neto (auto)</th>
+                                <th>PPM (auto)</th>
+                                <th>Estado IVA</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sii-mensual-body">
+                            {% for r in sii_resumen.mensual %}
+                            <tr
+                                data-mes-clave="{{ r.mes_clave }}"
+                                data-ajuste-manual="{{ 1 if r.ajuste_manual else 0 }}"
+                                data-apps-ratio="{{ '%.6f'|format((((r.ventas_apps or 0)|float) / ((r.ventas_brutas or 0)|float)) if ((r.ventas_brutas or 0)|float > 0) else 0) }}"
+                                class="{{ 'sii-row-manual' if r.ajuste_manual else '' }}"
+                            >
+                                <td>
+                                    {{ r.mes_label }}
+                                    {% if r.ajuste_manual %}
+                                    <span class="sii-manual-chip">Manual</span>
+                                    {% endif %}
+                                </td>
+                                <td><input class="sii-edit-input" type="number" min="0" step="0.01" data-field="ventas_brutas" value="{{ '%.2f'|format((r.ventas_brutas or 0)|float) }}"></td>
+                                <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="ventas_netas_sin_iva" value="{{ '%.2f'|format((r.ventas_netas_sin_iva or 0)|float) }}" readonly title="Se calcula automaticamente desde Ventas brutas, % comision apps e IVA."></td>
+                                <td>${{ '{:,.2f}'.format((r.compras_con_iva or 0)|float) }}</td>
+                                <td><input class="sii-edit-input" type="number" min="0" step="0.01" data-field="compras_sin_iva" value="{{ '%.2f'|format((r.compras_sin_iva or 0)|float) }}"></td>
+                                <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="iva_debito_estimado" value="{{ '%.2f'|format((r.iva_debito_estimado or 0)|float) }}" readonly title="Se calcula automaticamente desde Ventas brutas e IVA."></td>
+                                <td><input class="sii-edit-input" type="number" min="0" step="0.01" data-field="iva_credito_estimado" value="{{ '%.2f'|format((r.iva_credito_estimado or 0)|float) }}"></td>
+                                <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="iva_neto_estimado" value="{{ '%.2f'|format((r.iva_neto_estimado or 0)|float) }}" readonly title="Se calcula automaticamente como Debito - Credito (minimo 0)."></td>
+                                <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="ppm_estimado" value="{{ '%.2f'|format((r.ppm_estimado or 0)|float) }}" readonly title="Se calcula automaticamente sobre Base ventas s/IVA."></td>
+                                <td>
+                                    <span class="sii-iva-badge {{ (r.estado_iva or 'sin movimiento')|replace(' ', '-') }}">
+                                        {{ r.estado_iva or 'sin movimiento' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if not modo_sii %}
+        <section class="card">
+            <div class="card-header">Facturas archivadas</div>
+            <div class="card-body" id="facturas-listado-root">
+                {% if facturas %}
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Proveedor</th>
+                                <th>Numero</th>
+                                <th>Monto</th>
+                                <th>Archivo</th>
+                                <th>Cargado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in facturas %}
+                            <tr>
+                                <td>{{ f.fecha_factura }}</td>
+                                <td>{{ f.proveedor }}</td>
+                                <td>{{ f.numero_factura or '-' }}</td>
+                                <td>${{ '{:,.0f}'.format((f.monto_total or 0)|float) }}</td>
+                                <td>
+                                    <div>{{ f.archivo_nombre_original }}</div>
+                                    <span class="file-chip">{{ (f.archivo_extension or '')|replace('.', '') or 'archivo' }}</span>
+                                </td>
+                                <td>{{ f.creado }}</td>
+                                <td>
+                                    <div class="actions">
+                                        <button
+                                            class="btn btn-light"
+                                            type="button"
+                                            onclick='abrirModalEditarFactura(
+                                                {{ f.id }},
+                                                {{ (f.proveedor or "")|tojson }},
+                                                {{ (f.fecha_factura or "")|tojson }},
+                                                {{ (f.numero_factura or "")|tojson }},
+                                                {{ ((f.monto_total or 0)|float)|tojson }},
+                                                {{ (f.observacion or "")|tojson }}
+                                            )'
+                                        >Editar</button>
+                                        <a class="btn btn-light" target="_blank" href="/facturas/archivo/{{ f.id }}">Ver</a>
+                                        <a class="btn btn-light" href="/facturas/archivo/{{ f.id }}?download=1">Descargar</a>
+                                        <button class="btn btn-danger" type="button" onclick="eliminarFactura({{ f.id }})">Eliminar</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty">No hay facturas para los filtros seleccionados.</div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+    </main>
+
+    <div class="modal-overlay" id="modalEditarFactura">
+        <div class="modal-card">
+            <div class="modal-header-inline">
+                <h3 class="modal-title">Editar factura</h3>
+                <button class="modal-close" type="button" onclick="cerrarModalEditarFactura()">&times;</button>
+            </div>
+            <form id="editarFacturaForm">
+                <input type="hidden" id="edit-factura-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Proveedor *</label>
+                        <input type="text" id="edit-factura-proveedor" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha factura *</label>
+                        <input type="date" id="edit-factura-fecha" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Numero factura</label>
+                        <input type="text" id="edit-factura-numero" placeholder="F001-1234">
+                    </div>
+                    <div class="form-group">
+                        <label>Monto total</label>
+                        <input type="number" id="edit-factura-monto" min="0" step="0.01" placeholder="0">
+                    </div>
+                    <div class="form-group full">
+                        <label>Observacion</label>
+                        <textarea id="edit-factura-observacion" placeholder="Notas internas, tipo de compra, etc."></textarea>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn btn-primary" id="btnGuardarEdicionFactura">Guardar cambios</button>
+                    <button type="button" class="btn btn-light" onclick="cerrarModalEditarFactura()">Cancelar</button>
+                    <span class="upload-msg" id="editarFacturaMsg"></span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(245,158,11,.4);z-index:1000;transition:all .3s ease;">&#127769;</button>
+
+    <script>
+        function setDarkModeButtonIcon() {
+            const btn = document.getElementById('darkModeBtn');
+            if (!btn) return;
+            btn.innerHTML = document.body.classList.contains('dark-mode') ? '&#9728;' : '&#127769;';
+        }
+
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
+        setDarkModeButtonIcon();
+
+        function toggleDarkMode() {
+            const dark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', dark ? 'true' : 'false');
+            setDarkModeButtonIcon();
+        }
+
+        const filtrosFacturasForm = document.getElementById('filtrosFacturasForm');
+        const facturasListadoRoot = document.getElementById('facturas-listado-root');
+        const totalArchivosEl = document.getElementById('facturas-total-archivos');
+        const totalBytesEl = document.getElementById('facturas-total-bytes');
+        const totalMontoEl = document.getElementById('facturas-total-monto');
+
+        function escapeHtml(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatearMonto(valor) {
+            const numero = Number(valor || 0);
+            if (!Number.isFinite(numero)) return '0';
+            return Math.round(numero).toLocaleString('es-CL');
+        }
+
+        function formatearMb(bytes) {
+            const numero = Number(bytes || 0);
+            if (!Number.isFinite(numero) || numero < 0) return '0.0 MB';
+            return `${(numero / 1048576).toFixed(1)} MB`;
+        }
+
+        function leerFiltrosFacturas() {
+            return {
+                proveedor: document.getElementById('filtro-proveedor')?.value?.trim() || '',
+                mes: document.getElementById('filtro-mes')?.value?.trim() || '',
+                q: document.getElementById('filtro-q')?.value?.trim() || ''
+            };
+        }
+
+        function parsearPorcentajeEntrada(valor, fallback = 0) {
+            const normalizado = String(valor === null || valor === undefined ? '' : valor).replace(',', '.').trim();
+            const numero = Number(normalizado);
+            if (!Number.isFinite(numero) || numero < 0) return Number(fallback || 0);
+            return numero;
+        }
+
+        function leerParametrosSii() {
+            const anioEl = document.getElementById('sii-anio');
+            if (!anioEl) return null;
+            return {
+                anio: (anioEl.value || '').trim(),
+                iva_pct: parsearPorcentajeEntrada(document.getElementById('sii-iva-pct')?.value, 19),
+                comision_apps_pct: parsearPorcentajeEntrada(document.getElementById('sii-comision-apps-pct')?.value, 30),
+                ppm_pct: parsearPorcentajeEntrada(document.getElementById('sii-ppm-pct')?.value, 0)
+            };
+        }
+
+        function construirQuerySii() {
+            const sii = leerParametrosSii();
+            if (!sii) return '';
+            const query = new URLSearchParams();
+            if (sii.anio) query.set('anio', sii.anio);
+            query.set('iva_pct', String(sii.iva_pct));
+            query.set('comision_apps_pct', String(sii.comision_apps_pct));
+            query.set('ppm_pct', String(sii.ppm_pct));
+            return query.toString();
+        }
+
+        function baseFacturasPath() {
+            return document.body?.dataset?.facturasView === 'sii' ? '/facturas/sii' : '/facturas';
+        }
+
+        function construirQueryFacturas(incluirSii = false) {
+            const filtros = leerFiltrosFacturas();
+            const query = new URLSearchParams();
+            if (filtros.proveedor) query.set('proveedor', filtros.proveedor);
+            if (filtros.mes) query.set('mes', filtros.mes);
+            if (filtros.q) query.set('q', filtros.q);
+            if (incluirSii) {
+                const sii = leerParametrosSii();
+                if (sii) {
+                    if (sii.anio) query.set('sii_anio', sii.anio);
+                    query.set('sii_iva_pct', String(sii.iva_pct));
+                    query.set('sii_comision_apps_pct', String(sii.comision_apps_pct));
+                    query.set('sii_ppm_pct', String(sii.ppm_pct));
+                }
+            }
+            return query.toString();
+        }
+
+        function setSiiMsg(text, ok = null) {
+            const el = document.getElementById('sii-msg');
+            if (!el) return;
+            el.textContent = text;
+            el.classList.remove('ok', 'error');
+            if (ok === true) el.classList.add('ok');
+            if (ok === false) el.classList.add('error');
+        }
+
+        function actualizarLinkCsvSii() {
+            const btnCsv = document.getElementById('btnDescargarSiiCsv');
+            if (!btnCsv) return;
+            const query = construirQuerySii();
+            btnCsv.href = query ? `/api/facturas/sii-resumen.csv?${query}` : '/api/facturas/sii-resumen.csv';
+        }
+
+        function normalizarClaseEstadoIva(estado) {
+            const base = String(estado || 'sin movimiento').toLowerCase().trim();
+            const slug = base.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            return slug || 'sin-movimiento';
+        }
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        const SII_EDITABLE_FIELDS = [
+            'ventas_brutas',
+            'ventas_netas_sin_iva',
+            'compras_sin_iva',
+            'iva_debito_estimado',
+            'iva_credito_estimado',
+            'ppm_estimado'
+        ];
+
+        function leerNumeroEditableSii(inputEl) {
+            const raw = String(inputEl?.value ?? '').replace(',', '.').trim();
+            const num = Number(raw);
+            if (!Number.isFinite(num) || num < 0) return 0;
+            return Math.round(num * 100) / 100;
+        }
+
+        function valorInputSii(valor) {
+            const num = Number(valor || 0);
+            if (!Number.isFinite(num) || num < 0) return '0.00';
+            return num.toFixed(2);
+        }
+
+        function clampSiiRatio(valor) {
+            const n = Number(valor);
+            if (!Number.isFinite(n)) return 0;
+            if (n < 0) return 0;
+            if (n > 1) return 1;
+            return n;
+        }
+
+        function tasaSiiDecimal(valorPct, fallback = 0) {
+            const n = Number(valorPct);
+            if (!Number.isFinite(n) || n < 0) {
+                return Number(fallback || 0);
+            }
+            return n > 1 ? (n / 100) : n;
+        }
+
+        function leerTasasSiiDecimales() {
+            const params = leerParametrosSii();
+            return {
+                iva: tasaSiiDecimal(params.iva_pct, 0.19),
+                comision: tasaSiiDecimal(params.comision_apps_pct, 0.30),
+                ppm: tasaSiiDecimal(params.ppm_pct, 0.0)
+            };
+        }
+
+        function recalcularFilaSiiDesdeBruta(fila) {
+            if (!(fila instanceof HTMLElement)) return;
+            const brutasInput = fila.querySelector('input[data-field="ventas_brutas"]');
+            const baseInput = fila.querySelector('input[data-field="ventas_netas_sin_iva"]');
+            const debitoInput = fila.querySelector('input[data-field="iva_debito_estimado"]');
+            const ppmInput = fila.querySelector('input[data-field="ppm_estimado"]');
+            if (!(brutasInput instanceof HTMLInputElement) || !(baseInput instanceof HTMLInputElement) || !(debitoInput instanceof HTMLInputElement) || !(ppmInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const ventasBrutas = leerNumeroEditableSii(brutasInput);
+            const appsRatio = clampSiiRatio(fila.getAttribute('data-apps-ratio'));
+            const tasas = leerTasasSiiDecimales();
+            const divisorIva = 1 + Math.max(0, tasas.iva);
+            const comisionApps = ventasBrutas * appsRatio * Math.max(0, tasas.comision);
+            const ventasNetasComision = Math.max(0, ventasBrutas - comisionApps);
+            const ivaDebito = divisorIva > 0 ? (ventasNetasComision * Math.max(0, tasas.iva) / divisorIva) : 0;
+            const baseSinIva = Math.max(0, ventasNetasComision - ivaDebito);
+            const ppm = Math.max(0, baseSinIva * Math.max(0, tasas.ppm));
+
+            baseInput.value = baseSinIva.toFixed(2);
+            debitoInput.value = ivaDebito.toFixed(2);
+            ppmInput.value = ppm.toFixed(2);
+            recalcularIvaNetoFila(fila);
+        }
+
+        function recalcularTodasFilasSiiDesdeBruta() {
+            const mensualBody = document.getElementById('sii-mensual-body');
+            if (!mensualBody) return;
+            mensualBody.querySelectorAll('tr[data-mes-clave]').forEach((fila) => {
+                recalcularFilaSiiDesdeBruta(fila);
+            });
+        }
+
+        function recalcularIvaNetoFila(fila) {
+            if (!(fila instanceof HTMLElement)) return;
+            const debitoInput = fila.querySelector('input[data-field="iva_debito_estimado"]');
+            const creditoInput = fila.querySelector('input[data-field="iva_credito_estimado"]');
+            const netoInput = fila.querySelector('input[data-field="iva_neto_estimado"]');
+            const badge = fila.querySelector('.sii-iva-badge');
+            if (!(debitoInput instanceof HTMLInputElement) || !(creditoInput instanceof HTMLInputElement) || !(netoInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const debito = leerNumeroEditableSii(debitoInput);
+            const credito = leerNumeroEditableSii(creditoInput);
+            const neto = Math.max(0, debito - credito);
+            const remanente = Math.max(0, credito - debito);
+            netoInput.value = neto.toFixed(2);
+
+            let estado = 'sin movimiento';
+            if (neto > 0) estado = 'pagar';
+            else if (remanente > 0) estado = 'remanente';
+
+            if (badge) {
+                const clase = normalizarClaseEstadoIva(estado);
+                badge.className = `sii-iva-badge ${clase}`;
+                badge.textContent = estado;
+            }
+        }
+
+        function renderFilaSiiEditable(r) {
+            const estado = String(r?.estado_iva || 'sin movimiento');
+            const claseEstado = normalizarClaseEstadoIva(estado);
+            const mesClave = escapeHtml(r?.mes_clave || '');
+            const manual = Boolean(r?.ajuste_manual);
+            const ventasBrutasBase = Number(r?.ventas_brutas || 0);
+            const ventasAppsBase = Number(r?.ventas_apps || 0);
+            const appsRatio = (Number.isFinite(ventasBrutasBase) && ventasBrutasBase > 0)
+                ? clampSiiRatio(ventasAppsBase / ventasBrutasBase)
+                : 0;
+            return `
+                <tr data-mes-clave="${mesClave}" data-ajuste-manual="${manual ? '1' : '0'}" data-apps-ratio="${appsRatio.toFixed(6)}" class="${manual ? 'sii-row-manual' : ''}">
+                    <td>
+                        ${escapeHtml(r?.mes_label || '-')}
+                        ${manual ? '<span class="sii-manual-chip">Manual</span>' : ''}
+                    </td>
+                    <td><input class="sii-edit-input" type="number" min="0" step="0.01" data-field="ventas_brutas" value="${valorInputSii(r?.ventas_brutas)}"></td>
+                    <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="ventas_netas_sin_iva" value="${valorInputSii(r?.ventas_netas_sin_iva)}" readonly title="Se calcula automaticamente desde Ventas brutas, % comision apps e IVA."></td>
+                    <td>$${formatearMonto(r?.compras_con_iva || 0)}</td>
+                    <td><input class="sii-edit-input" type="number" min="0" step="0.01" data-field="compras_sin_iva" value="${valorInputSii(r?.compras_sin_iva)}"></td>
+                    <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="iva_debito_estimado" value="${valorInputSii(r?.iva_debito_estimado)}" readonly title="Se calcula automaticamente desde Ventas brutas e IVA."></td>
+                    <td><input class="sii-edit-input" type="number" min="0" step="0.01" data-field="iva_credito_estimado" value="${valorInputSii(r?.iva_credito_estimado)}"></td>
+                    <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="iva_neto_estimado" value="${valorInputSii(r?.iva_neto_estimado)}" readonly title="Se calcula automaticamente como Debito - Credito (minimo 0)."></td>
+                    <td><input class="sii-edit-input readonly" type="number" min="0" step="0.01" data-field="ppm_estimado" value="${valorInputSii(r?.ppm_estimado)}" readonly title="Se calcula automaticamente sobre Base ventas s/IVA."></td>
+                    <td><span class="sii-iva-badge ${claseEstado}">${escapeHtml(estado)}</span></td>
+                </tr>
+            `;
+        }
+
+        function renderSiiResumen(resumen) {
+            const data = resumen || {};
+            const totales = data.totales || {};
+            const meta = data.meta || {};
+            const periodo = data.periodo || {};
+            const alertas = Array.isArray(data.alertas) ? data.alertas : [];
+            const mensual = Array.isArray(data.mensual) ? data.mensual : [];
+
+            setText('sii-kpi-ventas', `$${formatearMonto(totales.ventas_netas_sin_iva || 0)}`);
+            setText('sii-kpi-compras', `$${formatearMonto(totales.compras_sin_iva || 0)}`);
+            setText('sii-kpi-iva', `$${formatearMonto(totales.iva_neto_estimado || 0)}`);
+            setText('sii-kpi-ppm', `$${formatearMonto(totales.ppm_estimado || 0)}`);
+            setText('sii-kpi-resultado', `$${formatearMonto(totales.resultado_operacional || 0)}`);
+
+            const metaLine = document.getElementById('sii-meta-line');
+            if (metaLine) {
+                const desde = periodo.desde || '-';
+                const hasta = periodo.hasta || '-';
+                const semanas = Number(meta.semanas_consideradas || 0);
+                const documentos = Number(meta.facturas_registradas || 0);
+                const manuales = Number(meta.meses_con_ajuste_manual || 0);
+                metaLine.textContent = `Periodo ${desde} a ${hasta} - semanas: ${semanas} - documentos compra: ${documentos} - meses manuales: ${manuales}`;
+            }
+
+            const alertRoot = document.getElementById('sii-alerts');
+            if (alertRoot) {
+                if (alertas.length) {
+                    alertRoot.innerHTML = alertas
+                        .map((a) => `<span class="sii-alert-chip">${escapeHtml(a)}</span>`)
+                        .join('');
+                } else {
+                    alertRoot.innerHTML = '<span class="sii-alert-chip">Sin alertas tributarias detectadas para este periodo.</span>';
+                }
+            }
+
+            const mensualBody = document.getElementById('sii-mensual-body');
+            if (mensualBody) {
+                if (!mensual.length) {
+                    mensualBody.innerHTML = '<tr><td colspan="10">Sin movimiento para el periodo seleccionado.</td></tr>';
+                } else {
+                    mensualBody.innerHTML = mensual.map((r) => renderFilaSiiEditable(r)).join('');
+                    recalcularTodasFilasSiiDesdeBruta();
+                }
+            }
+        }
+
+        function leerAjustesTablaSii() {
+            const mensualBody = document.getElementById('sii-mensual-body');
+            if (!mensualBody) return [];
+            const filas = Array.from(mensualBody.querySelectorAll('tr[data-mes-clave]'));
+            const ajustes = [];
+            for (const fila of filas) {
+                const mesClave = String(fila.getAttribute('data-mes-clave') || '').trim();
+                if (!mesClave) continue;
+                const esManualPrevio = fila.getAttribute('data-ajuste-manual') === '1';
+                const fueEditada = fila.getAttribute('data-dirty') === '1';
+                if (!esManualPrevio && !fueEditada) continue;
+                const row = { mes_clave: mesClave };
+                for (const field of SII_EDITABLE_FIELDS) {
+                    const input = fila.querySelector(`input[data-field="${field}"]`);
+                    row[field] = leerNumeroEditableSii(input);
+                }
+                ajustes.push(row);
+            }
+            return ajustes;
+        }
+
+        function renderTotalesFacturas(totales) {
+            const data = totales || {};
+            if (totalArchivosEl) {
+                totalArchivosEl.textContent = String(Number(data.archivos || 0));
+            }
+            if (totalBytesEl) {
+                totalBytesEl.textContent = formatearMb(data.bytes || 0);
+            }
+            if (totalMontoEl) {
+                totalMontoEl.textContent = `$${formatearMonto(data.monto || 0)}`;
+            }
+        }
+
+        function renderListadoFacturas(facturas) {
+            if (!facturasListadoRoot) return;
+            const rows = Array.isArray(facturas) ? facturas : [];
+            if (!rows.length) {
+                facturasListadoRoot.innerHTML = '<div class="empty">No hay facturas para los filtros seleccionados.</div>';
+                return;
+            }
+
+            const body = rows.map((f) => {
+                const id = Number(f.id || 0);
+                const proveedorArg = JSON.stringify(f.proveedor || '');
+                const fechaArg = JSON.stringify(f.fecha_factura || '');
+                const numeroArg = JSON.stringify(f.numero_factura || '');
+                const montoArg = JSON.stringify(Number(f.monto_total || 0));
+                const observacionArg = JSON.stringify(f.observacion || '');
+                const extension = String(f.archivo_extension || '').replace('.', '') || 'archivo';
+
+                return `
+                    <tr>
+                        <td>${escapeHtml(f.fecha_factura || '-')}</td>
+                        <td>${escapeHtml(f.proveedor || '-')}</td>
+                        <td>${escapeHtml(f.numero_factura || '-')}</td>
+                        <td>$${formatearMonto(f.monto_total || 0)}</td>
+                        <td>
+                            <div>${escapeHtml(f.archivo_nombre_original || '-')}</div>
+                            <span class="file-chip">${escapeHtml(extension)}</span>
+                        </td>
+                        <td>${escapeHtml(f.creado || '-')}</td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-light" type="button" onclick='abrirModalEditarFactura(${id}, ${proveedorArg}, ${fechaArg}, ${numeroArg}, ${montoArg}, ${observacionArg})'>Editar</button>
+                                <a class="btn btn-light" target="_blank" href="/facturas/archivo/${id}">Ver</a>
+                                <a class="btn btn-light" href="/facturas/archivo/${id}?download=1">Descargar</a>
+                                <button class="btn btn-danger" type="button" onclick="eliminarFactura(${id})">Eliminar</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            facturasListadoRoot.innerHTML = `
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Proveedor</th>
+                                <th>Numero</th>
+                                <th>Monto</th>
+                                <th>Archivo</th>
+                                <th>Cargado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>${body}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        async function recargarFacturasEnPantalla(options = {}) {
+            const preserveScroll = options.preserveScroll !== false;
+            const scrollY = window.scrollY || 0;
+            const queryFacturas = construirQueryFacturas(false);
+            const queryNavegacion = construirQueryFacturas(true);
+            const url = queryFacturas ? `/api/facturas/listado?${queryFacturas}` : '/api/facturas/listado';
+            const basePath = baseFacturasPath();
+            const browserUrl = queryNavegacion ? `${basePath}?${queryNavegacion}` : basePath;
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo actualizar el listado de facturas');
+            }
+            window.history.replaceState({}, '', browserUrl);
+            renderListadoFacturas(data.facturas || []);
+            renderTotalesFacturas(data.totales || {});
+            if (preserveScroll) {
+                window.requestAnimationFrame(() => window.scrollTo(0, scrollY));
+            }
+            return data;
+        }
+
+        function limpiarFiltrosFacturas() {
+            const proveedor = document.getElementById('filtro-proveedor');
+            const mes = document.getElementById('filtro-mes');
+            const q = document.getElementById('filtro-q');
+            if (proveedor) proveedor.value = '';
+            if (mes) mes.value = '';
+            if (q) q.value = '';
+            recargarFacturasEnPantalla({ preserveScroll: false }).catch((err) => {
+                alert('[ERROR] ' + err.message);
+            });
+        }
+
+        async function recalcularSiiResumen() {
+            const btn = document.getElementById('btnRecalcularSii');
+            const query = construirQuerySii();
+            const url = query ? `/api/facturas/sii-resumen?${query}` : '/api/facturas/sii-resumen';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Recalculando...';
+            }
+            setSiiMsg('Calculando estimado tributario...');
+
+            try {
+                const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo calcular el resumen SII');
+                }
+                renderSiiResumen(data.resumen || {});
+                actualizarLinkCsvSii();
+                const browserQuery = construirQueryFacturas(true);
+                const basePath = baseFacturasPath();
+                const browserUrl = browserQuery ? `${basePath}?${browserQuery}` : basePath;
+                window.history.replaceState({}, '', browserUrl);
+                setSiiMsg('Estimado actualizado.', true);
+            } catch (err) {
+                setSiiMsg('[ERROR] ' + err.message, false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Recalcular estimado';
+                }
+            }
+        }
+
+        async function guardarAjustesTablaSii() {
+            const btn = document.getElementById('btnGuardarTablaSii');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+            }
+            setSiiMsg('Guardando ajustes manuales...');
+            try {
+                const sii = leerParametrosSii();
+                const ajustes = leerAjustesTablaSii();
+                const response = await fetch('/api/facturas/sii-ajustes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        anio: sii.anio,
+                        iva_pct: sii.iva_pct,
+                        comision_apps_pct: sii.comision_apps_pct,
+                        ppm_pct: sii.ppm_pct,
+                        ajustes: ajustes
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudieron guardar los ajustes SII');
+                }
+                renderSiiResumen(data.resumen || {});
+                actualizarLinkCsvSii();
+                const browserQuery = construirQueryFacturas(true);
+                const basePath = baseFacturasPath();
+                const browserUrl = browserQuery ? `${basePath}?${browserQuery}` : basePath;
+                window.history.replaceState({}, '', browserUrl);
+                setSiiMsg('Ajustes SII guardados.', true);
+            } catch (err) {
+                setSiiMsg('[ERROR] ' + err.message, false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Guardar tabla editable';
+                }
+            }
+        }
+
+        async function limpiarAjustesTablaSii() {
+            if (!confirm('Se eliminar\u00e1n los ajustes manuales del a\u00f1o seleccionado. \u00bfContinuar?')) return;
+            const btn = document.getElementById('btnLimpiarAjustesSii');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Limpiando...';
+            }
+            setSiiMsg('Limpiando ajustes manuales...');
+            try {
+                const sii = leerParametrosSii();
+                const response = await fetch('/api/facturas/sii-ajustes/limpiar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        anio: sii.anio,
+                        iva_pct: sii.iva_pct,
+                        comision_apps_pct: sii.comision_apps_pct,
+                        ppm_pct: sii.ppm_pct
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudieron limpiar los ajustes SII');
+                }
+                renderSiiResumen(data.resumen || {});
+                actualizarLinkCsvSii();
+                const browserQuery = construirQueryFacturas(true);
+                const basePath = baseFacturasPath();
+                const browserUrl = browserQuery ? `${basePath}?${browserQuery}` : basePath;
+                window.history.replaceState({}, '', browserUrl);
+                setSiiMsg('Ajustes manuales eliminados.', true);
+            } catch (err) {
+                setSiiMsg('[ERROR] ' + err.message, false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Limpiar ajustes manuales';
+                }
+            }
+        }
+
+        function setUploadMsg(text, ok = null) {
+            const el = document.getElementById('uploadFacturaMsg');
+            if (!el) return;
+            el.textContent = text;
+            el.classList.remove('error', 'ok');
+            if (ok === true) {
+                el.classList.add('ok');
+            } else if (ok === false) {
+                el.classList.add('error');
+            }
+        }
+
+        function setEditarMsg(text, ok = null) {
+            const el = document.getElementById('editarFacturaMsg');
+            if (!el) return;
+            el.textContent = text;
+            el.classList.remove('error', 'ok');
+            if (text && ok === true) {
+                el.classList.add('ok');
+            } else if (text && ok === false) {
+                el.classList.add('error');
+            }
+        }
+
+        function abrirModalEditarFactura(id, proveedor, fechaFactura, numeroFactura, montoTotal, observacion) {
+            document.getElementById('edit-factura-id').value = String(id || '');
+            document.getElementById('edit-factura-proveedor').value = proveedor || '';
+            document.getElementById('edit-factura-fecha').value = fechaFactura || '';
+            document.getElementById('edit-factura-numero').value = numeroFactura || '';
+            document.getElementById('edit-factura-monto').value = Number(montoTotal || 0);
+            document.getElementById('edit-factura-observacion').value = observacion || '';
+            setEditarMsg('');
+            document.getElementById('modalEditarFactura').classList.add('active');
+        }
+
+        function cerrarModalEditarFactura() {
+            const modal = document.getElementById('modalEditarFactura');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
+        const editarFacturaForm = document.getElementById('editarFacturaForm');
+        if (editarFacturaForm) {
+            editarFacturaForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const facturaId = parseInt(document.getElementById('edit-factura-id').value || '0', 10);
+                if (!facturaId) {
+                    setEditarMsg('Factura inválida.');
+                    return;
+                }
+
+                const btn = document.getElementById('btnGuardarEdicionFactura');
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+                setEditarMsg('Actualizando factura...');
+
+                const payload = {
+                    proveedor: document.getElementById('edit-factura-proveedor').value.trim(),
+                    fecha_factura: document.getElementById('edit-factura-fecha').value,
+                    numero_factura: document.getElementById('edit-factura-numero').value.trim(),
+                    monto_total: document.getElementById('edit-factura-monto').value || 0,
+                    observacion: document.getElementById('edit-factura-observacion').value.trim()
+                };
+
+                try {
+                    const response = await fetch(`/api/facturas/${facturaId}/actualizar`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (!data.success) throw new Error(data.error || 'No se pudo actualizar');
+                    setEditarMsg('Factura actualizada correctamente.', true);
+                    await recargarFacturasEnPantalla();
+                    cerrarModalEditarFactura();
+                } catch (err) {
+                    setEditarMsg('[ERROR] ' + err.message, false);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Guardar cambios';
+                }
+            });
+        }
+
+        const fechaInput = document.getElementById('fechaFacturaInput');
+        if (fechaInput && !fechaInput.value) {
+            const hoy = new Date();
+            const y = hoy.getFullYear();
+            const m = String(hoy.getMonth() + 1).padStart(2, '0');
+            const d = String(hoy.getDate()).padStart(2, '0');
+            fechaInput.value = `${y}-${m}-${d}`;
+        }
+
+        const uploadForm = document.getElementById('uploadFacturaForm');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('btnSubirFacturas');
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+                setUploadMsg('Subiendo archivos...');
+
+                try {
+                    const formData = new FormData(uploadForm);
+                    const response = await fetch('/api/facturas/subir', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    if (!data.success) throw new Error(data.error || 'No se pudo guardar');
+                    setUploadMsg('Facturas guardadas correctamente.', true);
+                    await recargarFacturasEnPantalla({ preserveScroll: false });
+                    uploadForm.reset();
+                    if (fechaInput) {
+                        const hoy = new Date();
+                        const y = hoy.getFullYear();
+                        const m = String(hoy.getMonth() + 1).padStart(2, '0');
+                        const d = String(hoy.getDate()).padStart(2, '0');
+                        fechaInput.value = `${y}-${m}-${d}`;
+                    }
+                } catch (err) {
+                    setUploadMsg('[ERROR] ' + err.message, false);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Guardar facturas';
+                }
+            });
+        }
+
+        async function eliminarFactura(id) {
+            if (!confirm('Eliminar esta factura del archivo?')) return;
+            try {
+                const response = await fetch(`/api/facturas/${id}/eliminar`, { method: 'POST' });
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'No se pudo eliminar');
+                await recargarFacturasEnPantalla();
+            } catch (err) {
+                alert('[ERROR] ' + err.message);
+            }
+        }
+
+        if (filtrosFacturasForm) {
+            filtrosFacturasForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                try {
+                    await recargarFacturasEnPantalla({ preserveScroll: false });
+                } catch (err) {
+                    alert('[ERROR] ' + err.message);
+                }
+            });
+        }
+
+        const siiInputs = [
+            document.getElementById('sii-anio'),
+            document.getElementById('sii-iva-pct'),
+            document.getElementById('sii-comision-apps-pct'),
+            document.getElementById('sii-ppm-pct')
+        ].filter(Boolean);
+
+        for (const input of siiInputs) {
+            input.addEventListener('input', () => {
+                actualizarLinkCsvSii();
+                recalcularTodasFilasSiiDesdeBruta();
+                setSiiMsg('Hay cambios pendientes por recalcular.');
+            });
+            input.addEventListener('change', () => {
+                actualizarLinkCsvSii();
+                recalcularTodasFilasSiiDesdeBruta();
+                setSiiMsg('Hay cambios pendientes por recalcular.');
+            });
+        }
+
+        const btnRecalcularSii = document.getElementById('btnRecalcularSii');
+        if (btnRecalcularSii) {
+            btnRecalcularSii.addEventListener('click', () => {
+                recalcularSiiResumen();
+            });
+        }
+
+        const btnGuardarTablaSii = document.getElementById('btnGuardarTablaSii');
+        if (btnGuardarTablaSii) {
+            btnGuardarTablaSii.addEventListener('click', () => {
+                guardarAjustesTablaSii();
+            });
+        }
+
+        const btnLimpiarAjustesSii = document.getElementById('btnLimpiarAjustesSii');
+        if (btnLimpiarAjustesSii) {
+            btnLimpiarAjustesSii.addEventListener('click', () => {
+                limpiarAjustesTablaSii();
+            });
+        }
+
+        const siiMensualBody = document.getElementById('sii-mensual-body');
+        if (siiMensualBody) {
+            siiMensualBody.addEventListener('input', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLInputElement)) return;
+                if (!target.classList.contains('sii-edit-input')) return;
+                const fila = target.closest('tr[data-mes-clave]');
+                if (!fila) return;
+                const field = String(target.getAttribute('data-field') || '');
+                if (field === 'ventas_brutas') {
+                    recalcularFilaSiiDesdeBruta(fila);
+                } else if (field === 'iva_credito_estimado') {
+                    recalcularIvaNetoFila(fila);
+                }
+                fila.setAttribute('data-dirty', '1');
+                if (!fila.classList.contains('sii-row-manual')) {
+                    fila.classList.add('sii-row-manual');
+                }
+                setSiiMsg('Hay cambios pendientes por guardar.');
+            });
+        }
+
+        actualizarLinkCsvSii();
+
+        fetch('/api/alertas/contador')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('nav-alertas');
+                if (!badge) return;
+                badge.textContent = data.total;
+                badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
+            });
+
+        const modalEditar = document.getElementById('modalEditarFactura');
+        if (modalEditar) {
+            modalEditar.addEventListener('click', function (e) {
+                if (e.target === this) cerrarModalEditarFactura();
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (modalEditar && modalEditar.classList.contains('active')) {
+                cerrarModalEditarFactura();
+            }
+        });
+    </script>
+    <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

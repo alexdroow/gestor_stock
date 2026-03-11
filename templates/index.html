@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio - Sucr&eacute;e Pasteler&iacute;a</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --secondary: #f97316;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #0f172a;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .logo-text span {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav-item:hover {
+            background: #fff7ed;
+            color: var(--primary-dark);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .nav-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+        }
+
+        .sidebar-footer {
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 40px;
+            max-width: calc(100% - 260px);
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .page-heading {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            color: #64748b;
+        }
+
+        .header-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            background: #fff7ed;
+            color: #b45309;
+            font-size: 13px;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+
+        .header-link:hover {
+            border-color: #f59e0b;
+            background: #ffedd5;
+            color: #92400e;
+        }
+
+        .header-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .inicio-notas {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 24px;
+        }
+
+        .inicio-notas-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .inicio-notas-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .inicio-notas-link {
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 700;
+            color: #d97706;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 999px;
+            padding: 7px 12px;
+        }
+
+        .inicio-notas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
+        }
+
+        .inicio-nota {
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            min-height: 110px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .inicio-nota.amarilla { background: #fef9c3; }
+        .inicio-nota.naranja { background: #ffedd5; }
+        .inicio-nota.verde { background: #dcfce7; }
+        .inicio-nota.azul { background: #dbeafe; }
+        .inicio-nota.rosa { background: #fce7f3; }
+        .inicio-nota.lila { background: #ede9fe; }
+
+        .inicio-nota-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.25;
+        }
+
+        .inicio-nota-body {
+            font-size: 13px;
+            color: #334155;
+            white-space: pre-wrap;
+            flex: 1;
+        }
+
+        .inicio-nota-foot {
+            font-size: 11px;
+            color: #475569;
+        }
+
+        .inicio-nota-empty {
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            background: #f8fafc;
+            color: #64748b;
+            padding: 18px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .alerta-vencimiento {
+            display: none;
+            border: 1px solid #fcd34d;
+            background: #fffbeb;
+            color: #92400e;
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .alerta-desactivacion {
+            display: none;
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .alerta-desactivacion-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        .alerta-desactivacion-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #f97316;
+            background: #fff;
+            color: #c2410c;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .alerta-desactivacion-lista {
+            font-size: 13px;
+            font-weight: 500;
+            color: #7c2d12;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #64748b;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .stat-icon.blue { background: #dbeafe; }
+        .stat-icon.green { background: #d1fae5; }
+        .stat-icon.red { background: #fee2e2; }
+        .stat-icon.orange { background: #ffedd5; }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .stat-value.warning { color: #ef4444; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #0f172a;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .action-btn {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            text-decoration: none;
+            color: #0f172a;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+        }
+
+        .action-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .action-label {
+            font-weight: 600;
+        }
+
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .sidebar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        body.dark-mode .logo-text,
+        body.dark-mode .page-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .nav-item {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .nav-item:hover {
+            background: #334155;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .main-content {
+            background: #0f172a;
+        }
+
+        body.dark-mode .stat-card,
+        body.dark-mode .chart-card,
+        body.dark-mode .action-btn,
+        body.dark-mode .inicio-notas {
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        body.dark-mode .inicio-notas-title,
+        body.dark-mode .stat-value,
+        body.dark-mode .chart-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .inicio-notas-link {
+            color: #fbbf24;
+            border-color: #92400e;
+            background: #451a03;
+        }
+
+        body.dark-mode .inicio-nota {
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        body.dark-mode .inicio-nota-title {
+            color: #0f172a;
+        }
+
+        body.dark-mode .inicio-nota-body {
+            color: #1e293b;
+        }
+
+        body.dark-mode .inicio-nota-foot {
+            color: #334155;
+        }
+
+        body.dark-mode .inicio-nota-empty {
+            border-color: #475569;
+            background: #0f172a;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .header-link {
+            background: #1f2937;
+            border-color: #475569;
+            color: #fbbf24;
+        }
+
+        body.dark-mode .header-link:hover {
+            background: #334155;
+            border-color: #f59e0b;
+            color: #fde68a;
+        }
+
+        body.dark-mode .alerta-vencimiento {
+            background: #3f2b03;
+            border-color: #854d0e;
+            color: #fcd34d;
+        }
+
+        body.dark-mode .alerta-desactivacion {
+            background: #3f2b03;
+            border-color: #c2410c;
+            color: #fdba74;
+        }
+
+        body.dark-mode .alerta-desactivacion-link {
+            background: #451a03;
+            border-color: #c2410c;
+            color: #fdba74;
+        }
+
+        body.dark-mode .alerta-desactivacion-lista {
+            color: #fed7aa;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar { width: 240px; }
+            .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+            .quick-actions { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display: flex; min-height: 100vh;">
+        {% include "_sidebar.html" %}
+
+        <main class="main-content">
+            <div class="page-header">
+                <div class="page-heading">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Resumen de tu pasteler&iacute;a hoy</p>
+                </div>
+                <div class="header-actions">
+                    <a href="/historial-cambios" class="header-link">&#128221; Historial de cambios</a>
+                    <a href="/correlacion-operativa" class="header-link">&#128279; Correlaci&oacute;n operativa</a>
+                </div>
+            </div>
+
+            <section class="inicio-notas" id="inicio-notas-wrap">
+                <div class="inicio-notas-head">
+                    <div class="inicio-notas-title">&#128204; Notas fijadas</div>
+                    <a href="/agenda" class="inicio-notas-link">Abrir agenda</a>
+                </div>
+                <div class="inicio-notas-grid" id="inicio-notas-grid">
+                    <div class="inicio-nota-empty">Cargando notas fijadas...</div>
+                </div>
+            </section>
+
+            <div class="alerta-vencimiento" id="alerta-vencimiento">
+                <span id="alerta-vencimiento-texto"></span>
+            </div>
+
+            <div class="alerta-desactivacion" id="alerta-desactivacion-manual">
+                <div class="alerta-desactivacion-head">
+                    <span id="alerta-desactivacion-texto"></span>
+                    <a href="/ventas?filtro=baja_porcion" class="alerta-desactivacion-link">Ir a ventas</a>
+                </div>
+                <div class="alerta-desactivacion-lista" id="alerta-desactivacion-lista"></div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Productos</span>
+                        <div class="stat-icon blue">&#128202;</div>
+                    </div>
+                    <div class="stat-value" id="stat-productos">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Insumos</span>
+                        <div class="stat-icon green">&#127806;</div>
+                    </div>
+                    <div class="stat-value" id="stat-insumos">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Alertas</span>
+                        <div class="stat-icon red">&#128276;</div>
+                    </div>
+                    <div class="stat-value warning" id="stat-alertas">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Ventas Hoy</span>
+                        <div class="stat-icon orange">&#128176;</div>
+                    </div>
+                    <div class="stat-value" id="stat-ventas">-</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3 class="chart-title">&#128200; Ventas &Uacute;ltimos 7 D&iacute;as</h3>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="ventasChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3 class="chart-title">&#129383; Productos M&aacute;s Vendidos</h3>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="productosChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 600;">&#9889; Accesos R&aacute;pidos</h3>
+            <div class="quick-actions">
+                <a href="/ventas" class="action-btn">
+                    <div class="action-icon">&#128722;</div>
+                    <div class="action-label">Nueva Venta</div>
+                </a>
+                <a href="/produccion" class="action-btn">
+                    <div class="action-icon">&#129473;</div>
+                    <div class="action-label">Producci&oacute;n</div>
+                </a>
+                <a href="/productos" class="action-btn">
+                    <div class="action-icon">&#10133;</div>
+                    <div class="action-label">Agregar Producto</div>
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    ">&#127769;</button>
+
+    <script>
+    let ventasChartInstance = null;
+    let productosChartInstance = null;
+
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('darkModeBtn').textContent = '\u2600';
+    }
+
+    function toggleDarkMode() {
+        const body = document.body;
+        const btn = document.getElementById('darkModeBtn');
+
+        if (body.classList.contains('dark-mode')) {
+            body.classList.remove('dark-mode');
+            btn.textContent = '\uD83C\uDF19';
+            localStorage.setItem('darkMode', 'false');
+        } else {
+            body.classList.add('dark-mode');
+            btn.textContent = '\u2600';
+            localStorage.setItem('darkMode', 'true');
+        }
+        cargarGraficoVentas();
+        cargarGraficoProductos();
+    }
+
+    function escapeHtml(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatearNotaFecha(value) {
+        const txt = String(value || '').trim();
+        if (!txt) return '';
+        const dt = new Date(txt.replace(' ', 'T'));
+        if (Number.isNaN(dt.getTime())) return '';
+        return dt.toLocaleString('es-CL');
+    }
+
+    function formatearEntero(valor) {
+        const numero = Math.trunc(Number(valor || 0));
+        if (!Number.isFinite(numero) || numero < 0) return '0';
+        return String(numero);
+    }
+
+    function renderNotasFijadasInicio(notas) {
+        const grid = document.getElementById('inicio-notas-grid');
+        if (!grid) return;
+
+        const fijadas = (Array.isArray(notas) ? notas : [])
+            .filter(n => Boolean(n && n.fijada) && (n.estado || 'activa') === 'activa')
+            .slice(0, 6);
+
+        if (!fijadas.length) {
+            grid.innerHTML = '<div class="inicio-nota-empty">No hay notas fijadas activas. Puedes fijarlas desde Agenda.</div>';
+            return;
+        }
+
+        grid.innerHTML = fijadas.map(nota => {
+            const color = String(nota.color || 'amarilla').toLowerCase();
+            const texto = (nota.contenido || '').trim();
+            const resumen = texto.length > 160 ? `${texto.slice(0, 160)}...` : (texto || 'Sin detalle');
+            const fecha = formatearNotaFecha(nota.recordatorio || nota.actualizada);
+            return `
+                <article class="inicio-nota ${escapeHtml(color)}">
+                    <div class="inicio-nota-title">${escapeHtml(nota.titulo || 'Nota')}</div>
+                    <div class="inicio-nota-body">${escapeHtml(resumen)}</div>
+                    <div class="inicio-nota-foot">${fecha ? `&#128340; ${escapeHtml(fecha)}` : 'Sin recordatorio'}</div>
+                </article>
+            `;
+        }).join('');
+    }
+
+    function cargarNotasFijadasInicio() {
+        fetch('/api/agenda/notas')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) throw new Error(data.error || 'No se pudieron cargar notas');
+                renderNotasFijadasInicio(data.notas || []);
+            })
+            .catch(() => {
+                const grid = document.getElementById('inicio-notas-grid');
+                if (grid) {
+                    grid.innerHTML = '<div class="inicio-nota-empty">No se pudieron cargar notas fijadas.</div>';
+                }
+            });
+    }
+
+    function cargarEstadisticas() {
+        fetch('/api/estadisticas')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('stat-productos').textContent = data.productos ?? 0;
+                document.getElementById('stat-insumos').textContent = data.insumos ?? 0;
+                document.getElementById('stat-alertas').textContent = data.alertas ?? 0;
+                document.getElementById('stat-ventas').textContent = formatearEntero(data.ventas_hoy || 0);
+
+                if (Number(data.por_vencer || 0) > 0) {
+                    const alerta = document.getElementById('alerta-vencimiento');
+                    const texto = document.getElementById('alerta-vencimiento-texto');
+                    if (alerta && texto) {
+                        alerta.style.display = 'block';
+                        texto.textContent = `Tienes ${data.por_vencer} productos por vencer en los proximos dias.`;
+                    }
+                }
+            })
+            .catch(() => {
+                document.getElementById('stat-productos').textContent = '0';
+                document.getElementById('stat-insumos').textContent = '0';
+                document.getElementById('stat-alertas').textContent = '0';
+                document.getElementById('stat-ventas').textContent = '0';
+            });
+    }
+
+    function cargarAvisoDesactivacionesPendientes() {
+        fetch('/api/ventas/desactivaciones-pendientes')
+            .then(r => r.json())
+            .then(data => {
+                const box = document.getElementById('alerta-desactivacion-manual');
+                const texto = document.getElementById('alerta-desactivacion-texto');
+                const lista = document.getElementById('alerta-desactivacion-lista');
+                if (!box || !texto || !lista) return;
+                if (!data.success) {
+                    box.style.display = 'none';
+                    return;
+                }
+
+                const pendientes = Array.isArray(data.pendientes) ? data.pendientes : [];
+                if (!pendientes.length) {
+                    box.style.display = 'none';
+                    return;
+                }
+
+                const total = Number(data.total || pendientes.length || 0);
+                texto.textContent = `Tienes ${total} producto(s) critico(s) pendiente(s) de desactivacion manual.`;
+                const nombres = pendientes
+                    .slice(0, 4)
+                    .map((p) => String(p.nombre || 'Producto').trim())
+                    .filter(Boolean);
+                const extra = total > nombres.length ? ` +${total - nombres.length} mas` : '';
+                lista.textContent = `Pendientes: ${nombres.join(', ')}${extra}`;
+                box.style.display = 'block';
+            })
+            .catch(() => {
+                const box = document.getElementById('alerta-desactivacion-manual');
+                if (box) box.style.display = 'none';
+            });
+    }
+
+    function cargarContadorAlertas() {
+        fetch('/api/alertas/contador')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('nav-alertas');
+                if (!badge) return;
+                badge.textContent = data.total || 0;
+                badge.style.display = (data.total || 0) > 0 ? 'inline-flex' : 'none';
+            })
+            .catch(() => {});
+    }
+
+    function cargarGraficoVentas() {
+        const canvas = document.getElementById('ventasChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        fetch('/api/reportes/ventas-semanal')
+            .then(r => r.json())
+            .then(data => {
+                const labels = Array.isArray(data.labels) ? data.labels : [];
+                const values = (Array.isArray(data.values) ? data.values : []).map(v => Number(v) || 0);
+                if (!labels.length || !values.length) {
+                    canvas.parentElement.innerHTML = '<p style="text-align:center;padding:100px 20px;color:#64748b;">Sin datos de ventas</p>';
+                    return;
+                }
+
+                if (ventasChartInstance) ventasChartInstance.destroy();
+
+                const isDark = document.body.classList.contains('dark-mode');
+                const textColor = isDark ? '#e2e8f0' : '#334155';
+                const gridColor = isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.2)';
+
+                ventasChartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Ventas',
+                            data: values,
+                            borderColor: '#f59e0b',
+                            backgroundColor: isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.35,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: textColor },
+                                grid: { color: gridColor }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: { color: textColor },
+                                grid: { color: gridColor }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(() => {
+                canvas.parentElement.innerHTML = '<p style="text-align:center;padding:100px 20px;color:#64748b;">Error cargando ventas</p>';
+            });
+    }
+
+    function cargarGraficoProductos() {
+        const canvas = document.getElementById('productosChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        fetch('/api/reportes/top-productos')
+            .then(r => r.json())
+            .then(data => {
+                const labels = Array.isArray(data.labels) ? data.labels : [];
+                const values = Array.isArray(data.values) ? data.values : [];
+                if (!labels.length || !values.length) {
+                    canvas.parentElement.innerHTML = '<p style="text-align:center;padding:100px 20px;color:#64748b;">No hay datos</p>';
+                    return;
+                }
+
+                if (productosChartInstance) productosChartInstance.destroy();
+
+                const isDark = document.body.classList.contains('dark-mode');
+                productosChartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: ['#f59e0b', '#f97316', '#fb923c', '#fdba74', '#fed7aa'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 15,
+                                    font: { size: 11 },
+                                    color: isDark ? '#e2e8f0' : '#334155'
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(() => {
+                canvas.parentElement.innerHTML = '<p style="text-align:center;padding:100px 20px;color:#64748b;">Error cargando productos</p>';
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        cargarNotasFijadasInicio();
+        cargarEstadisticas();
+        cargarAvisoDesactivacionesPendientes();
+        cargarContadorAlertas();
+        cargarGraficoVentas();
+        cargarGraficoProductos();
+    });
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>
+
+

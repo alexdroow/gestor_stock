@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes - Sucr&eacute;e Pasteler&iacute;a</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary:#f59e0b; --secondary:#f97316; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:#f8fafc; min-height:100vh; color:#0f172a; }
+        .sidebar { width:260px; background:white; border-right:1px solid #e2e8f0; padding:24px; display:flex; flex-direction:column; position:fixed; height:100vh; z-index:100; }
+        .logo { display:flex; align-items:center; gap:12px; padding-bottom:32px; border-bottom:1px solid #e2e8f0; margin-bottom:24px; }
+        .logo-icon { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--primary),var(--secondary)); display:flex; align-items:center; justify-content:center; font-size:24px; }
+        .logo-text { font-size:20px; font-weight:700; color:#0f172a; }
+        .logo-text span { background:linear-gradient(135deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .nav-menu { display:flex; flex-direction:column; gap:8px; flex:1; }
+        .nav-item { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; text-decoration:none; color:#64748b; font-weight:500; transition:all .2s ease; }
+        .nav-item:hover { background:#fff7ed; color:#d97706; }
+        .nav-item.active { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:white; }
+        .nav-item .icon { font-size:20px; width:24px; text-align:center; }
+        .nav-badge { margin-left:auto; background:#ef4444; color:white; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; min-width:28px; }
+        .sidebar-footer { padding-top:24px; border-top:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center; }
+
+        .main-content { margin-left:260px; padding:28px 32px; width:calc(100vw - 260px); max-width:none; }
+        .page-title { font-size:32px; font-weight:700; color:#0f172a; }
+        .page-subtitle { color:#64748b; margin-top:4px; margin-bottom:20px; }
+
+        .card { background:white; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; margin-bottom:16px; }
+        .card-header { padding:16px 20px; border-bottom:1px solid #e2e8f0; font-weight:700; }
+        .card-body { padding:16px 20px; }
+
+        .filters-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; align-items:end; }
+        .form-group label { display:block; font-size:12px; color:#64748b; margin-bottom:6px; font-weight:700; text-transform:uppercase; }
+        .form-group input, .form-group select { width:100%; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:14px; }
+
+        .btn { border:none; border-radius:10px; padding:11px 16px; font-size:14px; font-weight:700; cursor:pointer; }
+        .btn-primary { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:white; }
+        .btn-secondary { background:#f1f5f9; border:1px solid #e2e8f0; color:#334155; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+        .btn-row { border:1px solid #e2e8f0; background:#f8fafc; color:#0f172a; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; }
+
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+        .stat-card { background:white; border:1px solid #e2e8f0; border-radius:14px; padding:14px; }
+        .stat-label { font-size:12px; color:#64748b; margin-bottom:8px; text-transform:uppercase; font-weight:700; }
+        .stat-value { font-size:30px; font-weight:800; color:#0f172a; }
+
+        .tabs { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+        .tab-btn { border:1px solid #e2e8f0; background:#f8fafc; color:#475569; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:700; cursor:pointer; }
+        .tab-btn.active { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:white; border-color:transparent; }
+        .tab-panel { display:none; }
+        .tab-panel.active { display:block; }
+
+        .table-wrapper { overflow-x:auto; }
+        .data-table { width:100%; border-collapse:collapse; min-width:760px; font-size:13px; }
+        .data-table th { text-align:left; padding:11px 12px; border-bottom:1px solid #e2e8f0; background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; }
+        .data-table td { padding:11px 12px; border-bottom:1px solid #f1f5f9; }
+
+        .status-badge { display:inline-flex; border-radius:999px; padding:4px 10px; font-size:11px; font-weight:700; text-transform:uppercase; }
+        .status-badge.activa { background:#fee2e2; color:#991b1b; }
+        .status-badge.revertida { background:#dcfce7; color:#166534; }
+        .status-badge.alta { background:#fee2e2; color:#991b1b; }
+        .status-badge.media { background:#fef3c7; color:#92400e; }
+        .status-badge.baja { background:#dbeafe; color:#1e40af; }
+        .helper { font-size:13px; color:#64748b; margin-bottom:10px; }
+        .empty-state { text-align:center; color:#64748b; padding:20px 12px; border:1px dashed #cbd5e1; border-radius:10px; background:#f8fafc; }
+
+        .auto-card-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+        .auto-title { font-size:16px; font-weight:700; color:#0f172a; }
+        .auto-meta { font-size:12px; color:#64748b; }
+        .auto-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+        .auto-item { border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#f8fafc; }
+        .auto-item-top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+        .auto-item-label { font-size:13px; font-weight:700; color:#1e293b; }
+        .auto-item-value { font-size:22px; font-weight:800; color:#0f172a; }
+        .auto-item-detail { font-size:12px; color:#64748b; }
+        .auto-status { font-size:10px; font-weight:700; border-radius:999px; padding:2px 8px; border:1px solid transparent; text-transform:uppercase; letter-spacing:.04em; }
+        .auto-status.ok { background:#dcfce7; color:#166534; border-color:#86efac; }
+        .auto-status.warning { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+        .auto-status.critical { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+        .auto-actions { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+        .btn-mini { border:1px solid #e2e8f0; background:#ffffff; color:#334155; border-radius:9px; padding:7px 10px; font-size:12px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+        .btn-mini:hover { border-color:#f59e0b; color:#b45309; background:#fff7ed; }
+        .margin-note { border:1px solid #fcd34d; background:#fffbeb; border-radius:12px; padding:12px 14px; margin-bottom:16px; color:#92400e; font-size:13px; }
+        .margin-note strong { color:#78350f; }
+        .margin-note.hidden { display:none; }
+        .weekly-compare-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-bottom:10px; }
+        .weekly-metric { border:1px solid #e2e8f0; border-radius:11px; background:#f8fafc; padding:10px; display:flex; flex-direction:column; gap:5px; }
+        .weekly-metric-label { font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700; }
+        .weekly-metric-value { font-size:22px; font-weight:800; color:#0f172a; }
+        .weekly-metric-value.negative, .money-negative { color:#b91c1c; font-weight:800; }
+        .weekly-metric-value.positive, .money-positive { color:#047857; font-weight:800; }
+
+        body.dark-mode { background:#0f172a; color:#f1f5f9; }
+        body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
+        body.dark-mode .logo-text { color:#f1f5f9; }
+        body.dark-mode .nav-item { color:#94a3b8; }
+        body.dark-mode .nav-item:hover { background:#334155; color:#f1f5f9; }
+        body.dark-mode .main-content { background:#0f172a; }
+        body.dark-mode .page-title { color:#f1f5f9; }
+        body.dark-mode .card, body.dark-mode .stat-card { background:#1e293b; border-color:#334155; }
+        body.dark-mode .stat-label, body.dark-mode .page-subtitle, body.dark-mode .helper { color:#94a3b8; }
+        body.dark-mode .stat-value { color:#f8fafc; }
+        body.dark-mode .tab-btn { background:#334155; border-color:#475569; color:#cbd5e1; }
+        body.dark-mode .data-table th { background:#334155; border-color:#475569; color:#94a3b8; }
+        body.dark-mode .data-table td { border-color:#334155; color:#f1f5f9; }
+        body.dark-mode .form-group input, body.dark-mode .form-group select { background:#334155; border-color:#475569; color:#f1f5f9; }
+        body.dark-mode .btn-secondary { background:#334155; border-color:#475569; color:#e2e8f0; }
+        body.dark-mode .empty-state { background:#334155; border-color:#475569; color:#cbd5e1; }
+        body.dark-mode .btn-row { background:#334155; border-color:#475569; color:#f1f5f9; }
+        body.dark-mode .auto-title { color:#f8fafc; }
+        body.dark-mode .auto-meta { color:#94a3b8; }
+        body.dark-mode .auto-item { background:#334155; border-color:#475569; }
+        body.dark-mode .auto-item-label { color:#f1f5f9; }
+        body.dark-mode .auto-item-value { color:#f8fafc; }
+        body.dark-mode .auto-item-detail { color:#94a3b8; }
+        body.dark-mode .auto-status.ok { background:rgba(22, 101, 52, 0.35); color:#bbf7d0; border-color:#166534; }
+        body.dark-mode .auto-status.warning { background:rgba(146, 64, 14, 0.35); color:#fde68a; border-color:#92400e; }
+        body.dark-mode .auto-status.critical { background:rgba(153, 27, 27, 0.4); color:#fecaca; border-color:#991b1b; }
+        body.dark-mode .btn-mini { background:#1e293b; border-color:#475569; color:#e2e8f0; }
+        body.dark-mode .btn-mini:hover { background:#334155; border-color:#f59e0b; color:#fbbf24; }
+        body.dark-mode .margin-note { background:rgba(146, 64, 14, 0.22); border-color:#92400e; color:#fde68a; }
+        body.dark-mode .margin-note strong { color:#fef3c7; }
+        body.dark-mode .weekly-metric { background:#334155; border-color:#475569; }
+        body.dark-mode .weekly-metric-label { color:#94a3b8; }
+        body.dark-mode .weekly-metric-value { color:#f8fafc; }
+        body.dark-mode .weekly-metric-value.negative, body.dark-mode .money-negative { color:#fca5a5; }
+        body.dark-mode .weekly-metric-value.positive, body.dark-mode .money-positive { color:#86efac; }
+
+        @media (max-width: 1024px) { .sidebar { width:240px; } .main-content { margin-left:240px; width:calc(100vw - 240px); padding:24px; } .stats-grid { grid-template-columns:1fr; } }
+        @media (max-width: 768px) { .sidebar { transform:translateX(-100%); } .main-content { margin-left:0; width:100vw; padding:20px; } }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display: flex; min-height: 100vh;">
+        {% include "_sidebar.html" %}
+
+        <main class="main-content">
+            <h1 class="page-title">Reportes operativos</h1>
+            <p class="page-subtitle">Producción, insumos, productos, merma, kardex y compras sugeridas en un solo panel.</p>
+
+            <div class="card">
+                <div class="card-header">Filtros por rango</div>
+                <div class="card-body">
+                    <form id="form-reportes-filtros" class="filters-form" method="GET" action="/reportes">
+                        <div class="form-group">
+                            <label>Desde</label>
+                            <input type="date" name="desde" value="{{ fecha_desde }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Hasta</label>
+                            <input type="date" name="hasta" value="{{ fecha_hasta }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Histórico consumo (días)</label>
+                            <input type="number" min="7" step="1" name="dias_hist" value="{{ dias_hist }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Cobertura objetivo (días)</label>
+                            <input type="number" min="1" step="1" name="dias_cov" value="{{ dias_cov }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Kardex tipo</label>
+                            <input type="hidden" name="kardex_limit" value="{{ kardex_limit }}">
+                            <select name="kardex_tipo" style="width:100%; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:14px;">
+                                <option value="" {{ '' == kardex_tipo and 'selected' or '' }}>Todos</option>
+                                <option value="insumo" {{ 'insumo' == kardex_tipo and 'selected' or '' }}>Solo insumos</option>
+                                <option value="producto" {{ 'producto' == kardex_tipo and 'selected' or '' }}>Solo productos</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" type="submit">Aplicar rango</button>
+                        <a class="btn btn-secondary" href="/reportes">Últimos 30 días</a>
+                    </form>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-label">Total producido</div><div class="stat-value" id="stat-total-producido">{{ '%.2f'|format(total_producido|float) }}</div></div>
+                <div class="stat-card"><div class="stat-label">Insumos agregados (items)</div><div class="stat-value" id="stat-total-insumos">{{ total_insumos|int }}</div></div>
+                <div class="stat-card"><div class="stat-label">Productos agregados (items)</div><div class="stat-value" id="stat-total-productos">{{ total_productos|int }}</div></div>
+                <div class="stat-card"><div class="stat-label">Merma neta</div><div class="stat-value" id="stat-total-merma">{{ '%.2f'|format(total_merma_neta|float) }}</div></div>
+                <div class="stat-card"><div class="stat-label">Movimientos kardex</div><div class="stat-value" id="stat-total-movimientos">{{ total_movimientos|int }}</div></div>
+                <div class="stat-card"><div class="stat-label">Compras urgentes</div><div class="stat-value" id="stat-total-urgentes">{{ sugerencias_urgentes|int }}</div></div>
+                <div class="stat-card"><div class="stat-label">Ingresos ventas</div><div class="stat-value" id="stat-margen-ingresos">${{ '{:,.0f}'.format((margen.ingresos_totales or 0)|float) }}</div></div>
+                <div class="stat-card"><div class="stat-label">Costo total</div><div class="stat-value" id="stat-margen-costo">${{ '{:,.0f}'.format((margen.costo_total or 0)|float) }}</div></div>
+                <div class="stat-card"><div class="stat-label">Margen bruto</div><div class="stat-value" id="stat-margen-bruto">${{ '{:,.0f}'.format((margen.margen_bruto or 0)|float) }}</div></div>
+                <div class="stat-card"><div class="stat-label">Margen %</div><div class="stat-value" id="stat-margen-pct">{{ '%.2f'|format((margen.margen_pct or 0)|float) }}%</div></div>
+            </div>
+
+            {% set vs_totales = ventas_vs_compras.totales if ventas_vs_compras and ventas_vs_compras.totales else {} %}
+            {% set margen_sin_precio = (margen.lineas_sin_precio or 0)|int %}
+            {% set margen_sin_costo = (margen.lineas_sin_costo or 0)|int %}
+            <div id="margen-calidad-card" class="margin-note {{ '' if (margen_sin_precio > 0 or margen_sin_costo > 0) else 'hidden' }}">
+                Margen estimado con datos incompletos:
+                <strong id="margen-lineas-sin-precio">{{ margen_sin_precio }}</strong> línea(s) sin precio de venta y
+                <strong id="margen-lineas-sin-costo">{{ margen_sin_costo }}</strong> producto(s) sin costo calculado por receta.
+            </div>
+
+            <div class="card">
+                <div class="card-header">Ventas semanales manuales vs compras facturadas</div>
+                <div class="card-body">
+                    <p class="helper">
+                        Tasa servicio promedio: {{ '%.2f'|format((ventas_vs_compras.tasa_servicio_pct or 30)|float) }}%.
+                        Impuesto sobre tasa promedio: {{ '%.2f'|format((ventas_vs_compras.impuesto_tasa_servicio_pct or 19)|float) }}%.
+                    </p>
+                    <div class="weekly-compare-grid">
+                        <div class="weekly-metric">
+                            <span class="weekly-metric-label">Ventas</span>
+                            <span class="weekly-metric-value">${{ '{:,.0f}'.format((vs_totales.ventas_monto or vs_totales.ventas_brutas or 0)|float) }}</span>
+                        </div>
+                        <div class="weekly-metric">
+                            <span class="weekly-metric-label">Marketing</span>
+                            <span class="weekly-metric-value negative">${{ '{:,.0f}'.format((vs_totales.marketing_monto or 0)|float) }}</span>
+                        </div>
+                        <div class="weekly-metric">
+                            <span class="weekly-metric-label">Servicio total</span>
+                            <span class="weekly-metric-value negative">${{ '{:,.0f}'.format((vs_totales.costo_servicio_total or 0)|float) }}</span>
+                        </div>
+                        <div class="weekly-metric">
+                            <span class="weekly-metric-label">Otros descuentos</span>
+                            <span class="weekly-metric-value negative">${{ '{:,.0f}'.format((vs_totales.otros_descuentos_monto or 0)|float) }}</span>
+                        </div>
+                        <div class="weekly-metric">
+                            <span class="weekly-metric-label">Compras facturadas</span>
+                            <span class="weekly-metric-value">${{ '{:,.0f}'.format((vs_totales.compras_facturadas or 0)|float) }}</span>
+                        </div>
+                        <div class="weekly-metric">
+                            <span class="weekly-metric-label">Ganancias</span>
+                            <span class="weekly-metric-value {{ 'positive' if (vs_totales.ganancia_neta or vs_totales.saldo_estimado or 0)|float >= 0 else 'negative' }}">
+                                ${{ '{:,.0f}'.format((vs_totales.ganancia_neta or vs_totales.saldo_estimado or 0)|float) }}
+                            </span>
+                        </div>
+                        <div class="weekly-metric">
+                            <span class="weekly-metric-label">Ganancia vs compras</span>
+                            <span class="weekly-metric-value {{ 'positive' if (vs_totales.ganancia_vs_compras or vs_totales.saldo_vs_compras or 0)|float >= 0 else 'negative' }}">
+                                ${{ '{:,.0f}'.format((vs_totales.ganancia_vs_compras or vs_totales.saldo_vs_compras or 0)|float) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if ventas_vs_compras.semanas %}
+                    <div class="table-wrapper" style="margin-top: 10px;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Semana</th>
+                                    <th>Ventas</th>
+                                    <th>Marketing</th>
+                                    <th>Servicio total</th>
+                                    <th>Otros desc.</th>
+                                    <th>Compras factura</th>
+                                    <th>Ganancias</th>
+                                    <th>Ganancia vs compras</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in ventas_vs_compras.semanas %}
+                                <tr>
+                                    <td>{{ s.semana_inicio }} -> {{ s.semana_fin }}</td>
+                                    <td>${{ '{:,.0f}'.format((s.ventas_monto or s.ventas_brutas or 0)|float) }}</td>
+                                    <td>${{ '{:,.0f}'.format((s.marketing_monto or 0)|float) }}</td>
+                                    <td>${{ '{:,.0f}'.format((s.costo_servicio_total or 0)|float) }}</td>
+                                    <td>${{ '{:,.0f}'.format((s.otros_descuentos_monto or 0)|float) }}</td>
+                                    <td>${{ '{:,.0f}'.format((s.compras_facturadas or 0)|float) }}</td>
+                                    <td class="{{ 'money-positive' if (s.ganancia_neta or s.saldo_estimado or 0)|float >= 0 else 'money-negative' }}">
+                                        ${{ '{:,.0f}'.format((s.ganancia_neta or s.saldo_estimado or 0)|float) }}
+                                    </td>
+                                    <td class="{{ 'money-positive' if (s.ganancia_vs_compras or s.saldo_vs_compras or 0)|float >= 0 else 'money-negative' }}">
+                                        ${{ '{:,.0f}'.format((s.ganancia_vs_compras or s.saldo_vs_compras or 0)|float) }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">No hay semanas registradas en este rango. C&aacute;rgalas desde Ventas -> Ventas semanales.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="auto-card-head">
+                        <div>
+                            <div class="auto-title">Automatizaciones operativas</div>
+                            <div class="auto-meta" id="auto-meta">Chequeo rapido del estado operativo diario.</div>
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="cargarAutomatizaciones()">Actualizar</button>
+                    </div>
+                    <div class="auto-grid" id="auto-grid">
+                        <div class="empty-state">Cargando automatizaciones...</div>
+                    </div>
+                    <div class="auto-actions" id="auto-actions"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Comparativo general</div>
+                <div class="card-body"><div style="height: 240px; position: relative;"><canvas id="totalesChart"></canvas></div></div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="tab-produccion">Produccion</button>
+                <button class="tab-btn" data-tab="tab-insumos">Insumos agregados</button>
+                <button class="tab-btn" data-tab="tab-productos">Productos agregados</button>
+                <button class="tab-btn" data-tab="tab-mermas">Mermas productos</button>
+                <button class="tab-btn" data-tab="tab-kardex">Kardex</button>
+                <button class="tab-btn" data-tab="tab-compras">Compras sugeridas</button>
+            </div>
+
+            <div id="tab-produccion" class="tab-panel active">
+                <div class="card">
+                    <div class="card-header">Movimientos de produccion</div>
+                    <div class="card-body">
+                        {% if produccion %}
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Fecha</th><th>Receta</th><th>Lotes</th><th>Cantidad resultante</th></tr></thead>
+                                <tbody>
+                                    {% for r in produccion %}
+                                    <tr><td>{{ r.creado }}</td><td>{{ r.receta_nombre }}</td><td>{{ r.cantidad }}</td><td>{{ r.cantidad_resultado or r.cantidad }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No hay movimientos de produccion en este rango.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-insumos" class="tab-panel">
+                <div class="card">
+                    <div class="card-header">Ingresos de insumos</div>
+                    <div class="card-body">
+                        {% if insumos_agregados %}
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Fecha</th><th>Insumo</th><th>Accion</th><th>Cantidad</th><th>Stock (antes -> despues)</th><th>Detalle</th></tr></thead>
+                                <tbody>
+                                    {% for m in insumos_agregados %}
+                                    <tr><td>{{ m.creado }}</td><td>{{ m.nombre_recurso or ('Insumo #' ~ m.recurso_id) }}</td><td>{{ m.accion }}</td><td>{{ m.cantidad }}</td><td>{{ m.stock_anterior }} -> {{ m.stock_nuevo }}</td><td>{{ m.detalle or '-' }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No hay ingresos de insumos en este rango.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-productos" class="tab-panel">
+                <div class="card">
+                    <div class="card-header">Ingresos de productos</div>
+                    <div class="card-body">
+                        {% if productos_agregados %}
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Fecha</th><th>Producto</th><th>Accion</th><th>Cantidad</th><th>Stock (antes -> despues)</th><th>Detalle</th></tr></thead>
+                                <tbody>
+                                    {% for m in productos_agregados %}
+                                    <tr><td>{{ m.creado }}</td><td>{{ m.nombre_recurso or ('Producto #' ~ m.recurso_id) }}</td><td>{{ m.accion }}</td><td>{{ m.cantidad }}</td><td>{{ m.stock_anterior }} -> {{ m.stock_nuevo }}</td><td>{{ m.detalle or '-' }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No hay ingresos de productos en este rango.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-mermas" class="tab-panel">
+                <div class="card">
+                    <div class="card-header">Resumen de merma por fecha</div>
+                    <div class="card-body" id="merma-resumen-root">
+                        {% if resumen_mermas %}
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Fecha</th><th>Registros</th><th>Merma bruta</th><th>Revertida</th><th>Merma neta</th></tr></thead>
+                                <tbody>
+                                    {% for r in resumen_mermas %}
+                                    <tr><td>{{ r.fecha }}</td><td>{{ r.registros }}</td><td>{{ '%.2f'|format((r.cantidad_bruta or 0)|float) }}</td><td>{{ '%.2f'|format((r.cantidad_revertida or 0)|float) }}</td><td><strong>{{ '%.2f'|format((r.cantidad_neta or 0)|float) }}</strong></td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No hay mermas registradas en este rango.</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Detalle de mermas</div>
+                    <div class="card-body" id="merma-detalle-root">
+                        <p class="helper">La reversa de merma se ejecuta aqui, en esta tabla.</p>
+                        {% if mermas_productos %}
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Lotes</th><th>Accion</th></tr></thead>
+                                <tbody>
+                                    {% for m in mermas_productos %}
+                                    <tr>
+                                        <td>{{ m.creado }}</td>
+                                        <td>{{ m.producto_nombre or ('Producto #' ~ m.producto_id) }}</td>
+                                        <td>{{ m.cantidad }}</td>
+                                        <td>{{ m.motivo }}{% if m.detalle %} - {{ m.detalle }}{% endif %}</td>
+                                        <td><span class="status-badge {{ m.estado or 'activa' }}">{{ m.estado or 'activa' }}</span></td>
+                                        <td>{{ m.lotes_afectados or 0 }}</td>
+                                        <td>
+                                            {% if (m.estado or 'activa') == 'activa' %}
+                                            <button class="btn-row" type="button" onclick="revertirMerma({{ m.id }})">Revertir</button>
+                                            {% else %}
+                                            <span style="color:#64748b;">{{ m.revertida_en or '-' }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No hay detalle de merma para este rango.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-kardex" class="tab-panel">
+                <div class="card">
+                    <div class="card-header">Kardex de movimientos de stock</div>
+                    <div class="card-body">
+                        <p class="helper">Trazabilidad completa de entradas y salidas. Se listan hasta {{ kardex_limit }} registros.</p>
+                        {% if kardex %}
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Fecha</th><th>Tipo</th><th>Recurso</th><th>Acción</th><th>Cantidad</th><th>Stock (antes -> después)</th><th>Referencia</th><th>Detalle</th></tr></thead>
+                                <tbody>
+                                    {% for m in kardex %}
+                                    <tr>
+                                        <td>{{ m.creado }}</td>
+                                        <td>{{ m.tipo_recurso }}</td>
+                                        <td>{{ m.nombre_recurso }}</td>
+                                        <td>{{ m.accion }}</td>
+                                        <td>{{ m.cantidad }}</td>
+                                        <td>{{ m.stock_anterior if m.stock_anterior is not none else '-' }} -> {{ m.stock_nuevo if m.stock_nuevo is not none else '-' }}</td>
+                                        <td>{{ m.referencia_tipo or '-' }}{% if m.referencia_id %} #{{ m.referencia_id }}{% endif %}</td>
+                                        <td>{{ m.detalle or '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No hay movimientos de kardex para este rango.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-compras" class="tab-panel">
+                <div class="card">
+                    <div class="card-header">Sugerencias inteligentes de compra (insumos)</div>
+                    <div class="card-body">
+                        <p class="helper">Cálculo basado en consumo histórico de {{ dias_hist }} días y cobertura objetivo de {{ dias_cov }} días.</p>
+                        {% if sugerencias_compra %}
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Prioridad</th><th>Insumo</th><th>Stock actual</th><th>Mínimo</th><th>Consumo diario</th><th>Cobertura estimada</th><th>Stock objetivo</th><th>Sugerido comprar</th></tr></thead>
+                                <tbody>
+                                    {% for s in sugerencias_compra %}
+                                    <tr>
+                                        <td><span class="status-badge {{ s.prioridad }}">{{ s.prioridad }}</span></td>
+                                        <td>{{ s.nombre }}</td>
+                                        <td>{{ s.stock_actual }} {{ s.unidad }}</td>
+                                        <td>{{ s.stock_minimo }} {{ s.unidad }}</td>
+                                        <td>{{ s.consumo_diario }} {{ s.unidad }}/día</td>
+                                        <td>{% if s.dias_cobertura_estimados is not none %}{{ s.dias_cobertura_estimados }} días{% else %}Sin datos{% endif %}</td>
+                                        <td>{{ s.stock_objetivo }} {{ s.unidad }}</td>
+                                        <td><strong>{{ s.cantidad_sugerida }} {{ s.unidad }}</strong></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No hay sugerencias de compra para este rango.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(245,158,11,.4);z-index:1000;transition:all .3s ease;">&#127769;</button>
+
+    <script>
+        function setDarkModeButtonIcon(){
+            const btn = document.getElementById('darkModeBtn');
+            if (!btn) return;
+            const isDark = document.body.classList.contains('dark-mode');
+            btn.innerHTML = isDark ? '&#9728;' : '&#127769;';
+        }
+
+        if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
+        setDarkModeButtonIcon();
+
+        function toggleDarkMode() {
+            const body = document.body;
+            if (body.classList.contains('dark-mode')) {
+                body.classList.remove('dark-mode');
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                body.classList.add('dark-mode');
+                localStorage.setItem('darkMode', 'true');
+            }
+            setDarkModeButtonIcon();
+            renderComparativo();
+        }
+
+        const REPORTES_UI_STATE_KEY = 'reportes_ui_state_v1';
+
+        function setActiveTab(tabId) {
+            if (!tabId) return;
+            const panel = document.getElementById(tabId);
+            if (!panel) return;
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.tab === tabId);
+            });
+            document.querySelectorAll('.tab-panel').forEach(p => {
+                p.classList.toggle('active', p.id === tabId);
+            });
+        }
+
+        function saveReportesUiState() {
+            const activeBtn = document.querySelector('.tab-btn.active');
+            const state = {
+                tab: activeBtn ? activeBtn.dataset.tab : 'tab-produccion',
+                scroll_y: window.scrollY || 0
+            };
+            sessionStorage.setItem(REPORTES_UI_STATE_KEY, JSON.stringify(state));
+        }
+
+        function restoreReportesUiStateIfNeeded() {
+            const raw = sessionStorage.getItem(REPORTES_UI_STATE_KEY);
+            if (!raw) return;
+            sessionStorage.removeItem(REPORTES_UI_STATE_KEY);
+            try {
+                const state = JSON.parse(raw) || {};
+                if (typeof state.tab === 'string') {
+                    setActiveTab(state.tab);
+                }
+                const y = Number(state.scroll_y || 0);
+                if (Number.isFinite(y) && y > 0) {
+                    window.requestAnimationFrame(() => window.scrollTo(0, y));
+                }
+            } catch (_) {
+                // Ignorar estado inválido
+            }
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setActiveTab(btn.dataset.tab);
+                saveReportesUiState();
+            });
+        });
+
+        const comparativoTotales = {
+            produccion: Number({{ (total_producido or 0)|tojson }}),
+            insumos: Number({{ (total_insumos or 0)|tojson }}),
+            productos: Number({{ (total_productos or 0)|tojson }}),
+            merma: Number({{ (total_merma_neta or 0)|tojson }})
+        };
+        let autoBackupEndpoint = '/api/backup/crear';
+        let autoBackupOpenEndpoint = '/api/backup/abrir-carpeta';
+
+        let comparativoChart = null;
+        function renderComparativo() {
+            const canvas = document.getElementById('totalesChart');
+            if (!canvas) return;
+            const isDark = document.body.classList.contains('dark-mode');
+            if (comparativoChart) comparativoChart.destroy();
+            comparativoChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Produccion','Insumos','Productos','Merma neta'],
+                    datasets: [{
+                        data: [
+                            comparativoTotales.produccion,
+                            comparativoTotales.insumos,
+                            comparativoTotales.productos,
+                            comparativoTotales.merma
+                        ],
+                        backgroundColor: ['#f59e0b','#10b981','#3b82f6','#ef4444'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: isDark ? '#cbd5e1' : '#334155' }, grid: { color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.2)' } },
+                        y: { beginAtZero: true, ticks: { color: isDark ? '#cbd5e1' : '#334155' }, grid: { color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.2)' } }
+                    }
+                }
+            });
+        }
+
+        function formatearDecimal(valor) {
+            const numero = Number(valor || 0);
+            if (!Number.isFinite(numero)) return '0.00';
+            return numero.toFixed(2);
+        }
+
+        function escapeHtml(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatearMoneda(valor) {
+            const numero = Number(valor || 0);
+            if (!Number.isFinite(numero)) return '$0';
+            return `$${Math.round(numero).toLocaleString('es-CL')}`;
+        }
+
+        function leerRangoFechasReportes() {
+            const form = document.getElementById('form-reportes-filtros');
+            if (!form) return { desde: '', hasta: '' };
+            return {
+                desde: form.querySelector('[name="desde"]')?.value || '',
+                hasta: form.querySelector('[name="hasta"]')?.value || ''
+            };
+        }
+
+        function estadoAutomatizacionTexto(status) {
+            if (status === 'critical') return 'Critico';
+            if (status === 'warning') return 'Atencion';
+            return 'OK';
+        }
+
+        function renderAutomatizaciones(payload) {
+            const grid = document.getElementById('auto-grid');
+            const actionsRoot = document.getElementById('auto-actions');
+            const meta = document.getElementById('auto-meta');
+            if (!grid || !actionsRoot || !meta) return;
+
+            autoBackupEndpoint = typeof payload?.backup_endpoint === 'string' && payload.backup_endpoint.trim()
+                ? payload.backup_endpoint.trim()
+                : '/api/backup/crear';
+            autoBackupOpenEndpoint = typeof payload?.backup_open_endpoint === 'string' && payload.backup_open_endpoint.trim()
+                ? payload.backup_open_endpoint.trim()
+                : '/api/backup/abrir-carpeta';
+
+            const checks = Array.isArray(payload?.checks) ? payload.checks : [];
+            const resumen = payload?.resumen || {};
+            const generated = payload?.generated_at || '';
+            const crit = Number(resumen.critical || 0);
+            const warn = Number(resumen.warning || 0);
+            const ok = Number(resumen.ok || 0);
+            meta.textContent = `Estado: ${crit} critico(s), ${warn} alerta(s), ${ok} ok. ${generated ? `Actualizado ${generated}` : ''}`.trim();
+
+            if (!checks.length) {
+                grid.innerHTML = '<div class="empty-state">No hay chequeos disponibles.</div>';
+            } else {
+                grid.innerHTML = checks.map((check) => `
+                    <div class="auto-item">
+                        <div class="auto-item-top">
+                            <span class="auto-item-label">${escapeHtml(check.label || 'Chequeo')}</span>
+                            <span class="auto-status ${escapeHtml(check.status || 'ok')}">${estadoAutomatizacionTexto(check.status)}</span>
+                        </div>
+                        <div class="auto-item-value">${escapeHtml(check.value ?? '-')}</div>
+                        <div class="auto-item-detail">${escapeHtml(check.detail || '')}</div>
+                    </div>
+                `).join('');
+            }
+
+            const acciones = Array.isArray(payload?.actions) ? payload.actions : [];
+            const accionesHtml = acciones.map((action) => `
+                <a class="btn-mini" href="${escapeHtml(action.href || '#')}">${escapeHtml(action.label || 'Accion')}</a>
+            `).join('');
+            actionsRoot.innerHTML = `${accionesHtml}
+                <button type="button" class="btn-mini" data-auto-action="backup" onclick="crearBackupDesdeAutomatizaciones()">Crear backup</button>
+                <button type="button" class="btn-mini" data-auto-action="open-backup" onclick="abrirCarpetaBackupDesdeAutomatizaciones()">Abrir carpeta backups</button>`;
+        }
+
+        async function crearBackupDesdeAutomatizaciones() {
+            const btn = document.querySelector('[data-auto-action="backup"]');
+            const textoOriginal = btn ? btn.textContent : '';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Creando...';
+                }
+                const response = await fetch(autoBackupEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo crear el backup');
+                }
+                await cargarAutomatizaciones();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal || 'Crear backup';
+                }
+            }
+        }
+
+        async function abrirCarpetaBackupDesdeAutomatizaciones() {
+            const btn = document.querySelector('[data-auto-action="open-backup"]');
+            const textoOriginal = btn ? btn.textContent : '';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Abriendo...';
+                }
+                const response = await fetch(`${autoBackupOpenEndpoint}?tipo=backup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo abrir la carpeta de backups');
+                }
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal || 'Abrir carpeta backups';
+                }
+            }
+        }
+
+        async function cargarAutomatizaciones() {
+            const grid = document.getElementById('auto-grid');
+            if (grid) {
+                grid.innerHTML = '<div class="empty-state">Cargando automatizaciones...</div>';
+            }
+
+            const form = document.getElementById('form-reportes-filtros');
+            const diasHist = form?.querySelector('[name="dias_hist"]')?.value || '30';
+            const diasCov = form?.querySelector('[name="dias_cov"]')?.value || '14';
+            const qs = new URLSearchParams({ dias_hist: diasHist, dias_cov: diasCov }).toString();
+            const url = `/api/reportes/automatizaciones?${qs}`;
+
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo cargar automatizaciones');
+            }
+            renderAutomatizaciones(data);
+        }
+
+        function renderResumenMerma(resumen) {
+            const root = document.getElementById('merma-resumen-root');
+            if (!root) return;
+            const rows = Array.isArray(resumen) ? resumen : [];
+            if (!rows.length) {
+                root.innerHTML = '<div class="empty-state">No hay mermas registradas en este rango.</div>';
+                return;
+            }
+            const body = rows.map((r) => `
+                <tr>
+                    <td>${escapeHtml(r.fecha || '-')}</td>
+                    <td>${Number(r.registros || 0)}</td>
+                    <td>${formatearDecimal(r.cantidad_bruta || 0)}</td>
+                    <td>${formatearDecimal(r.cantidad_revertida || 0)}</td>
+                    <td><strong>${formatearDecimal(r.cantidad_neta || 0)}</strong></td>
+                </tr>
+            `).join('');
+            root.innerHTML = `
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr><th>Fecha</th><th>Registros</th><th>Merma bruta</th><th>Revertida</th><th>Merma neta</th></tr></thead>
+                        <tbody>${body}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderDetalleMerma(detalle) {
+            const root = document.getElementById('merma-detalle-root');
+            if (!root) return;
+            const rows = Array.isArray(detalle) ? detalle : [];
+            if (!rows.length) {
+                root.innerHTML = `
+                    <p class="helper">La reversa de merma se ejecuta aqui, en esta tabla.</p>
+                    <div class="empty-state">No hay detalle de merma para este rango.</div>
+                `;
+                return;
+            }
+            const body = rows.map((m) => {
+                const estado = (m.estado || 'activa');
+                const accionHtml = estado === 'activa'
+                    ? `<button class="btn-row" type="button" onclick="revertirMerma(${Number(m.id || 0)})">Revertir</button>`
+                    : `<span style="color:#64748b;">${escapeHtml(m.revertida_en || '-')}</span>`;
+                const producto = m.producto_nombre || `Producto #${m.producto_id || '-'}`;
+                const motivo = m.detalle ? `${m.motivo || ''} - ${m.detalle}` : (m.motivo || '-');
+                return `
+                    <tr>
+                        <td>${escapeHtml(m.creado || '-')}</td>
+                        <td>${escapeHtml(producto)}</td>
+                        <td>${formatearDecimal(m.cantidad || 0)}</td>
+                        <td>${escapeHtml(motivo)}</td>
+                        <td><span class="status-badge ${escapeHtml(estado)}">${escapeHtml(estado)}</span></td>
+                        <td>${Number(m.lotes_afectados || 0)}</td>
+                        <td>${accionHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            root.innerHTML = `
+                <p class="helper">La reversa de merma se ejecuta aqui, en esta tabla.</p>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Lotes</th><th>Accion</th></tr></thead>
+                        <tbody>${body}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function actualizarStatsMerma(detalle) {
+            const rows = Array.isArray(detalle) ? detalle : [];
+            const bruta = rows.reduce((sum, r) => sum + Number(r.cantidad || 0), 0);
+            const revertida = rows
+                .filter((r) => (r.estado || 'activa') === 'revertida')
+                .reduce((sum, r) => sum + Number(r.cantidad || 0), 0);
+            const neta = Math.max(0, bruta - revertida);
+            const mermaEl = document.getElementById('stat-total-merma');
+            if (mermaEl) mermaEl.textContent = formatearDecimal(neta);
+            comparativoTotales.merma = neta;
+            renderComparativo();
+        }
+
+        function actualizarStatsMargen(margen) {
+            const data = margen || {};
+            const ingresosEl = document.getElementById('stat-margen-ingresos');
+            const costoEl = document.getElementById('stat-margen-costo');
+            const brutoEl = document.getElementById('stat-margen-bruto');
+            const pctEl = document.getElementById('stat-margen-pct');
+            if (ingresosEl) ingresosEl.textContent = formatearMoneda(data.ingresos_totales || 0);
+            if (costoEl) costoEl.textContent = formatearMoneda(data.costo_total || 0);
+            if (brutoEl) brutoEl.textContent = formatearMoneda(data.margen_bruto || 0);
+            if (pctEl) pctEl.textContent = `${formatearDecimal(data.margen_pct || 0)}%`;
+            actualizarAvisoCalidadMargen(data);
+        }
+
+        function actualizarAvisoCalidadMargen(margen) {
+            const card = document.getElementById('margen-calidad-card');
+            const sinPrecioEl = document.getElementById('margen-lineas-sin-precio');
+            const sinCostoEl = document.getElementById('margen-lineas-sin-costo');
+            if (!card) return;
+
+            const sinPrecio = Number(margen?.lineas_sin_precio || 0);
+            const sinCosto = Number(margen?.lineas_sin_costo || 0);
+            if (sinPrecioEl) sinPrecioEl.textContent = String(Math.max(0, sinPrecio));
+            if (sinCostoEl) sinCostoEl.textContent = String(Math.max(0, sinCosto));
+
+            if (sinPrecio > 0 || sinCosto > 0) card.classList.remove('hidden');
+            else card.classList.add('hidden');
+        }
+
+        async function refrescarMermasYMargen() {
+            const { desde, hasta } = leerRangoFechasReportes();
+            const query = new URLSearchParams();
+            if (desde) query.set('desde', desde);
+            if (hasta) query.set('hasta', hasta);
+            const queryString = query.toString();
+            const mermasUrl = queryString ? `/api/reportes/mermas-productos?${queryString}` : '/api/reportes/mermas-productos';
+            const margenUrl = queryString ? `/api/reportes/margen?${queryString}` : '/api/reportes/margen';
+
+            const [mermasResp, margenResp] = await Promise.all([
+                fetch(mermasUrl, { headers: { Accept: 'application/json' } }),
+                fetch(margenUrl, { headers: { Accept: 'application/json' } })
+            ]);
+
+            const mermasData = await mermasResp.json();
+            const margenData = await margenResp.json();
+            if (!mermasResp.ok || !mermasData.success) {
+                throw new Error(mermasData.error || 'No se pudo refrescar mermas');
+            }
+            if (!margenResp.ok || !margenData.success) {
+                throw new Error(margenData.error || 'No se pudo refrescar margen');
+            }
+
+            renderResumenMerma(mermasData.resumen || []);
+            renderDetalleMerma(mermasData.data || []);
+            actualizarStatsMerma(mermasData.data || []);
+            actualizarStatsMargen(margenData.data || {});
+        }
+
+        async function revertirMerma(mermaId) {
+            if (!confirm('Revertir esta merma y devolver stock al producto?')) return;
+            try {
+                const response = await fetch(`/api/producto/merma/${mermaId}/revertir`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'No se pudo revertir la merma');
+                await refrescarMermasYMargen();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            }
+        }
+
+        renderComparativo();
+        restoreReportesUiStateIfNeeded();
+        cargarAutomatizaciones().catch((error) => {
+            const grid = document.getElementById('auto-grid');
+            const meta = document.getElementById('auto-meta');
+            if (meta) meta.textContent = 'No se pudo cargar automatizaciones.';
+            if (grid) grid.innerHTML = `<div class="empty-state">${escapeHtml(error.message || 'Error cargando automatizaciones')}</div>`;
+        });
+
+        fetch('/api/alertas/contador')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('nav-alertas');
+                if (!badge) return;
+                badge.textContent = data.total;
+                badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
+            });
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

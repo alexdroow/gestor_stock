@@ -1,0 +1,2571 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventas - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --secondary: #f97316;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #0f172a;
+        }
+        
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .logo-text span { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background: #fff7ed;
+            color: var(--primary-dark);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .nav-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .nav-badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+        }
+        
+        .sidebar-footer {
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 40px;
+            max-width: calc(100% - 260px);
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .page-subtitle {
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .agenda-context {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .agenda-context-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #9a3412;
+        }
+
+        .agenda-context-sub {
+            font-size: 13px;
+            color: #7c2d12;
+        }
+
+        .agenda-context-link {
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+            color: #9a3412;
+            background: #ffedd5;
+            border: 1px solid #fdba74;
+            border-radius: 999px;
+            padding: 7px 11px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .ventas-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 24px;
+        }
+        
+        .productos-section {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 24px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .stock-filtros {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .stock-filtro-btn {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #475569;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .stock-filtro-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: transparent;
+            color: white;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .productos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        
+        .producto-card {
+            background: #f8fafc;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        
+        .producto-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+        }
+        
+        .producto-card.agotado {
+            opacity: 1;
+            cursor: not-allowed;
+            border-color: #ef4444;
+            background: #fff1f2;
+            box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.25);
+        }
+
+        .producto-card.desactivacion-confirmada {
+            border-color: #fdba74;
+            background: #fffaf3;
+            opacity: 0.78;
+            box-shadow: none;
+        }
+
+        .producto-card.bajo-minimo {
+            border-color: #fca5a5;
+        }
+
+        .producto-card.cerca-minimo {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .producto-card.baja-porcion {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+        
+        .producto-card.agotado:hover {
+            border-color: #ef4444;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .producto-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+        
+        .producto-nombre {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: #0f172a;
+        }
+        
+        .producto-stock {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .producto-stock-ref {
+            margin-top: 2px;
+            min-height: 14px;
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.25;
+        }
+        
+        .producto-stock.bajo {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        .producto-stock.cerca {
+            color: #c2410c;
+            font-weight: 600;
+        }
+
+        .producto-stock.desactivado-confirmado {
+            color: #b07a45;
+            font-weight: 600;
+        }
+
+        .producto-porcion {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .producto-porcion.baja {
+            color: #b45309;
+            font-weight: 600;
+        }
+
+        .producto-porcion.critica {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .producto-porcion.desactivada {
+            color: #b07a45;
+            font-weight: 600;
+        }
+
+        .producto-dependencias {
+            margin-top: 6px;
+            min-height: 16px;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #64748b;
+            word-break: break-word;
+        }
+
+        .producto-dependencias.aviso {
+            color: #b45309;
+            font-weight: 600;
+        }
+
+        .producto-dependencias.critica {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .producto-acciones {
+            margin-top: 10px;
+        }
+
+        .btn-desactivacion {
+            width: 100%;
+            border: 1px solid #f97316;
+            background: #fff7ed;
+            color: #c2410c;
+            border-radius: 8px;
+            padding: 7px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-desactivacion:hover {
+            background: #ffedd5;
+            border-color: #ea580c;
+        }
+
+        .btn-desactivacion.pendiente {
+            border-color: #991b1b;
+            color: #fff7ed;
+            background: #dc2626;
+            box-shadow: 0 0 0 1px rgba(153, 27, 27, 0.35);
+        }
+
+        .btn-desactivacion.confirmado {
+            border-color: #fdba74;
+            color: #b45309;
+            background: #fff7ed;
+            opacity: 0.78;
+            box-shadow: none;
+        }
+
+        .btn-desactivacion.confirmado:hover {
+            background: #ffedd5;
+            border-color: #fdba74;
+        }
+
+        .producto-card.desactivacion-confirmada.baja-porcion,
+        .producto-card.desactivacion-confirmada.bajo-minimo,
+        .producto-card.desactivacion-confirmada.agotado {
+            border-color: #fdba74;
+            background: #fffaf3;
+            box-shadow: none;
+        }
+
+        .btn-desactivacion.hidden {
+            display: none;
+        }
+        
+        .carrito-section {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            max-height: 700px;
+        }
+        
+        .carrito-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .carrito-titulo {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .carrito-count {
+            background: var(--primary);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .carrito-items {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        
+        .carrito-vacio {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+        }
+        
+        .carrito-vacio-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        
+        .carrito-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .carrito-item.bajo-porcion {
+            border: 1px solid #fca5a5;
+            background: #fff1f2;
+        }
+        
+        .carrito-item-info {
+            flex: 1;
+        }
+        
+        .carrito-item-nombre {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .carrito-item-alerta {
+            color: #b91c1c;
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+        
+        .carrito-item-cantidad {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-cantidad {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .btn-cantidad:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .cantidad-valor {
+            font-weight: 600;
+            min-width: 24px;
+            text-align: center;
+        }
+        
+        .btn-eliminar-item {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 4px;
+            margin-left: 8px;
+        }
+        
+        .carrito-footer {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        .carrito-codigo {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .carrito-codigo label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .carrito-codigo input,
+        .carrito-codigo select {
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 14px;
+            font-family: inherit;
+            color: #0f172a;
+            background: #ffffff;
+        }
+
+        .carrito-codigo input:focus,
+        .carrito-codigo select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+        }
+        
+        .carrito-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+        }
+        
+        .btn-primary:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            transform: scale(0.95);
+            transition: all 0.2s ease;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+        
+        .modal-icon {
+            width: 64px;
+            height: 64px;
+            background: #d1fae5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 20px;
+        }
+        
+        .modal-icon.warning {
+            background: #fef3c7;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        
+        .modal-text {
+            color: #64748b;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .alertas-lista {
+            background: #fef2f2;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .alerta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            color: #991b1b;
+            font-size: 14px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .modal-actions .btn {
+            flex: 1;
+        }
+
+        .btn-header {
+            width: auto;
+            padding: 12px 18px;
+            font-size: 14px;
+        }
+
+        .btn-outline {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            color: #334155;
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            color: var(--primary-dark);
+            background: #fff7ed;
+        }
+
+        .modal.modal-wide {
+            max-width: 860px;
+            max-height: 88vh;
+            overflow-y: auto;
+        }
+
+        .weekly-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .weekly-form-group label {
+            display: block;
+            font-size: 12px;
+            color: #475569;
+            margin-bottom: 6px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .weekly-form-group input,
+        .weekly-form-group textarea {
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #ffffff;
+            color: #0f172a;
+        }
+
+        .weekly-form-group textarea {
+            min-height: 70px;
+            resize: vertical;
+        }
+
+        .weekly-helper {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .weekly-summary {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .weekly-summary-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .weekly-summary-label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .weekly-summary-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .weekly-summary-value.negative {
+            color: #b91c1c;
+        }
+
+        .weekly-summary-value.positive {
+            color: #047857;
+        }
+
+        .weekly-table-wrap {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: auto;
+            max-height: 280px;
+            background: #ffffff;
+        }
+
+        .weekly-table {
+            width: 100%;
+            min-width: 860px;
+            border-collapse: collapse;
+        }
+
+        .weekly-table th {
+            background: #f8fafc;
+            color: #475569;
+            font-size: 11px;
+            text-transform: uppercase;
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .weekly-table td {
+            font-size: 13px;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .weekly-table td.negative {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .weekly-table td.positive {
+            color: #047857;
+            font-weight: 700;
+        }
+
+        .weekly-row-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-mini-weekly {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #334155;
+            border-radius: 8px;
+            padding: 6px 9px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-mini-weekly:hover {
+            border-color: #f59e0b;
+            background: #fff7ed;
+            color: #b45309;
+        }
+
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .logo-text {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .nav-item {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .nav-item:hover {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .main-content {
+            background: #0f172a;
+        }
+        
+        body.dark-mode .page-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .agenda-context {
+            background: #3f2b03;
+            border-color: #854d0e;
+        }
+
+        body.dark-mode .agenda-context-title {
+            color: #fcd34d;
+        }
+
+        body.dark-mode .agenda-context-sub {
+            color: #fde68a;
+        }
+
+        body.dark-mode .agenda-context-link {
+            color: #fcd34d;
+            background: #451a03;
+            border-color: #92400e;
+        }
+        
+        body.dark-mode .productos-section,
+        body.dark-mode .carrito-section {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .section-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .search-box input {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .stock-filtro-btn {
+            background: #334155;
+            border-color: #475569;
+            color: #cbd5e1;
+        }
+        
+        body.dark-mode .producto-card {
+            background: #334155;
+        }
+        
+        body.dark-mode .producto-nombre {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .producto-stock {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .producto-stock-ref {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .producto-porcion {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .producto-card.baja-porcion {
+            background: #3f2f0a;
+            border-color: #d97706;
+        }
+
+        body.dark-mode .producto-card.cerca-minimo {
+            background: #3f2f0a;
+            border-color: #d97706;
+        }
+
+        body.dark-mode .producto-card.desactivacion-confirmada {
+            background: #352a1d;
+            border-color: #8b6b45;
+            opacity: 0.82;
+        }
+
+        body.dark-mode .producto-card.agotado {
+            background: #3f1d1d;
+            border-color: #ef4444;
+            box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.45);
+        }
+        
+        body.dark-mode .carrito-header {
+            border-color: #334155;
+        }
+
+        body.dark-mode .producto-stock.desactivado-confirmado {
+            color: #c7a37d;
+            font-weight: 600;
+        }
+
+        body.dark-mode .producto-stock.cerca {
+            color: #fdba74;
+        }
+
+        body.dark-mode .producto-porcion.desactivada {
+            color: #c7a37d;
+            font-weight: 600;
+        }
+
+        body.dark-mode .producto-dependencias {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .producto-dependencias.aviso {
+            color: #fbbf24;
+        }
+
+        body.dark-mode .producto-dependencias.critica {
+            color: #fda4af;
+        }
+
+        body.dark-mode .btn-desactivacion {
+            background: #3f2b03;
+            border-color: #c2410c;
+            color: #fdba74;
+        }
+
+        body.dark-mode .btn-desactivacion:hover {
+            background: #4a3304;
+            border-color: #ea580c;
+            color: #ffedd5;
+        }
+
+        body.dark-mode .btn-desactivacion.pendiente {
+            background: #b91c1c;
+            border-color: #ef4444;
+            color: #ffe4e6;
+            box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4);
+        }
+
+        body.dark-mode .btn-desactivacion.confirmado {
+            background: #352a1d;
+            border-color: #8b6b45;
+            color: #c7a37d;
+            opacity: 0.78;
+        }
+        
+        body.dark-mode .carrito-item {
+            background: #334155;
+        }
+
+        body.dark-mode .carrito-item.bajo-porcion {
+            background: #3f1d1d;
+            border-color: #7f1d1d;
+        }
+        
+        body.dark-mode .carrito-item-nombre {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .btn-cantidad {
+            background: #475569;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .carrito-footer {
+            border-color: #334155;
+        }
+
+        body.dark-mode .carrito-codigo label {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .carrito-codigo input,
+        body.dark-mode .carrito-codigo select {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .carrito-total {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .btn-secondary {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .modal {
+            background: #1e293b;
+        }
+        
+        body.dark-mode .modal-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .modal-text {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .btn-outline {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .btn-outline:hover {
+            background: #3f4d64;
+            border-color: #f59e0b;
+            color: #fbbf24;
+        }
+
+        body.dark-mode .weekly-form-group label,
+        body.dark-mode .weekly-summary-label {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .weekly-form-group input,
+        body.dark-mode .weekly-form-group textarea {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .weekly-helper {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .weekly-summary {
+            background: #334155;
+            border-color: #475569;
+        }
+
+        body.dark-mode .weekly-summary-value {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .weekly-summary-value.negative {
+            color: #fca5a5;
+        }
+
+        body.dark-mode .weekly-summary-value.positive {
+            color: #86efac;
+        }
+
+        body.dark-mode .weekly-table-wrap {
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .weekly-table th {
+            background: #334155;
+            color: #94a3b8;
+            border-color: #475569;
+        }
+
+        body.dark-mode .weekly-table td {
+            color: #f1f5f9;
+            border-color: #334155;
+        }
+
+        body.dark-mode .weekly-table td.negative {
+            color: #fca5a5;
+        }
+
+        body.dark-mode .weekly-table td.positive {
+            color: #86efac;
+        }
+
+        body.dark-mode .btn-mini-weekly {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .btn-mini-weekly:hover {
+            background: #3f4d64;
+            border-color: #f59e0b;
+            color: #fbbf24;
+        }
+        
+        @media (max-width: 1024px) {
+            .sidebar { width: 240px; }
+            .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
+            .ventas-layout { grid-template-columns: 1fr; }
+            .carrito-section { max-height: none; }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
+            .productos-grid { grid-template-columns: repeat(2, 1fr); }
+            .header-actions { flex-direction: column; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display: flex; min-height: 100vh;">
+        <!-- Sidebar -->
+        {% include "_sidebar.html" %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Punto de Venta</h1>
+                    <p class="page-subtitle">Selecciona productos y procesa la venta</p>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="btn btn-outline btn-header" onclick="abrirModalVentasSemanales()">
+                        &#128221; Ventas semanales
+                    </button>
+                    <a href="/historial-ventas" class="btn btn-secondary btn-header">
+                        &#128221; Ver Historial
+                    </a>
+                </div>
+            </div>
+
+            {% if agenda_evento %}
+            <section class="agenda-context">
+                <div>
+                    <div class="agenda-context-title">Pedido desde agenda: {{ agenda_evento.titulo or 'Sin título' }}</div>
+                    <div class="agenda-context-sub">
+                        Fecha: {{ agenda_evento.fecha or '-' }}
+                        {% if agenda_evento.cliente %} · Cliente: {{ agenda_evento.cliente }}{% endif %}
+                    </div>
+                </div>
+                <a class="agenda-context-link" href="/agenda">Volver a agenda</a>
+            </section>
+            {% endif %}
+
+            <div class="ventas-layout">
+                <!-- Productos -->
+                <div class="productos-section">
+                    <h3 class="section-title">&#128203; Productos Disponibles</h3>
+                    
+                    <div class="search-box">
+                        <span class="search-icon"></span>
+                        <input type="text" id="buscador" placeholder="Buscar producto..." onkeyup="filtrarProductos()">
+                    </div>
+
+                    <div class="stock-filtros">
+                        <button type="button" class="stock-filtro-btn active" data-filtro="todos" onclick="aplicarFiltroStock('todos')">Todos</button>
+                        <button type="button" class="stock-filtro-btn" data-filtro="bajo_minimo" onclick="aplicarFiltroStock('bajo_minimo')">Bajo m&iacute;nimo</button>
+                        <button type="button" class="stock-filtro-btn" data-filtro="baja_porcion" onclick="aplicarFiltroStock('baja_porcion')">Baja porci&oacute;n</button>
+                    </div>
+                    
+                    <div class="productos-grid" id="productos-grid">
+                        {% for p in productos %}
+                        <div class="producto-card {{ 'agotado' if (p.sin_porcion_disponible or p.bajo_minimo or p.dependencias_criticas) and not p.desactivacion_manual_confirmada else '' }} {{ 'bajo-minimo' if p.bajo_minimo else '' }} {{ 'cerca-minimo' if (p.cerca_minimo or p.baja_porcion or p.dependencias_baja_porcion or p.dependencias_cerca_minimo) and not p.bajo_minimo and not p.sin_porcion_disponible and not p.dependencias_criticas else '' }} {{ 'baja-porcion' if p.baja_porcion else '' }} {{ 'desactivacion-confirmada' if p.desactivacion_manual_confirmada else '' }}" 
+                             data-id="{{ p.id }}" 
+                             data-nombre="{{ p.nombre }}" 
+                             data-stock="{{ p.stock_visual if p.stock_visual is defined else p.stock }}"
+                             data-bajo-minimo="{{ 1 if p.bajo_minimo else 0 }}"
+                             data-cerca-minimo="{{ 1 if p.cerca_minimo else 0 }}"
+                             data-baja-porcion="{{ 1 if p.baja_porcion else 0 }}"
+                             data-requiere-desactivacion="{{ 1 if p.desactivacion_manual_requiere_confirmacion else 0 }}"
+                             data-desactivacion-confirmada="{{ 1 if p.desactivacion_manual_confirmada else 0 }}"
+                             data-porciones="{{ p.porciones_disponibles }}"
+                             onclick='agregarAlCarrito({{ p.id }})'>
+                            <div class="producto-icon" data-icono="{{ p.icono or 'cupcake' }}"></div>
+                            <div class="producto-nombre">{{ p.nombre }}</div>
+                            <div class="producto-stock {{ 'desactivado-confirmado' if p.desactivacion_manual_confirmada else 'bajo' if p.bajo_minimo or p.sin_porcion_disponible or p.dependencias_criticas else 'cerca' if (p.cerca_minimo or p.baja_porcion or p.dependencias_baja_porcion or p.dependencias_cerca_minimo) else '' }}">
+                                Stock: {{ p.stock_visual_label if p.stock_visual_label is defined else p.stock_label }} {{ p.stock_visual_unidad if p.stock_visual_unidad is defined else (p.unidad or 'unidad') }}
+                            </div>
+                            <div class="producto-stock-ref">
+                                {% if p.stock_visual_origen is defined and p.stock_visual_origen != 'propio' and p.stock_visual_dependencia_nombre %}
+                                    Segun {{ p.stock_visual_origen }}: {{ p.stock_visual_dependencia_nombre }}
+                                {% endif %}
+                            </div>
+                            <div class="producto-porcion {{ 'desactivada' if p.desactivacion_manual_confirmada else 'critica' if p.sin_porcion_disponible else 'baja' if p.baja_porcion else '' }}">
+                                Porci&oacute;n: {{ p.porcion_cantidad_label }} {{ p.porcion_unidad }} &middot; Disp.: {{ p.porciones_disponibles }}
+                            </div>
+                            <div class="producto-dependencias {{ 'critica' if p.dependencias_criticas else 'aviso' if p.dependencias_alerta_texto else '' }}">
+                                {{ p.dependencias_alerta_texto or '' }}
+                            </div>
+                            <div class="producto-acciones">
+                                <button
+                                    type="button"
+                                    class="btn-desactivacion {{ 'confirmado' if p.desactivacion_manual_confirmada else 'pendiente' }} {{ '' if (p.sin_porcion_disponible or p.bajo_minimo or p.dependencias_criticas) else 'hidden' }}"
+                                    onclick="toggleEstadoDesactivado(event, {{ p.id }})"
+                                >
+                                    {{ 'Desactivado confirmado' if p.desactivacion_manual_confirmada else 'Marcar desactivado' }}
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Carrito -->
+                <div class="carrito-section">
+                    <div class="carrito-header">
+                        <div class="carrito-titulo">
+                            &#128722; Carrito
+                            <span class="carrito-count" id="carrito-count">0</span>
+                        </div>
+                        <button onclick="vaciarCarrito()" class="btn-secondary" style="padding: 6px 12px; font-size: 13px; width: auto;">
+                            Vaciar
+                        </button>
+                    </div>
+                    
+                    <div class="carrito-items" id="carrito-items">
+                        <div class="carrito-vacio">
+                            <div class="carrito-vacio-icon">&#128722;</div>
+                            <div>El carrito est&aacute; vac&iacute;o</div>
+                            <div style="font-size: 13px; margin-top: 4px;">Haz clic en un producto para agregarlo</div>
+                        </div>
+                    </div>
+                    
+                    <div class="carrito-footer">
+                        <div class="carrito-codigo">
+                            <label for="carrito-fecha-venta">Fecha de venta</label>
+                            <input
+                                type="date"
+                                id="carrito-fecha-venta"
+                            >
+                        </div>
+                        <div class="carrito-codigo">
+                            <label for="carrito-codigo-pedido">Codigo pedido (opcional)</label>
+                            <input
+                                type="text"
+                                id="carrito-codigo-pedido"
+                                maxlength="80"
+                                placeholder="Ej: UB-2045, PY-778, Pedido Cliente"
+                            >
+                        </div>
+                        <div class="carrito-codigo">
+                            <label for="carrito-canal-venta">Canal de venta</label>
+                            <select id="carrito-canal-venta">
+                                <option value="presencial">Presencial</option>
+                                <option value="uber_eats">Uber Eats</option>
+                                <option value="pedidosya">PedidosYa</option>
+                            </select>
+                        </div>
+                        <div class="carrito-total">
+                            <span>Total de items:</span>
+                            <span id="total-items">0</span>
+                        </div>
+                        <button onclick="procesarVenta()" class="btn btn-success" id="btn-vender" disabled>
+                            &#128176; Procesar Venta
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Exito -->
+    <div class="modal-overlay" id="modal-exito">
+        <div class="modal">
+            <div class="modal-icon">&#9989;</div>
+            <h3 class="modal-title">&iexcl;Venta Exitosa!</h3>
+            <p class="modal-text" id="modal-mensaje-exito">La venta se ha procesado correctamente.</p>
+            <div id="alertas-venta" style="margin-bottom: 24px;"></div>
+            <button onclick="cerrarModalExito()" class="btn btn-primary">Aceptar</button>
+        </div>
+    </div>
+
+    <!-- Modal Alertas -->
+    <div class="modal-overlay" id="modal-alertas">
+        <div class="modal">
+            <div class="modal-icon warning">&#9888;</div>
+            <h3 class="modal-title">Alertas de Stock</h3>
+            <p class="modal-text">Algunos productos quedaron con stock bajo o agotado:</p>
+            <div class="alertas-lista" id="lista-alertas"></div>
+            <button onclick="cerrarModalAlertas()" class="btn btn-primary">Entendido</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ventas-semanales">
+        <div class="modal modal-wide">
+            <h3 class="modal-title" style="text-align:left; margin-bottom: 6px;">Registro semanal de ventas</h3>
+            <p class="weekly-helper">
+                Formula activa:
+                <strong>Ganancias = Ventas - Marketing - (Tasa de servicio + impuesto sobre tasa) - Otros descuentos</strong>.
+            </p>
+            <form id="form-ventas-semanales" onsubmit="guardarVentaSemanal(event)">
+                <input type="hidden" id="venta-semanal-id">
+                <div class="weekly-form-grid">
+                    <div class="weekly-form-group">
+                        <label>Semana (cualquier d&iacute;a)</label>
+                        <input type="date" id="venta-semanal-fecha" required>
+                    </div>
+                    <div class="weekly-form-group">
+                        <label>Ventas (monto fijo)</label>
+                        <input type="number" id="venta-semanal-monto" min="0" step="1" value="0" required>
+                    </div>
+                    <div class="weekly-form-group">
+                        <label>Marketing (monto fijo)</label>
+                        <input type="number" id="venta-semanal-marketing" min="0" step="1" value="0" required>
+                    </div>
+                    <div class="weekly-form-group">
+                        <label>Tasa servicio (%)</label>
+                        <input type="number" id="venta-semanal-servicio-pct" min="0" step="0.01" value="30" required>
+                    </div>
+                    <div class="weekly-form-group">
+                        <label>Impuesto tasa servicio (%)</label>
+                        <input type="number" id="venta-semanal-servicio-impuesto-pct" min="0" step="0.01" value="19" required>
+                    </div>
+                    <div class="weekly-form-group">
+                        <label>Otros descuentos</label>
+                        <input type="number" id="venta-semanal-otros-descuentos" min="0" step="1" value="0" required>
+                    </div>
+                </div>
+                <div class="weekly-form-group" style="margin-bottom: 12px;">
+                    <label>Notas (opcional)</label>
+                    <textarea id="venta-semanal-notas" placeholder="Comentarios de la semana..."></textarea>
+                </div>
+                <div class="modal-actions" style="margin-bottom: 12px;">
+                    <button type="submit" class="btn btn-primary" id="btn-venta-semanal-guardar">Guardar semana</button>
+                    <button type="button" class="btn btn-secondary" onclick="limpiarFormularioVentasSemanales()">Nueva semana</button>
+                </div>
+            </form>
+
+            <div id="ventas-semanales-preview" class="weekly-summary"></div>
+
+            <div class="weekly-helper" style="margin-top: 8px; margin-bottom: 8px;">
+                Historial semanal guardado (se actualiza en la pantalla de reportes).
+            </div>
+            <div id="ventas-semanales-lista" class="weekly-table-wrap">
+                <div class="carrito-vacio" style="padding: 18px;">Cargando...</div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalVentasSemanales()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boton Modo Oscuro -->
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    ">&#127769;</button>
+
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeBtn').textContent = '\u2600';
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const btn = document.getElementById('darkModeBtn');
+            
+            if (body.classList.contains('dark-mode')) {
+                body.classList.remove('dark-mode');
+                btn.textContent = '\uD83C\uDF19';
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                body.classList.add('dark-mode');
+                btn.textContent = '\u2600';
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        let carrito = [];
+        let filtroStockActivo = 'todos';
+        const VENTAS_UI_STATE_KEY = 'ventas_ui_state_v1';
+        const VENTAS_CART_KEY = 'ventas_cart_v2';
+        const agendaEventoActual = {{ agenda_evento|tojson if agenda_evento else 'null' }};
+        const ICONOS_PRODUCTO = {
+            cupcake: '\uD83E\uDDC1',
+            cake: '\uD83C\uDF82',
+            cookie: '\uD83C\uDF6A',
+            muffin: '\uD83E\uDDC7',
+            donut: '\uD83C\uDF69',
+            croissant: '\uD83E\uDD50',
+            bread: '\uD83C\uDF5E',
+            pie: '\uD83E\uDD67',
+            chocolate: '\uD83C\uDF6B',
+            candy: '\uD83C\uDF6C',
+            icecream: '\uD83C\uDF66',
+            coffee: '\u2615',
+            package: '\uD83D\uDCE6'
+        };
+        const ICONO_PRODUCTO_FALLBACK = ICONOS_PRODUCTO.cupcake;
+        const VENTAS_SEMANALES_SERVICIO_PCT_DEFAULT = 30;
+        const VENTAS_SEMANALES_IMPUESTO_SERVICIO_PCT_DEFAULT = 19;
+        let ventasSemanalesCache = [];
+
+        function obtenerIconoProducto(key) {
+            const k = String(key || '').trim().toLowerCase();
+            return ICONOS_PRODUCTO[k] || ICONO_PRODUCTO_FALLBACK;
+        }
+
+        function escapeHtmlLocal(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function guardarCarritoPersistente() {
+            try {
+                const codigoPedidoInput = document.getElementById('carrito-codigo-pedido');
+                const fechaVentaInput = document.getElementById('carrito-fecha-venta');
+                const canalVentaInput = document.getElementById('carrito-canal-venta');
+                const payload = {
+                    items: (Array.isArray(carrito) ? carrito : []).map(item => ({
+                        id: Number(item.id || 0),
+                        nombre: String(item.nombre || ''),
+                        cantidad: Math.max(1, Number(item.cantidad || 1))
+                    })).filter(item => item.id > 0),
+                    codigo_pedido: (codigoPedidoInput ? codigoPedidoInput.value : '') || '',
+                    fecha_venta: (fechaVentaInput ? fechaVentaInput.value : '') || '',
+                    canal_venta: (canalVentaInput ? canalVentaInput.value : 'presencial') || 'presencial'
+                };
+                localStorage.setItem(VENTAS_CART_KEY, JSON.stringify(payload));
+            } catch (_) {
+                // No bloquear flujo por storage
+            }
+        }
+
+        function limpiarCarritoPersistente() {
+            try {
+                localStorage.removeItem(VENTAS_CART_KEY);
+            } catch (_) {
+                // No-op
+            }
+        }
+
+        function restaurarCarritoPersistente() {
+            try {
+                const raw = localStorage.getItem(VENTAS_CART_KEY);
+                if (!raw) return;
+                const data = JSON.parse(raw) || {};
+                const restaurado = [];
+                const items = Array.isArray(data.items) ? data.items : [];
+                items.forEach((it) => {
+                    const id = Number(it && it.id ? it.id : 0);
+                    if (!id || !productosData[id]) return;
+                    const nombre = String(productosData[id].nombre || it.nombre || 'Producto');
+                    const maxDisponible = Math.max(0, Number(productosData[id].porciones_disponibles || 0));
+                    const cantidad = Math.max(1, Math.floor(Number(it.cantidad || 1)));
+                    if (maxDisponible <= 0) return;
+                    restaurado.push({
+                        id,
+                        nombre,
+                        cantidad: Math.min(cantidad, maxDisponible)
+                    });
+                });
+                carrito = restaurado;
+                const codigoPedidoInput = document.getElementById('carrito-codigo-pedido');
+                const fechaVentaInput = document.getElementById('carrito-fecha-venta');
+                const canalVentaInput = document.getElementById('carrito-canal-venta');
+                if (codigoPedidoInput && typeof data.codigo_pedido === 'string') {
+                    codigoPedidoInput.value = data.codigo_pedido;
+                }
+                if (fechaVentaInput) {
+                    if (typeof data.fecha_venta === 'string' && data.fecha_venta.trim()) {
+                        fechaVentaInput.value = data.fecha_venta.trim();
+                    } else if (!fechaVentaInput.value) {
+                        fechaVentaInput.value = fechaIsoHoy();
+                    }
+                }
+                if (canalVentaInput) {
+                    const canal = String(data.canal_venta || '').trim().toLowerCase();
+                    if (canal === 'uber_eats' || canal === 'pedidosya' || canal === 'presencial') {
+                        canalVentaInput.value = canal;
+                    } else {
+                        canalVentaInput.value = 'presencial';
+                    }
+                }
+            } catch (_) {
+                carrito = [];
+            }
+        }
+
+        function formatearMonedaCLP(valor) {
+            const n = Number(valor || 0);
+            if (!Number.isFinite(n)) return '$0';
+            return `$${Math.round(n).toLocaleString('es-CL')}`;
+        }
+
+        function obtenerValorNumerico(id) {
+            const el = document.getElementById(id);
+            if (!el) return 0;
+            const n = Number(el.value || 0);
+            if (!Number.isFinite(n) || n < 0) return 0;
+            return n;
+        }
+
+        function fechaIsoHoy() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function sumarDiasISO(fechaIso, dias) {
+            if (!fechaIso) return '';
+            const ref = new Date(`${fechaIso}T00:00:00`);
+            if (Number.isNaN(ref.getTime())) return '';
+            ref.setDate(ref.getDate() + Number(dias || 0));
+            const y = ref.getFullYear();
+            const m = String(ref.getMonth() + 1).padStart(2, '0');
+            const d = String(ref.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function inicioSemanaLunes(fechaIso) {
+            const ref = new Date(`${fechaIso || fechaIsoHoy()}T00:00:00`);
+            if (Number.isNaN(ref.getTime())) return fechaIsoHoy();
+            const day = ref.getDay();
+            const delta = day === 0 ? -6 : 1 - day;
+            ref.setDate(ref.getDate() + delta);
+            const y = ref.getFullYear();
+            const m = String(ref.getMonth() + 1).padStart(2, '0');
+            const d = String(ref.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function formatoFechaBreve(fechaIso) {
+            if (!fechaIso) return '-';
+            const ref = new Date(`${fechaIso}T00:00:00`);
+            if (Number.isNaN(ref.getTime())) return fechaIso;
+            return ref.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+        }
+
+        function etiquetaSemana(inicioIso, finIso) {
+            const fin = finIso || sumarDiasISO(inicioIso, 6);
+            return `${formatoFechaBreve(inicioIso)} - ${formatoFechaBreve(fin)}`;
+        }
+
+        function calcularResumenSemanalPreview() {
+            const ventasMonto = obtenerValorNumerico('venta-semanal-monto');
+            const marketingMonto = obtenerValorNumerico('venta-semanal-marketing');
+            const otrosDescuentos = obtenerValorNumerico('venta-semanal-otros-descuentos');
+
+            let tasaServicioPct = obtenerValorNumerico('venta-semanal-servicio-pct');
+            let impuestoServicioPct = obtenerValorNumerico('venta-semanal-servicio-impuesto-pct');
+            if (!Number.isFinite(tasaServicioPct) || tasaServicioPct < 0) {
+                tasaServicioPct = VENTAS_SEMANALES_SERVICIO_PCT_DEFAULT;
+            }
+            if (!Number.isFinite(impuestoServicioPct) || impuestoServicioPct < 0) {
+                impuestoServicioPct = VENTAS_SEMANALES_IMPUESTO_SERVICIO_PCT_DEFAULT;
+            }
+
+            const tasaServicio = tasaServicioPct / 100;
+            const impuestoTasaServicio = impuestoServicioPct / 100;
+            const servicioBase = ventasMonto * tasaServicio;
+            const impuestoServicio = servicioBase * impuestoTasaServicio;
+            const costoServicioTotal = servicioBase + impuestoServicio;
+            const gananciaNeta = ventasMonto - marketingMonto - costoServicioTotal - otrosDescuentos;
+
+            return {
+                ventasMonto,
+                marketingMonto,
+                otrosDescuentos,
+                tasaServicioPct,
+                impuestoServicioPct,
+                servicioBase,
+                impuestoServicio,
+                costoServicioTotal,
+                gananciaNeta,
+            };
+        }
+
+        function renderPreviewVentasSemanales() {
+            const root = document.getElementById('ventas-semanales-preview');
+            if (!root) return;
+            const resumen = calcularResumenSemanalPreview();
+            root.innerHTML = `
+                <div class="weekly-summary-item">
+                    <span class="weekly-summary-label">Ventas</span>
+                    <span class="weekly-summary-value">${formatearMonedaCLP(resumen.ventasMonto)}</span>
+                </div>
+                <div class="weekly-summary-item">
+                    <span class="weekly-summary-label">Marketing</span>
+                    <span class="weekly-summary-value negative">${formatearMonedaCLP(resumen.marketingMonto)}</span>
+                </div>
+                <div class="weekly-summary-item">
+                    <span class="weekly-summary-label">Tasa servicio (${formatearNumeroSimple(resumen.tasaServicioPct)}%)</span>
+                    <span class="weekly-summary-value negative">${formatearMonedaCLP(resumen.servicioBase)}</span>
+                </div>
+                <div class="weekly-summary-item">
+                    <span class="weekly-summary-label">Imp. tasa (${formatearNumeroSimple(resumen.impuestoServicioPct)}%)</span>
+                    <span class="weekly-summary-value negative">${formatearMonedaCLP(resumen.impuestoServicio)}</span>
+                </div>
+                <div class="weekly-summary-item">
+                    <span class="weekly-summary-label">Otros descuentos</span>
+                    <span class="weekly-summary-value negative">${formatearMonedaCLP(resumen.otrosDescuentos)}</span>
+                </div>
+                <div class="weekly-summary-item">
+                    <span class="weekly-summary-label">Ganancias</span>
+                    <span class="weekly-summary-value ${resumen.gananciaNeta >= 0 ? 'positive' : 'negative'}">${formatearMonedaCLP(resumen.gananciaNeta)}</span>
+                </div>
+            `;
+        }
+
+        function limpiarFormularioVentasSemanales() {
+            const idEl = document.getElementById('venta-semanal-id');
+            const fechaEl = document.getElementById('venta-semanal-fecha');
+            const montoEl = document.getElementById('venta-semanal-monto');
+            const marketingEl = document.getElementById('venta-semanal-marketing');
+            const servicioPctEl = document.getElementById('venta-semanal-servicio-pct');
+            const servicioImpPctEl = document.getElementById('venta-semanal-servicio-impuesto-pct');
+            const otrosDescEl = document.getElementById('venta-semanal-otros-descuentos');
+            const notasEl = document.getElementById('venta-semanal-notas');
+            const btnGuardar = document.getElementById('btn-venta-semanal-guardar');
+            if (idEl) idEl.value = '';
+            if (fechaEl) fechaEl.value = inicioSemanaLunes(fechaIsoHoy());
+            if (montoEl) montoEl.value = '0';
+            if (marketingEl) marketingEl.value = '0';
+            if (servicioPctEl) servicioPctEl.value = String(VENTAS_SEMANALES_SERVICIO_PCT_DEFAULT);
+            if (servicioImpPctEl) servicioImpPctEl.value = String(VENTAS_SEMANALES_IMPUESTO_SERVICIO_PCT_DEFAULT);
+            if (otrosDescEl) otrosDescEl.value = '0';
+            if (notasEl) notasEl.value = '';
+            if (btnGuardar) btnGuardar.textContent = 'Guardar semana';
+            renderPreviewVentasSemanales();
+        }
+
+        function llenarFormularioVentaSemanal(row) {
+            if (!row) return;
+            const idEl = document.getElementById('venta-semanal-id');
+            const fechaEl = document.getElementById('venta-semanal-fecha');
+            const montoEl = document.getElementById('venta-semanal-monto');
+            const marketingEl = document.getElementById('venta-semanal-marketing');
+            const servicioPctEl = document.getElementById('venta-semanal-servicio-pct');
+            const servicioImpPctEl = document.getElementById('venta-semanal-servicio-impuesto-pct');
+            const otrosDescEl = document.getElementById('venta-semanal-otros-descuentos');
+            const notasEl = document.getElementById('venta-semanal-notas');
+            const btnGuardar = document.getElementById('btn-venta-semanal-guardar');
+            if (idEl) idEl.value = String(row.id || '');
+            if (fechaEl) fechaEl.value = row.semana_inicio || fechaIsoHoy();
+            if (montoEl) montoEl.value = String(Math.round(Number(row.ventas_monto || row.ventas_brutas || 0)));
+            if (marketingEl) marketingEl.value = String(Math.round(Number(row.marketing_monto || 0)));
+            if (servicioPctEl) servicioPctEl.value = String(Number(row.tasa_servicio_pct || VENTAS_SEMANALES_SERVICIO_PCT_DEFAULT));
+            if (servicioImpPctEl) servicioImpPctEl.value = String(Number(row.impuesto_tasa_servicio_pct || VENTAS_SEMANALES_IMPUESTO_SERVICIO_PCT_DEFAULT));
+            if (otrosDescEl) otrosDescEl.value = String(Math.round(Number(row.otros_descuentos_monto || 0)));
+            if (notasEl) notasEl.value = row.notas || '';
+            if (btnGuardar) btnGuardar.textContent = 'Actualizar semana';
+            renderPreviewVentasSemanales();
+        }
+
+        function renderTablaVentasSemanales(rows) {
+            const root = document.getElementById('ventas-semanales-lista');
+            if (!root) return;
+            const lista = Array.isArray(rows) ? rows : [];
+            if (!lista.length) {
+                root.innerHTML = '<div class="carrito-vacio" style="padding: 18px;">Aun no hay semanas registradas.</div>';
+                return;
+            }
+
+            const body = lista.map((r) => {
+                const gananciaClase = Number(r.ganancia_neta || r.saldo_estimado || 0) >= 0 ? 'positive' : 'negative';
+                return `
+                    <tr>
+                        <td>${escapeHtmlLocal(etiquetaSemana(r.semana_inicio, r.semana_fin))}</td>
+                        <td>${formatearMonedaCLP(r.ventas_monto || r.ventas_brutas || 0)}</td>
+                        <td>${formatearMonedaCLP(r.marketing_monto || 0)}</td>
+                        <td>${formatearMonedaCLP(r.costo_servicio_total || 0)}</td>
+                        <td>${formatearMonedaCLP(r.otros_descuentos_monto || 0)}</td>
+                        <td>${formatearMonedaCLP(r.compras_facturadas || 0)}</td>
+                        <td class="${gananciaClase}">${formatearMonedaCLP(r.ganancia_neta || r.saldo_estimado || 0)}</td>
+                        <td>
+                            <div class="weekly-row-actions">
+                                <button type="button" class="btn-mini-weekly" onclick="editarVentaSemanal(${Number(r.id || 0)})">Editar</button>
+                                <button type="button" class="btn-mini-weekly" onclick="eliminarVentaSemanal(${Number(r.id || 0)})">Eliminar</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            root.innerHTML = `
+                <table class="weekly-table">
+                    <thead>
+                        <tr>
+                            <th>Semana</th>
+                            <th>Ventas</th>
+                            <th>Marketing</th>
+                            <th>Servicio total</th>
+                            <th>Otros desc.</th>
+                            <th>Compras (factura)</th>
+                            <th>Ganancias</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
+        async function cargarVentasSemanales() {
+            const response = await fetch('/api/ventas/semanales?limit=30', { headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo cargar ventas semanales');
+            }
+            ventasSemanalesCache = Array.isArray(data.data) ? data.data : [];
+            renderTablaVentasSemanales(ventasSemanalesCache);
+        }
+
+        function abrirModalVentasSemanales() {
+            const modal = document.getElementById('modal-ventas-semanales');
+            if (!modal) return;
+            modal.classList.add('active');
+            limpiarFormularioVentasSemanales();
+            cargarVentasSemanales().catch((err) => {
+                const root = document.getElementById('ventas-semanales-lista');
+                if (root) root.innerHTML = `<div class="carrito-vacio" style="padding: 18px;">${escapeHtmlLocal(err.message || 'Error cargando')}</div>`;
+            });
+        }
+
+        function cerrarModalVentasSemanales() {
+            const modal = document.getElementById('modal-ventas-semanales');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
+        function editarVentaSemanal(id) {
+            const registro = ventasSemanalesCache.find((r) => Number(r.id || 0) === Number(id || 0));
+            if (!registro) return;
+            llenarFormularioVentaSemanal(registro);
+        }
+
+        async function eliminarVentaSemanal(id) {
+            try {
+                const registro = ventasSemanalesCache.find((r) => Number(r.id || 0) === Number(id || 0));
+                if (!registro) return;
+                const ok = confirm(`Eliminar registro de la semana ${etiquetaSemana(registro.semana_inicio, registro.semana_fin)}?`);
+                if (!ok) return;
+                const response = await fetch(`/api/ventas/semanales/${Number(id)}/eliminar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo eliminar el registro');
+                }
+                await cargarVentasSemanales();
+                limpiarFormularioVentasSemanales();
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess('Registro semanal eliminado.');
+                }
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            }
+        }
+
+        async function guardarVentaSemanal(event) {
+            event.preventDefault();
+            const btn = document.getElementById('btn-venta-semanal-guardar');
+            const textoOriginal = btn ? btn.textContent : '';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Guardando...';
+                }
+                const payload = {
+                    semana_inicio: document.getElementById('venta-semanal-fecha')?.value || fechaIsoHoy(),
+                    ventas_monto: Math.max(0, Math.round(obtenerValorNumerico('venta-semanal-monto'))),
+                    marketing_monto: Math.max(0, Math.round(obtenerValorNumerico('venta-semanal-marketing'))),
+                    tasa_servicio_pct: Math.max(0, Number(obtenerValorNumerico('venta-semanal-servicio-pct').toFixed(4))),
+                    impuesto_tasa_servicio_pct: Math.max(0, Number(obtenerValorNumerico('venta-semanal-servicio-impuesto-pct').toFixed(4))),
+                    otros_descuentos_monto: Math.max(0, Math.round(obtenerValorNumerico('venta-semanal-otros-descuentos'))),
+                    notas: (document.getElementById('venta-semanal-notas')?.value || '').trim()
+                };
+                const response = await fetch('/api/ventas/semanales', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar la semana');
+                }
+                await cargarVentasSemanales();
+                llenarFormularioVentaSemanal(data.registro || {});
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess('Semana guardada correctamente.');
+                }
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal || 'Guardar semana';
+                }
+            }
+        }
+        
+        const productosData = {
+            {% for p in productos %}
+            {{ p.id }}: {
+                nombre: {{ p.nombre|tojson }},
+                icono: {{ (p.icono or 'cupcake')|tojson }},
+                stock: {{ p.stock|tojson }},
+                unidad: {{ (p.unidad or 'unidad')|tojson }},
+                stock_visual: {{ (p.stock_visual if p.stock_visual is defined else p.stock)|tojson }},
+                stock_visual_unidad: {{ (p.stock_visual_unidad if p.stock_visual_unidad is defined else (p.unidad or 'unidad'))|tojson }},
+                stock_visual_origen: {{ (p.stock_visual_origen if p.stock_visual_origen is defined else 'propio')|tojson }},
+                stock_visual_dependencia_nombre: {{ (p.stock_visual_dependencia_nombre if p.stock_visual_dependencia_nombre is defined else '')|tojson }},
+                porciones_disponibles: {{ p.porciones_disponibles|int }},
+                sin_porcion_disponible: {{ 'true' if p.sin_porcion_disponible else 'false' }},
+                baja_porcion: {{ 'true' if p.baja_porcion else 'false' }},
+                bajo_minimo: {{ 'true' if p.bajo_minimo else 'false' }},
+                cerca_minimo: {{ 'true' if p.cerca_minimo else 'false' }},
+                desactivacion_manual_requiere_confirmacion: {{ 'true' if p.desactivacion_manual_requiere_confirmacion else 'false' }},
+                desactivacion_manual_confirmada: {{ 'true' if p.desactivacion_manual_confirmada else 'false' }},
+                porcion_cantidad: {{ (p.porcion_cantidad or 1)|tojson }},
+                porcion_unidad: {{ (p.porcion_unidad or 'unidad')|tojson }},
+                porcion: {{ (p.porcion_cantidad_label ~ ' ' ~ p.porcion_unidad)|tojson }},
+                dependencias_alerta_texto: {{ (p.dependencias_alerta_texto or '')|tojson }},
+                dependencias_criticas: {{ 'true' if p.dependencias_criticas else 'false' }},
+                dependencias_baja_porcion: {{ 'true' if p.dependencias_baja_porcion else 'false' }},
+                dependencias_cerca_minimo: {{ 'true' if p.dependencias_cerca_minimo else 'false' }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        };
+
+        function saveVentasUiState() {
+            const buscadorInput = document.getElementById('buscador');
+            const state = {
+                q: buscadorInput ? buscadorInput.value : '',
+                filtro: filtroStockActivo,
+                scroll_y: window.scrollY || 0
+            };
+            sessionStorage.setItem(VENTAS_UI_STATE_KEY, JSON.stringify(state));
+        }
+
+        function restoreVentasUiStateIfNeeded() {
+            const raw = sessionStorage.getItem(VENTAS_UI_STATE_KEY);
+            if (!raw) return;
+            sessionStorage.removeItem(VENTAS_UI_STATE_KEY);
+
+            try {
+                const state = JSON.parse(raw) || {};
+                const buscadorInput = document.getElementById('buscador');
+                if (buscadorInput && typeof state.q === 'string') {
+                    buscadorInput.value = state.q;
+                }
+
+                if (state.filtro === 'bajo_minimo' || state.filtro === 'baja_porcion' || state.filtro === 'todos') {
+                    aplicarFiltroStock(state.filtro);
+                } else {
+                    filtrarProductos();
+                }
+
+                const y = Number(state.scroll_y || 0);
+                if (Number.isFinite(y) && y > 0) {
+                    window.requestAnimationFrame(() => window.scrollTo(0, y));
+                }
+            } catch (_) {
+                // Ignorar estado invalido
+            }
+        }
+
+        function aplicarFiltroInicialDesdeQuery() {
+            const raw = sessionStorage.getItem(VENTAS_UI_STATE_KEY);
+            if (raw) return;
+            const params = new URLSearchParams(window.location.search || '');
+            const filtro = (params.get('filtro') || '').trim().toLowerCase();
+            if (filtro === 'baja_porcion' || filtro === 'bajo_minimo' || filtro === 'todos') {
+                aplicarFiltroStock(filtro);
+            }
+        }
+
+        function formatearNumeroSimple(valor) {
+            const num = Number(valor || 0);
+            if (!Number.isFinite(num)) return '0';
+            if (Math.abs(num - Math.round(num)) < 1e-9) return String(Math.round(num));
+            return num.toFixed(2);
+        }
+
+        function construirDescripcionPorcion(info) {
+            const cantidad = formatearNumeroSimple(info.porcion_cantidad || 1);
+            const unidad = info.porcion_unidad || 'unidad';
+            return `${cantidad} ${unidad}`;
+        }
+
+        function actualizarTarjetaProducto(id) {
+            const card = document.querySelector(`.producto-card[data-id="${id}"]`);
+            if (!card) return;
+            const info = productosData[id];
+            if (!info) return;
+
+            const stockNumerico = Number(info.stock_visual ?? info.stock ?? 0);
+            const porciones = Number(info.porciones_disponibles || 0);
+            const esCritico =
+                porciones <= 0
+                || Boolean(info.sin_porcion_disponible)
+                || Boolean(info.bajo_minimo)
+                || Boolean(info.dependencias_criticas);
+            const esAdvertencia =
+                Boolean(info.baja_porcion)
+                || Boolean(info.cerca_minimo)
+                || Boolean(info.dependencias_baja_porcion)
+                || Boolean(info.dependencias_cerca_minimo);
+            const esCercaMinimo = esAdvertencia && !esCritico;
+            const desactivacionConfirmada = esCritico && Boolean(info.desactivacion_manual_confirmada);
+            const requiereConfirmacion = esCritico && !desactivacionConfirmada;
+            const stockLabel = formatearNumeroSimple(stockNumerico);
+            const porcionDescripcion = construirDescripcionPorcion(info);
+            const unidad = info.stock_visual_unidad || info.unidad || 'unidad';
+            const stockOrigen = String(info.stock_visual_origen || 'propio').toLowerCase();
+            const stockDepNombre = String(info.stock_visual_dependencia_nombre || '').trim();
+            const dependenciasTexto = String(info.dependencias_alerta_texto || '').trim();
+
+            card.setAttribute('data-stock', String(stockNumerico));
+            card.setAttribute('data-bajo-minimo', info.bajo_minimo ? '1' : '0');
+            card.setAttribute('data-cerca-minimo', esCercaMinimo ? '1' : '0');
+            card.setAttribute('data-baja-porcion', info.baja_porcion ? '1' : '0');
+            card.setAttribute('data-requiere-desactivacion', requiereConfirmacion ? '1' : '0');
+            card.setAttribute('data-desactivacion-confirmada', desactivacionConfirmada ? '1' : '0');
+            card.setAttribute('data-porciones', String(porciones));
+            card.classList.toggle('agotado', esCritico && !desactivacionConfirmada);
+            card.classList.toggle('bajo-minimo', Boolean(info.bajo_minimo));
+            card.classList.toggle('cerca-minimo', esCercaMinimo);
+            card.classList.toggle('baja-porcion', Boolean(info.baja_porcion) && !esCritico);
+            card.classList.toggle('desactivacion-confirmada', desactivacionConfirmada);
+            card.setAttribute('onclick', `agregarAlCarrito(${id})`);
+
+            const iconEl = card.querySelector('.producto-icon');
+            if (iconEl) {
+                iconEl.textContent = obtenerIconoProducto(info.icono);
+            }
+
+            const stockEl = card.querySelector('.producto-stock');
+            if (stockEl) {
+                stockEl.textContent = `Stock: ${stockLabel} ${unidad}`;
+                stockEl.classList.toggle('bajo', esCritico);
+                stockEl.classList.toggle('cerca', esCercaMinimo);
+                stockEl.classList.toggle('desactivado-confirmado', desactivacionConfirmada);
+            }
+
+            const stockRefEl = card.querySelector('.producto-stock-ref');
+            if (stockRefEl) {
+                if ((stockOrigen === 'producto' || stockOrigen === 'insumo') && stockDepNombre) {
+                    stockRefEl.textContent = `Segun ${stockOrigen}: ${stockDepNombre}`;
+                } else {
+                    stockRefEl.textContent = '';
+                }
+            }
+
+            const porcionEl = card.querySelector('.producto-porcion');
+            if (porcionEl) {
+                porcionEl.textContent = `Porción: ${porcionDescripcion} · Disp.: ${porciones}`;
+                porcionEl.classList.remove('baja', 'critica', 'desactivada');
+                if (desactivacionConfirmada) {
+                    porcionEl.classList.add('desactivada');
+                } else if (porciones <= 0) {
+                    porcionEl.classList.add('critica');
+                } else if (info.baja_porcion) {
+                    porcionEl.classList.add('baja');
+                }
+            }
+
+            const depsEl = card.querySelector('.producto-dependencias');
+            if (depsEl) {
+                depsEl.textContent = dependenciasTexto;
+                depsEl.classList.remove('aviso', 'critica');
+                if (dependenciasTexto) {
+                    if (Boolean(info.dependencias_criticas)) {
+                        depsEl.classList.add('critica');
+                    } else {
+                        depsEl.classList.add('aviso');
+                    }
+                }
+            }
+
+            const btn = card.querySelector('.btn-desactivacion');
+            if (btn) {
+                btn.classList.remove('hidden', 'pendiente', 'confirmado');
+                if (!esCritico) {
+                    btn.classList.add('hidden');
+                } else if (desactivacionConfirmada) {
+                    btn.classList.add('confirmado');
+                    btn.textContent = 'Desactivado confirmado';
+                } else {
+                    btn.classList.add('pendiente');
+                    btn.textContent = 'Marcar desactivado';
+                }
+            }
+        }
+
+        function aplicarProductosActualizados(productosActualizados) {
+            if (!Array.isArray(productosActualizados)) return;
+            productosActualizados.forEach((item) => {
+                const id = Number(item.id || 0);
+                if (!id || !productosData[id]) return;
+                productosData[id] = {
+                    ...productosData[id],
+                    stock: Number(item.stock || 0),
+                    unidad: item.unidad || productosData[id].unidad || 'unidad',
+                    stock_visual: Number((item.stock_visual ?? item.stock) || 0),
+                    stock_visual_unidad: item.stock_visual_unidad || item.unidad || productosData[id].stock_visual_unidad || productosData[id].unidad || 'unidad',
+                    stock_visual_origen: item.stock_visual_origen || productosData[id].stock_visual_origen || 'propio',
+                    stock_visual_dependencia_nombre: item.stock_visual_dependencia_nombre || '',
+                    porciones_disponibles: Number(item.porciones_disponibles || 0),
+                    sin_porcion_disponible: Boolean(item.sin_porcion_disponible),
+                    baja_porcion: Boolean(item.baja_porcion),
+                    bajo_minimo: Boolean(item.bajo_minimo),
+                    cerca_minimo: Boolean(item.cerca_minimo),
+                    desactivacion_manual_requiere_confirmacion: Boolean(item.desactivacion_manual_requiere_confirmacion),
+                    desactivacion_manual_confirmada: Boolean(item.desactivacion_manual_confirmada),
+                    porcion_cantidad: Number(item.porcion_cantidad || productosData[id].porcion_cantidad || 1),
+                    porcion_unidad: item.porcion_unidad || productosData[id].porcion_unidad || 'unidad',
+                    dependencias_alerta_texto: item.dependencias_alerta_texto || '',
+                    dependencias_criticas: Boolean(item.dependencias_criticas),
+                    dependencias_baja_porcion: Boolean(item.dependencias_baja_porcion),
+                    dependencias_cerca_minimo: Boolean(item.dependencias_cerca_minimo),
+                };
+                productosData[id].porcion = construirDescripcionPorcion(productosData[id]);
+                actualizarTarjetaProducto(id);
+            });
+            ordenarTarjetasPorPrioridadDesactivacion();
+            filtrarProductos();
+            actualizarCarrito();
+        }
+
+        function ordenarTarjetasPorPrioridadDesactivacion() {
+            const grid = document.getElementById('productos-grid');
+            if (!grid) return;
+            const cards = Array.from(grid.querySelectorAll('.producto-card'));
+            cards.sort((a, b) => {
+                const aReq = a.getAttribute('data-requiere-desactivacion') === '1';
+                const bReq = b.getAttribute('data-requiere-desactivacion') === '1';
+                if (aReq !== bReq) return aReq ? -1 : 1;
+
+                const aNombre = String(a.getAttribute('data-nombre') || '').trim();
+                const bNombre = String(b.getAttribute('data-nombre') || '').trim();
+                return aNombre.localeCompare(bNombre, 'es', { sensitivity: 'base' });
+            });
+            cards.forEach((card) => grid.appendChild(card));
+        }
+
+        function toggleEstadoDesactivado(event, id) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            const info = productosData[id];
+            if (!info) return;
+            const esCritico =
+                Number(info.porciones_disponibles || 0) <= 0
+                || Boolean(info.sin_porcion_disponible)
+                || Boolean(info.bajo_minimo)
+                || Boolean(info.dependencias_criticas);
+            if (!esCritico) {
+                alert('Este boton solo se habilita cuando el producto esta en rojo critico.');
+                return;
+            }
+
+            const confirmar = !Boolean(info.desactivacion_manual_confirmada);
+            const btn = event && event.currentTarget ? event.currentTarget : null;
+            const textoPrevio = btn ? btn.textContent : '';
+            let actualizacionExitosa = false;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = confirmar ? 'Confirmando...' : 'Reactivando...';
+            }
+
+            fetch(`/api/producto/${id}/desactivacion-manual`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirmado: confirmar })
+            })
+            .then(r => r.json().then(data => ({ ok: r.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar el estado');
+                }
+                const estado = data.estado || {};
+                productosData[id] = {
+                    ...productosData[id],
+                    desactivacion_manual_confirmada: Boolean(estado.desactivacion_manual_confirmada),
+                    desactivacion_manual_requiere_confirmacion: Boolean(estado.desactivacion_manual_requiere_confirmacion),
+                };
+                actualizarTarjetaProducto(id);
+                ordenarTarjetasPorPrioridadDesactivacion();
+                filtrarProductos();
+                actualizacionExitosa = true;
+            })
+            .catch((err) => {
+                alert('[ERROR] ' + err.message);
+            })
+            .finally(() => {
+                if (btn) {
+                    btn.disabled = false;
+                    if (!actualizacionExitosa) {
+                        btn.textContent = textoPrevio || 'Marcar desactivado';
+                    }
+                }
+            });
+        }
+
+        async function marcarEventoAgendaCompletadoSiAplica() {
+            if (!agendaEventoActual || !agendaEventoActual.id) return;
+            try {
+                await fetch(`/api/agenda/evento/${agendaEventoActual.id}/estado`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ estado: 'completado' })
+                });
+            } catch (_) {
+                // No bloquear venta por error de agenda.
+            }
+        }
+
+        function aplicarFiltroStock(filtro) {
+            filtroStockActivo = filtro;
+            document.querySelectorAll('.stock-filtro-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-filtro') === filtro);
+            });
+            filtrarProductos();
+        }
+
+        function filtrarProductos() {
+            const texto = document.getElementById('buscador').value.toLowerCase();
+            const cards = document.querySelectorAll('.producto-card');
+
+            cards.forEach(card => {
+                const nombre = card.getAttribute('data-nombre').toLowerCase();
+                const matchTexto = nombre.includes(texto);
+                const esBajoMinimo = card.getAttribute('data-bajo-minimo') === '1';
+                const esBajaPorcion = card.getAttribute('data-baja-porcion') === '1';
+                let matchFiltro = true;
+                if (filtroStockActivo === 'bajo_minimo') matchFiltro = esBajoMinimo;
+                if (filtroStockActivo === 'baja_porcion') matchFiltro = esBajaPorcion;
+                card.style.display = (matchTexto && matchFiltro) ? '' : 'none';
+            });
+        }
+
+        function agregarAlCarrito(id) {
+            const info = productosData[id];
+            if (!info) return;
+            const nombre = info.nombre || 'Producto';
+            const porcionesDisponibles = Number(info.porciones_disponibles || 0);
+            if (porcionesDisponibles <= 0) {
+                alert('Este producto no alcanza para una porcion completa.');
+                return;
+            }
+
+            const existente = carrito.find(item => item.id === id);
+
+            if (existente) {
+                if (existente.cantidad < porcionesDisponibles) {
+                    existente.cantidad++;
+                } else {
+                    alert('No hay mas porciones disponibles de este producto');
+                    return;
+                }
+            } else {
+                carrito.push({ id, nombre, cantidad: 1 });
+            }
+
+            actualizarCarrito();
+        }
+
+        function actualizarCarrito() {
+            const container = document.getElementById('carrito-items');
+            const count = document.getElementById('carrito-count');
+            const totalItems = document.getElementById('total-items');
+            const btnVender = document.getElementById('btn-vender');
+            
+            count.textContent = carrito.length;
+            totalItems.textContent = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+            
+            if (carrito.length === 0) {
+                container.innerHTML = `
+                    <div class="carrito-vacio">
+                        <div class="carrito-vacio-icon">&#128722;</div>
+                        <div>El carrito est&aacute; vac&iacute;o</div>
+                        <div style="font-size: 13px; margin-top: 4px;">Haz clic en un producto para agregarlo</div>
+                    </div>
+                `;
+                btnVender.disabled = true;
+                limpiarCarritoPersistente();
+            } else {
+                container.innerHTML = carrito.map(item => `
+                    <div class="carrito-item ${(productosData[item.id] && (productosData[item.id].baja_porcion || productosData[item.id].bajo_minimo || productosData[item.id].dependencias_criticas || item.cantidad >= productosData[item.id].porciones_disponibles)) ? 'bajo-porcion' : ''}">
+                        <div class="carrito-item-info">
+                            <div class="carrito-item-nombre">${item.nombre}</div>
+                            ${(productosData[item.id] && (productosData[item.id].baja_porcion || productosData[item.id].bajo_minimo || productosData[item.id].dependencias_criticas || item.cantidad >= productosData[item.id].porciones_disponibles))
+                                ? `<div class="carrito-item-alerta">${productosData[item.id].dependencias_alerta_texto ? escapeHtmlLocal(productosData[item.id].dependencias_alerta_texto) : ('Stock bajo por porcion (' + escapeHtmlLocal(productosData[item.id].porcion || '') + ')')}</div>`
+                                : ''}
+                        </div>
+                        <div class="carrito-item-cantidad">
+                            <button class="btn-cantidad" onclick="restarCantidad(${item.id})">-</button>
+                            <span class="cantidad-valor">${item.cantidad}</span>
+                            <button class="btn-cantidad" onclick="sumarCantidad(${item.id})">+</button>
+                            <button class="btn-eliminar-item" onclick="eliminarDelCarrito(${item.id})">&#128465;</button>
+                        </div>
+                    </div>
+                `).join('');
+                btnVender.disabled = false;
+                guardarCarritoPersistente();
+            }
+        }
+
+        function sumarCantidad(id) {
+            const item = carrito.find(i => i.id === id);
+            const stockDisponible = (productosData[id] && productosData[id].porciones_disponibles) || 0;
+            
+            if (item && item.cantidad < stockDisponible) {
+                item.cantidad++;
+                actualizarCarrito();
+            } else {
+                alert('Stock maximo alcanzado por porcion');
+            }
+        }
+
+        function restarCantidad(id) {
+            const item = carrito.find(i => i.id === id);
+            if (item) {
+                item.cantidad--;
+                if (item.cantidad === 0) {
+                    eliminarDelCarrito(id);
+                } else {
+                    actualizarCarrito();
+                }
+            }
+        }
+
+        function eliminarDelCarrito(id) {
+            carrito = carrito.filter(item => item.id !== id);
+            actualizarCarrito();
+        }
+
+        function vaciarCarrito() {
+            if (carrito.length === 0) return;
+            if (confirm('\u00BFVaciar el carrito?')) {
+                carrito = [];
+                actualizarCarrito();
+            }
+        }
+
+        function procesarVenta() {
+            if (carrito.length === 0) return;
+            const codigoPedidoInput = document.getElementById('carrito-codigo-pedido');
+            const fechaVentaInput = document.getElementById('carrito-fecha-venta');
+            const canalVentaInput = document.getElementById('carrito-canal-venta');
+            const codigoPedido = (codigoPedidoInput ? codigoPedidoInput.value : '').trim();
+            const fechaVenta = (fechaVentaInput ? fechaVentaInput.value : '').trim() || fechaIsoHoy();
+            const canalVenta = (canalVentaInput ? canalVentaInput.value : 'presencial').trim() || 'presencial';
+            const hoy = fechaIsoHoy();
+            if (fechaVenta > hoy) {
+                alert('La fecha de venta no puede ser futura.');
+                return;
+            }
+            
+            const items = carrito.map(item => ({
+                id: item.id,
+                cantidad: item.cantidad
+            }));
+            
+            fetch('/api/venta/procesar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    items,
+                    codigo_pedido: codigoPedido,
+                    fecha_venta: fechaVenta,
+                    canal_venta: canalVenta,
+                    agenda_evento_id: agendaEventoActual && agendaEventoActual.id ? agendaEventoActual.id : null
+                })
+            })
+            .then(r => r.json())
+            .then(async (data) => {
+                if (data.success) {
+                    aplicarProductosActualizados(data.productos_actualizados || []);
+                    carrito = [];
+                    actualizarCarrito();
+                    if (codigoPedidoInput) codigoPedidoInput.value = '';
+                    limpiarCarritoPersistente();
+                    await marcarEventoAgendaCompletadoSiAplica();
+                    if (data.alertas && data.alertas.length > 0) {
+                        mostrarAlertas(data.alertas);
+                    } else {
+                        document.getElementById('modal-mensaje-exito').textContent = data.mensaje;
+                        document.getElementById('modal-exito').classList.add('active');
+                    }
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        function mostrarAlertas(alertas) {
+            const lista = document.getElementById('lista-alertas');
+            lista.innerHTML = alertas.map(a => `
+                <div class="alerta-item">
+                    \u26A0 ${a.nombre}: Quedaron ${a.stock} unidades
+                </div>
+            `).join('');
+            document.getElementById('modal-alertas').classList.add('active');
+        }
+
+        function cerrarModalAlertas() {
+            document.getElementById('modal-alertas').classList.remove('active');
+            document.getElementById('modal-exito').classList.add('active');
+        }
+
+        function cerrarModalExito() {
+            document.getElementById('modal-exito').classList.remove('active');
+            carrito = [];
+            actualizarCarrito();
+            const codigoPedidoInput = document.getElementById('carrito-codigo-pedido');
+            if (codigoPedidoInput) codigoPedidoInput.value = '';
+        }
+
+        [
+            'venta-semanal-fecha',
+            'venta-semanal-monto',
+            'venta-semanal-marketing',
+            'venta-semanal-servicio-pct',
+            'venta-semanal-servicio-impuesto-pct',
+            'venta-semanal-otros-descuentos',
+        ].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', renderPreviewVentasSemanales);
+                el.addEventListener('change', renderPreviewVentasSemanales);
+            }
+        });
+
+        const codigoPedidoInput = document.getElementById('carrito-codigo-pedido');
+        if (codigoPedidoInput) {
+            codigoPedidoInput.addEventListener('input', () => {
+                if (carrito.length > 0) {
+                    guardarCarritoPersistente();
+                }
+            });
+        }
+
+        const fechaVentaInput = document.getElementById('carrito-fecha-venta');
+        if (fechaVentaInput) {
+            if (!fechaVentaInput.value) {
+                fechaVentaInput.value = fechaIsoHoy();
+            }
+            fechaVentaInput.max = fechaIsoHoy();
+            fechaVentaInput.addEventListener('change', () => {
+                const value = (fechaVentaInput.value || '').trim();
+                const hoy = fechaIsoHoy();
+                if (!value) {
+                    fechaVentaInput.value = hoy;
+                } else if (value > hoy) {
+                    fechaVentaInput.value = hoy;
+                    alert('La fecha de venta no puede ser futura.');
+                }
+                if (carrito.length > 0) {
+                    guardarCarritoPersistente();
+                }
+            });
+        }
+
+        const canalVentaInput = document.getElementById('carrito-canal-venta');
+        if (canalVentaInput) {
+            if (!canalVentaInput.value) {
+                canalVentaInput.value = 'presencial';
+            }
+            canalVentaInput.addEventListener('change', () => {
+                if (carrito.length > 0) {
+                    guardarCarritoPersistente();
+                }
+            });
+        }
+
+        const modalVentasSemanales = document.getElementById('modal-ventas-semanales');
+        if (modalVentasSemanales) {
+            modalVentasSemanales.addEventListener('click', (event) => {
+                if (event.target === modalVentasSemanales) {
+                    cerrarModalVentasSemanales();
+                }
+            });
+        }
+
+        limpiarFormularioVentasSemanales();
+
+        restoreVentasUiStateIfNeeded();
+        aplicarFiltroInicialDesdeQuery();
+        Object.keys(productosData).forEach((id) => {
+            const idNum = Number(id || 0);
+            if (idNum) actualizarTarjetaProducto(idNum);
+        });
+        ordenarTarjetasPorPrioridadDesactivacion();
+        filtrarProductos();
+        restaurarCarritoPersistente();
+        actualizarCarrito();
+
+        fetch('/api/alertas/contador')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('nav-alertas');
+                badge.textContent = data.total;
+                badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
+            });
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>
+

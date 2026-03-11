@@ -1,0 +1,395 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C&aacute;maras - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary:#f59e0b; --secondary:#f97316; --primary-dark:#d97706; }
+        body { font-family:'Inter',sans-serif; background:#f8fafc; min-height:100vh; color:#0f172a; }
+        .app-shell { display:flex; min-height:100vh; }
+        .sidebar { width:260px; background:#fff; border-right:1px solid #e2e8f0; padding:24px; display:flex; flex-direction:column; position:fixed; height:100vh; z-index:100; }
+        .logo { display:flex; align-items:center; gap:12px; padding-bottom:32px; border-bottom:1px solid #e2e8f0; margin-bottom:24px; }
+        .logo-icon { width:44px; height:44px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 12px rgba(245, 158, 11, 0.3); }
+        .logo-text { font-size:20px; font-weight:700; color:#0f172a; }
+        .logo-text span { background:linear-gradient(135deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .nav-menu { display:flex; flex-direction:column; gap:8px; flex:1; }
+        .nav-item { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; text-decoration:none; color:#64748b; font-weight:500; transition:all .2s ease; }
+        .nav-item:hover { background:#fff7ed; color:var(--primary-dark); }
+        .nav-item.active { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:#fff; box-shadow:0 4px 12px rgba(245,158,11,.3); }
+        .nav-item .icon { font-size:20px; width:24px; text-align:center; }
+        .nav-badge { margin-left:auto; background:#ef4444; color:#fff; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; min-width:28px; }
+        .sidebar-footer { padding-top:24px; border-top:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center; }
+        .main-content { margin-left:260px; padding:28px 32px; width:calc(100vw - 260px); max-width:none; }
+        .page-header { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+        .page-title { font-size:32px; font-weight:700; }
+        .page-subtitle { color:#64748b; margin-top:4px; }
+        .btn { border:none; border-radius:10px; padding:10px 14px; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+        .btn-primary { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:#fff; }
+        .btn-secondary { background:#f1f5f9; border:1px solid #e2e8f0; color:#334155; }
+        .btn-mini { padding:8px 10px; font-size:12px; }
+        .btn:disabled { opacity:.55; cursor:not-allowed; }
+        .msg { font-size:13px; min-height:20px; margin-left:8px; }
+        .msg.ok { color:#166534; }
+        .msg.error { color:#b91c1c; }
+        .diag-card { margin: 8px 0 14px; border-radius: 12px; border: 1px solid #fecaca; background: #fff1f2; padding: 10px 12px; }
+        .diag-title { font-size: 13px; font-weight: 800; color: #991b1b; margin-bottom: 4px; }
+        .diag-detail { font-size: 12px; color: #7f1d1d; line-height: 1.45; }
+        .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+        .camera-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; }
+        .camera-head { padding:12px 14px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .camera-title { font-size:16px; font-weight:700; }
+        .state { font-size:11px; font-weight:700; border-radius:999px; padding:5px 10px; text-transform:uppercase; }
+        .state.ok { background:#dcfce7; color:#166534; }
+        .state.warn { background:#fef3c7; color:#92400e; }
+        .state.off { background:#fee2e2; color:#991b1b; }
+        .camera-body { padding:12px; }
+        .camera-frame-wrap { height:340px; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#0f172a; position:relative; }
+        .camera-image { width:100%; height:100%; object-fit:cover; display:block; background:#0f172a; }
+        .camera-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+        .camera-link { font-size:12px; color:#64748b; margin-top:8px; word-break:break-all; }
+        .camera-note { font-size:12px; color:#92400e; margin-top:6px; }
+        .fullscreen-exit-btn { position:absolute; top:10px; right:10px; z-index:5; display:none; border:1px solid rgba(255,255,255,.45); background:rgba(2,6,23,.72); color:#fff; border-radius:10px; padding:8px 10px; font-size:12px; font-weight:700; cursor:pointer; }
+        .camera-frame-wrap:fullscreen .fullscreen-exit-btn,
+        .camera-frame-wrap:-webkit-full-screen .fullscreen-exit-btn { display:inline-flex; align-items:center; gap:6px; }
+        .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; margin-bottom:14px; }
+        .card-header { padding:16px 20px; border-bottom:1px solid #e2e8f0; font-weight:700; font-size:18px; }
+        .card-body { padding:14px 20px; }
+        .cfg-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+        .field label { display:block; font-size:12px; color:#64748b; margin-bottom:5px; font-weight:700; text-transform:uppercase; }
+        .field input, .field select { width:100%; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:14px; color:#0f172a; background:#fff; }
+        .table-wrap { overflow:auto; }
+        .table { width:100%; border-collapse:collapse; min-width:980px; }
+        .table th, .table td { padding:10px 8px; border-bottom:1px solid #e2e8f0; text-align:left; }
+        .table th { font-size:11px; color:#64748b; text-transform:uppercase; }
+        .table input[type="text"], .table input[type="url"] { width:100%; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:13px; }
+        .hint { font-size:12px; color:#64748b; margin-top:8px; line-height:1.5; }
+        body.dark-mode { background:#0f172a; color:#f1f5f9; }
+        body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
+        body.dark-mode .logo { border-color:#334155; }
+        body.dark-mode .logo-text { color:#f1f5f9; }
+        body.dark-mode .nav-item { color:#94a3b8; }
+        body.dark-mode .nav-item:hover { background:#334155; color:#f1f5f9; }
+        body.dark-mode .sidebar-footer { border-color:#334155; color:#94a3b8; }
+        body.dark-mode .main-content { background:#0f172a; }
+        body.dark-mode .page-subtitle, body.dark-mode .hint, body.dark-mode .camera-link { color:#cbd5e1; }
+        body.dark-mode .camera-card, body.dark-mode .card { background:#1e293b; border-color:#334155; }
+        body.dark-mode .camera-head, body.dark-mode .card-header { border-color:#334155; }
+        body.dark-mode .btn-secondary { background:#334155; border-color:#475569; color:#e2e8f0; }
+        body.dark-mode .camera-frame-wrap { border-color:#475569; }
+        body.dark-mode .field input, body.dark-mode .field select, body.dark-mode .table input { background:#334155; border-color:#475569; color:#f8fafc; }
+        body.dark-mode .table th, body.dark-mode .table td { border-color:#334155; color:#e2e8f0; }
+        body.dark-mode .diag-card { background:#3f1d1d; border-color:#7f1d1d; }
+        body.dark-mode .diag-title { color:#fecaca; }
+        body.dark-mode .diag-detail { color:#fee2e2; }
+        @media (max-width:1120px) { .grid { grid-template-columns:1fr; } .cfg-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .camera-frame-wrap { height:320px; } }
+        @media (max-width:768px) { .sidebar { position:static; width:100%; height:auto; } .app-shell { display:block; } .main-content { margin-left:0; width:100vw; padding:20px; } .cfg-grid { grid-template-columns:1fr; } .camera-frame-wrap { height:280px; } }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+<div class="app-shell">
+    {% include "_sidebar.html" %}
+
+    <main class="main-content">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">C&aacute;maras</h1>
+                <p class="page-subtitle">Panel RTSP estable con captura persistente por canal.</p>
+            </div>
+            <div>
+                <button class="btn btn-secondary" type="button" onclick="aplicarPerfilGlobal('estable')">Modo estable (todas)</button>
+                <button class="btn btn-secondary" type="button" onclick="aplicarPerfilGlobal('alta_calidad')">Alta calidad (todas)</button>
+                <button class="btn btn-secondary" type="button" onclick="autoConfigRtspLocal()">Auto RTSP local</button>
+                <button class="btn btn-primary" type="button" onclick="guardarConfigCamaras()">Guardar cambios</button>
+                <span id="cfg-msg" class="msg"></span>
+            </div>
+        </div>
+        {% if opencv_diag and not opencv_diag.ok %}
+        <div class="diag-card">
+            <div class="diag-title">Diagn&oacute;stico c&aacute;maras: OpenCV no disponible</div>
+            <div class="diag-detail">
+                {{ opencv_diag.error or 'No se pudo cargar el motor de video.' }}<br>
+                {{ opencv_diag.hint or 'Instala dependencias de video y vuelve a abrir la app.' }}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="grid">
+            {% for c in camaras_paneles %}
+            {% set st = (camaras_estado or {}).get(c.id) %}
+            <section class="camera-card" data-cam-id="{{ c.id }}">
+                <div class="camera-head">
+                    <div class="camera-title">{{ c.nombre or ('Camara ' ~ c.id) }}</div>
+                    {% if st and st.online %}
+                    <span class="state ok">Online</span>
+                    {% elif c.rtsp_url %}
+                    <span class="state warn">Reconectando</span>
+                    {% else %}
+                    <span class="state off">Sin RTSP</span>
+                    {% endif %}
+                </div>
+                <div class="camera-body">
+                    <div class="camera-frame-wrap">
+                        <img id="cam-img-{{ c.id }}" class="camera-image" src="/api/camaras/mjpeg/{{ c.id }}?fps=10&v={{ c.actualizado or '' }}" alt="Camara {{ c.id }}" loading="lazy">
+                        <button class="fullscreen-exit-btn" type="button" onclick="salirPantallaCompleta()">Cerrar pantalla completa</button>
+                    </div>
+                    <div class="camera-actions">
+                        {% set rtsp_actual = c.rtsp_url or '' %}
+                        <button class="btn btn-secondary btn-mini {% if 'stream=1' in rtsp_actual %}btn-primary{% endif %}" type="button" onclick="cambiarPerfilCamara({{ c.id }}, 'estable')" {% if not c.rtsp_url %}disabled{% endif %}>Estable</button>
+                        <button class="btn btn-secondary btn-mini {% if 'stream=0' in rtsp_actual %}btn-primary{% endif %}" type="button" onclick="cambiarPerfilCamara({{ c.id }}, 'alta_calidad')" {% if not c.rtsp_url %}disabled{% endif %}>Alta calidad</button>
+                        <button class="btn btn-secondary btn-mini" type="button" onclick="abrirCamaraPantallaCompleta({{ c.id }})">Pantalla completa</button>
+                        {% if c.abrir_url %}
+                        <a class="btn btn-secondary btn-mini" href="{{ c.abrir_url }}" target="_blank" rel="noopener noreferrer">Abrir servidor</a>
+                        {% endif %}
+                    </div>
+                    <div class="camera-link">{{ c.rtsp_url or 'URL no configurada' }}</div>
+                    {% if st and st.last_error %}
+                    <div class="camera-note">{{ st.last_error }}</div>
+                    {% endif %}
+                </div>
+            </section>
+            {% endfor %}
+        </div>
+
+        <section class="card">
+            <div class="card-header">Configuraci&oacute;n de conexi&oacute;n</div>
+            <div class="card-body">
+                <div class="cfg-grid">
+                    <div class="field">
+                        <label>Plataforma</label>
+                        <input type="text" id="cfg-plataforma" value="{{ camaras_config.plataforma or 'XVRview' }}">
+                    </div>
+                    <div class="field">
+                        <label>Modo</label>
+                        <select id="cfg-modo">
+                            <option value="local" {% if (camaras_config.modo or 'local') == 'local' %}selected{% endif %}>Local</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Device ID</label>
+                        <input type="text" id="cfg-device-id" value="{{ camaras_config.device_id or '' }}">
+                    </div>
+                    <div class="field">
+                        <label>User ID</label>
+                        <input type="text" id="cfg-user-id" value="{{ camaras_config.user_id or '' }}">
+                    </div>
+                    <div class="field">
+                        <label>IP DVR local</label>
+                        <input type="text" id="cfg-local-ip" value="{{ camaras_config.servidor_1 or '192.168.1.10' }}">
+                    </div>
+                    <div class="field">
+                        <label>Puerto RTSP</label>
+                        <input type="number" id="cfg-rtsp-port" value="554" min="1" max="65535">
+                    </div>
+                    <div class="field">
+                        <label>Tipo stream preferido</label>
+                        <select id="cfg-rtsp-stream">
+                            <option value="1" selected>Substream (estable)</option>
+                            <option value="0">Mainstream (calidad)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Usuario RTSP</label>
+                        <input type="text" id="cfg-rtsp-user" value="{{ camaras_config.user_id or 'admin' }}">
+                    </div>
+                    <div class="field">
+                        <label>Clave RTSP</label>
+                        <input type="password" id="cfg-rtsp-pass" value="">
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Activa</th>
+                            <th>Nombre</th>
+                            <th>URL abrir</th>
+                            <th>URL RTSP</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for c in camaras_paneles %}
+                        <tr>
+                            <td>{{ c.id }}</td>
+                            <td><input type="checkbox" id="cam-activa-{{ c.id }}" {% if c.activa %}checked{% endif %}></td>
+                            <td><input type="text" id="cam-nombre-{{ c.id }}" value="{{ c.nombre or ('Camara ' ~ c.id) }}"></td>
+                            <td><input type="url" id="cam-abrir-{{ c.id }}" value="{{ c.abrir_url or '' }}"></td>
+                            <td><input type="text" id="cam-rtsp-{{ c.id }}" value="{{ c.rtsp_url or '' }}" placeholder="rtsp://..."></td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="hint">
+                    Esta version usa un motor limpio: cada camara mantiene su propia conexion RTSP en segundo plano.
+                    Si una se cae, se reconecta sin bloquear las demas.
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<button onclick="toggleDarkMode()" id="darkModeBtn" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(245,158,11,.4);z-index:1000;">&#127769;</button>
+
+<script>
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('darkModeBtn').innerHTML = '&#9728;';
+    }
+
+    function toggleDarkMode() {
+        const body = document.body;
+        const btn = document.getElementById('darkModeBtn');
+        const isDark = body.classList.toggle('dark-mode');
+        btn.innerHTML = isDark ? '&#9728;' : '&#127769;';
+        localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+    }
+
+    function setMsg(text, ok) {
+        const el = document.getElementById('cfg-msg');
+        if (!el) return;
+        el.textContent = text || '';
+        el.classList.remove('ok', 'error');
+        if (ok === true) el.classList.add('ok');
+        if (ok === false) el.classList.add('error');
+    }
+
+    function leerPayload() {
+        const paneles = [];
+        for (let i = 1; i <= 4; i++) {
+            paneles.push({
+                id: i,
+                activa: !!document.getElementById(`cam-activa-${i}`)?.checked,
+                nombre: document.getElementById(`cam-nombre-${i}`)?.value || '',
+                abrir_url: document.getElementById(`cam-abrir-${i}`)?.value || '',
+                embed_url: '',
+                rtsp_url: document.getElementById(`cam-rtsp-${i}`)?.value || '',
+                orden: i
+            });
+        }
+        return {
+            plataforma: document.getElementById('cfg-plataforma')?.value || 'XVRview',
+            modo: 'local',
+            device_id: document.getElementById('cfg-device-id')?.value || '',
+            user_id: document.getElementById('cfg-user-id')?.value || '',
+            servidor_1: document.getElementById('cfg-local-ip')?.value || '',
+            servidor_2: '',
+            paneles
+        };
+    }
+
+    function hayRtspConfigurado() {
+        for (let i = 1; i <= 4; i++) {
+            const val = (document.getElementById(`cam-rtsp-${i}`)?.value || '').trim().toLowerCase();
+            if (val.startsWith('rtsp://') || val.startsWith('rtsps://')) return true;
+        }
+        return false;
+    }
+
+    async function autoConfigRtspLocal(silencioso = false) {
+        try {
+            if (!silencioso) setMsg('Aplicando autoconfiguracion RTSP...', null);
+            const response = await fetch('/api/camaras/config/auto-xvr-local', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    ip: document.getElementById('cfg-local-ip')?.value || '192.168.1.10',
+                    rtsp_port: parseInt(document.getElementById('cfg-rtsp-port')?.value || '554', 10),
+                    stream_idx: parseInt(document.getElementById('cfg-rtsp-stream')?.value || '1', 10),
+                    user: document.getElementById('cfg-rtsp-user')?.value || 'admin',
+                    password: document.getElementById('cfg-rtsp-pass')?.value || ''
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo autoconfigurar');
+            if (!silencioso) setMsg('Autoconfigurado. Recargando...', true);
+            window.setTimeout(() => window.location.reload(), 700);
+        } catch (err) {
+            if (!silencioso) setMsg('[ERROR] ' + err.message, false);
+        }
+    }
+
+    async function cambiarPerfilCamara(camaraId, perfil) {
+        try {
+            setMsg('Aplicando perfil...', null);
+            const response = await fetch(`/api/camaras/perfil/${camaraId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({perfil})
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo cambiar perfil');
+            setMsg('Perfil aplicado. Recargando...', true);
+            window.setTimeout(() => window.location.reload(), 550);
+        } catch (err) {
+            setMsg('[ERROR] ' + err.message, false);
+        }
+    }
+
+    async function aplicarPerfilGlobal(perfil) {
+        try {
+            setMsg('Aplicando perfil global...', null);
+            for (let id = 1; id <= 4; id++) {
+                const rtsp = (document.getElementById(`cam-rtsp-${id}`)?.value || '').trim().toLowerCase();
+                if (!rtsp.startsWith('rtsp://') && !rtsp.startsWith('rtsps://')) continue;
+                const response = await fetch(`/api/camaras/perfil/${id}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({perfil})
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || `Error en camara ${id}`);
+            }
+            setMsg('Perfil global aplicado. Recargando...', true);
+            window.setTimeout(() => window.location.reload(), 600);
+        } catch (err) {
+            setMsg('[ERROR] ' + err.message, false);
+        }
+    }
+
+    function abrirCamaraPantallaCompleta(camaraId) {
+        const container = document.querySelector(`section.camera-card[data-cam-id="${camaraId}"] .camera-frame-wrap`);
+        if (!container) return;
+        if (container.requestFullscreen) container.requestFullscreen();
+        else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+        else if (container.msRequestFullscreen) container.msRequestFullscreen();
+    }
+
+    function salirPantallaCompleta() {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        else if (document.msExitFullscreen) document.msExitFullscreen();
+    }
+
+    async function guardarConfigCamaras() {
+        try {
+            setMsg('Guardando...', null);
+            const response = await fetch('/api/camaras/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(leerPayload())
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo guardar');
+            setMsg('Configuracion guardada. Recargando...', true);
+            window.setTimeout(() => window.location.reload(), 500);
+        } catch (err) {
+            setMsg('[ERROR] ' + err.message, false);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!hayRtspConfigurado()) autoConfigRtspLocal(true);
+    });
+</script>
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>
+
+

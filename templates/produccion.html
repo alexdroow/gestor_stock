@@ -1,0 +1,3407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Producci&oacute;n - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --secondary: #f97316;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #0f172a;
+        }
+        
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .logo-text span { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background: #fff7ed;
+            color: var(--primary-dark);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .nav-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .nav-badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+        }
+        
+        .sidebar-footer {
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 40px;
+            max-width: calc(100% - 260px);
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .page-subtitle {
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+        
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .recetas-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .recetas-count {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .recetas-search {
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .recetas-search input {
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 14px 10px 36px;
+            font-size: 14px;
+            font-family: inherit;
+            background: white;
+        }
+
+        .recetas-search input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+        }
+
+        .recetas-search .icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: #94a3b8;
+        }
+        
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card-body {
+            padding: 24px;
+        }
+        
+        .recetas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        
+        .receta-card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .receta-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .receta-card.hidden {
+            display: none;
+        }
+        
+        .receta-nombre {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .receta-producto {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .receta-insumos {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        
+        .insumo-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .insumo-item:last-child {
+            border-bottom: none;
+        }
+        
+        .receta-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .receta-actions .btn {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .receta-zoom-overlay {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(8px);
+            z-index: 1200;
+        }
+
+        .receta-zoom-modal {
+            width: min(960px, 94vw);
+            max-width: none;
+            max-height: 90vh;
+            padding: 0;
+            border-radius: 18px;
+            overflow: hidden;
+            transform: translateY(14px) scale(0.985);
+            opacity: 0;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .receta-zoom-modal .modal-header {
+            margin-bottom: 0;
+            padding: 14px 18px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+
+        .receta-zoom-modal .modal-title {
+            font-size: 20px;
+        }
+
+        .receta-zoom-body {
+            max-height: calc(90vh - 66px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px;
+            background: #f8fafc;
+        }
+
+        .receta-zoom-sheet {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.15);
+            overflow: hidden;
+        }
+
+        .receta-zoom-kicker {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+
+        .receta-zoom-title {
+            font-size: clamp(30px, 3.6vw, 50px);
+            line-height: 1.06;
+            margin: 0 0 12px 0;
+            color: #0f172a;
+            overflow-wrap: anywhere;
+        }
+
+        .receta-zoom-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .receta-zoom-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 7px 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #334155;
+            font-size: clamp(15px, 1.15vw, 19px);
+            font-weight: 600;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+
+        .receta-zoom-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 14px;
+        }
+
+        .receta-zoom-block {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            padding: 14px;
+            min-width: 0;
+        }
+
+        .receta-zoom-block h4 {
+            margin: 0 0 10px 0;
+            font-size: clamp(17px, 1.5vw, 23px);
+            color: #334155;
+        }
+
+        .receta-zoom-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .receta-zoom-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px dashed #cbd5e1;
+            min-width: 0;
+        }
+
+        .receta-zoom-item:last-child {
+            border-bottom: none;
+        }
+
+        .receta-zoom-item-name {
+            font-size: clamp(20px, 1.8vw, 30px);
+            color: #1e293b;
+            line-height: 1.15;
+            font-weight: 600;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .receta-zoom-item-value {
+            font-size: clamp(20px, 1.9vw, 30px);
+            color: #0f172a;
+            font-weight: 800;
+            white-space: normal;
+            padding-left: 10px;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .receta-zoom-summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            font-size: clamp(15px, 1.15vw, 19px);
+            border-bottom: 1px dashed #cbd5e1;
+            color: #334155;
+            min-width: 0;
+        }
+
+        .receta-zoom-summary-item strong {
+            color: #0f172a;
+            font-size: clamp(17px, 1.35vw, 23px);
+        }
+
+        .receta-zoom-cost {
+            margin-top: 12px;
+            border-radius: 10px;
+            border: 1px solid #d1fae5;
+            background: #ecfdf5;
+            padding: 12px;
+        }
+
+        .receta-zoom-cost span {
+            display: block;
+            color: #065f46;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .receta-zoom-cost strong {
+            display: block;
+            color: #047857;
+            font-size: clamp(22px, 1.9vw, 32px);
+            font-weight: 800;
+            margin-top: 6px;
+            overflow-wrap: anywhere;
+        }
+
+        .receta-zoom-note {
+            margin-top: 12px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .receta-zoom-empty {
+            padding: 12px 0;
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        @media (max-width: 900px) {
+            .receta-zoom-body {
+                padding: 12px;
+            }
+
+            .receta-zoom-sheet {
+                padding: 14px;
+            }
+        }
+        
+        .historial-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .historial-meta {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .historial-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .historial-tab-btn {
+            flex: 1;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #475569;
+            border-radius: 10px;
+            padding: 9px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .historial-tab-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border-color: transparent;
+        }
+
+        .historial-panel {
+            display: none;
+        }
+
+        .historial-panel.active {
+            display: block;
+        }
+
+        .historial-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .historial-info {
+            flex: 1;
+        }
+        
+        .historial-receta {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .historial-fecha {
+            font-size: 12px;
+            color: #64748b;
+        }
+        
+        .historial-cantidad {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-right: 12px;
+        }
+
+        .historial-item.compact {
+            margin-bottom: 6px;
+            padding: 10px;
+        }
+
+        .historial-empty {
+            text-align: center;
+            color: #64748b;
+            font-size: 13px;
+            padding: 16px 10px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .historial-week {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .historial-week summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 10px 12px;
+            background: #f8fafc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .historial-week summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .historial-week-summary-left {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .historial-week-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .historial-week-subtitle {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .historial-week-total {
+            font-size: 12px;
+            color: #475569;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .historial-week[open] summary {
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .historial-week-body {
+            background: #f8fafc;
+            padding: 8px;
+        }
+
+        .historial-load-more {
+            width: 100%;
+            margin-top: 6px;
+            padding: 9px 12px;
+            border-radius: 10px;
+            border: 1px dashed #cbd5e1;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: none;
+        }
+
+        .historial-load-more:hover {
+            border-color: var(--primary);
+            color: var(--primary-dark);
+            background: #fff7ed;
+        }
+
+        .plan-semanal {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .plan-semanal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .plan-semanal-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .plan-semanal-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .plan-semanal-meta {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 10px;
+        }
+
+        .plan-semanal-list {
+            max-height: 340px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .plan-semanal-empty {
+            text-align: center;
+            color: #64748b;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 14px 10px;
+            background: #f8fafc;
+            font-size: 13px;
+        }
+
+        .plan-day {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            overflow: hidden;
+        }
+
+        .plan-day-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 9px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+
+        .plan-day-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .plan-day-agenda {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        .plan-day-items {
+            padding: 8px 10px;
+        }
+
+        .plan-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 7px 0;
+            border-bottom: 1px dashed #cbd5e1;
+        }
+
+        .plan-item:last-child {
+            border-bottom: none;
+        }
+
+        .plan-item-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .plan-item-metrics {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .plan-chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            border: 1px solid #dbeafe;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+
+        .plan-chip.warning {
+            border-color: #fde68a;
+            background: #fffbeb;
+            color: #b45309;
+        }
+
+        .plan-chip.manual {
+            border-color: #86efac;
+            background: #f0fdf4;
+            color: #166534;
+        }
+
+        .plan-manual-list {
+            margin-bottom: 8px;
+            padding: 8px;
+            border: 1px solid #dcfce7;
+            border-radius: 10px;
+            background: #f8fff9;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .plan-manual-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #166534;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+
+        .plan-manual-item {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            border-bottom: 1px dashed #bbf7d0;
+            padding-bottom: 6px;
+        }
+
+        .plan-manual-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .plan-manual-info {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .plan-manual-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #14532d;
+            overflow-wrap: anywhere;
+        }
+
+        .plan-manual-note {
+            font-size: 11px;
+            color: #3f6212;
+            overflow-wrap: anywhere;
+        }
+
+        .btn-plan-remove {
+            border: 1px solid #fecaca;
+            background: #fff1f2;
+            color: #b91c1c;
+            border-radius: 8px;
+            padding: 2px 7px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+
+        .btn-plan-remove:hover {
+            background: #fee2e2;
+        }
+
+        .agenda-produccion-hint {
+            font-size: 12px;
+            color: #64748b;
+            margin: -2px 0 10px;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #64748b;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        #modal-ver-receta .modal {
+            max-width: 780px;
+            width: 92%;
+            max-height: 86vh;
+        }
+
+        #modal-ver-receta input[readonly] {
+            background: #f8fafc;
+            color: #0f172a;
+            font-weight: 600;
+            cursor: default;
+        }
+
+        .ver-receta-list {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #ffffff;
+            max-height: 44vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .ver-receta-head,
+        .ver-receta-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+            gap: 14px;
+            align-items: center;
+            padding: 12px 14px;
+        }
+
+        .ver-receta-head {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #64748b;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .ver-receta-row {
+            font-size: 16px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .ver-receta-row:last-child {
+            border-bottom: none;
+        }
+
+        .ver-receta-nombre {
+            color: #0f172a;
+            font-weight: 700;
+            font-size: clamp(22px, 2.3vw, 32px);
+            line-height: 1.12;
+            overflow-wrap: anywhere;
+        }
+
+        .ver-receta-cantidad {
+            color: #0f172a;
+            font-weight: 800;
+            font-size: clamp(22px, 2.2vw, 32px);
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .ver-receta-vacio {
+            padding: 14px 12px;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .ver-receta-nutricion {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #ffffff;
+            padding: 12px;
+        }
+
+        .ver-receta-nutri-meta {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 10px;
+        }
+
+        .ver-receta-nutri-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .ver-receta-nutri-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fafc;
+        }
+
+        .ver-receta-nutri-card h4 {
+            margin: 0 0 8px;
+            font-size: 13px;
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .ver-receta-nutri-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 13px;
+            border-bottom: 1px dashed #e2e8f0;
+            padding: 4px 0;
+        }
+
+        .ver-receta-nutri-row:last-child {
+            border-bottom: none;
+        }
+
+        .ver-receta-nutri-label {
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .ver-receta-nutri-value {
+            color: #0f172a;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        .ver-receta-nutri-warn {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+            font-size: 12px;
+        }
+        
+        .insumo-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr 1fr auto;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .insumo-row select[data-field="tipo"] {
+            font-weight: 600;
+        }
+        
+        .btn-remove {
+            background: #fee2e2;
+            color: #ef4444;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .search-empty {
+            display: none;
+            text-align: center;
+            padding: 24px 12px;
+            color: #64748b;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            margin-top: 8px;
+            font-size: 14px;
+            background: #f8fafc;
+        }
+
+        .search-empty.active {
+            display: block;
+        }
+        
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .logo-text {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .nav-item {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .nav-item:hover {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .main-content {
+            background: #0f172a;
+        }
+        
+        body.dark-mode .page-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .card {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .card-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .receta-card {
+            background: #334155;
+            border-color: #475569;
+        }
+        
+        body.dark-mode .receta-nombre {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .historial-item {
+            background: #334155;
+        }
+
+        body.dark-mode .historial-meta {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .historial-tab-btn {
+            background: #334155;
+            border-color: #475569;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .historial-empty {
+            background: #334155;
+            border-color: #475569;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .historial-week {
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .historial-week summary {
+            background: #334155;
+        }
+
+        body.dark-mode .historial-week-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .historial-week-subtitle {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .historial-week-total {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .historial-week[open] summary {
+            border-color: #475569;
+        }
+
+        body.dark-mode .historial-week-body {
+            background: #334155;
+        }
+
+        body.dark-mode .historial-load-more {
+            background: #334155;
+            border-color: #475569;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .plan-semanal {
+            border-color: #475569;
+        }
+
+        body.dark-mode .plan-semanal-title {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .plan-semanal-meta {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .plan-semanal-empty {
+            background: #334155;
+            border-color: #475569;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .plan-day {
+            border-color: #475569;
+            background: #334155;
+        }
+
+        body.dark-mode .plan-day-header {
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .plan-day-title {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .plan-day-agenda {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .plan-item {
+            border-bottom-color: #475569;
+        }
+
+        body.dark-mode .plan-item-name {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .plan-chip {
+            border-color: #1e40af;
+            background: rgba(30, 64, 175, 0.25);
+            color: #bfdbfe;
+        }
+
+        body.dark-mode .plan-chip.warning {
+            border-color: #92400e;
+            background: rgba(146, 64, 14, 0.3);
+            color: #fde68a;
+        }
+
+        body.dark-mode .plan-chip.manual {
+            border-color: #14532d;
+            background: rgba(20, 83, 45, 0.35);
+            color: #bbf7d0;
+        }
+
+        body.dark-mode .plan-manual-list {
+            border-color: #14532d;
+            background: rgba(15, 23, 42, 0.45);
+        }
+
+        body.dark-mode .plan-manual-label {
+            color: #86efac;
+        }
+
+        body.dark-mode .plan-manual-item {
+            border-bottom-color: #166534;
+        }
+
+        body.dark-mode .plan-manual-title {
+            color: #dcfce7;
+        }
+
+        body.dark-mode .plan-manual-note {
+            color: #bbf7d0;
+        }
+
+        body.dark-mode .btn-plan-remove {
+            border-color: #7f1d1d;
+            background: rgba(127, 29, 29, 0.35);
+            color: #fecaca;
+        }
+
+        body.dark-mode .agenda-produccion-hint {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .modal {
+            background: #1e293b;
+        }
+
+        body.dark-mode .receta-zoom-overlay {
+            background: rgba(2, 6, 23, 0.6);
+        }
+
+        body.dark-mode .receta-zoom-modal .modal-header {
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .receta-zoom-body {
+            background: #0f172a;
+        }
+
+        body.dark-mode .receta-zoom-sheet {
+            background: #1e293b;
+            border-color: #475569;
+            box-shadow: 0 18px 36px rgba(2, 6, 23, 0.5);
+        }
+
+        body.dark-mode .receta-zoom-kicker {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .receta-zoom-title {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .receta-zoom-chip {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .receta-zoom-block {
+            background: #334155;
+            border-color: #475569;
+        }
+
+        body.dark-mode .receta-zoom-block h4 {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .receta-zoom-item {
+            border-bottom-color: #475569;
+        }
+
+        body.dark-mode .receta-zoom-item-name {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .receta-zoom-item-value {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .receta-zoom-summary-item {
+            border-bottom-color: #475569;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .receta-zoom-summary-item strong {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .receta-zoom-cost {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        body.dark-mode .receta-zoom-cost span {
+            color: #a7f3d0;
+        }
+
+        body.dark-mode .receta-zoom-cost strong {
+            color: #6ee7b7;
+        }
+
+        body.dark-mode .receta-zoom-note,
+        body.dark-mode .receta-zoom-empty {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .btn-secondary {
+            background: #334155;
+            color: #f1f5f9;
+            border-color: #475569;
+        }
+
+        body.dark-mode .btn-secondary:hover {
+            background: #475569;
+        }
+
+        body.dark-mode .recetas-count {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .recetas-search input {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .search-empty {
+            background: #334155;
+            border-color: #475569;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode #modal-ver-receta input[readonly] {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .ver-receta-list {
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .ver-receta-head {
+            background: #334155;
+            border-color: #475569;
+            color: #94a3b8;
+        }
+
+        body.dark-mode .ver-receta-row {
+            border-bottom-color: #334155;
+        }
+
+        body.dark-mode .ver-receta-nombre,
+        body.dark-mode .ver-receta-cantidad {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .ver-receta-vacio {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .ver-receta-nutricion {
+            background: #1e293b;
+            border-color: #475569;
+        }
+
+        body.dark-mode .ver-receta-nutri-meta {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .ver-receta-nutri-card {
+            background: #334155;
+            border-color: #475569;
+        }
+
+        body.dark-mode .ver-receta-nutri-card h4 {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .ver-receta-nutri-row {
+            border-bottom-color: #475569;
+        }
+
+        body.dark-mode .ver-receta-nutri-label {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .ver-receta-nutri-value {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .ver-receta-nutri-warn {
+            background: rgba(146, 64, 14, 0.2);
+            border-color: #92400e;
+            color: #fde68a;
+        }
+        
+        @media (max-width: 1024px) {
+            .sidebar { width: 240px; }
+            .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
+            .layout-grid { grid-template-columns: 1fr; }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
+            .recetas-grid { grid-template-columns: 1fr; }
+            .ver-receta-head,
+            .ver-receta-row {
+                grid-template-columns: minmax(0, 1fr) minmax(120px, 150px);
+                gap: 10px;
+                padding: 10px;
+            }
+
+            .ver-receta-nombre,
+            .ver-receta-cantidad {
+                font-size: clamp(20px, 6vw, 28px);
+            }
+
+            .ver-receta-nutri-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <script>
+        // Aplicar tema antes de renderizar para evitar parpadeo en modo oscuro.
+        (function () {
+            try {
+                if (localStorage.getItem('darkMode') === 'true') {
+                    document.body.classList.add('dark-mode');
+                }
+            } catch (_) {}
+        })();
+    </script>
+    <div style="display: flex; min-height: 100vh;">
+        <!-- Sidebar -->
+        {% include "_sidebar.html" %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Producci&oacute;n</h1>
+                    <p class="page-subtitle">Gestiona recetas y produce tus productos</p>
+                </div>
+                <button onclick="abrirModalReceta()" class="btn btn-primary">
+                    <span>+</span> Nueva Receta
+                </button>
+            </div>
+
+            <div class="layout-grid">
+                <!-- Recetas -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">&#128203; Recetas Guardadas</h3>
+                    </div>
+                    <div class="card-body" id="recetas-panel-root">
+                        <div class="recetas-toolbar">
+                            <div class="recetas-count">
+                                <span id="recetas-visibles">{{ recetas|length }}</span> de {{ recetas|length }} recetas
+                            </div>
+                            <div class="recetas-search">
+                                <span class="icon">&#128270;</span>
+                                <input type="text" id="buscador-receta" placeholder="Buscar receta o producto..." oninput="filtrarRecetas()">
+                            </div>
+                        </div>
+
+                        {% if recetas %}
+                        <div class="recetas-grid" id="recetas-grid">
+                            {% for receta in recetas %}
+                            <div class="receta-card receta-item" data-receta-nombre="{{ receta.nombre|lower }}" data-receta-producto="{{ receta.producto_nombre|lower }}" data-receta-id="{{ receta.id }}">
+                                <div class="receta-nombre">{{ receta.nombre }}</div>
+                                <div class="receta-producto">Produce: {{ receta.producto_nombre }}</div>
+                                <div class="receta-producto">Rendimiento por lote: {{ receta.rendimiento }}</div>
+                                
+                                <!-- COSTO TOTAL DE LA RECETA -->
+                                <div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 8px; padding: 12px; margin-bottom: 12px; text-align: center;">
+                                    <div style="font-size: 11px; color: #065f46; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Costo Total</div>
+                                    <div style="font-size: 24px; font-weight: 800; color: #047857;">${{ "{:,.0f}".format(receta.costo_total).replace(",", ".") }}</div>
+                                    <div style="font-size: 11px; color: #059669; margin-top: 2px;">IVA incluido</div>
+                                </div>
+                                
+                                <div class="receta-insumos">
+                                    {% for insumo in (receta.componentes if receta.componentes is defined else receta.insumos) %}
+                                    <div class="insumo-item">
+                                        <span>
+                                            {% if insumo.tipo is defined and insumo.tipo == 'producto' %}
+                                                &#128230; {{ insumo.nombre }}
+                                            {% else %}
+                                                &#127806; {{ insumo.insumo_nombre if insumo.insumo_nombre is defined else insumo.nombre }}
+                                            {% endif %}
+                                        </span>
+                                        <strong>{{ insumo.cantidad }} {{ insumo.unidad }}</strong>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <!-- DESGLOSE DE COSTOS (opcional, colapsable) -->
+                                <details style="margin-bottom: 12px; font-size: 12px;">
+                                    <summary style="cursor: pointer; color: #64748b; padding: 8px; background: #f8fafc; border-radius: 6px;">
+                                        Ver desglose de costos
+                                    </summary>
+                                    <div style="padding: 12px; background: #f8fafc; border-radius: 0 0 6px 6px; margin-top: 4px;">
+                                        {% for item in receta.costo_detalle %}
+                                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
+                                            <span style="color: #374151;">{{ item.insumo }}</span>
+                                            <span style="font-weight: 600; color: #059669;">
+                                                {% if item.error %}
+                                                    <span style="color: #ef4444;">{{ item.error }}</span>
+                                                {% else %}
+                                                    ${{ "{:,.0f}".format(item.costo).replace(",", ".") }}
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                        <div style="display: flex; justify-content: space-between; padding-top: 8px; margin-top: 8px; border-top: 2px solid #10b981; font-weight: 700;">
+                                            <span style="color: #065f46;">TOTAL</span>
+                                            <span style="color: #047857;">${{ "{:,.0f}".format(receta.costo_total).replace(",", ".") }}</span>
+                                        </div>
+                                    </div>
+                                </details>
+                                
+                                <div class="receta-actions">
+                                    <button onclick='producirReceta({{ receta.id }}, {{ receta.nombre|tojson }})' class="btn btn-success btn-sm">
+                                        &#10003; Producir
+                                    </button>
+                                    <button onclick="abrirModalEditarReceta({{ receta.id }})" class="btn btn-secondary btn-sm">
+                                        &#9998; Editar
+                                    </button>
+                                    <button onclick="eliminarReceta({{ receta.id }})" class="btn btn-danger btn-sm">
+                                        &#128465; Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div id="recetas-search-empty" class="search-empty">
+                            No se encontraron recetas con ese criterio.
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <div class="empty-state-icon">&#127859;</div>
+                            <div>No hay recetas guardadas</div>
+                            <div style="color: #64748b; font-size: 14px; margin-top: 8px;">
+                                Crea tu primera receta para empezar a producir
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Historial de Produccion -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">&#128220; Historial de Producci&oacute;n</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="historial-meta" id="historial-meta">
+                            Mostrando historial de los &uacute;ltimos 6 meses
+                        </div>
+
+                        <div class="historial-tabs">
+                            <button class="historial-tab-btn active" id="historial-tab-semana" onclick="cambiarTabHistorial('semana')">
+                                Esta semana (<span id="historial-semana-total">0</span>)
+                            </button>
+                            <button class="historial-tab-btn" id="historial-tab-anterior" onclick="cambiarTabHistorial('anterior')">
+                                Anteriores (<span id="historial-anterior-total">0</span> semanas)
+                            </button>
+                        </div>
+
+                        <div class="historial-panel active" id="historial-panel-semana">
+                            <div class="historial-list" id="historial-semana-list">
+                                <!-- Se carga por JS -->
+                            </div>
+                        </div>
+
+                        <div class="historial-panel" id="historial-panel-anterior">
+                            <div class="historial-list" id="historial-anterior-list">
+                                <!-- Se carga por JS -->
+                            </div>
+                            <button id="historial-mas-btn" class="historial-load-more" onclick="cargarMasSemanas()">
+                                Cargar m&aacute;s semanas anteriores
+                            </button>
+                        </div>
+
+                        <div class="plan-semanal">
+                            <div class="plan-semanal-header">
+                                <div class="plan-semanal-title">Produccion planificada (semana)</div>
+                                <div class="plan-semanal-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalAgendaProduccion()">
+                                        Agendar produccion
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="refrescarAgendaProduccion()">
+                                        Actualizar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="plan-semanal-meta" id="agenda-produccion-meta">
+                                Cargando agenda de produccion...
+                            </div>
+                            <div class="plan-semanal-list" id="agenda-produccion-list">
+                                <div class="plan-semanal-empty">Cargando agenda de produccion...</div>
+                            </div>
+                        </div>
+
+                        <div class="plan-semanal">
+                            <div class="plan-semanal-header">
+                                <div class="plan-semanal-title">Plan semanal sugerido</div>
+                                <div class="plan-semanal-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="refrescarPlanSemanal()">
+                                        Actualizar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="plan-semanal-meta" id="plan-semanal-meta">
+                                Estimacion basada en ventas recientes y agenda.
+                            </div>
+                            <div class="plan-semanal-list" id="plan-semanal-list">
+                                <div class="plan-semanal-empty">Cargando plan semanal...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    <!-- Modal Nueva Receta -->
+    <div class="modal-overlay" id="modal-receta">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">&#127859; Nueva Receta</h3>
+                <button class="btn-close" onclick="cerrarModalReceta()">&#215;</button>
+            </div>
+            <form id="form-receta" action="/api/receta/crear" method="POST">
+                <div class="form-group">
+                    <label>Nombre de la Receta</label>
+                    <input type="text" name="nombre" required placeholder="Ej: Base de Pie de Lim&oacute;n">
+                </div>
+                
+                <div class="form-group">
+                    <label>Producto que Produce (opcional)</label>
+                    <select name="producto_id">
+                        <option value="">-- Seleccionar producto --</option>
+                        {% for p in productos %}
+                        <option value="{{ p.id }}">{{ p.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Rendimiento por lote</label>
+                    <input type="number" name="rendimiento" min="0.01" step="0.01" value="1" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Componentes (insumos y/o productos)</label>
+                    <div id="insumos-container">
+                        <!-- Filas dinamicas -->
+                    </div>
+                    <button type="button" onclick="agregarInsumo()" class="btn btn-secondary" style="width: 100%; margin-top: 12px;">
+                        + Agregar Componente
+                    </button>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    &#128190; Guardar Receta
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Editar Receta -->
+    <div class="modal-overlay" id="modal-editar-receta">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">&#9998; Editar Receta</h3>
+                <button class="btn-close" onclick="cerrarModalEditarReceta()">&#215;</button>
+            </div>
+            <form id="form-editar-receta" onsubmit="guardarEdicionReceta(event)">
+                <input type="hidden" id="editar-receta-id">
+
+                <div class="form-group">
+                    <label>Nombre de la Receta</label>
+                    <input type="text" id="editar-receta-nombre" required placeholder="Ej: Base de Pie de Lim&oacute;n">
+                </div>
+
+                <div class="form-group">
+                    <label>Producto que Produce (opcional)</label>
+                    <select id="editar-receta-producto">
+                        <option value="">-- Seleccionar producto --</option>
+                        {% for p in productos %}
+                        <option value="{{ p.id }}">{{ p.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Rendimiento por lote</label>
+                    <input type="number" id="editar-receta-rendimiento" min="0.01" step="0.01" value="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Componentes de la receta</label>
+                    <div id="insumos-editar-container"></div>
+                    <button type="button" onclick="agregarFilaEditarInsumo()" class="btn btn-secondary" style="width: 100%; margin-top: 12px;">
+                        + Agregar Componente
+                    </button>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    &#128190; Guardar Cambios
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Ver Receta -->
+    <div class="modal-overlay" id="modal-ver-receta">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">&#128214; Ver Receta</h3>
+                <button class="btn-close" onclick="cerrarModalVerReceta()">&#215;</button>
+            </div>
+
+            <div class="form-group">
+                <label>Nombre de la receta</label>
+                <input type="text" id="ver-receta-nombre" readonly>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Ingredientes y componentes</label>
+                <div class="ver-receta-list">
+                    <div class="ver-receta-head">
+                        <span>Ingrediente</span>
+                        <span style="text-align:right;">Cantidad</span>
+                    </div>
+                    <div id="ver-receta-items"></div>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 16px; margin-bottom: 0;">
+                <label>Informacion nutricional estimada</label>
+                <div id="ver-receta-nutricion" class="ver-receta-nutricion"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Producir -->
+<div class="modal-overlay" id="modal-producir">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">&#9881; Producir</h3>
+            <button class="btn-close" onclick="cerrarModalProducir()">&#215;</button>
+        </div>
+        
+        <div class="form-group">
+            <label>Receta</label>
+            <input type="text" id="producir-receta-nombre" readonly style="background: #f8fafc; font-weight: 600;">
+        </div>
+        
+        <div class="form-group">
+            <label>Cantidad de lotes a ejecutar</label>
+            <input type="number" id="producir-cantidad" value="1" min="1" step="1" onchange="actualizarCostoProduccion()">
+            <small style="display:block; margin-top:6px; color:#64748b;">
+                Este valor define cuánto se descuenta de componentes de la receta.
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label>Cantidad de producto resultante (stock final agregado)</label>
+            <input type="number" id="producir-cantidad-resultante" value="1" min="0.01" step="0.01" onchange="actualizarCostoProduccion()">
+        </div>
+
+        <div class="form-group">
+            <label>Fecha de vencimiento del lote (opcional)</label>
+            <input type="date" id="producir-fecha-vencimiento">
+        </div>
+        
+        <!-- RESUMEN DE COSTO -->
+        <div style="background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 13px; color: #92400e; font-weight: 600;">Costo por unidad:</span>
+                <span id="costo-unidad" style="font-size: 16px; font-weight: 700; color: #78350f;">$0</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #f59e0b;">
+                <span style="font-size: 14px; color: #92400e; font-weight: 700;">Costo total estimado:</span>
+                <span id="costo-total-produccion" style="font-size: 24px; font-weight: 800; color: #78350f;">$0</span>
+            </div>
+            <div style="font-size: 11px; color: #a16207; margin-top: 6px; text-align: right;">
+                IVA incluido &bull; Precios actuales de insumos
+            </div>
+        </div>
+        
+        <div style="background: #f0fdf4; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 13px; color: #166534;">
+            <strong>&#128161; Nota:</strong> Se descuenta el stock de todos los componentes de la receta (insumos y productos) según lotes ejecutados. No se registra movimiento de dinero.
+        </div>
+        
+        <button onclick="confirmarProduccion()" class="btn btn-success" style="width: 100%;">
+            &#10003; Confirmar Producci&oacute;n
+        </button>
+    </div>
+</div>
+
+    <!-- Modal Agendar Produccion -->
+    <div class="modal-overlay" id="modal-agendar-produccion">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">&#128197; Agendar produccion</h3>
+                <button class="btn-close" onclick="cerrarModalAgendaProduccion()">&#215;</button>
+            </div>
+            <form id="form-agendar-produccion" onsubmit="guardarAgendaProduccion(event)">
+                <div class="form-group">
+                    <label>Receta</label>
+                    <select id="agenda-produccion-receta" required>
+                        <option value="">-- Seleccionar receta --</option>
+                        {% for receta in recetas %}
+                        <option value="{{ receta.id }}">{{ receta.nombre }}{% if receta.producto_nombre %} -> {{ receta.producto_nombre }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="agenda-produccion-fecha" required>
+                </div>
+                <div class="agenda-produccion-hint" id="agenda-produccion-rango">
+                    Semana activa: calculando rango...
+                </div>
+                <div class="form-group">
+                    <label>Cantidad de lotes</label>
+                    <input type="number" id="agenda-produccion-cantidad" min="0.01" step="0.01" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Nota (opcional)</label>
+                    <input type="text" id="agenda-produccion-nota" maxlength="400" placeholder="Ej: base lista para pedidos del viernes">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Guardar agenda semanal
+                </button>
+            </form>
+        </div>
+    </div>
+ 
+    <!-- Boton Modo Oscuro -->
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    ">&#127769;</button>
+
+    <script>
+        const UNIDADES_RECETA = ['unidad', 'gr', 'kg', 'ml', 'lt', 'oz', 'lb'];
+        const INSUMOS_CATALOGO = [
+            {% for i in insumos %}
+            {
+                id: {{ i.id|tojson }},
+                nombre: {{ i.nombre|tojson }},
+                stock: {{ i.stock|tojson }},
+                unidad: {{ i.unidad|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+        const PRODUCTOS_CATALOGO = [
+            {% for p in productos %}
+            {
+                id: {{ p.id|tojson }},
+                nombre: {{ p.nombre|tojson }},
+                stock: {{ p.stock|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        let recetaIdActual = null;
+        let costoPorUnidad = 0;
+        let rendimientoRecetaActual = 1;
+        let cantidadResultadoEditada = false;
+        let historialTabActual = 'semana';
+        let historialPagina = 1;
+        let historialSemanasPorPagina = 6;
+        let historialHasMore = false;
+        let agendaProduccionCargando = false;
+        let planSemanalCargando = false;
+        let planSemanalRango = { desde: '', hasta: '' };
+        const AGENDA_PRODUCCION_INICIAL = {{ (agenda_produccion_inicial or {"days": [], "resumen": {}, "fecha_desde": "", "fecha_hasta": ""})|tojson }};
+        const PLAN_SEMANAL_INICIAL = {{ (plan_semanal_inicial or {"days": [], "resumen": {}})|tojson }};
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        const NUTRICION_METRICAS = [
+            { key: 'kcal', label: 'Energia', unidad: 'kcal', decimales: 0 },
+            { key: 'proteinas_g', label: 'Proteinas', unidad: 'g', decimales: 2 },
+            { key: 'carbohidratos_g', label: 'Carbohidratos', unidad: 'g', decimales: 2 },
+            { key: 'grasas_g', label: 'Grasas', unidad: 'g', decimales: 2 },
+            { key: 'azucares_g', label: 'Azucares', unidad: 'g', decimales: 2 },
+            { key: 'sodio_mg', label: 'Sodio', unidad: 'mg', decimales: 2 }
+        ];
+
+        function formatearNutricion(valor, decimales = 2) {
+            const numero = Number(valor || 0);
+            if (!Number.isFinite(numero)) return '0';
+            return numero.toLocaleString('es-CL', {
+                minimumFractionDigits: decimales,
+                maximumFractionDigits: decimales
+            });
+        }
+
+        function renderNutricionReceta(nutricion) {
+            const container = document.getElementById('ver-receta-nutricion');
+            if (!container) return;
+
+            if (!nutricion || !nutricion.success) {
+                container.innerHTML = '<div class="ver-receta-vacio">No hay informacion nutricional calculable para esta receta.</div>';
+                return;
+            }
+
+            const porLote = nutricion.por_lote || {};
+            const porPorcion = nutricion.por_porcion || {};
+            const rendimiento = Number(nutricion.rendimiento || 1);
+            const faltantes = Array.isArray(nutricion.faltantes) ? nutricion.faltantes : [];
+
+            const renderRows = (source) => NUTRICION_METRICAS.map((m) => {
+                const valor = formatearNutricion(source[m.key] || 0, m.decimales);
+                return `
+                    <div class="ver-receta-nutri-row">
+                        <span class="ver-receta-nutri-label">${escapeHtml(m.label)}</span>
+                        <span class="ver-receta-nutri-value">${escapeHtml(valor)} ${escapeHtml(m.unidad)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            let html = `
+                <div class="ver-receta-nutri-meta">
+                    Base de calculo: receta completa y por porcion (rendimiento: ${escapeHtml(formatoNumeroLocal(rendimiento))}).
+                </div>
+                <div class="ver-receta-nutri-grid">
+                    <div class="ver-receta-nutri-card">
+                        <h4>Total receta</h4>
+                        ${renderRows(porLote)}
+                    </div>
+                    <div class="ver-receta-nutri-card">
+                        <h4>Por porcion</h4>
+                        ${renderRows(porPorcion)}
+                    </div>
+                </div>
+            `;
+
+            if (faltantes.length > 0) {
+                const lista = faltantes
+                    .slice(0, 5)
+                    .map((f) => `${f.nombre || 'Componente'}: ${f.motivo || 'sin datos'}`)
+                    .join(' | ');
+                html += `<div class="ver-receta-nutri-warn">Atencion: ${escapeHtml(lista)}</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function opcionesUnidad(unidadSeleccionada = 'unidad') {
+            return UNIDADES_RECETA.map(unidad => `
+                <option value="${unidad}" ${unidad === unidadSeleccionada ? 'selected' : ''}>${unidad}</option>
+            `).join('');
+        }
+
+        function opcionesInsumo(insumoSeleccionado = '') {
+            const optionBase = '<option value="">-- Insumo --</option>';
+            const options = INSUMOS_CATALOGO.map(insumo => {
+                const selected = String(insumo.id) === String(insumoSeleccionado) ? 'selected' : '';
+                const label = `${insumo.nombre} (${insumo.stock} ${insumo.unidad})`;
+                return `<option value="${insumo.id}" ${selected}>${escapeHtml(label)}</option>`;
+            }).join('');
+            return optionBase + options;
+        }
+
+        function opcionesTipo(tipo = 'insumo') {
+            const tipoActual = (tipo === 'producto') ? 'producto' : 'insumo';
+            return `
+                <option value="insumo" ${tipoActual === 'insumo' ? 'selected' : ''}>&#127806; Insumo</option>
+                <option value="producto" ${tipoActual === 'producto' ? 'selected' : ''}>&#128230; Producto</option>
+            `;
+        }
+
+        function obtenerCatalogoPorTipo(tipo) {
+            return tipo === 'producto' ? PRODUCTOS_CATALOGO : INSUMOS_CATALOGO;
+        }
+
+        function opcionesRecurso(tipo = 'insumo', recursoSeleccionado = '') {
+            const esProducto = tipo === 'producto';
+            const optionBase = `<option value="">-- ${esProducto ? 'Producto' : 'Insumo'} --</option>`;
+            const options = obtenerCatalogoPorTipo(tipo).map(item => {
+                const selected = String(item.id) === String(recursoSeleccionado) ? 'selected' : '';
+                const label = esProducto
+                    ? `${item.nombre} (${item.stock} u.)`
+                    : `${item.nombre} (${item.stock} ${item.unidad})`;
+                return `<option value="${item.id}" ${selected}>${escapeHtml(label)}</option>`;
+            }).join('');
+            return optionBase + options;
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const btn = document.getElementById('darkModeBtn');
+            
+            if (body.classList.contains('dark-mode')) {
+                body.classList.remove('dark-mode');
+                btn.textContent = '\uD83C\uDF19';
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                body.classList.add('dark-mode');
+                btn.textContent = '\u2600';
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        const PRODUCCION_UI_STATE_KEY = 'produccion_ui_state_v1';
+        let refrescandoProduccion = false;
+
+        function obtenerProduccionUiStateActual() {
+            const buscador = document.getElementById('buscador-receta');
+            return {
+                q: buscador ? buscador.value : '',
+                historial_tab: historialTabActual === 'anterior' ? 'anterior' : 'semana',
+                scroll_y: window.scrollY || 0
+            };
+        }
+
+        function aplicarProduccionUiState(state) {
+            const data = state || {};
+            const buscador = document.getElementById('buscador-receta');
+            if (buscador && typeof data.q === 'string') {
+                buscador.value = data.q;
+            }
+            filtrarRecetas();
+
+            if (data.historial_tab === 'anterior' || data.historial_tab === 'semana') {
+                cambiarTabHistorial(data.historial_tab);
+            }
+
+            const y = Number(data.scroll_y || 0);
+            if (Number.isFinite(y) && y > 0) {
+                window.requestAnimationFrame(() => window.scrollTo(0, y));
+            }
+        }
+
+        async function refrescarPanelRecetasDesdeServidor() {
+            const response = await fetch('/produccion', { headers: { Accept: 'text/html' } });
+            if (!response.ok) throw new Error('No se pudo recargar panel de recetas');
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const nuevoPanel = doc.getElementById('recetas-panel-root');
+            const panelActual = document.getElementById('recetas-panel-root');
+            if (!nuevoPanel || !panelActual) throw new Error('Panel de recetas no disponible');
+            panelActual.innerHTML = nuevoPanel.innerHTML;
+        }
+
+        function reloadProduccionKeepingState() {
+            if (refrescandoProduccion) return;
+            const state = obtenerProduccionUiStateActual();
+            refrescandoProduccion = true;
+            refrescarPanelRecetasDesdeServidor()
+                .then(() => {
+                    aplicarProduccionUiState(state);
+                    return Promise.all([
+                        cargarHistorial(true),
+                        cargarPlanSemanal(true)
+                    ]);
+                })
+                .catch(() => {
+                    alert('No se pudo refrescar producción automáticamente. Intenta nuevamente.');
+                })
+                .finally(() => {
+                    refrescandoProduccion = false;
+                });
+        }
+
+        function restoreProduccionUiStateIfNeeded() {
+            const raw = sessionStorage.getItem(PRODUCCION_UI_STATE_KEY);
+            if (!raw) return;
+            sessionStorage.removeItem(PRODUCCION_UI_STATE_KEY);
+
+            try {
+                const state = JSON.parse(raw) || {};
+                aplicarProduccionUiState(state);
+            } catch (_) {
+                // Ignorar estado invalido
+            }
+        }
+
+        function filtrarRecetas() {
+            const query = (document.getElementById('buscador-receta')?.value || '').trim().toLowerCase();
+            const cards = document.querySelectorAll('.receta-item');
+            let visibles = 0;
+
+            cards.forEach(card => {
+                const nombre = card.dataset.recetaNombre || '';
+                const producto = card.dataset.recetaProducto || '';
+                const match = !query || nombre.includes(query) || producto.includes(query);
+                card.classList.toggle('hidden', !match);
+                if (match) visibles += 1;
+            });
+
+            const lbl = document.getElementById('recetas-visibles');
+            if (lbl) lbl.textContent = String(visibles);
+
+            const empty = document.getElementById('recetas-search-empty');
+            if (empty) {
+                empty.classList.toggle('active', cards.length > 0 && visibles === 0);
+            }
+        }
+
+        function cambiarTabHistorial(tab) {
+            historialTabActual = tab === 'anterior' ? 'anterior' : 'semana';
+            const isSemana = historialTabActual === 'semana';
+
+            document.getElementById('historial-tab-semana').classList.toggle('active', isSemana);
+            document.getElementById('historial-tab-anterior').classList.toggle('active', !isSemana);
+            document.getElementById('historial-panel-semana').classList.toggle('active', isSemana);
+            document.getElementById('historial-panel-anterior').classList.toggle('active', !isSemana);
+        }
+
+        function htmlHistorialItem(h, compact = false) {
+            const cantidad = Number(h.cantidad || 0);
+            const cantidadTexto = Number.isFinite(cantidad) ? cantidad.toLocaleString('es-CL') : String(h.cantidad || 0);
+            const compactClass = compact ? ' compact' : '';
+            return `
+                <div class="historial-item${compactClass}">
+                    <div class="historial-info">
+                        <div class="historial-receta">${escapeHtml(h.receta_nombre || 'Receta')}</div>
+                        <div class="historial-fecha">${escapeHtml(h.fecha_hora || '')}</div>
+                    </div>
+                    <div class="historial-cantidad">&times;${cantidadTexto}</div>
+                    <button onclick="eliminarProduccion(${h.id})" class="btn-remove" title="Eliminar registro">&times;</button>
+                </div>
+            `;
+        }
+
+        function renderHistorialSemana(items) {
+            const container = document.getElementById('historial-semana-list');
+            if (!container) return;
+
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="historial-empty">No hay producciones registradas esta semana.</div>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => htmlHistorialItem(item)).join('');
+        }
+
+        function renderHistorialAnterior(weeks, append = false) {
+            const container = document.getElementById('historial-anterior-list');
+            if (!container) return;
+
+            if (!append) {
+                container.innerHTML = '';
+            }
+
+            if (!weeks || weeks.length === 0) {
+                if (!append) {
+                    container.innerHTML = '<div class="historial-empty">No hay semanas anteriores dentro del rango de 6 meses.</div>';
+                }
+                return;
+            }
+
+            const html = weeks.map((week, index) => {
+                const openAttr = (!append && index === 0) ? 'open' : '';
+                const registrosHtml = (week.registros || []).map(item => htmlHistorialItem(item, true)).join('');
+                return `
+                    <details class="historial-week" ${openAttr}>
+                        <summary>
+                            <div class="historial-week-summary-left">
+                                <span class="historial-week-title">${escapeHtml(week.semana_label || 'Semana')}</span>
+                                <span class="historial-week-subtitle">${escapeHtml(week.rango_label || '')}</span>
+                            </div>
+                            <span class="historial-week-total">${week.total_registros || 0} reg. &bull; ${week.total_cantidad || 0} u.</span>
+                        </summary>
+                        <div class="historial-week-body">
+                            ${registrosHtml || '<div class="historial-empty">Sin registros en esta semana.</div>'}
+                        </div>
+                    </details>
+                `;
+            }).join('');
+
+            container.insertAdjacentHTML('beforeend', html);
+        }
+
+        function formatoNumeroPlan(valor, maxDecimales = 2) {
+            const numero = Number(valor || 0);
+            if (!Number.isFinite(numero)) return '0';
+            const rounded = Number(numero.toFixed(maxDecimales));
+            const decimales = Number.isInteger(rounded) ? 0 : maxDecimales;
+            return rounded.toLocaleString('es-CL', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: decimales
+            });
+        }
+
+        function formatearFechaPlan(fechaIso) {
+            const raw = String(fechaIso || '').trim();
+            if (!raw) return '';
+            const partes = raw.split('-');
+            if (partes.length !== 3) return raw;
+            return `${partes[2]}/${partes[1]}`;
+        }
+
+        function actualizarRangoAgendaProduccion(data) {
+            const dias = Array.isArray(data?.days) ? data.days : [];
+            const rango = { desde: '', hasta: '' };
+            if (dias.length > 0) {
+                rango.desde = String(dias[0].fecha || '');
+                rango.hasta = String(dias[dias.length - 1].fecha || '');
+            }
+            planSemanalRango = rango;
+
+            const fechaInput = document.getElementById('agenda-produccion-fecha');
+            if (fechaInput) {
+                fechaInput.min = rango.desde || '';
+                fechaInput.max = rango.hasta || '';
+                if (!fechaInput.value || (rango.desde && fechaInput.value < rango.desde) || (rango.hasta && fechaInput.value > rango.hasta)) {
+                    fechaInput.value = rango.desde || '';
+                }
+            }
+
+            const hint = document.getElementById('agenda-produccion-rango');
+            if (hint) {
+                if (rango.desde && rango.hasta) {
+                    hint.textContent = `Semana activa: ${formatearFechaPlan(rango.desde)} al ${formatearFechaPlan(rango.hasta)}.`;
+                } else {
+                    hint.textContent = 'Semana activa: sin rango disponible.';
+                }
+            }
+        }
+
+        function abrirModalAgendaProduccion() {
+            const modal = document.getElementById('modal-agendar-produccion');
+            const recetaInput = document.getElementById('agenda-produccion-receta');
+            if (!modal || !recetaInput) return;
+            if (recetaInput.options.length <= 1) {
+                alert('Primero crea al menos una receta para poder agendar produccion.');
+                return;
+            }
+
+            const cantidadInput = document.getElementById('agenda-produccion-cantidad');
+            const notaInput = document.getElementById('agenda-produccion-nota');
+            const fechaInput = document.getElementById('agenda-produccion-fecha');
+            const hint = document.getElementById('agenda-produccion-rango');
+            if (cantidadInput) cantidadInput.value = '1';
+            if (notaInput) notaInput.value = '';
+
+            if (fechaInput) {
+                fechaInput.min = planSemanalRango.desde || '';
+                fechaInput.max = planSemanalRango.hasta || '';
+                if (
+                    !fechaInput.value ||
+                    (planSemanalRango.desde && fechaInput.value < planSemanalRango.desde) ||
+                    (planSemanalRango.hasta && fechaInput.value > planSemanalRango.hasta)
+                ) {
+                    if (planSemanalRango.desde) {
+                        fechaInput.value = planSemanalRango.desde;
+                    } else {
+                        const hoy = new Date();
+                        const yyyy = hoy.getFullYear();
+                        const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+                        const dd = String(hoy.getDate()).padStart(2, '0');
+                        fechaInput.value = `${yyyy}-${mm}-${dd}`;
+                    }
+                }
+            }
+
+            if (hint) {
+                if (planSemanalRango.desde && planSemanalRango.hasta) {
+                    hint.textContent = `Semana activa: ${formatearFechaPlan(planSemanalRango.desde)} al ${formatearFechaPlan(planSemanalRango.hasta)}.`;
+                } else {
+                    hint.textContent = 'Semana activa: sin rango disponible.';
+                }
+            }
+
+            modal.classList.add('active');
+        }
+
+        function cerrarModalAgendaProduccion() {
+            const modal = document.getElementById('modal-agendar-produccion');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
+        function guardarAgendaProduccion(event) {
+            event.preventDefault();
+            const recetaId = parseInt(document.getElementById('agenda-produccion-receta')?.value || '0', 10);
+            const fecha = (document.getElementById('agenda-produccion-fecha')?.value || '').trim();
+            const cantidad = parseFloat(document.getElementById('agenda-produccion-cantidad')?.value || '0');
+            const nota = (document.getElementById('agenda-produccion-nota')?.value || '').trim();
+
+            if (!Number.isFinite(recetaId) || recetaId <= 0) {
+                alert('Selecciona una receta valida.');
+                return;
+            }
+            if (!fecha) {
+                alert('Selecciona una fecha.');
+                return;
+            }
+            if (!Number.isFinite(cantidad) || cantidad <= 0) {
+                alert('La cantidad debe ser mayor a 0.');
+                return;
+            }
+
+            fetch('/api/produccion/agenda', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    receta_id: recetaId,
+                    fecha: fecha,
+                    cantidad: cantidad,
+                    nota: nota
+                })
+            })
+            .then(async (r) => {
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar la agenda de produccion.');
+                }
+                return data;
+            })
+            .then((data) => {
+                cerrarModalAgendaProduccion();
+                if (data && data.agenda && Array.isArray(data.agenda.days)) {
+                    renderAgendaProduccion(data.agenda);
+                } else {
+                    cargarAgendaProduccion(true);
+                }
+                if (data && data.plan && Array.isArray(data.plan.days)) {
+                    renderPlanSemanal(data.plan);
+                } else {
+                    cargarPlanSemanal(true);
+                }
+            })
+            .catch((error) => {
+                alert('[ERROR] ' + error.message);
+            });
+        }
+
+        function eliminarAgendaProduccion(id) {
+            const agendaId = Number(id || 0);
+            if (!Number.isFinite(agendaId) || agendaId <= 0) return;
+            if (!confirm('Eliminar este item agendado de produccion?')) return;
+
+            fetch(`/api/produccion/agenda/${agendaId}/eliminar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(async (r) => {
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo eliminar el item agendado.');
+                }
+                if (data && data.agenda && Array.isArray(data.agenda.days)) {
+                    renderAgendaProduccion(data.agenda);
+                } else {
+                    cargarAgendaProduccion(true);
+                }
+            })
+            .then(() => {
+                cargarPlanSemanal(true);
+            })
+            .catch((error) => {
+                alert('[ERROR] ' + error.message);
+            });
+        }
+
+        function renderAgendaProduccion(data) {
+            const meta = document.getElementById('agenda-produccion-meta');
+            const list = document.getElementById('agenda-produccion-list');
+            if (!meta || !list) return;
+
+            actualizarRangoAgendaProduccion(data);
+
+            const days = Array.isArray(data?.days) ? data.days : [];
+            const resumen = data?.resumen || {};
+            const desde = String(data?.fecha_desde || '').trim();
+            const hasta = String(data?.fecha_hasta || '').trim();
+            const totalItems = Number(resumen.total_items || 0);
+            const totalLotes = Number(resumen.total_lotes || 0);
+            const diasConItems = Number(resumen.dias_con_items || 0);
+
+            const metaPartes = [];
+            if (desde && hasta) {
+                metaPartes.push(`Rango: ${formatearFechaPlan(desde)} al ${formatearFechaPlan(hasta)}.`);
+            }
+            metaPartes.push(`Items: ${formatoNumeroPlan(totalItems, 0)}.`);
+            metaPartes.push(`Lotes: ${formatoNumeroPlan(totalLotes)}.`);
+            metaPartes.push(`Dias con produccion: ${formatoNumeroPlan(diasConItems, 0)}.`);
+            meta.textContent = metaPartes.join(' ');
+
+            const diasConItemsLista = days.filter(d => Array.isArray(d?.items) && d.items.length > 0);
+            if (!diasConItemsLista.length) {
+                list.innerHTML = '<div class="plan-semanal-empty">No hay produccion planificada para esta semana.</div>';
+                return;
+            }
+
+            list.innerHTML = diasConItemsLista.map((dia) => {
+                const items = Array.isArray(dia.items) ? dia.items : [];
+                const rows = items.map((manual) => {
+                    const cantidad = formatoNumeroPlan(manual.cantidad || 0);
+                    const producto = (manual.producto_nombre || '').trim();
+                    const nota = (manual.nota || '').trim();
+                    return `
+                        <div class="plan-manual-item">
+                            <div class="plan-manual-info">
+                                <div class="plan-manual-title">${escapeHtml(manual.receta_nombre || 'Receta')} - ${escapeHtml(cantidad)} lote(s)</div>
+                                ${producto ? `<div class="plan-manual-note">Producto: ${escapeHtml(producto)}</div>` : ''}
+                                ${nota ? `<div class="plan-manual-note">Nota: ${escapeHtml(nota)}</div>` : ''}
+                            </div>
+                            <button type="button" class="btn-plan-remove" onclick="eliminarAgendaProduccion(${Number(manual.id || 0)})">Quitar</button>
+                        </div>
+                    `;
+                }).join('');
+                return `
+                    <div class="plan-day">
+                        <div class="plan-day-header">
+                            <span class="plan-day-title">${escapeHtml(dia.fecha_label || dia.fecha || '')}</span>
+                            <span class="plan-day-agenda">${formatoNumeroPlan(dia.total_lotes || 0)} lote(s)</span>
+                        </div>
+                        <div class="plan-day-items">
+                            <div class="plan-manual-list">
+                                ${rows}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function cargarAgendaProduccion(force = false) {
+            const list = document.getElementById('agenda-produccion-list');
+            if (!list) return Promise.resolve();
+            if (agendaProduccionCargando && !force) return Promise.resolve();
+
+            agendaProduccionCargando = true;
+            list.innerHTML = '<div class="plan-semanal-empty">Cargando agenda de produccion...</div>';
+            const stamp = Date.now();
+            return fetch(`/api/produccion/agenda-semanal?dias=7&_ts=${stamp}`, {
+                cache: 'no-store'
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'No se pudo cargar la agenda de produccion');
+                    }
+                    renderAgendaProduccion(data);
+                })
+                .catch((error) => {
+                    console.error('Error agenda produccion:', error);
+                    const meta = document.getElementById('agenda-produccion-meta');
+                    if (meta) meta.textContent = 'No se pudo actualizar la agenda de produccion.';
+                    list.innerHTML = '<div class="plan-semanal-empty">Error al cargar agenda. Reintenta en unos segundos.</div>';
+                })
+                .finally(() => {
+                    agendaProduccionCargando = false;
+                });
+        }
+
+        function refrescarAgendaProduccion() {
+            cargarAgendaProduccion(true);
+        }
+
+        function renderPlanSemanal(data) {
+            const meta = document.getElementById('plan-semanal-meta');
+            const list = document.getElementById('plan-semanal-list');
+            if (!meta || !list) return;
+
+            actualizarRangoAgendaProduccion(data);
+
+            const dias = Array.isArray(data?.days) ? data.days : [];
+            const resumen = data?.resumen || {};
+            const totalSugerido = Number(resumen.total_porciones_sugeridas || 0);
+            const productosConSugerencia = Number(resumen.productos_con_sugerencia || 0);
+            const totalManual = Number(resumen.total_programado_manual || 0);
+            const recetasManual = Number(resumen.recetas_programadas || 0);
+            const fechaGeneracion = data?.fecha_generacion || '';
+
+            const metaPartes = [
+                `Sugerido: ${formatoNumeroPlan(totalSugerido, 0)} porciones en ${formatoNumeroPlan(productosConSugerencia, 0)} producto(s).`,
+                `Agendado manual: ${formatoNumeroPlan(totalManual)} lote(s) en ${formatoNumeroPlan(recetasManual, 0)} receta(s).`
+            ];
+            if (fechaGeneracion) {
+                metaPartes.push(`Actualizado ${fechaGeneracion}`);
+            }
+            meta.textContent = metaPartes.join(' ');
+
+            const diasConContenido = dias.filter(d => {
+                const items = Array.isArray(d?.items) ? d.items.length : 0;
+                const manual = Array.isArray(d?.manual_items) ? d.manual_items.length : 0;
+                return items > 0 || manual > 0;
+            });
+            if (!diasConContenido.length) {
+                list.innerHTML = '<div class="plan-semanal-empty">Sin agenda ni sugerencias para la semana actual.</div>';
+                return;
+            }
+
+            list.innerHTML = diasConContenido.map((dia) => {
+                const eventos = Number(dia.eventos_agenda || 0);
+                const agendaHtml = eventos > 0
+                    ? `<span class="plan-day-agenda">Agenda: ${eventos}</span>`
+                    : '<span class="plan-day-agenda">Sin agenda</span>';
+
+                const manualItems = Array.isArray(dia.manual_items) ? dia.manual_items : [];
+                const manualHtml = manualItems.length > 0
+                    ? `
+                        <div class="plan-manual-list">
+                            <div class="plan-manual-label">Agendado manual</div>
+                            ${manualItems.map((manual) => {
+                                const cantidad = formatoNumeroPlan(manual.cantidad || 0);
+                                const producto = (manual.producto_nombre || '').trim();
+                                const nota = (manual.nota || '').trim();
+                                return `
+                                    <div class="plan-manual-item">
+                                        <div class="plan-manual-info">
+                                            <div class="plan-manual-title">${escapeHtml(manual.receta_nombre || 'Receta')} - ${escapeHtml(cantidad)} lote(s)</div>
+                                            ${producto ? `<div class="plan-manual-note">Producto: ${escapeHtml(producto)}</div>` : ''}
+                                            ${nota ? `<div class="plan-manual-note">Nota: ${escapeHtml(nota)}</div>` : ''}
+                                        </div>
+                                        <button type="button" class="btn-plan-remove" onclick="eliminarAgendaProduccion(${Number(manual.id || 0)})">Quitar</button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `
+                    : '';
+
+                const itemsHtml = (dia.items || []).map((item) => {
+                    const sugerido = Number(item.sugerido_producir || 0);
+                    const programado = Number(item.programado_manual || 0);
+                    return `
+                        <div class="plan-item">
+                            <div class="plan-item-name">${escapeHtml(item.producto_nombre || 'Producto')}</div>
+                            <div class="plan-item-metrics">
+                                <span class="plan-chip">Demanda ${Number(item.demanda_estimada || 0)}</span>
+                                ${programado > 0 ? `<span class="plan-chip manual">Agenda ${formatoNumeroPlan(programado)}</span>` : ''}
+                                <span class="plan-chip ${sugerido > 0 ? 'warning' : ''}">Producir ${sugerido}</span>
+                                <span class="plan-chip">Cierre ${Number(item.stock_fin_porciones || 0)}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="plan-day">
+                        <div class="plan-day-header">
+                            <span class="plan-day-title">${escapeHtml(dia.fecha_label || dia.fecha || '')}</span>
+                            ${agendaHtml}
+                        </div>
+                        <div class="plan-day-items">
+                            ${manualHtml}
+                            ${itemsHtml || '<div class="plan-day-agenda">Sin sugerencia automatica para este dia.</div>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function cargarPlanSemanal(force = false) {
+            const list = document.getElementById('plan-semanal-list');
+            if (!list) return Promise.resolve();
+            if (planSemanalCargando && !force) return Promise.resolve();
+
+            planSemanalCargando = true;
+            list.innerHTML = '<div class="plan-semanal-empty">Calculando plan semanal...</div>';
+
+            const stamp = Date.now();
+            return fetch(`/api/produccion/plan-semanal?dias_hist=28&dias_plan=7&_ts=${stamp}`, {
+                cache: 'no-store'
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'No se pudo calcular el plan semanal');
+                    }
+                    renderPlanSemanal(data);
+                })
+                .catch((error) => {
+                    console.error('Error plan semanal:', error);
+                    const meta = document.getElementById('plan-semanal-meta');
+                    if (meta) meta.textContent = 'No se pudo actualizar el plan semanal.';
+                    list.innerHTML = '<div class="plan-semanal-empty">Error al calcular el plan. Reintenta en unos segundos.</div>';
+                })
+                .finally(() => {
+                    planSemanalCargando = false;
+                });
+        }
+
+        function refrescarPlanSemanal() {
+            cargarPlanSemanal(true);
+        }
+
+        function eliminarReceta(id) {
+            if (!confirm('¿Eliminar esta receta permanentemente?')) return;
+            
+            fetch(`/api/receta/${id}/eliminar`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('\u2705 Receta eliminada');
+                    reloadProduccionKeepingState();
+                } else {
+                    alert('[ERROR] Error: ' + data.error);
+                }
+            })
+            .catch(() => {
+                alert('[ERROR] Error de conexión');
+            });
+        }
+
+        function construirFilaComponente(item = null) {
+            const tipo = (item && item.tipo === 'producto') ? 'producto' : 'insumo';
+            const recursoId = item && (item.recurso_id || item.insumo_id || item.producto_id) ? (item.recurso_id || item.insumo_id || item.producto_id) : '';
+            const cantidad = item && item.cantidad ? item.cantidad : '';
+            const unidad = item && item.unidad ? item.unidad : 'unidad';
+
+            const row = document.createElement('div');
+            row.className = 'insumo-row';
+            row.innerHTML = `
+                <select data-field="tipo">
+                    ${opcionesTipo(tipo)}
+                </select>
+                <select data-field="recurso" required>
+                    ${opcionesRecurso(tipo, recursoId)}
+                </select>
+                <input type="number" data-field="cantidad" placeholder="Cantidad" step="0.01" min="0.01" value="${cantidad}" required>
+                <select data-field="unidad">
+                    ${opcionesUnidad(unidad)}
+                </select>
+                <button type="button" class="btn-remove" title="Quitar componente">&times;</button>
+            `;
+
+            const tipoSelect = row.querySelector('[data-field="tipo"]');
+            const recursoSelect = row.querySelector('[data-field="recurso"]');
+            tipoSelect.addEventListener('change', () => {
+                recursoSelect.innerHTML = opcionesRecurso(tipoSelect.value, '');
+            });
+
+            row.querySelector('.btn-remove').addEventListener('click', () => {
+                row.remove();
+                reindexarInsumosNuevo();
+            });
+
+            return row;
+        }
+
+        function agregarComponenteEn(containerId, item = null) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.appendChild(construirFilaComponente(item));
+            if (containerId === 'insumos-container') {
+                reindexarInsumosNuevo();
+            }
+        }
+
+        function reindexarInsumosNuevo() {
+            const rows = document.querySelectorAll('#insumos-container .insumo-row');
+            rows.forEach((row, index) => {
+                row.querySelector('[data-field="tipo"]').name = `insumos[${index}][tipo]`;
+                row.querySelector('[data-field="recurso"]').name = `insumos[${index}][id]`;
+                row.querySelector('[data-field="cantidad"]').name = `insumos[${index}][cantidad]`;
+                row.querySelector('[data-field="unidad"]').name = `insumos[${index}][unidad]`;
+            });
+        }
+
+        function abrirModalReceta() {
+            const modal = document.getElementById('modal-receta');
+            modal.classList.add('active');
+
+            const form = document.getElementById('form-receta');
+            if (form) {
+                form.reset();
+                const rendimiento = form.querySelector('input[name="rendimiento"]');
+                if (rendimiento) rendimiento.value = '1';
+            }
+
+            const container = document.getElementById('insumos-container');
+            if (container) {
+                container.innerHTML = '';
+                agregarComponenteEn('insumos-container');
+            }
+        }
+
+        function cerrarModalReceta() {
+            document.getElementById('modal-receta').classList.remove('active');
+        }
+
+        function agregarInsumo(item = null) {
+            agregarComponenteEn('insumos-container', item);
+        }
+
+        function abrirModalVerReceta(recetaId) {
+            if (!recetaId) return;
+
+            fetch(`/api/receta/${recetaId}/detalle`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert('[ERROR] ' + (data.error || 'No se pudo cargar la receta'));
+                        return;
+                    }
+
+                    const receta = data.receta || {};
+                    const items = Array.isArray(receta.items) ? receta.items : [];
+
+                    document.getElementById('ver-receta-nombre').value = receta.nombre || '';
+
+                    const itemsContainer = document.getElementById('ver-receta-items');
+                    if (items.length === 0) {
+                        itemsContainer.innerHTML = '<div class="ver-receta-vacio">Esta receta no tiene componentes cargados.</div>';
+                    } else {
+                        itemsContainer.innerHTML = items.map(item => {
+                            const nombre = item.nombre || 'Sin nombre';
+                            const cantidad = formatoNumeroLocal(item.cantidad || 0);
+                            const unidad = item.unidad || 'unidad';
+                            const cantidadConUnidad = `${cantidad} ${unidad}`;
+                            return `
+                                <div class="ver-receta-row">
+                                    <span class="ver-receta-nombre">${escapeHtml(nombre)}</span>
+                                    <span class="ver-receta-cantidad">${escapeHtml(cantidadConUnidad)}</span>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+
+                    renderNutricionReceta(receta.nutricion || null);
+
+                    document.getElementById('modal-ver-receta').classList.add('active');
+                })
+                .catch(() => {
+                    alert('[ERROR] Error de conexión al cargar la receta');
+                });
+        }
+
+        function cerrarModalVerReceta() {
+            const modal = document.getElementById('modal-ver-receta');
+            if (!modal) return;
+            modal.classList.remove('active');
+            const nutri = document.getElementById('ver-receta-nutricion');
+            if (nutri) {
+                nutri.innerHTML = '';
+            }
+        }
+
+        function abrirModalEditarReceta(recetaId) {
+            fetch(`/api/receta/${recetaId}/detalle`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert('[ERROR] ' + (data.error || 'No se pudo cargar la receta'));
+                        return;
+                    }
+
+                    const receta = data.receta;
+                    document.getElementById('editar-receta-id').value = receta.id;
+                    document.getElementById('editar-receta-nombre').value = receta.nombre || '';
+                    document.getElementById('editar-receta-producto').value = receta.producto_id || '';
+                    document.getElementById('editar-receta-rendimiento').value = receta.rendimiento || 1;
+
+                    const container = document.getElementById('insumos-editar-container');
+                    container.innerHTML = '';
+
+                    if (receta.items && receta.items.length > 0) {
+                        receta.items.forEach(item => agregarFilaEditarInsumo(item));
+                    } else {
+                        agregarFilaEditarInsumo();
+                    }
+
+                    document.getElementById('modal-editar-receta').classList.add('active');
+                })
+                .catch(() => {
+                    alert('[ERROR] Error de conexión al cargar la receta');
+                });
+        }
+
+        function cerrarModalEditarReceta() {
+            document.getElementById('modal-editar-receta').classList.remove('active');
+        }
+
+        function agregarFilaEditarInsumo(item = null) {
+            agregarComponenteEn('insumos-editar-container', item);
+        }
+
+        function recolectarItemsDesdeContenedor(containerId) {
+            const rows = document.querySelectorAll(`#${containerId} .insumo-row`);
+            const items = [];
+
+            for (const row of rows) {
+                const tipo = row.querySelector('[data-field="tipo"]').value || 'insumo';
+                const recursoRaw = row.querySelector('[data-field="recurso"]').value;
+                const cantidad = parseFloat(row.querySelector('[data-field="cantidad"]').value);
+                const unidad = row.querySelector('[data-field="unidad"]').value || 'unidad';
+
+                if (!recursoRaw) continue;
+                if (!cantidad || cantidad <= 0) {
+                    return { ok: false, error: 'Todas las cantidades deben ser mayores a 0.' };
+                }
+
+                items.push({
+                    tipo: tipo,
+                    id: parseInt(recursoRaw, 10),
+                    cantidad: cantidad,
+                    unidad: unidad
+                });
+            }
+
+            if (items.length === 0) {
+                return { ok: false, error: 'Debes agregar al menos un componente.' };
+            }
+
+            return { ok: true, items };
+        }
+
+        function guardarEdicionReceta(event) {
+            event.preventDefault();
+
+            const recetaId = document.getElementById('editar-receta-id').value;
+            const nombre = document.getElementById('editar-receta-nombre').value.trim();
+            const productoIdRaw = document.getElementById('editar-receta-producto').value;
+            const producto_id = productoIdRaw ? parseInt(productoIdRaw, 10) : null;
+            const rendimiento = parseFloat(document.getElementById('editar-receta-rendimiento').value || '1');
+            const itemsPayload = recolectarItemsDesdeContenedor('insumos-editar-container');
+
+            if (!nombre) {
+                alert('El nombre de la receta es obligatorio.');
+                return;
+            }
+            if (!Number.isFinite(rendimiento) || rendimiento <= 0) {
+                alert('El rendimiento debe ser mayor a 0.');
+                return;
+            }
+            if (!itemsPayload.ok) {
+                alert(itemsPayload.error);
+                return;
+            }
+
+            fetch(`/api/receta/${recetaId}/actualizar`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    nombre,
+                    producto_id,
+                    rendimiento,
+                    items: itemsPayload.items
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('\u2705 Receta actualizada correctamente');
+                    cerrarModalEditarReceta();
+                    reloadProduccionKeepingState();
+                } else {
+                    alert('[ERROR] ' + (data.error || 'No se pudo actualizar la receta'));
+                }
+            })
+            .catch(() => {
+                alert('[ERROR] Error de conexión al guardar la receta');
+            });
+        }
+
+        function producirReceta(id, nombre) {
+            recetaIdActual = id;
+            cantidadResultadoEditada = false;
+
+            Promise.all([
+                fetch(`/api/receta/${id}/costo`).then(r => r.json()).catch(() => ({ success: false })),
+                fetch(`/api/receta/${id}/detalle`).then(r => r.json()).catch(() => ({ success: false }))
+            ])
+            .then(([costoData, detalleData]) => {
+                costoPorUnidad = Number(costoData.costo_total || 0);
+                rendimientoRecetaActual = Number(detalleData?.receta?.rendimiento || 1);
+                if (!Number.isFinite(rendimientoRecetaActual) || rendimientoRecetaActual <= 0) {
+                    rendimientoRecetaActual = 1;
+                }
+
+                document.getElementById('producir-receta-nombre').value = nombre;
+                document.getElementById('producir-cantidad').value = 1;
+                document.getElementById('producir-cantidad-resultante').value = rendimientoRecetaActual.toString();
+                document.getElementById('producir-fecha-vencimiento').value = '';
+                actualizarCostoProduccion();
+                document.getElementById('modal-producir').classList.add('active');
+            });
+        }
+
+        function formatoNumeroLocal(valor) {
+            const numero = Number(valor || 0);
+            if (!Number.isFinite(numero)) return '0';
+            return numero.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+        }
+
+        function actualizarCostoProduccion() {
+            const cantidad = parseInt(document.getElementById('producir-cantidad').value, 10) || 1;
+            if (cantidad < 1) {
+                document.getElementById('producir-cantidad').value = 1;
+            }
+
+            const cantidadLotes = Math.max(1, parseInt(document.getElementById('producir-cantidad').value, 10) || 1);
+            const resultadoInput = document.getElementById('producir-cantidad-resultante');
+            if (!cantidadResultadoEditada && resultadoInput) {
+                const sugerido = cantidadLotes * rendimientoRecetaActual;
+                resultadoInput.value = Number.isInteger(sugerido) ? String(sugerido) : sugerido.toFixed(2);
+            }
+
+            const cantidadResultante = parseFloat(resultadoInput?.value || 0);
+            const costoTotal = costoPorUnidad * cantidad;
+            const formatoChileno = (num) => '$' + Math.round(num).toLocaleString('es-CL');
+            
+            document.getElementById('costo-unidad').textContent = formatoChileno(costoPorUnidad);
+            document.getElementById('costo-total-produccion').textContent =
+                `${formatoChileno(costoTotal)} \u2022 ${formatoNumeroLocal(cantidadResultante)} u.`;
+        }
+
+        function cerrarModalProducir() {
+            document.getElementById('modal-producir').classList.remove('active');
+            recetaIdActual = null;
+            costoPorUnidad = 0;
+            rendimientoRecetaActual = 1;
+            cantidadResultadoEditada = false;
+        }
+
+        function confirmarProduccion() {
+            if (!recetaIdActual) return;
+            
+            const cantidad = parseInt(document.getElementById('producir-cantidad').value, 10);
+            const cantidadResultadoRaw = (document.getElementById('producir-cantidad-resultante').value || '').trim();
+            const fechaVencimiento = (document.getElementById('producir-fecha-vencimiento').value || '').trim();
+            if (cantidad < 1) {
+                alert('La cantidad debe ser al menos 1');
+                return;
+            }
+
+            let cantidadResultado = null;
+            if (cantidadResultadoRaw) {
+                cantidadResultado = parseFloat(cantidadResultadoRaw);
+                if (!Number.isFinite(cantidadResultado) || cantidadResultado <= 0) {
+                    alert('La cantidad resultante debe ser mayor a 0');
+                    return;
+                }
+            }
+
+            const payload = { cantidad: cantidad };
+            if (cantidadResultado !== null) payload.cantidad_resultado = cantidadResultado;
+            if (fechaVencimiento) payload.fecha_vencimiento = fechaVencimiento;
+            
+            fetch(`/api/receta/${recetaIdActual}/producir`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const descuentos = Array.isArray(data.descuentos_detalle) ? data.descuentos_detalle : [];
+                    const resumenDescuentos = descuentos
+                        .slice(0, 6)
+                        .map((d) => {
+                            const nombre = d.nombre || (d.tipo === 'insumo' ? 'Insumo' : 'Producto');
+                            const cantidadDesc = formatoNumeroLocal(d.cantidad || 0);
+                            const unidadDesc = d.unidad || 'unidad';
+                            return `  · ${nombre}: -${cantidadDesc} ${unidadDesc}`;
+                        });
+                    const mensaje = [
+                        `\u2705 Producción exitosa`,
+                        `- Lotes ejecutados: ${cantidad}`,
+                        `- Componentes descontados: ${Number(data.insumos_descontados || 0) + Number(data.productos_descontados || 0)}`,
+                        `- Cantidad producida: ${formatoNumeroLocal(data.cantidad_resultado || 0)}`
+                    ];
+                    if (resumenDescuentos.length > 0) {
+                        mensaje.push('- Descuento aplicado:');
+                        mensaje.push(...resumenDescuentos);
+                    }
+                    if (data.lote_creado_id) {
+                        mensaje.push(`- Lote generado: #${data.lote_creado_id}`);
+                    }
+                    alert(mensaje.join('\n'));
+                    cerrarModalProducir();
+                    reloadProduccionKeepingState();
+                } else {
+                    alert('[ERROR] Error: ' + data.error);
+                }
+            })
+            .catch(() => {
+                alert('[ERROR] Error de conexión');
+            });
+        }
+
+        function cargarHistorial(reset = true) {
+            if (reset) {
+                historialPagina = 1;
+            }
+
+            const paginaActual = historialPagina;
+            const btnMas = document.getElementById('historial-mas-btn');
+            if (!reset && btnMas) {
+                btnMas.disabled = true;
+                btnMas.textContent = 'Cargando...';
+            }
+
+            return fetch(`/api/produccion/historial?page=${paginaActual}&limit=${historialSemanasPorPagina}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'No se pudo cargar el historial');
+                    }
+
+                    if (reset) {
+                        renderHistorialSemana(data.this_week || []);
+                        renderHistorialAnterior(data.previous_weeks || [], false);
+                        document.getElementById('historial-semana-total').textContent = String(data.this_week_total_registros || 0);
+                        document.getElementById('historial-anterior-total').textContent = String(data.previous_total_weeks || 0);
+
+                        const meta = document.getElementById('historial-meta');
+                        if (meta) {
+                            meta.textContent = `Mostrando historial de los últimos ${data.months_kept || 6} meses`;
+                        }
+                    } else {
+                        renderHistorialAnterior(data.previous_weeks || [], true);
+                    }
+
+                    historialHasMore = Boolean(data.has_more);
+                    if (btnMas) {
+                        btnMas.style.display = historialHasMore ? 'block' : 'none';
+                        btnMas.disabled = false;
+                        btnMas.textContent = 'Cargar más semanas anteriores';
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error historial:', error);
+                    if (!reset) {
+                        historialPagina = Math.max(1, historialPagina - 1);
+                    } else {
+                        renderHistorialSemana([]);
+                        renderHistorialAnterior([], false);
+                    }
+
+                    if (btnMas) {
+                        btnMas.disabled = false;
+                        btnMas.textContent = 'Cargar más semanas anteriores';
+                        btnMas.style.display = 'none';
+                    }
+                });
+        }
+
+        function cargarMasSemanas() {
+            if (!historialHasMore) return;
+            historialPagina += 1;
+            cargarHistorial(false);
+        }
+
+        function eliminarProduccion(id) {
+            if (!confirm('¿Eliminar este registro de producción?')) return;
+            
+            fetch(`/api/produccion/${id}/eliminar`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    cargarHistorial(true);
+                    cargarPlanSemanal(true);
+                } else {
+                    alert('[ERROR] ' + (data.error || 'No se pudo eliminar el registro'));
+                }
+            })
+            .catch(() => {
+                alert('[ERROR] Error de conexión al eliminar la producción');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            document.body.classList.toggle('dark-mode', isDark);
+            const darkBtn = document.getElementById('darkModeBtn');
+            if (darkBtn) {
+                darkBtn.textContent = isDark ? '\u2600' : '\uD83C\uDF19';
+            }
+
+            const formReceta = document.getElementById('form-receta');
+            if (formReceta) {
+                formReceta.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    reindexarInsumosNuevo();
+                    const itemsPayload = recolectarItemsDesdeContenedor('insumos-container');
+                    if (!itemsPayload.ok) {
+                        alert(itemsPayload.error);
+                        return;
+                    }
+
+                    const submitBtn = formReceta.querySelector('button[type="submit"]');
+                    const textoOriginal = submitBtn ? submitBtn.textContent : '';
+                    try {
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.textContent = 'Guardando...';
+                        }
+
+                        if (window.AppUX && typeof window.AppUX.submitFormJSON === 'function') {
+                            await window.AppUX.submitFormJSON(formReceta);
+                        } else {
+                            const response = await fetch(formReceta.action, {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-Requested-With': 'fetch'
+                                },
+                                body: new FormData(formReceta)
+                            });
+                            const data = await response.json();
+                            if (!response.ok || !data.success) {
+                                throw new Error(data.error || 'No se pudo guardar la receta');
+                            }
+                        }
+
+                        cerrarModalReceta();
+                        reloadProduccionKeepingState();
+                    } catch (error) {
+                        alert('[ERROR] ' + error.message);
+                    } finally {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = textoOriginal;
+                        }
+                    }
+                });
+            }
+
+            const cantidadResultadoInput = document.getElementById('producir-cantidad-resultante');
+            if (cantidadResultadoInput) {
+                cantidadResultadoInput.addEventListener('input', () => {
+                    cantidadResultadoEditada = true;
+                });
+            }
+
+            document.addEventListener('click', (e) => {
+                const card = e.target.closest('#recetas-panel-root .receta-item');
+                if (!card) return;
+                if (e.target.closest('.receta-actions, button, a, input, select, textarea, details, summary')) {
+                    return;
+                }
+                const recetaId = Number(card.dataset.recetaId || 0);
+                if (!recetaId) return;
+                abrirModalVerReceta(recetaId);
+            });
+
+            filtrarRecetas();
+            cargarHistorial();
+            if (AGENDA_PRODUCCION_INICIAL && Array.isArray(AGENDA_PRODUCCION_INICIAL.days)) {
+                renderAgendaProduccion(AGENDA_PRODUCCION_INICIAL);
+            }
+            if (PLAN_SEMANAL_INICIAL && Array.isArray(PLAN_SEMANAL_INICIAL.days)) {
+                renderPlanSemanal(PLAN_SEMANAL_INICIAL);
+            }
+            cargarAgendaProduccion(true);
+            cargarPlanSemanal(true);
+            restoreProduccionUiStateIfNeeded();
+
+            fetch('/api/alertas/contador')
+                .then(r => r.json())
+                .then(data => {
+                    const badge = document.getElementById('nav-alertas');
+                    if (!badge) return;
+                    badge.textContent = data.total;
+                    badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
+                });
+
+            ['modal-receta', 'modal-editar-receta', 'modal-producir', 'modal-ver-receta', 'modal-agendar-produccion'].forEach(id => {
+                const modal = document.getElementById(id);
+                if (!modal) return;
+                modal.addEventListener('click', function(e) {
+                    if (e.target !== this) return;
+                    if (id === 'modal-receta') cerrarModalReceta();
+                    if (id === 'modal-editar-receta') cerrarModalEditarReceta();
+                    if (id === 'modal-producir') cerrarModalProducir();
+                    if (id === 'modal-ver-receta') cerrarModalVerReceta();
+                    if (id === 'modal-agendar-produccion') cerrarModalAgendaProduccion();
+                });
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Escape') return;
+                const modalAgenda = document.getElementById('modal-agendar-produccion');
+                if (modalAgenda && modalAgenda.classList.contains('active')) {
+                    cerrarModalAgendaProduccion();
+                    return;
+                }
+                const modalVer = document.getElementById('modal-ver-receta');
+                if (modalVer && modalVer.classList.contains('active')) {
+                    cerrarModalVerReceta();
+                }
+            });
+        });
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

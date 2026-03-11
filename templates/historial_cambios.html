@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Historial de Cambios - Sucr&eacute;e Pasteler&iacute;a{% endblock %}
+
+{% block extra_styles %}
+.page-header {
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.header-actions {
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.toolbar-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.search-input {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    width: min(360px, 100%);
+    background: #fff;
+    color: #0f172a;
+}
+
+.table-wrapper {
+    overflow: auto;
+}
+
+.data-table {
+    min-width: 920px;
+}
+
+.tipo-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #b45309;
+}
+
+.estado-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid transparent;
+}
+
+.estado-badge.agregado {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
+}
+
+.estado-badge.eliminado {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+
+.estado-badge.otro {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+.detalle {
+    color: #475569;
+    line-height: 1.35;
+    white-space: pre-wrap;
+}
+
+.empty {
+    text-align: center;
+    padding: 20px;
+    color: #64748b;
+}
+
+.btn-xs {
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1;
+}
+
+body.dark-mode .toolbar-title {
+    color: #f8fafc;
+}
+
+body.dark-mode .search-input {
+    background: #334155;
+    border-color: #475569;
+    color: #f8fafc;
+}
+
+body.dark-mode .data-table tbody tr:hover {
+    background: #273449;
+}
+
+body.dark-mode .detalle {
+    color: #cbd5e1;
+}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Historial de Cambios</h1>
+        <p class="page-subtitle">Registro de altas y eliminaciones de productos e insumos.</p>
+    </div>
+    <div class="header-actions">
+        <a href="/" class="btn btn-secondary">&#11013; Volver a inicio</a>
+    </div>
+</div>
+
+<section class="card">
+    <div class="card-header">
+        <div class="toolbar">
+            <div class="toolbar-title">
+                Movimientos registrados: <span id="mov-count">{{ movimientos|length }}</span>
+            </div>
+            <input
+                id="buscar-movimientos"
+                class="search-input"
+                type="text"
+                placeholder="Buscar por nombre, tipo o acci&oacute;n..."
+                oninput="filtrarMovimientos()"
+            >
+        </div>
+    </div>
+    <div class="table-wrapper">
+        <table id="tabla-movimientos" class="data-table">
+            <thead>
+                <tr>
+                    <th>Fecha y hora</th>
+                    <th>Tipo</th>
+                    <th>Nombre</th>
+                    <th>Acci&oacute;n</th>
+                    <th>Detalle</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="mov-tbody">
+                {% if movimientos %}
+                    {% for m in movimientos %}
+                    <tr class="mov-row"
+                        data-id="{{ m.id }}"
+                        data-nombre="{{ (m.recurso_nombre or '')|lower }}"
+                        data-tipo="{{ (m.recurso_tipo or '')|lower }}"
+                        data-accion="{{ (m.accion or '')|lower }}"
+                    >
+                        <td>{{ m.fecha_hora or '-' }}</td>
+                        <td><span class="tipo-chip">{{ m.recurso_tipo or '-' }}</span></td>
+                        <td>{{ m.recurso_nombre or '-' }}</td>
+                        <td>
+                            {% set accion = (m.accion or '')|lower %}
+                            <span class="estado-badge {{ 'agregado' if accion == 'agregado' else 'eliminado' if accion == 'eliminado' else 'otro' }}">
+                                {{ m.accion or '-' }}
+                            </span>
+                        </td>
+                        <td class="detalle">{{ m.detalle or '-' }}</td>
+                        <td>
+                            <button
+                                type="button"
+                                class="btn btn-danger btn-xs"
+                                onclick="eliminarMovimiento({{ m.id }}, this)"
+                            >
+                                Eliminar
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr id="fila-empty"><td colspan="6" class="empty">No hay movimientos registrados.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function filtrarMovimientos() {
+    const texto = String(document.getElementById('buscar-movimientos')?.value || '').trim().toLowerCase();
+    const filas = document.querySelectorAll('.mov-row');
+    let visibles = 0;
+
+    filas.forEach((fila) => {
+        const nombre = String(fila.getAttribute('data-nombre') || '');
+        const tipo = String(fila.getAttribute('data-tipo') || '');
+        const accion = String(fila.getAttribute('data-accion') || '');
+        const ok = !texto || nombre.includes(texto) || tipo.includes(texto) || accion.includes(texto);
+        fila.style.display = ok ? '' : 'none';
+        if (ok) visibles += 1;
+    });
+
+    renderEmptyState(visibles, texto.length > 0 ? 'Sin coincidencias para la b\u00fasqueda.' : 'No hay movimientos registrados.');
+}
+
+function renderEmptyState(cantidadFilasVisibles, mensaje) {
+    const tbody = document.getElementById('mov-tbody');
+    if (!tbody) return;
+    let filaEmpty = document.getElementById('fila-empty');
+    if (cantidadFilasVisibles > 0) {
+        if (filaEmpty) filaEmpty.remove();
+        return;
+    }
+    if (!filaEmpty) {
+        filaEmpty = document.createElement('tr');
+        filaEmpty.id = 'fila-empty';
+        filaEmpty.innerHTML = '<td colspan="6" class="empty"></td>';
+        tbody.appendChild(filaEmpty);
+    }
+    const celda = filaEmpty.querySelector('td');
+    if (celda) celda.textContent = mensaje || 'No hay movimientos registrados.';
+}
+
+function actualizarContador() {
+    const total = document.querySelectorAll('.mov-row').length;
+    const countEl = document.getElementById('mov-count');
+    if (countEl) countEl.textContent = String(total);
+    renderEmptyState(total, 'No hay movimientos registrados.');
+}
+
+function notificar(msg, tipo) {
+    if (typeof window.toast === 'function') {
+        window.toast(msg, { type: tipo || 'info' });
+        return;
+    }
+    alert(msg);
+}
+
+function eliminarMovimiento(id, btn) {
+    if (!confirm('Eliminar este registro del historial?')) return;
+    const previo = btn ? btn.textContent : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Eliminando...';
+    }
+
+    fetch(`/api/historial-cambios/${id}/eliminar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok || !data.success) throw new Error(data.error || 'No se pudo eliminar');
+        const row = document.querySelector(`.mov-row[data-id="${id}"]`);
+        if (row) row.remove();
+        actualizarContador();
+        notificar('Movimiento eliminado correctamente.', 'success');
+    })
+    .catch((e) => {
+        notificar('Error al eliminar: ' + e.message, 'error');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = previo || 'Eliminar';
+        }
+    });
+}
+</script>
+{% endblock %}

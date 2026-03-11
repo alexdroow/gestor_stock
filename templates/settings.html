@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuraci&oacute;n - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --secondary: #f97316;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #0f172a;
+        }
+        
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .logo-text span { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background: #fff7ed;
+            color: var(--primary-dark);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .nav-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .nav-badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+        }
+        
+        .sidebar-footer {
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 40px;
+            max-width: calc(100% - 260px);
+        }
+        
+        .page-header {
+            margin-bottom: 32px;
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        
+        .card-body {
+            padding: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .info-item {
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 12px;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        
+        .hora-display {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Courier New', monospace;
+        }
+        
+        .fecha-display {
+            font-size: 16px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+        
+        .backup-mensaje {
+            font-size: 13px;
+            margin-top: 8px;
+            min-height: 20px;
+        }
+
+        .acciones-backup {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn-sm {
+            padding: 8px 14px;
+            font-size: 13px;
+        }
+
+        .config-panel {
+            display: grid;
+            gap: 14px;
+        }
+
+        .updater-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        .updater-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+
+        .updater-status {
+            margin-top: 10px;
+            min-height: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .config-item {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .config-item input[type="checkbox"] {
+            margin-top: 3px;
+            accent-color: var(--secondary);
+        }
+
+        .config-item-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .config-item-sub {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .config-select-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .config-select-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px;
+            background: #fff;
+        }
+
+        .config-select-card label {
+            display: block;
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .config-select-card select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #fff;
+            color: #0f172a;
+        }
+        .config-select-card input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #fff;
+            color: #0f172a;
+        }
+        .weather-status {
+            font-size: 13px;
+            min-height: 20px;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+        .weather-note {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+
+        .recordatorios-wrap {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 14px;
+        }
+
+        .recordatorios-title {
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+
+        .recordatorios-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .alerta-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .logo-text {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .nav-item {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .nav-item:hover {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .main-content {
+            background: #0f172a;
+        }
+        
+        body.dark-mode .page-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .card {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .card-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .info-item {
+            background: #334155;
+        }
+        
+        body.dark-mode .info-value {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .form-control {
+            background: #334155;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .btn-secondary {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .config-item,
+        body.dark-mode .config-select-card,
+        body.dark-mode .alerta-item {
+            background: #334155;
+            border-color: #475569;
+        }
+
+        body.dark-mode .updater-status {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .config-item-title,
+        body.dark-mode .recordatorios-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .config-item-sub {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .config-select-card label {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .config-select-card select {
+            background: #1e293b;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+        body.dark-mode .config-select-card input[type="text"] {
+            background: #1e293b;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+        body.dark-mode .weather-note {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .recordatorios-wrap {
+            border-color: #475569;
+        }
+        
+        @media (max-width: 1024px) {
+            .sidebar { width: 240px; }
+            .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
+            .info-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display: flex; min-height: 100vh;">
+        <!-- Sidebar -->
+        {% include "_sidebar.html" %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Configuración</h1>
+            </div>
+
+            <!-- Zona Horaria -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"> Zona Horaria</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Seleccionar zona horaria</label>
+                        <select id="timezone-select" class="form-control" onchange="cambiarTimezone()">
+                            <option value="America/Santiago">Chile (Santiago)</option>
+                            <option value="America/Buenos_Aires">Argentina (Buenos Aires)</option>
+                            <option value="America/Mexico_City">México (Ciudad de México)</option>
+                            <option value="America/Bogota">Colombia (Bogotá)</option>
+                            <option value="America/Lima">Perú (Lima)</option>
+                            <option value="Europe/Madrid">España (Madrid)</option>
+                            <option value="UTC">UTC</option>
+                        </select>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #fff7ed, #ffedd5); padding: 24px; border-radius: 12px; text-align: center; margin: 20px 0;">
+                        <div class="hora-display" id="hora-actual">--:--:--</div>
+                        <div class="fecha-display" id="fecha-actual">Cargando...</div>
+                    </div>
+                    
+                    <button onclick="guardarTimezone()" class="btn btn-primary">
+                        &#128190; Guardar Configuraci&oacute;n
+                    </button>
+                </div>
+            </div>
+
+            <!-- Información del Sistema -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">&#8505; Información del Sistema</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Versión</div>
+                            <div class="info-value">v{{ app_version }} Sucr&eacute;eStock</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Base de datos</div>
+                            <div class="info-value">SQLite</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Último backup</div>
+                            <div class="info-value" id="ultimo-backup">Cargando...</div>
+                            <div class="acciones-backup">
+                                <button onclick="crearBackup()" class="btn btn-primary btn-sm">
+                                    &#128190; Crear Backup
+                                </button>
+                                <button onclick="abrirCarpetaDatos()" class="btn btn-secondary btn-sm">
+                                    &#128194; Abrir carpeta de datos
+                                </button>
+                                <button onclick="abrirCarpetaBackups()" class="btn btn-secondary btn-sm">
+                                    &#128193; Abrir carpeta de backups
+                                </button>
+                            </div>
+                            <div class="info-value" id="ruta-datos" style="margin-top: 8px; font-size: 12px; color: #64748b;">Ruta: cargando...</div>
+                            <div class="backup-mensaje" id="backup-mensaje"></div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Productos registrados</div>
+                            <div class="info-value" id="total-productos">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">&#128260; Actualizador remoto (GitHub)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="updater-grid">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Repositorio GitHub (usuario/repositorio)</label>
+                            <input type="text" id="upd-repo" class="form-control" placeholder="ej: tuusuario/gestor-stock">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>GitHub token (PAT)</label>
+                            <input type="password" id="upd-token" class="form-control" placeholder="ghp_xxx (opcional si ya quedó guardado)">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Archivo a instalar (asset release)</label>
+                            <input type="text" id="upd-asset" class="form-control" placeholder="GestionStockPro.exe">
+                        </div>
+                        <label class="config-item" style="margin-bottom:0;">
+                            <input type="checkbox" id="upd-habilitado">
+                            <div>
+                                <div class="config-item-title">Habilitar updater</div>
+                                <div class="config-item-sub">Permite buscar y aplicar actualizaciones desde esta app.</div>
+                            </div>
+                        </label>
+                        <label class="config-item" style="margin-bottom:0;">
+                            <input type="checkbox" id="upd-prerelease">
+                            <div>
+                                <div class="config-item-title">Permitir prerelease</div>
+                                <div class="config-item-sub">Incluye versiones beta/rc publicadas en GitHub.</div>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="updater-actions">
+                        <button type="button" class="btn btn-secondary" onclick="guardarConfigUpdater()">Guardar updater</button>
+                        <button type="button" class="btn btn-secondary" onclick="publicarVersionActual()">Publicar esta versión</button>
+                        <button type="button" class="btn btn-primary" onclick="buscarActualizacion()">Buscar actualización</button>
+                        <button type="button" class="btn btn-primary" onclick="descargarActualizacion()">Descargar</button>
+                        <button type="button" class="btn btn-secondary" onclick="aplicarActualizacion()">Instalar ahora</button>
+                    </div>
+                    <div class="updater-status" id="upd-status">Versión instalada: v{{ app_version }}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">&#9881; Configuración de alertas y recordatorios</h3>
+                </div>
+                <div class="card-body config-panel">
+                    <div class="config-grid">
+                        <label class="config-item">
+                            <input type="checkbox" id="cfg-notificaciones" {% if config_alertas.notificaciones_activas %}checked{% endif %}>
+                            <div>
+                                <div class="config-item-title">Activar notificaciones</div>
+                                <div class="config-item-sub">Muestra alertas emergentes del sistema.</div>
+                            </div>
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="cfg-inicio-windows" {% if config_alertas.inicio_windows %}checked{% endif %}>
+                            <div>
+                                <div class="config-item-title">Iniciar agente con Windows</div>
+                                <div class="config-item-sub">Permite recordatorios incluso con la app cerrada.</div>
+                            </div>
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="cfg-stock" {% if config_alertas.incluir_stock_bajo %}checked{% endif %}>
+                            <div>
+                                <div class="config-item-title">Alertar stock bajo</div>
+                                <div class="config-item-sub">Incluye productos e insumos críticos.</div>
+                            </div>
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="cfg-vencimientos" {% if config_alertas.incluir_vencimientos %}checked{% endif %}>
+                            <div>
+                                <div class="config-item-title">Alertar vencimientos</div>
+                                <div class="config-item-sub">Notifica lotes próximos a vencer.</div>
+                            </div>
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="cfg-agenda" {% if config_alertas.incluir_agenda %}checked{% endif %}>
+                            <div>
+                                <div class="config-item-title">Alertar agenda</div>
+                                <div class="config-item-sub">Recordatorios de pedidos y entregas.</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="config-select-grid">
+                        <div class="config-select-card">
+                            <label>Repetir cada</label>
+                            <select id="cfg-repetir">
+                                {% for m in [5,10,15,30,60] %}
+                                <option value="{{ m }}" {% if config_alertas.repetir_minutos == m %}selected{% endif %}>{{ m }} min</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="config-select-card">
+                            <label>Anticipación agenda</label>
+                            <select id="cfg-dias">
+                                {% for d in [1,2,3,5,7,14] %}
+                                <option value="{{ d }}" {% if config_alertas.dias_anticipacion == d %}selected{% endif %}>{{ d }} días</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="guardarConfigAlertas()">Guardar configuración</button>
+
+                    <div class="recordatorios-wrap">
+                        <h4 class="recordatorios-title">&#128467; Recordatorios de agenda pendientes</h4>
+                        <div id="recordatorios-lista" class="recordatorios-list">
+                            {% if recordatorios %}
+                                {% for r in recordatorios %}
+                                <div class="alerta-item">
+                                    <div>
+                                        <div style="font-weight:600;">{{ r.titulo }}</div>
+                                        <div style="font-size:12px; color:#64748b;">{{ r.fecha }} {{ r.hora_inicio or '' }}</div>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" onclick="descartarRecordatorio({{ r.id }}, '{{ r.ventana_clave }}', this)">Descartar</button>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p style="color:#64748b;">No hay recordatorios pendientes.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Botón Modo Oscuro -->
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    ">&#127769;</button>
+
+    <script>
+        // Modo Oscuro
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeBtn').textContent = '\u2600';
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const btn = document.getElementById('darkModeBtn');
+            
+            if (body.classList.contains('dark-mode')) {
+                body.classList.remove('dark-mode');
+                btn.textContent = '\uD83C\uDF19';
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                body.classList.add('dark-mode');
+                btn.textContent = '\u2600';
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        // Zona horaria
+        let timezone = localStorage.getItem('timezone') || 'America/Santiago';
+        document.getElementById('timezone-select').value = timezone;
+
+        function updateHora() {
+            const now = new Date();
+            const options = { 
+                timeZone: timezone,
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            };
+            const fechaOptions = {
+                timeZone: timezone,
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            };
+            
+            document.getElementById('hora-actual').textContent = now.toLocaleTimeString('es-CL', options);
+            document.getElementById('fecha-actual').textContent = now.toLocaleDateString('es-CL', fechaOptions);
+        }
+        
+        setInterval(updateHora, 1000);
+        updateHora();
+
+        function cambiarTimezone() {
+            timezone = document.getElementById('timezone-select').value;
+            updateHora();
+        }
+
+        function guardarTimezone() {
+            localStorage.setItem('timezone', timezone);
+            alert('\u2705 Configuración guardada correctamente');
+        }
+
+        // Backup functions
+        function crearBackup() {
+            const btn = document.querySelector('button[onclick="crearBackup()"]');
+            const msg = document.getElementById('backup-mensaje');
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Creando...';
+            }
+            msg.textContent = '';
+            
+            fetch('/api/backup/crear', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        mostrarMensajeBackup('\u2705 ' + data.mensaje, true);
+                        actualizarUltimoBackup();
+                    } else {
+                        mostrarMensajeBackup('[ERROR] Error: ' + data.error, false);
+                    }
+                })
+                .catch(e => {
+                    mostrarMensajeBackup('[ERROR] Error de conexión', false);
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = '\uD83D\uDCBE Crear Backup';
+                    }
+                });
+        }
+
+        function mostrarMensajeBackup(texto, ok) {
+            const msg = document.getElementById('backup-mensaje');
+            if (!msg) return;
+            msg.textContent = texto || '';
+            msg.style.color = ok ? '#10b981' : '#ef4444';
+        }
+
+        function actualizarUltimoBackup() {
+            fetch('/api/backup/ultimo')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('ultimo-backup').textContent = data.ultimo;
+                })
+                .catch(() => {
+                    document.getElementById('ultimo-backup').textContent = 'Error';
+                });
+        }
+
+        function actualizarRutasBackup() {
+            fetch('/api/backup/directorio')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo obtener la ruta de datos');
+                    const rutaDatos = document.getElementById('ruta-datos');
+                    if (rutaDatos) {
+                        rutaDatos.textContent = `Datos: ${data.data_dir} | Backups: ${data.backup_dir}`;
+                    }
+                })
+                .catch(() => {
+                    const rutaDatos = document.getElementById('ruta-datos');
+                    if (rutaDatos) rutaDatos.textContent = 'Ruta: no disponible';
+                });
+        }
+
+        function abrirCarpetaDatos() {
+            fetch('/api/backup/abrir-carpeta?tipo=datos', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo abrir la carpeta de datos');
+                    mostrarMensajeBackup('\u2705 Carpeta de datos abierta', true);
+                })
+                .catch(err => mostrarMensajeBackup('[ERROR] ' + err.message, false));
+        }
+
+        function abrirCarpetaBackups() {
+            fetch('/api/backup/abrir-carpeta?tipo=backup', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo abrir la carpeta de backups');
+                    mostrarMensajeBackup('\u2705 Carpeta de backups abierta', true);
+                })
+                .catch(err => mostrarMensajeBackup('[ERROR] ' + err.message, false));
+        }
+
+        function guardarConfigAlertas() {
+            const payload = {
+                notificaciones_activas: document.getElementById('cfg-notificaciones').checked,
+                inicio_windows: document.getElementById('cfg-inicio-windows').checked,
+                incluir_stock_bajo: document.getElementById('cfg-stock').checked,
+                incluir_vencimientos: document.getElementById('cfg-vencimientos').checked,
+                incluir_agenda: document.getElementById('cfg-agenda').checked,
+                repetir_minutos: parseInt(document.getElementById('cfg-repetir').value || '15', 10),
+                dias_anticipacion: parseInt(document.getElementById('cfg-dias').value || '2', 10)
+            };
+
+            fetch('/api/alertas/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo guardar');
+                    alert('\u2705 Configuración guardada');
+                })
+                .catch(err => alert('[ERROR] ' + err.message));
+        }
+
+        function descartarRecordatorio(eventoId, ventanaClave, btn) {
+            fetch('/api/alertas/recordatorio/descartar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ evento_id: eventoId, ventana_clave: ventanaClave })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo descartar');
+                    const item = btn.closest('.alerta-item');
+                    if (item) item.remove();
+                    const lista = document.getElementById('recordatorios-lista');
+                    if (lista && !lista.querySelector('.alerta-item')) {
+                        lista.innerHTML = '<p style="color:#64748b;">No hay recordatorios pendientes.</p>';
+                    }
+                })
+                .catch(err => alert('[ERROR] ' + err.message));
+        }
+
+        let updaterDownloadedPath = '';
+
+        function setUpdaterStatus(text, ok = null) {
+            const box = document.getElementById('upd-status');
+            if (!box) return;
+            box.textContent = text || '';
+            if (ok === true) box.style.color = '#10b981';
+            else if (ok === false) box.style.color = '#ef4444';
+            else box.style.color = '';
+        }
+
+        function updaterPayload(includeToken = false) {
+            const payload = {
+                habilitado: document.getElementById('upd-habilitado').checked,
+                github_repo: (document.getElementById('upd-repo').value || '').trim(),
+                release_asset: (document.getElementById('upd-asset').value || '').trim(),
+                permitir_prerelease: document.getElementById('upd-prerelease').checked,
+            };
+            if (includeToken) {
+                const token = (document.getElementById('upd-token').value || '').trim();
+                payload.github_token = token || '__KEEP__';
+            }
+            return payload;
+        }
+
+        function cargarConfigUpdater() {
+            fetch('/api/updater/config')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo cargar updater');
+                    const cfg = data.config || {};
+                    document.getElementById('upd-habilitado').checked = !!cfg.habilitado;
+                    document.getElementById('upd-repo').value = cfg.github_repo || '';
+                    document.getElementById('upd-token').value = '';
+                    if (cfg.has_token) {
+                        document.getElementById('upd-token').placeholder = 'Token guardado (deja vacío para mantener)';
+                    }
+                    document.getElementById('upd-asset').value = cfg.release_asset || 'GestionStockPro.exe';
+                    document.getElementById('upd-prerelease').checked = !!cfg.permitir_prerelease;
+                    const appV = data.app_version || '{{ app_version }}';
+                    setUpdaterStatus(`Versión instalada: v${appV}`);
+                })
+                .catch(err => setUpdaterStatus('[ERROR] ' + err.message, false));
+        }
+
+        function guardarConfigUpdater() {
+            const payload = updaterPayload(true);
+            fetch('/api/updater/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo guardar updater');
+                    setUpdaterStatus('✅ Configuración de updater guardada.', true);
+                })
+                .catch(err => setUpdaterStatus('[ERROR] ' + err.message, false));
+        }
+
+        function publicarVersionActual() {
+            const payload = updaterPayload(true);
+            setUpdaterStatus('Publicando release en GitHub...');
+            fetch('/api/updater/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo publicar la versión');
+                    setUpdaterStatus(`✅ Publicado ${data.tag} en ${data.repo} (${data.asset_name}).`, true);
+                })
+                .catch(err => setUpdaterStatus('[ERROR] ' + err.message, false));
+        }
+
+        function buscarActualizacion() {
+            const payload = updaterPayload(false);
+            setUpdaterStatus('Buscando versión en GitHub...');
+            fetch('/api/updater/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo consultar GitHub');
+                    const tag = data.tag || data.titulo || 'sin tag';
+                    if (data.update_available) {
+                        setUpdaterStatus(`⚠️ Nueva versión disponible: ${tag} (actual: v${data.current_version})`, true);
+                    } else {
+                        setUpdaterStatus(`✅ Ya estás en la última versión: v${data.current_version}`, true);
+                    }
+                })
+                .catch(err => setUpdaterStatus('[ERROR] ' + err.message, false));
+        }
+
+        function descargarActualizacion() {
+            const payload = updaterPayload(false);
+            setUpdaterStatus('Descargando actualización...');
+            fetch('/api/updater/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo descargar');
+                    updaterDownloadedPath = data.file_path || '';
+                    const sizeMb = ((Number(data.file_size || 0) / (1024 * 1024))).toFixed(2);
+                    setUpdaterStatus(`✅ Descargado: ${data.file_name} (${sizeMb} MB). Ahora pulsa "Instalar ahora".`, true);
+                })
+                .catch(err => setUpdaterStatus('[ERROR] ' + err.message, false));
+        }
+
+        function aplicarActualizacion() {
+            if (!updaterDownloadedPath) {
+                setUpdaterStatus('Primero descarga la actualización.', false);
+                return;
+            }
+            if (!confirm('Se cerrará la app para aplicar la actualización. ¿Continuar?')) return;
+            setUpdaterStatus('Aplicando actualización. La app se cerrará...', true);
+            fetch('/api/updater/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_path: updaterDownloadedPath }),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo aplicar la actualización');
+                    if (data.manual) {
+                        setUpdaterStatus('✅ Se abrió el instalador. Sigue los pasos en pantalla.', true);
+                    } else {
+                        setUpdaterStatus('✅ Actualización en curso. Espera a que la app se reinicie.', true);
+                    }
+                })
+                .catch(err => setUpdaterStatus('[ERROR] ' + err.message, false));
+        }
+
+        // Cargar datos
+        fetch('/api/estadisticas')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('total-productos').textContent = data.productos;
+            });
+
+        fetch('/api/alertas/contador')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('nav-alertas');
+                if (badge) {
+                    badge.textContent = data.total;
+                    badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
+                }
+            });
+
+        actualizarUltimoBackup();
+        actualizarRutasBackup();
+        cargarConfigUpdater();
+        cargarConfigClimaSidebar(true);
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

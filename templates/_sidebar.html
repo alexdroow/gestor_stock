@@ -1,0 +1,213 @@
+<aside class="sidebar">
+    <style>
+        .sidebar {
+            overflow-y: auto;
+        }
+        .sidebar .nav-menu {
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .sidebar .nav-menu::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar .nav-menu::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.35);
+            border-radius: 999px;
+        }
+        .sidebar-tuya {
+            margin: 2px 0 10px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+        .st-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .st-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 2px 0;
+            min-width: 0;
+        }
+        .st-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+            flex: 1;
+        }
+        .st-value {
+            font-size: 14px;
+            line-height: 1;
+            font-weight: 800;
+            color: #7c2d12;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .st-item.st-alert .st-name {
+            color: #b91c1c;
+        }
+        .st-item.st-alert .st-value {
+            color: #991b1b;
+        }
+        body.dark-mode .sidebar-tuya {
+            background: transparent;
+            box-shadow: none;
+        }
+        body.dark-mode .st-name {
+            color: #cbd5e1;
+        }
+        body.dark-mode .st-value {
+            color: #e2e8f0;
+        }
+        body.dark-mode .st-item.st-alert .st-name {
+            color: #fca5a5;
+        }
+        body.dark-mode .st-item.st-alert .st-value {
+            color: #fecaca;
+        }
+    </style>
+
+    <div class="logo">
+        <div class="logo-icon">&#128230;</div>
+        <div class="logo-text">Sucr&eacute;e<span>Stock</span></div>
+    </div>
+
+    <section class="sidebar-tuya" id="sidebar-tuya-widget" aria-live="polite">
+        <div class="st-list">
+            <div class="st-item" id="st-row-refri">
+                <span class="st-name" id="st-refri-label">Refrigerador</span>
+                <span class="st-value" id="st-refri-temp">-- C</span>
+            </div>
+            <div class="st-item" id="st-row-vitrina">
+                <span class="st-name" id="st-vitrina-label">Vitrina</span>
+                <span class="st-value" id="st-vitrina-temp">-- C</span>
+            </div>
+        </div>
+    </section>
+
+    <nav class="nav-menu">
+        <a href="/" class="nav-item">
+            <span class="icon">&#127968;</span>
+            <span>Inicio</span>
+        </a>
+        <a href="/productos" class="nav-item">
+            <span class="icon">&#129473;</span>
+            <span>Productos</span>
+        </a>
+        <a href="/insumos" class="nav-item">
+            <span class="icon">&#127793;</span>
+            <span>Insumos</span>
+        </a>
+        <a href="/produccion" class="nav-item">
+            <span class="icon">&#127859;</span>
+            <span>Producci&oacute;n</span>
+        </a>
+        <a href="/agenda" class="nav-item">
+            <span class="icon">&#128197;</span>
+            <span>Agenda</span>
+        </a>
+        <a href="/ventas" class="nav-item">
+            <span class="icon">&#128722;</span>
+            <span>Ventas</span>
+        </a>
+        <a href="/reportes" class="nav-item">
+            <span class="icon">&#128202;</span>
+            <span>Reportes</span>
+        </a>
+        <a href="/facturas" class="nav-item">
+            <span class="icon">&#129534;</span>
+            <span>Facturas</span>
+        </a>
+        <a href="/alertas" class="nav-item">
+            <span class="icon">&#128276;</span>
+            <span>Alertas</span>
+            <span class="nav-badge" id="nav-alertas" style="display:none;">0</span>
+        </a>
+        <a href="/haccp" class="nav-item">
+            <span class="icon">&#129514;</span>
+            <span>HACCP</span>
+        </a>
+        <a href="/camaras" class="nav-item">
+            <span class="icon">&#128249;</span>
+            <span>C&aacute;maras</span>
+        </a>
+        <a href="/settings" class="nav-item">
+            <span class="icon">&#9881;</span>
+            <span>Configuraci&oacute;n</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">v{{ app_version }} &bull; Sucr&eacute;e Pasteler&iacute;a</div>
+
+    <script>
+        (function () {
+            if (window.__sucreeSidebarTuyaInit) return;
+            window.__sucreeSidebarTuyaInit = true;
+
+            const REFRESH_MS = 60 * 1000;
+            const refs = {
+                rowRefri: document.getElementById('st-row-refri'),
+                rowVitrina: document.getElementById('st-row-vitrina'),
+                labelRefri: document.getElementById('st-refri-label'),
+                labelVitrina: document.getElementById('st-vitrina-label'),
+                tempRefri: document.getElementById('st-refri-temp'),
+                tempVitrina: document.getElementById('st-vitrina-temp'),
+            };
+            if (Object.values(refs).some((el) => !el)) return;
+
+            function setLoading() {
+                refs.tempRefri.textContent = '-- C';
+                refs.tempVitrina.textContent = '-- C';
+                refs.rowRefri.classList.remove('st-alert');
+                refs.rowVitrina.classList.remove('st-alert');
+            }
+
+            function setSlot(slot, data, defaults) {
+                const row = slot === 'refri' ? refs.rowRefri : refs.rowVitrina;
+                const label = slot === 'refri' ? refs.labelRefri : refs.labelVitrina;
+                const temp = slot === 'refri' ? refs.tempRefri : refs.tempVitrina;
+
+                const d = data || {};
+                const titulo = String(d.punto_nombre || d.device_name || defaults.title || '').trim() || defaults.title;
+                label.textContent = titulo;
+
+                const t = Number(d.temperatura);
+                temp.textContent = Number.isFinite(t) ? `${t.toFixed(1)} C` : '-- C';
+
+                const alerta = d.alerta_temp || {};
+                row.classList.toggle('st-alert', !!alerta.fuera_rango);
+            }
+
+            async function loadTuyaSidebar() {
+                try {
+                    const r = await fetch('/api/haccp/tuya/sidebar', { cache: 'no-store' });
+                    const d = await r.json();
+                    if (!r.ok || !d.success) throw new Error(d.error || 'No se pudo consultar Tuya');
+
+                    setSlot('refri', d.refrigerador, { title: 'Refrigerador' });
+                    setSlot('vitrina', d.vitrina, { title: 'Vitrina' });
+                } catch (err) {
+                    setLoading();
+                }
+            }
+
+            setLoading();
+            loadTuyaSidebar();
+            setInterval(loadTuyaSidebar, REFRESH_MS);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') loadTuyaSidebar();
+            });
+            window.addEventListener('sucree-tuya-sidebar-updated', loadTuyaSidebar);
+        })();
+    </script>
+</aside>

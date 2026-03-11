@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alertas - Sucr&eacute;e Pasteler&iacute;a</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --secondary: #f97316;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #0f172a;
+        }
+        
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .logo-text span { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #64748b;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background: #fff7ed;
+            color: var(--primary-dark);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        
+        .nav-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .nav-badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+        }
+        
+        .sidebar-footer {
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 40px;
+            max-width: calc(100% - 260px);
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .page-subtitle {
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #64748b;
+        }
+        
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .stat-icon.red { background: #fee2e2; }
+        .stat-icon.orange { background: #fef3c7; }
+        .stat-icon.blue { background: #dbeafe; }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #ef4444;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card-body {
+            padding: 0;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .config-panel {
+            padding: 18px 24px 24px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .config-item {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .config-item input[type="checkbox"] {
+            margin-top: 3px;
+            accent-color: var(--secondary);
+        }
+
+        .config-item-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .config-item-sub {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .config-select-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .config-select-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px;
+            background: #fff;
+        }
+
+        .config-select-card label {
+            display: block;
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .config-select-card select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #fff;
+            color: #0f172a;
+        }
+
+        .config-select-card select:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+        }
+
+        .recordatorios-wrap {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 14px;
+        }
+
+        .recordatorios-title {
+            font-size: 15px;
+            margin-bottom: 8px;
+        }
+
+        .recordatorios-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .alerta-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .data-table th {
+            text-align: left;
+            padding: 16px;
+            font-weight: 600;
+            color: #64748b;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .data-table td {
+            padding: 16px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state-icon {
+            width: 88px;
+            height: 88px;
+            margin: 0 auto 16px auto;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 44px;
+            font-weight: 700;
+            color: #10b981;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            line-height: 1;
+        }
+        
+        .empty-state-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .empty-state-text {
+            color: #64748b;
+        }
+        
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .sidebar {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .logo-text {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .nav-item {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .nav-item:hover {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .main-content {
+            background: #0f172a;
+        }
+        
+        body.dark-mode .page-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .page-subtitle {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .stat-card {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .stat-label {
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .card {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        body.dark-mode .card-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .data-table th {
+            background: #334155;
+            color: #94a3b8;
+        }
+        
+        body.dark-mode .data-table td {
+            border-color: #334155;
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .empty-state-title {
+            color: #f1f5f9;
+        }
+        
+        body.dark-mode .empty-state-text {
+            color: #94a3b8;
+        }
+
+        body.dark-mode .empty-state-icon {
+            color: #34d399;
+            background: rgba(16, 185, 129, 0.16);
+            border-color: rgba(52, 211, 153, 0.35);
+        }
+
+        body.dark-mode .btn-secondary {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .config-item,
+        body.dark-mode .config-select-card,
+        body.dark-mode .alerta-item {
+            background: #334155;
+            border-color: #475569;
+        }
+
+        body.dark-mode .config-item-title,
+        body.dark-mode .recordatorios-title {
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .config-item-sub {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .config-select-card label {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .config-select-card select {
+            background: #1e293b;
+            border-color: #475569;
+            color: #f1f5f9;
+        }
+
+        body.dark-mode .recordatorios-wrap {
+            border-color: #475569;
+        }
+        
+        @media (max-width: 1024px) {
+            .sidebar { width: 240px; }
+            .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display: flex; min-height: 100vh;">
+        <!-- Sidebar -->
+        {% include "_sidebar.html" %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Alertas</h1>
+                    <p class="page-subtitle">Productos e insumos con stock bajo o porci&oacute;n insuficiente</p>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Productos con Alerta</span>
+                        <div class="stat-icon red">&#9888;</div>
+                    </div>
+                    <div class="stat-value">{{ productos_total_alerta_count }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Bajo m&iacute;nimo</span>
+                        <div class="stat-icon orange">&#128230;</div>
+                    </div>
+                    <div class="stat-value">{{ productos_stock_bajo_count }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Sin porci&oacute;n disponible</span>
+                        <div class="stat-icon blue">&#127860;</div>
+                    </div>
+                    <div class="stat-value">{{ productos_baja_porcion_count }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Insumos con Stock Bajo</span>
+                        <div class="stat-icon orange">&#127806;</div>
+                    </div>
+                    <div class="stat-value">{{ insumos|length }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Controles HACCP vencidos</span>
+                        <div class="stat-icon red">&#129514;</div>
+                    </div>
+                    <div class="stat-value">{{ haccp_vencidos_count or 0 }}</div>
+                </div>
+            </div>
+            <!-- Productos -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3 class="card-title">&#128230; Productos con Stock Bajo</h3>
+                    <a href="/productos" class="btn btn-primary btn-sm">Gestionar -></a>
+                </div>
+                <div class="card-body">
+                    {% if productos %}
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Stock Actual</th>
+                                    <th>Stock Mínimo</th>
+                                    <th>Faltante</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in productos %}
+                                <tr>
+                                    <td>
+                                        <strong style="font-size: 15px;">{{ p.nombre }}</strong>
+                                        <div style="font-size: 12px; color: #64748b;">ID: #{{ p.id }}</div>
+                                    </td>
+                                    <td style="color: #ef4444; font-weight: 700; font-size: 18px;">{{ p.stock_label }} {{ p.unidad }}</td>
+                                    <td>{{ p.stock_minimo_label }} {{ p.unidad }}</td>
+                                    <td>
+                                        <span class="badge badge-danger" style="font-size: 14px; padding: 8px 16px;">
+                                            +{{ p.faltante_alerta_label }} {{ p.unidad }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">&#10003;</div>
+                        <div class="empty-state-title">¡Todo bien!</div>
+                        <div class="empty-state-text">Todos los productos tienen stock suficiente</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Productos sin porcion -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3 class="card-title">&#127860; Productos sin porci&oacute;n disponible</h3>
+                    <a href="/ventas" class="btn btn-primary btn-sm">Ir a ventas &rarr;</a>
+                </div>
+                <div class="card-body">
+                    {% if productos_baja_porcion %}
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Stock Actual</th>
+                                    <th>Porci&oacute;n</th>
+                                    <th>Faltante</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in productos_baja_porcion %}
+                                <tr>
+                                    <td>
+                                        <strong style="font-size: 15px;">{{ p.nombre }}</strong>
+                                        <div style="font-size: 12px; color: #64748b;">ID: #{{ p.id }}</div>
+                                    </td>
+                                    <td style="color: #ef4444; font-weight: 700; font-size: 18px;">{{ p.stock_label }} {{ p.unidad }}</td>
+                                    <td>{{ p.porcion_cantidad_label }} {{ p.porcion_unidad }}</td>
+                                    <td>
+                                        {% if p.error_porcion %}
+                                            <span class="badge badge-danger" style="font-size: 12px; padding: 8px 12px;">{{ p.error_porcion }}</span>
+                                        {% else %}
+                                            <span class="badge badge-danger" style="font-size: 14px; padding: 8px 16px;">
+                                                +{{ p.faltante_para_porcion_label }} {{ p.unidad }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">&#10003;</div>
+                        <div class="empty-state-title">&iexcl;Todo bien!</div>
+                        <div class="empty-state-text">No hay productos por debajo de una porci&oacute;n</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Insumos -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">&#127806; Insumos con Stock Bajo</h3>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarTodosFaltantesACompra()">+ Comprar todos</button>
+                        <a href="/insumos" class="btn btn-primary btn-sm">Gestionar &rarr;</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if insumos %}
+                    <div class="table-wrapper">
+                        <table class="data-table" id="tabla-alertas-insumos">
+                            <thead>
+                                <tr>
+                                    <th>Insumo</th>
+                                    <th>Stock Actual</th>
+                                    <th>Stock Mínimo</th>
+                                    <th>Faltante</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in insumos %}
+                                {% set faltante_compra = (i.faltante_alerta if i.faltante_alerta is not none else (i.stock_minimo - i.stock)) %}
+                                <tr
+                                    data-insumo-id="{{ i.id }}"
+                                    data-insumo-nombre="{{ i.nombre }}"
+                                    data-insumo-faltante="{{ faltante_compra }}"
+                                    data-insumo-unidad="{{ i.unidad }}"
+                                >
+                                    <td>
+                                        <strong style="font-size: 15px;">{{ i.nombre }}</strong>
+                                        <div style="font-size: 12px; color: #64748b;">ID: #{{ i.id }}</div>
+                                    </td>
+                                    <td style="color: #ef4444; font-weight: 700; font-size: 18px;">{{ i.stock }} {{ i.unidad }}</td>
+                                    <td>{{ i.stock_minimo }} {{ i.unidad }}</td>
+                                    <td>
+                                        <span class="badge badge-danger" style="font-size: 14px; padding: 8px 16px;">
+                                            +{{ "%.2f"|format(faltante_compra) }} {{ i.unidad }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button
+                                            type="button"
+                                            class="btn btn-secondary btn-sm"
+                                            onclick='agregarInsumoCompraPendiente(this, {{ i.id }}, {{ i.nombre|tojson }}, {{ faltante_compra|tojson }}, {{ (i.unidad or "unidad")|tojson }})'
+                                        >+ Lista compra</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">&#10003;</div>
+                        <div class="empty-state-title">¡Todo bien!</div>
+                        <div class="empty-state-text">Todos los insumos tienen stock suficiente</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">&#129514; Controles HACCP vencidos</h3>
+                    <a href="/haccp" class="btn btn-primary btn-sm">Abrir HACCP &rarr;</a>
+                </div>
+                <div class="card-body">
+                    {% if haccp_vencidos %}
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Punto</th>
+                                    <th>Categoria</th>
+                                    <th>Frecuencia</th>
+                                    <th>Ultimo control</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for h in haccp_vencidos %}
+                                <tr>
+                                    <td><strong style="font-size: 15px;">{{ h.nombre }}</strong></td>
+                                    <td>{{ h.categoria or 'General' }}</td>
+                                    <td>{{ h.frecuencia_horas }}h</td>
+                                    <td>{{ h.ultimo_registrado_en or 'Sin registro' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">&#10003;</div>
+                        <div class="empty-state-title">&iexcl;Todo bien!</div>
+                        <div class="empty-state-text">No hay puntos HACCP vencidos por ahora</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Botón Modo Oscuro -->
+    <button onclick="toggleDarkMode()" id="darkModeBtn" style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    ">&#127769;</button>
+
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeBtn').textContent = '\u2600';
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const btn = document.getElementById('darkModeBtn');
+            
+            if (body.classList.contains('dark-mode')) {
+                body.classList.remove('dark-mode');
+                btn.textContent = '\uD83C\uDF19';
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                body.classList.add('dark-mode');
+                btn.textContent = '\u2600';
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        function _normalizarCantidadCompra(valor) {
+            const n = Number(valor || 0);
+            if (!Number.isFinite(n) || n <= 0) return 0;
+            return Math.round(n * 100) / 100;
+        }
+
+        function _payloadCompraDesdeAlerta(insumoId, nombre, faltante, unidad) {
+            const cantidad = _normalizarCantidadCompra(faltante);
+            if (!insumoId || cantidad <= 0) return null;
+            return {
+                insumo_id: Number(insumoId),
+                nombre: String(nombre || '').trim(),
+                cantidad,
+                unidad: String(unidad || 'unidad').trim() || 'unidad',
+                estado: 'pendiente',
+            };
+        }
+
+        async function agregarInsumoCompraPendiente(btn, insumoId, nombre, faltante, unidad) {
+            const payload = _payloadCompraDesdeAlerta(insumoId, nombre, faltante, unidad);
+            if (!payload) {
+                alert('No hay cantidad faltante para agregar.');
+                return;
+            }
+            const original = btn ? btn.textContent : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Agregando...';
+            }
+            try {
+                const response = await fetch('/api/compras-pendientes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: [payload] })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo agregar a compras pendientes');
+                }
+                if (btn) btn.textContent = 'Agregado';
+            } catch (err) {
+                if (btn) btn.textContent = original || '+ Lista compra';
+                alert('[ERROR] ' + err.message);
+            } finally {
+                if (btn) {
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.textContent = '+ Lista compra';
+                    }, 900);
+                }
+            }
+        }
+
+        async function agregarTodosFaltantesACompra() {
+            const rows = Array.from(document.querySelectorAll('#tabla-alertas-insumos tbody tr[data-insumo-id]'));
+            if (!rows.length) {
+                alert('No hay insumos faltantes para agregar.');
+                return;
+            }
+            const items = rows
+                .map((row) => _payloadCompraDesdeAlerta(
+                    row.getAttribute('data-insumo-id'),
+                    row.getAttribute('data-insumo-nombre'),
+                    row.getAttribute('data-insumo-faltante'),
+                    row.getAttribute('data-insumo-unidad')
+                ))
+                .filter(Boolean);
+
+            if (!items.length) {
+                alert('No hay cantidades válidas para agregar.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/compras-pendientes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo agregar la lista de compra');
+                }
+                alert(`Se agregaron ${items.length} insumo(s) a compras pendientes.`);
+            } catch (err) {
+                alert('[ERROR] ' + err.message);
+            }
+        }
+
+        fetch('/api/alertas/contador')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('nav-alertas');
+                badge.textContent = data.total;
+                badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
+            });
+    </script>
+
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>
+
+
+
+
+
