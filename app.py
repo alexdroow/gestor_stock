@@ -25,8 +25,9 @@ from werkzeug.utils import secure_filename
 from camera_hub import CameraHub
 
 # Silenciar ruido nativo de FFmpeg/OpenCV cuando se ejecuta app.py directo.
-# Se puede desactivar con: GESTIONSTOCK_SUPPRESS_STDERR=0
-if os.environ.get("GESTIONSTOCK_SUPPRESS_STDERR", "1").strip().lower() not in ("0", "false", "no", "off"):
+# En servidores (Render/gunicorn) conviene dejar stderr visible para diagnostico.
+# Se puede activar manualmente con: GESTIONSTOCK_SUPPRESS_STDERR=1
+if os.environ.get("GESTIONSTOCK_SUPPRESS_STDERR", "0").strip().lower() not in ("0", "false", "no", "off"):
     try:
         _null_stderr = open(os.devnull, "w", encoding="utf-8", buffering=1)
         os.dup2(_null_stderr.fileno(), 2)
