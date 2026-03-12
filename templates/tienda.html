@@ -535,9 +535,9 @@
             border-radius: 999px;
             background: #111827;
             color: #fff;
-            padding: 20px 30px;
+            padding: 24px 40px;
             font-weight: 800;
-            font-size: 1.7rem;
+            font-size: 2.2rem;
             box-shadow: 0 8px 20px rgba(0,0,0,.25);
             cursor: pointer;
         }
@@ -563,14 +563,15 @@
             border-radius: 999px;
             background: #111827;
             color: #fff;
-            padding: 12px 14px;
+            padding: 22px 28px;
             font-weight: 800;
+            font-size: 2rem;
             box-shadow: 0 8px 20px rgba(0,0,0,.25);
             cursor: pointer;
         }
         body.mobile-ui .left-nav { display: none; }
         body.mobile-ui .cart-panel { display: none; }
-        body.mobile-ui { font-size: 150%; }
+        body.mobile-ui { font-size: 200%; }
         body.mobile-ui .mobile-cat-strip { display: flex; }
         body.mobile-ui .mobile-cart-fab {
             display: inline-flex;
@@ -580,16 +581,27 @@
             display: inline-flex;
             align-items: center;
         }
-        body.mobile-ui .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-        body.mobile-ui .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-        body.mobile-ui .item-name { font-size: .98rem; min-height: 32px; }
-        body.mobile-ui .item-desc { font-size: .79rem; min-height: 22px; }
-        body.mobile-ui .item-body { padding: 8px 8px 10px; }
-        body.mobile-ui .quick-add { width: 31px; height: 31px; font-size: 1.08rem; }
-        body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(240px, 78vw); width: min(240px, 78vw); }
+        body.mobile-ui .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        body.mobile-ui .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        body.mobile-ui .item-name { font-size: 1.95rem; min-height: auto; }
+        body.mobile-ui .item-desc { font-size: 1.5rem; min-height: auto; }
+        body.mobile-ui .item-body { padding: 16px 16px 20px; gap: 12px; }
+        body.mobile-ui .price-final { font-size: 2.35rem; }
+        body.mobile-ui .price-old { font-size: 1.45rem; }
+        body.mobile-ui .discount-chip,
+        body.mobile-ui .agotado-chip { font-size: 1.12rem; padding: 4px 10px; }
+        body.mobile-ui .stock { font-size: 1.32rem; }
+        body.mobile-ui .quick-add { width: 58px; height: 58px; font-size: 2rem; }
+        body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(360px, 82vw); width: min(360px, 82vw); }
+        body.mobile-ui .section h2 { font-size: 2.2rem; margin-bottom: 12px; }
+        body.mobile-ui .tienda-estado-banner { font-size: 1.4rem; padding: 16px 18px; }
+        body.mobile-ui .topbar .brand { font-size: 1.8rem; }
+        body.mobile-ui .topbar input { font-size: 1.45rem; padding: 12px 14px; }
+        body.mobile-ui .mobile-cat-chip { font-size: 1.24rem; padding: 10px 16px; }
+        body.mobile-ui .ofertas-nav-btn { width: 44px; height: 44px; font-size: 1.4rem; }
         .mobile-cart-fab .total-chip {
             margin-left: 8px;
-            font-size: 1.1rem;
+            font-size: 1.4rem;
             color: #cbd5e1;
             font-weight: 700;
         }
@@ -637,13 +649,54 @@
             border-radius: 16px 16px 0 0;
             border: 1px solid #e2e8f0;
             border-bottom: 0;
-            padding: 28px;
+            padding: 42px 34px;
             display: grid;
-            gap: 10px;
+            gap: 16px;
         }
         body.mobile-ui .modal {
-            width: min(700px, 99vw);
-            padding: 22px;
+            width: min(980px, 99vw);
+            padding: 34px;
+            gap: 16px;
+        }
+        body.mobile-ui .modal h3 {
+            font-size: 2.35rem;
+        }
+        body.mobile-ui .modal input,
+        body.mobile-ui .modal .phone-prefix {
+            font-size: 1.45rem;
+            padding: 16px;
+        }
+        body.mobile-ui .modal .two {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        body.mobile-ui .modal .phone-wrap {
+            grid-template-columns: 96px 1fr;
+        }
+        body.mobile-ui #modal-exito-texto {
+            font-size: 1.55rem !important;
+            line-height: 1.45;
+        }
+        body.mobile-ui .modal .btn-muted,
+        body.mobile-ui .modal .btn-primary {
+            font-size: 1.45rem;
+            padding: 14px 20px;
+        }
+        body.mobile-ui .mobile-cart-panel,
+        body.mobile-ui .mobile-cart-panel * {
+            font-size: 1.55rem;
+        }
+        body.mobile-ui .mobile-cart-panel .checkout-btn {
+            font-size: 1.7rem;
+            padding: 16px;
+        }
+        body.mobile-ui .mobile-cart-panel .clear-cart-btn {
+            font-size: 1.45rem;
+            padding: 14px;
+        }
+        body.mobile-ui .mobile-cart-close {
+            font-size: 1.3rem;
+            padding: 10px 16px;
         }
         .mobile-cart-head {
             display: flex;
@@ -681,9 +734,15 @@
             border-radius: 16px 16px 0 0;
             border: 1px solid #e2e8f0;
             border-bottom: 0;
-            padding: 18px;
+            padding: 34px 28px;
             display: grid;
             gap: 10px;
+        }
+        body.mobile-ui .mobile-menu-list .mobile-cat-chip {
+            width: 100%;
+            text-align: left;
+            font-size: 1.5rem;
+            padding: 14px 16px;
         }
         .mobile-menu-list {
             display: grid;
@@ -753,7 +812,7 @@
 </head>
 <body>
     <header class="topbar">
-        <button type="button" class="mobile-menu-btn" id="btn-mobile-menu">Menu</button>
+        <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()">Menu</button>
         <div class="brand">Tienda en linea</div>
         <div class="search">
             <input id="search-input" type="search" placeholder="Buscar productos...">
@@ -818,8 +877,8 @@
     </main>
 
     <div class="mobile-overlay" id="mobile-overlay"></div>
-    <button type="button" class="mobile-menu-fab" id="mobile-menu-fab">Menu</button>
-    <button type="button" class="mobile-cart-fab" id="mobile-cart-fab">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
+    <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirMenuMobile()">Menu</button>
+    <button type="button" class="mobile-cart-fab" id="mobile-cart-fab" onclick="abrirCarritoMobile()">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
     <div class="mobile-menu-modal" id="mobile-menu-modal">
         <div class="mobile-menu-panel">
             <div class="mobile-cart-head">
@@ -1322,6 +1381,7 @@
         async function checkout() {
             if (!tiendaAbierta) return msg("La tienda esta cerrada por el momento.", true);
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
             modalClienteEl.classList.add("active");
         }
 
@@ -1410,7 +1470,7 @@
                 cuponAplicado = { codigo: "", descuento_monto: 0 };
                 renderCart();
                 cerrarModalCliente();
-                abrirModalExito("Tu pedido fue ingresado correctamente y sera contactado a la brevedad.");
+                abrirModalExito();
                 msg(`Compra confirmada. Venta #${data.venta_id}`);
                 _trackTienda("checkout");
                 await cargarProductos();
@@ -1423,6 +1483,8 @@
         window.sumar = sumar;
         window.restar = restar;
         window.cambiarCategoria = cambiarCategoria;
+        window.abrirMenuMobile = abrirMenuMobile;
+        window.abrirCarritoMobile = abrirCarritoMobile;
         window.vaciarCarrito = () => {
             carrito = [];
             cuponAplicado = { codigo: "", descuento_monto: 0 };

@@ -24,6 +24,8 @@ from io import BytesIO, StringIO
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
 from camera_hub import CameraHub
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
 # Silenciar ruido nativo de FFmpeg/OpenCV cuando se ejecuta app.py directo.
 # En servidores (Render/gunicorn) conviene dejar stderr visible para diagnostico.
@@ -895,6 +897,153 @@ def _normalizar_telefono_cl(raw):
     if len(dig) != 8:
         return None
     return f"+569{dig}"
+
+
+def _bool_env(name, default=False):
+    raw = str(os.environ.get(name, "1" if default else "0")).strip().lower()
+    return raw in {"1", "true", "yes", "on", "si"}
+
+
+def _normalizar_numero_whatsapp(raw):
+    texto = str(raw or "").strip()
+    if not texto:
+        return ""
+    if texto.lower().startswith("whatsapp:"):
+        return texto
+    dig = re.sub(r"\D+", "", texto)
+    if not dig:
+        return ""
+    if not dig.startswith("56"):
+        dig = f"56{dig}"
+    return f"whatsapp:+{dig}"
+
+
+def _crear_pdf_resumen_pedido_tienda(venta_id, cliente_nombre, cliente_email, cliente_telefono, items, subtotal, descuento, total):
+    base_dir = os.path.join(static_dir, "tienda_pedidos_pdf")
+    os.makedirs(base_dir, exist_ok=True)
+    filename = f"pedido_{int(venta_id)}_{uuid.uuid4().hex[:10]}.pdf"
+    abs_path = os.path.join(base_dir, filename)
+
+    c = canvas.Canvas(abs_path, pagesize=A4)
+    width, height = A4
+    y = height - 52
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, y, f"Pedido tienda online #{int(venta_id)}")
+    y -= 20
+    c.setFont("Helvetica", 10)
+    c.drawString(40, y, f"Fecha: {datetime.now(ZoneInfo('America/Santiago')).strftime('%d-%m-%Y %H:%M:%S')}")
+    y -= 20
+    c.drawString(40, y, f"Cliente: {cliente_nombre}")
+    y -= 14
+    c.drawString(40, y, f"Correo: {cliente_email}")
+    y -= 14
+    c.drawString(40, y, f"Telefono: {cliente_telefono}")
+    y -= 24
+
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "Productos")
+    y -= 16
+    c.setFont("Helvetica", 10)
+    for it in (items or []):
+        nombre = str(it.get("nombre") or f"Producto #{it.get('id')}").strip()
+        cantidad = int(it.get("cantidad") or 0)
+        precio_u = float(it.get("precio_unitario") or 0)
+        linea_total = cantidad * precio_u
+        c.drawString(44, y, f"- {nombre} x{cantidad} | ${linea_total:,.0f}".replace(",", "."))
+        y -= 14
+        if y < 88:
+            c.showPage()
+            y = height - 52
+            c.setFont("Helvetica", 10)
+
+    y -= 8
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, f"Subtotal: ${subtotal:,.0f}".replace(",", "."))
+    y -= 14
+    c.drawString(40, y, f"Descuento: -${descuento:,.0f}".replace(",", "."))
+    y -= 14
+    c.drawString(40, y, f"Total: ${total:,.0f}".replace(",", "."))
+    c.save()
+    return filename
+
+
+def _enviar_whatsapp_twilio(body_text, media_url=None):
+    account_sid = str(os.environ.get("TWILIO_ACCOUNT_SID") or "").strip()
+    auth_token = str(os.environ.get("TWILIO_AUTH_TOKEN") or "").strip()
+    from_number = _normalizar_numero_whatsapp(os.environ.get("TWILIO_WHATSAPP_FROM"))
+    to_number = _normalizar_numero_whatsapp(os.environ.get("GESTIONSTOCK_WHATSAPP_TO", "+56964330546"))
+    if not account_sid or not auth_token or not from_number or not to_number:
+        return False, "Twilio no configurado"
+
+    payload = {
+        "To": to_number,
+        "From": from_number,
+        "Body": str(body_text or "").strip()[:1500],
+    }
+    if media_url:
+        payload["MediaUrl"] = media_url
+
+    auth_b64 = base64.b64encode(f"{account_sid}:{auth_token}".encode("utf-8")).decode("ascii")
+    req = UrlRequest(
+        f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
+        data=urlencode(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {auth_b64}",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=20) as res:
+            _ = res.read()
+        return True, ""
+    except HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8", errors="ignore")
+        except Exception:
+            detail = str(e)
+        return False, f"HTTP {e.code}: {detail[:240]}"
+    except Exception as e:
+        return False, str(e)
+
+
+def _notificar_whatsapp_pedido_tienda_async(venta_id, cliente_nombre, cliente_email, cliente_telefono, items, subtotal, descuento, total, host_url):
+    if not _bool_env("GESTIONSTOCK_WHATSAPP_ENABLED", default=False):
+        return
+
+    def _run():
+        try:
+            filename = _crear_pdf_resumen_pedido_tienda(
+                venta_id=venta_id,
+                cliente_nombre=cliente_nombre,
+                cliente_email=cliente_email,
+                cliente_telefono=cliente_telefono,
+                items=items,
+                subtotal=subtotal,
+                descuento=descuento,
+                total=total,
+            )
+            media_url = f"{str(host_url or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
+            resumen_items = ", ".join(
+                f"{str(it.get('nombre') or '').strip() or ('#' + str(it.get('id') or ''))} x{int(it.get('cantidad') or 0)}"
+                for it in (items or [])
+            )[:700]
+            body = (
+                f"Nuevo pedido tienda online #{int(venta_id)}\n"
+                f"Cliente: {cliente_nombre}\n"
+                f"Correo: {cliente_email}\n"
+                f"Telefono: {cliente_telefono}\n"
+                f"Total: ${total:,.0f}\n"
+                f"Items: {resumen_items}\n"
+                "Adjunto PDF de respaldo."
+            ).replace(",", ".")
+            ok, err = _enviar_whatsapp_twilio(body, media_url=media_url)
+            if not ok:
+                print(f"[WARN] No se pudo enviar WhatsApp de pedido #{venta_id}: {err}")
+        except Exception as e:
+            print(f"[WARN] Error en notificacion WhatsApp pedido #{venta_id}: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _parse_hora_hhmm(valor):
@@ -4694,6 +4843,7 @@ def api_tienda_checkout():
         }
         items_limpios = []
         items_serializados = []
+        items_notificacion = []
         for idx, raw in enumerate(items_req, start=1):
             if not isinstance(raw, dict):
                 return jsonify({'success': False, 'error': f'Item #{idx} invalido'}), 400
@@ -4729,6 +4879,14 @@ def api_tienda_checkout():
                     "cantidad": cantidad,
                     "precio_unitario": precio_final,
                     "descuento_tienda_pct": float(prod.get("descuento_tienda_pct") or 0),
+                }
+            )
+            items_notificacion.append(
+                {
+                    "id": pid,
+                    "nombre": str(prod.get("nombre") or "").strip() or f"Producto #{pid}",
+                    "cantidad": cantidad,
+                    "precio_unitario": precio_final,
                 }
             )
 
@@ -4798,6 +4956,17 @@ def api_tienda_checkout():
         respuesta["cliente_email"] = cliente_email
         respuesta["cliente_telefono"] = cliente_telefono
         respuesta["total_monto"] = round(total_neto, 2)
+        _notificar_whatsapp_pedido_tienda_async(
+            venta_id=venta_id,
+            cliente_nombre=cliente_nombre,
+            cliente_email=cliente_email,
+            cliente_telefono=cliente_telefono,
+            items=items_notificacion,
+            subtotal=float(subtotal),
+            descuento=float(descuento_monto),
+            total=float(total_neto),
+            host_url=request.url_root,
+        )
         return jsonify(respuesta)
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
