@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response, send_file, Response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response, send_file, Response, session
 import os
 import sys
 import math
@@ -44,6 +44,66 @@ else:
 
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 CAMERA_HUB = CameraHub()
+app.secret_key = os.environ.get("GESTIONSTOCK_SECRET_KEY", "gestor_stock_dev_secret_change_me")
+
+ADMIN_PIN_ENV = "GESTIONSTOCK_ADMIN_PIN"
+DEFAULT_ADMIN_PIN = "1234"
+_ADMIN_SESSION_KEY = "admin_autenticado"
+
+if not str(os.environ.get(ADMIN_PIN_ENV) or "").strip():
+    print(
+        f"[WARN] {ADMIN_PIN_ENV} no configurado. Usando PIN temporal por defecto ({DEFAULT_ADMIN_PIN}). "
+        "Configuralo en variables de entorno para produccion."
+    )
+
+
+def _obtener_admin_pin():
+    pin = str(os.environ.get(ADMIN_PIN_ENV) or "").strip()
+    if pin:
+        return pin
+    return DEFAULT_ADMIN_PIN
+
+
+def _ruta_es_publica(path):
+    ruta = str(path or "").strip()
+    if not ruta:
+        return False
+    if ruta.startswith("/static/"):
+        return True
+    if ruta in {"/tienda", "/tienda/", "/admin/login", "/admin/logout", "/favicon.ico"}:
+        return True
+    if ruta.startswith("/api/tienda/"):
+        return True
+    return False
+
+
+def _normalizar_next_admin(destino):
+    raw = str(destino or "").strip()
+    if not raw:
+        return url_for("index")
+    parsed = urlparse(raw)
+    if parsed.scheme or parsed.netloc:
+        return url_for("index")
+    path = parsed.path or "/"
+    if not path.startswith("/"):
+        path = f"/{path}"
+    query = f"?{parsed.query}" if parsed.query else ""
+    return f"{path}{query}"
+
+
+@app.before_request
+def _proteger_area_admin():
+    path = request.path or "/"
+    if _ruta_es_publica(path):
+        return None
+    if session.get(_ADMIN_SESSION_KEY):
+        return None
+    if path == "/":
+        return redirect(url_for("tienda_publica"))
+    if path.startswith("/api/"):
+        return jsonify({"success": False, "error": "Acceso no autorizado."}), 401
+    destino = request.full_path if request.query_string else request.path
+    return redirect(url_for("admin_login", next=destino))
 
 _GO2RTC_PROCESS = None
 
@@ -701,6 +761,63 @@ def api_disponibilidad_producto(producto_id):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if session.get(_ADMIN_SESSION_KEY):
+        return redirect(url_for("index"))
+
+    error = None
+    if request.method == 'POST':
+        pin = str(request.form.get('pin') or '').strip()
+        next_url = _normalizar_next_admin(request.form.get('next'))
+        if pin == _obtener_admin_pin():
+            session[_ADMIN_SESSION_KEY] = True
+            return redirect(next_url)
+        error = "PIN incorrecto."
+
+    next_url = _normalizar_next_admin(request.args.get('next'))
+    return render_template('admin_login.html', error=error, next_url=next_url)
+
+
+@app.route('/admin/logout', methods=['GET', 'POST'])
+def admin_logout():
+    session.pop(_ADMIN_SESSION_KEY, None)
+    return redirect(url_for('admin_login'))
+
+
+@app.route('/tienda')
+def tienda_publica():
+    return render_template('tienda.html')
+
+
+def _serializar_producto_tienda(producto):
+    item = dict(producto or {})
+    return {
+        "id": int(item.get("id") or 0),
+        "nombre": item.get("nombre") or "Producto",
+        "precio": float(item.get("precio") or 0),
+        "stock_visual": float(item.get("stock_visual") or 0),
+        "stock_visual_label": item.get("stock_visual_label") or _formatear_numero_simple(item.get("stock_visual")),
+        "stock_visual_unidad": item.get("stock_visual_unidad") or item.get("unidad") or "unidad",
+        "foto_url": item.get("foto_url"),
+        "icono": item.get("icono") or "package",
+    }
+
+
+@app.route('/api/tienda/productos', methods=['GET'])
+def api_tienda_productos():
+    try:
+        productos = _obtener_productos_para_venta()
+        disponibles = [
+            _serializar_producto_tienda(p)
+            for p in productos
+            if p.get("disponible") and not p.get("bloqueado") and not p.get("desactivacion_manual_requiere_confirmacion")
+        ]
+        return jsonify({"success": True, "productos": disponibles})
+    except Exception as e:
+        return jsonify({"success": False, "productos": [], "error": str(e)}), 500
 
 
 @app.route('/historial-cambios')
@@ -3411,65 +3528,104 @@ def api_toggle_desactivacion_manual_producto(id):
             conn.close()
 
 
+def _procesar_venta_desde_payload(data, canal_por_defecto='presencial', permitir_canal_usuario=True, permitir_agenda=True):
+    payload = data or {}
+    items = payload.get('items', [])
+    codigo_pedido = str(payload.get('codigo_pedido') or '').strip()[:80]
+    fecha_venta = str(payload.get('fecha_venta') or '').strip() or None
+    agenda_evento_id = payload.get('agenda_evento_id') if permitir_agenda else None
+    canal_venta = canal_por_defecto
+    if permitir_canal_usuario:
+        canal_enviado = str(payload.get('canal_venta') or '').strip().lower()
+        if canal_enviado:
+            canal_venta = canal_enviado
+    if not items:
+        raise ValueError('Carrito vacio')
+
+    resultado = procesar_venta_con_insumos(
+        items,
+        codigo_pedido=codigo_pedido,
+        fecha_venta=fecha_venta,
+        agenda_evento_id=agenda_evento_id,
+        canal_venta=canal_venta,
+    )
+    if not resultado.get('success'):
+        raise RuntimeError(resultado.get('error', 'No se pudo procesar la venta'))
+
+    venta_id = resultado.get('venta_id')
+    alertas = resultado.get('alertas', [])
+    productos_actualizados = resultado.get('productos_actualizados', []) or []
+
+    if productos_actualizados:
+        conn_est = None
+        try:
+            conn_est = get_db()
+            cursor_est = conn_est.cursor()
+            _enriquecer_productos_con_dependencias_venta(cursor_est, productos_actualizados)
+            _anotar_estado_desactivacion_manual(cursor_est, productos_actualizados, limpiar_resueltas=True)
+            conn_est.commit()
+        except Exception:
+            if conn_est:
+                conn_est.rollback()
+        finally:
+            if conn_est:
+                conn_est.close()
+
+    crear_backup()
+    fecha_venta_resp = resultado.get('fecha_venta')
+    segmento_fecha = f" el {fecha_venta_resp}" if fecha_venta_resp else ""
+    return {
+        'success': True,
+        'venta_id': venta_id,
+        'codigo_operacion': resultado.get('codigo_operacion'),
+        'alertas': alertas,
+        'productos_actualizados': productos_actualizados,
+        'insumos_consumidos': resultado.get('insumos_consumidos', []),
+        'agenda_evento_id': resultado.get('agenda_evento_id'),
+        'codigo_pedido': codigo_pedido or None,
+        'fecha_venta': fecha_venta_resp,
+        'canal_venta': resultado.get('canal_venta') or canal_venta,
+        'total_monto': resultado.get('total_monto'),
+        'mensaje': f"Venta #{venta_id} procesada{(' (pedido ' + codigo_pedido + ')') if codigo_pedido else ''}{segmento_fecha}: {len(items)} productos"
+    }
+
+
 @app.route('/api/venta/procesar', methods=['POST'])
 def procesar_venta():
     try:
         data = request.get_json(silent=True) or {}
-        items = data.get('items', [])
-        codigo_pedido = str(data.get('codigo_pedido') or '').strip()[:80]
-        fecha_venta = str(data.get('fecha_venta') or '').strip() or None
-        canal_venta = str(data.get('canal_venta') or '').strip().lower() or 'presencial'
-        agenda_evento_id = data.get('agenda_evento_id')
-        
-        if not items:
-            return jsonify({'success': False, 'error': 'Carrito vacio'}), 400
-        resultado = procesar_venta_con_insumos(
-            items,
-            codigo_pedido=codigo_pedido,
-            fecha_venta=fecha_venta,
-            agenda_evento_id=agenda_evento_id,
-            canal_venta=canal_venta,
+        respuesta = _procesar_venta_desde_payload(
+            data,
+            canal_por_defecto='presencial',
+            permitir_canal_usuario=True,
+            permitir_agenda=True,
         )
-        if not resultado.get('success'):
-            return jsonify({'success': False, 'error': resultado.get('error', 'No se pudo procesar la venta')}), 400
-        venta_id = resultado.get('venta_id')
-        alertas = resultado.get('alertas', [])
-        productos_actualizados = resultado.get('productos_actualizados', []) or []
+        return jsonify(respuesta)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-        if productos_actualizados:
-            conn_est = None
-            try:
-                conn_est = get_db()
-                cursor_est = conn_est.cursor()
-                _enriquecer_productos_con_dependencias_venta(cursor_est, productos_actualizados)
-                _anotar_estado_desactivacion_manual(cursor_est, productos_actualizados, limpiar_resueltas=True)
-                conn_est.commit()
-            except Exception:
-                if conn_est:
-                    conn_est.rollback()
-            finally:
-                if conn_est:
-                    conn_est.close()
-        
-        crear_backup()
-        fecha_venta_resp = resultado.get('fecha_venta')
-        segmento_fecha = f" el {fecha_venta_resp}" if fecha_venta_resp else ""
-        
-        return jsonify({
-            'success': True,
-            'venta_id': venta_id,
-            'codigo_operacion': resultado.get('codigo_operacion'),
-            'alertas': alertas,
-            'productos_actualizados': productos_actualizados,
-            'insumos_consumidos': resultado.get('insumos_consumidos', []),
-            'agenda_evento_id': resultado.get('agenda_evento_id'),
-            'codigo_pedido': codigo_pedido or None,
-            'fecha_venta': fecha_venta_resp,
-            'canal_venta': resultado.get('canal_venta') or canal_venta,
-            'total_monto': resultado.get('total_monto'),
-            'mensaje': f"Venta #{venta_id} procesada{(' (pedido ' + codigo_pedido + ')') if codigo_pedido else ''}{segmento_fecha}: {len(items)} productos"
-        })
-        
+
+@app.route('/api/tienda/checkout', methods=['POST'])
+def api_tienda_checkout():
+    try:
+        data = request.get_json(silent=True) or {}
+        respuesta = _procesar_venta_desde_payload(
+            data,
+            canal_por_defecto='tienda_online',
+            permitir_canal_usuario=False,
+            permitir_agenda=False,
+        )
+        return jsonify(respuesta)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         import traceback
         traceback.print_exc()

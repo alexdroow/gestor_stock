@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Administrador</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #111827;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --accent: #f97316;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: radial-gradient(circle at top right, #1f2937 0%, var(--bg) 60%);
+            color: var(--text);
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+        .panel {
+            width: 100%;
+            max-width: 420px;
+            background: color-mix(in srgb, var(--panel) 92%, black 8%);
+            border: 1px solid #1f2937;
+            border-radius: 14px;
+            padding: 24px;
+        }
+        h1 {
+            margin: 0 0 10px;
+            font-size: 1.4rem;
+        }
+        p {
+            margin: 0 0 20px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        input[type="password"] {
+            width: 100%;
+            border: 1px solid #334155;
+            background: #0b1220;
+            color: var(--text);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 1rem;
+            margin-bottom: 14px;
+        }
+        input[type="password"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(249, 115, 22, .2);
+        }
+        .error {
+            background: rgba(239, 68, 68, .14);
+            border: 1px solid rgba(239, 68, 68, .4);
+            color: #fecaca;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            font-size: .92rem;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        button, a {
+            border: 0;
+            border-radius: 10px;
+            padding: 11px 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+        button {
+            background: var(--accent);
+            color: #111827;
+        }
+        a {
+            background: #1f2937;
+            color: #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <form class="panel" method="post" action="{{ url_for('admin_login') }}">
+        <h1>Acceso administrador</h1>
+        <p>Ingresa PIN para abrir la zona de gestion interna.</p>
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+        <input type="hidden" name="next" value="{{ next_url or '/' }}">
+        <label for="pin">PIN</label>
+        <input id="pin" name="pin" type="password" autocomplete="current-password" required>
+        <div class="actions">
+            <button type="submit">Entrar</button>
+            <a href="{{ url_for('tienda_publica') }}">Ir a tienda</a>
+        </div>
+    </form>
+</body>
+</html>

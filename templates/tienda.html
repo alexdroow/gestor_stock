@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda</title>
+    <style>
+        :root {
+            --bg: #fff7ed;
+            --panel: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --accent: #ea580c;
+            --accent-dark: #c2410c;
+            --line: #fed7aa;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: radial-gradient(circle at top left, #ffedd5 0, var(--bg) 50%);
+            color: var(--text);
+        }
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 18px;
+            background: color-mix(in srgb, #ffffff 88%, #ffedd5 12%);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(6px);
+        }
+        .brand {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--accent-dark);
+        }
+        .topbar a {
+            color: #374151;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 700;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 7px 10px;
+            background: #fff;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 16px;
+            padding: 16px;
+            max-width: 1250px;
+            margin: 0 auto;
+        }
+        .catalogo {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        .card {
+            background: var(--panel);
+            border: 1px solid #ffedd5;
+            border-radius: 14px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 20px rgba(194, 65, 12, 0.06);
+        }
+        .foto {
+            width: 100%;
+            height: 150px;
+            background: #fff7ed;
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+        }
+        .foto img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .icono {
+            font-size: 2.2rem;
+            color: #fdba74;
+        }
+        .card-body {
+            padding: 12px;
+            display: grid;
+            gap: 8px;
+        }
+        .nombre {
+            font-weight: 700;
+            line-height: 1.3;
+            min-height: 40px;
+        }
+        .precio {
+            font-weight: 800;
+            color: var(--accent-dark);
+            font-size: 1.05rem;
+        }
+        .stock {
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+        button {
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        button:hover { background: var(--accent-dark); }
+        .panel {
+            background: #fff;
+            border: 1px solid #ffedd5;
+            border-radius: 14px;
+            padding: 14px;
+            height: fit-content;
+            position: sticky;
+            top: 72px;
+        }
+        .panel h2 {
+            margin: 0 0 8px;
+            font-size: 1.05rem;
+        }
+        .cart-list {
+            display: grid;
+            gap: 8px;
+            max-height: 340px;
+            overflow: auto;
+            margin-bottom: 10px;
+        }
+        .cart-item {
+            border: 1px solid #ffedd5;
+            border-radius: 10px;
+            padding: 8px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .cart-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .qty-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+            padding: 0;
+            font-weight: 800;
+        }
+        .qty-val { min-width: 18px; text-align: center; font-weight: 700; }
+        .inputs {
+            display: grid;
+            gap: 8px;
+            margin-top: 8px;
+            margin-bottom: 10px;
+        }
+        input {
+            width: 100%;
+            border: 1px solid #fdba74;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .total {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 800;
+            margin: 8px 0 12px;
+        }
+        .msg {
+            margin-top: 8px;
+            font-size: .9rem;
+            color: var(--muted);
+            min-height: 18px;
+        }
+        @media (max-width: 1024px) {
+            .layout { grid-template-columns: 1fr; }
+            .panel { position: static; }
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">Tienda en linea</div>
+        <a href="{{ url_for('admin_login') }}">Administrador</a>
+    </header>
+
+    <main class="layout">
+        <section>
+            <div class="catalogo" id="catalogo"></div>
+        </section>
+
+        <aside class="panel">
+            <h2>Carrito</h2>
+            <div class="cart-list" id="cart-list"></div>
+            <div class="inputs">
+                <input id="codigo-pedido" type="text" maxlength="80" placeholder="Codigo pedido (opcional)">
+            </div>
+            <div class="total">
+                <span>Total</span>
+                <span id="total">$0</span>
+            </div>
+            <button id="btn-checkout" type="button">Confirmar compra</button>
+            <div class="msg" id="msg"></div>
+        </aside>
+    </main>
+
+    <script>
+        const catalogoEl = document.getElementById("catalogo");
+        const cartListEl = document.getElementById("cart-list");
+        const totalEl = document.getElementById("total");
+        const msgEl = document.getElementById("msg");
+        const codigoPedidoEl = document.getElementById("codigo-pedido");
+        const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
+
+        let productos = [];
+        let carrito = [];
+
+        function setMsg(texto, isError = false) {
+            msgEl.textContent = texto || "";
+            msgEl.style.color = isError ? "#b91c1c" : "#6b7280";
+        }
+
+        function precioNum(valor) {
+            const n = Number(valor || 0);
+            return Number.isFinite(n) ? Math.max(0, n) : 0;
+        }
+
+        function renderCatalogo() {
+            if (!productos.length) {
+                catalogoEl.innerHTML = "<p>No hay productos disponibles.</p>";
+                return;
+            }
+            catalogoEl.innerHTML = productos.map((p) => `
+                <article class="card">
+                    <div class="foto">
+                        ${p.foto_url ? `<img src="${p.foto_url}" alt="${p.nombre}">` : `<div class="icono">*</div>`}
+                    </div>
+                    <div class="card-body">
+                        <div class="nombre">${p.nombre}</div>
+                        <div class="precio">${money.format(precioNum(p.precio))}</div>
+                        <div class="stock">Disponible: ${p.stock_visual_label} ${p.stock_visual_unidad || ""}</div>
+                        <button type="button" onclick="agregar(${p.id})">Agregar</button>
+                    </div>
+                </article>
+            `).join("");
+        }
+
+        function renderCarrito() {
+            if (!carrito.length) {
+                cartListEl.innerHTML = "<div>El carrito esta vacio.</div>";
+                totalEl.textContent = money.format(0);
+                return;
+            }
+            cartListEl.innerHTML = carrito.map((item) => `
+                <div class="cart-item">
+                    <div>
+                        <div><strong>${item.nombre}</strong></div>
+                        <div>${money.format(item.precio_unitario)} c/u</div>
+                    </div>
+                    <div class="cart-actions">
+                        <button type="button" class="qty-btn" onclick="restar(${item.id})">-</button>
+                        <span class="qty-val">${item.cantidad}</span>
+                        <button type="button" class="qty-btn" onclick="sumar(${item.id})">+</button>
+                    </div>
+                </div>
+            `).join("");
+            const total = carrito.reduce((acc, it) => acc + (it.cantidad * it.precio_unitario), 0);
+            totalEl.textContent = money.format(total);
+        }
+
+        function agregar(id) {
+            const p = productos.find((x) => x.id === id);
+            if (!p) return;
+            const item = carrito.find((x) => x.id === id);
+            if (item) {
+                item.cantidad += 1;
+            } else {
+                carrito.push({
+                    id: p.id,
+                    nombre: p.nombre,
+                    cantidad: 1,
+                    precio_unitario: precioNum(p.precio)
+                });
+            }
+            renderCarrito();
+            setMsg("");
+        }
+
+        function sumar(id) {
+            const item = carrito.find((x) => x.id === id);
+            if (!item) return;
+            item.cantidad += 1;
+            renderCarrito();
+        }
+
+        function restar(id) {
+            const item = carrito.find((x) => x.id === id);
+            if (!item) return;
+            item.cantidad -= 1;
+            if (item.cantidad <= 0) {
+                carrito = carrito.filter((x) => x.id !== id);
+            }
+            renderCarrito();
+        }
+
+        async function cargarProductos() {
+            setMsg("Cargando productos...");
+            try {
+                const res = await fetch("/api/tienda/productos", { headers: { "Accept": "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar catalogo");
+                productos = Array.isArray(data.productos) ? data.productos : [];
+                renderCatalogo();
+                setMsg("");
+            } catch (err) {
+                productos = [];
+                renderCatalogo();
+                setMsg(err.message || "Error cargando productos", true);
+            }
+        }
+
+        async function checkout() {
+            if (!carrito.length) {
+                setMsg("Agrega productos al carrito.", true);
+                return;
+            }
+            const payload = {
+                items: carrito.map((it) => ({
+                    id: it.id,
+                    cantidad: it.cantidad,
+                    precio_unitario: precioNum(it.precio_unitario)
+                })),
+                codigo_pedido: String(codigoPedidoEl.value || "").trim(),
+                fecha_venta: new Date().toISOString().slice(0, 10)
+            };
+            setMsg("Procesando compra...");
+            try {
+                const res = await fetch("/api/tienda/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
+                carrito = [];
+                codigoPedidoEl.value = "";
+                renderCarrito();
+                setMsg(`Compra confirmada. Nro venta: ${data.venta_id}`);
+                await cargarProductos();
+            } catch (err) {
+                setMsg(err.message || "Error de compra", true);
+            }
+        }
+
+        document.getElementById("btn-checkout").addEventListener("click", checkout);
+        renderCarrito();
+        cargarProductos();
+    </script>
+</body>
+</html>
