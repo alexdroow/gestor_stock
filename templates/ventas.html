@@ -1369,6 +1369,9 @@
                     <a href="/ventas/admin-catalogo" class="btn btn-outline btn-header">
                         &#9881; Catalogo tienda
                     </a>
+                    <a href="/ventas/cupones" class="btn btn-outline btn-header">
+                        &#127991; Cupones
+                    </a>
                     <button type="button" class="btn btn-outline btn-header" onclick="abrirModalVentasSemanales()">
                         &#128221; Ventas semanales
                     </button>
@@ -2871,6 +2874,51 @@
                 badge.textContent = data.total;
                 badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
             });
+
+        let _pedidosTiendaLastId = 0;
+        let _pedidosTiendaPollTimer = null;
+
+        function _beepPedidoNuevo() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.30);
+            } catch (_) {}
+        }
+
+        async function _pollPedidosTiendaNuevos() {
+            try {
+                const response = await fetch(`/api/tienda/admin/pedidos-nuevos?since_id=${Number(_pedidosTiendaLastId || 0)}`, {
+                    headers: { Accept: 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) return;
+                const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                if (pedidos.length > 0) {
+                    _pedidosTiendaLastId = Number(data.max_id || _pedidosTiendaLastId || 0);
+                    _beepPedidoNuevo();
+                    const totalNuevos = pedidos.length;
+                    if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                        window.AppUX.toastSuccess(`${totalNuevos} pedido(s) nuevo(s) desde tienda online.`);
+                    } else {
+                        alert(`${totalNuevos} pedido(s) nuevo(s) desde tienda online.`);
+                    }
+                }
+            } catch (_) {}
+        }
+
+        _pedidosTiendaPollTimer = setInterval(_pollPedidosTiendaNuevos, 12000);
     </script>
 
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>

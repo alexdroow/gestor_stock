@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cupones tienda</title>
+    <style>
+        :root { --bg:#f8fafc; --panel:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b; --accent:#ea580c; }
+        * { box-sizing:border-box; }
+        body { margin:0; font-family:"Segoe UI", Tahoma, sans-serif; background:var(--bg); color:var(--text); }
+        .wrap { max-width:1200px; margin:0 auto; padding:16px; display:grid; gap:12px; }
+        .top { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+        .top a { text-decoration:none; border:1px solid var(--line); border-radius:8px; padding:7px 10px; color:#334155; font-weight:700; background:#fff; }
+        .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); }
+        .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:11px; display:grid; gap:8px; }
+        .two { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+        label { display:grid; gap:4px; font-size:.84rem; color:#475569; font-weight:600; }
+        input, select { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 9px; font:inherit; }
+        .check { display:flex; align-items:center; gap:6px; font-size:.85rem; color:#334155; }
+        .actions { display:flex; gap:8px; flex-wrap:wrap; }
+        button { border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:800; padding:9px 12px; cursor:pointer; }
+        .danger { background:#ef4444; }
+        .msg { font-size:.83rem; min-height:16px; color:var(--muted); }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="top">
+            <div>
+                <strong>Cupones de descuento</strong>
+                <div style="font-size:.86rem;color:#64748b;">Crea reglas por fecha, hora, limite de uso, monto minimo y restriccion de ofertas.</div>
+            </div>
+            <a href="{{ url_for('ventas') }}">Volver a ventas</a>
+        </div>
+        <div class="actions">
+            <button type="button" onclick="nuevoCupon()">Nuevo cupon</button>
+        </div>
+        <div class="grid" id="grid"></div>
+    </div>
+
+    <script>
+        const gridEl = document.getElementById("grid");
+        let cupones = [];
+
+        function esc(text) {
+            return String(text || "")
+                .replaceAll("&","&amp;")
+                .replaceAll("<","&lt;")
+                .replaceAll(">","&gt;")
+                .replaceAll('"',"&quot;")
+                .replaceAll("'","&#39;");
+        }
+
+        function n(v) { const x = Number(v || 0); return Number.isFinite(x) ? x : 0; }
+
+        function render() {
+            if (!cupones.length) {
+                gridEl.innerHTML = "<p>No hay cupones creados.</p>";
+                return;
+            }
+            gridEl.innerHTML = cupones.map((c) => `
+                <article class="card" data-id="${c.id || 0}">
+                    <div class="two">
+                        <label>Codigo
+                            <input name="codigo" value="${esc(c.codigo || "")}" maxlength="40">
+                        </label>
+                        <label>Nombre
+                            <input name="nombre" value="${esc(c.nombre || "")}" maxlength="120">
+                        </label>
+                    </div>
+                    <div class="two">
+                        <label>Tipo descuento
+                            <select name="tipo_descuento">
+                                <option value="porcentaje" ${(c.tipo_descuento || "porcentaje") === "porcentaje" ? "selected" : ""}>Porcentaje</option>
+                                <option value="monto_fijo" ${(c.tipo_descuento || "") === "monto_fijo" ? "selected" : ""}>Monto fijo</option>
+                            </select>
+                        </label>
+                        <label>Valor descuento
+                            <input name="valor_descuento" type="number" min="0" step="1" value="${Math.round(n(c.valor_descuento))}">
+                        </label>
+                    </div>
+                    <div class="three">
+                        <label>Fecha inicio
+                            <input name="fecha_inicio" type="date" value="${esc(c.fecha_inicio || "")}">
+                        </label>
+                        <label>Fecha fin
+                            <input name="fecha_fin" type="date" value="${esc(c.fecha_fin || "")}">
+                        </label>
+                        <label>Monto minimo
+                            <input name="monto_minimo" type="number" min="0" step="1" value="${Math.round(n(c.monto_minimo))}">
+                        </label>
+                    </div>
+                    <div class="three">
+                        <label>Hora inicio
+                            <input name="hora_inicio" type="time" value="${esc(c.hora_inicio || "")}">
+                        </label>
+                        <label>Hora fin
+                            <input name="hora_fin" type="time" value="${esc(c.hora_fin || "")}">
+                        </label>
+                        <label>Limite total usos
+                            <input name="usos_max_total" type="number" min="0" step="1" value="${c.usos_max_total == null ? "" : Number(c.usos_max_total)}">
+                        </label>
+                    </div>
+                    <div class="three">
+                        <label>Limite por cliente
+                            <input name="usos_max_por_cliente" type="number" min="0" step="1" value="${c.usos_max_por_cliente == null ? "" : Number(c.usos_max_por_cliente)}">
+                        </label>
+                        <label class="check">
+                            <input name="activo" type="checkbox" ${Number(c.activo || 0) ? "checked" : ""}>
+                            Activo
+                        </label>
+                        <label class="check">
+                            <input name="solo_sin_oferta" type="checkbox" ${Number(c.solo_sin_oferta || 0) ? "checked" : ""}>
+                            Solo productos sin oferta
+                        </label>
+                    </div>
+                    <div class="actions">
+                        <button type="button" onclick="guardar(${c.id || 0})">Guardar</button>
+                        ${(c.id || 0) > 0 ? `<button type="button" class="danger" onclick="eliminarCupon(${c.id})">Eliminar</button>` : ""}
+                    </div>
+                    <div class="msg" id="msg-${c.id || 0}"></div>
+                </article>
+            `).join("");
+        }
+
+        function payload(card, id) {
+            const val = (name) => card.querySelector(`[name="${name}"]`);
+            return {
+                id: id || 0,
+                codigo: val("codigo").value,
+                nombre: val("nombre").value,
+                tipo_descuento: val("tipo_descuento").value,
+                valor_descuento: Number(val("valor_descuento").value || 0),
+                fecha_inicio: val("fecha_inicio").value || null,
+                fecha_fin: val("fecha_fin").value || null,
+                hora_inicio: val("hora_inicio").value || null,
+                hora_fin: val("hora_fin").value || null,
+                usos_max_total: val("usos_max_total").value || null,
+                usos_max_por_cliente: val("usos_max_por_cliente").value || null,
+                monto_minimo: Number(val("monto_minimo").value || 0),
+                activo: val("activo").checked,
+                solo_sin_oferta: val("solo_sin_oferta").checked
+            };
+        }
+
+        async function cargar() {
+            gridEl.innerHTML = "<p>Cargando...</p>";
+            try {
+                const res = await fetch("/api/tienda/admin/cupones", { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar");
+                cupones = Array.isArray(data.cupones) ? data.cupones : [];
+                render();
+            } catch (e) {
+                gridEl.innerHTML = `<p style="color:#b91c1c;">${esc(e.message || "Error cargando")}</p>`;
+            }
+        }
+
+        async function guardar(id) {
+            const card = document.querySelector(`article[data-id="${id}"]`);
+            if (!card) return;
+            const msgEl = document.getElementById(`msg-${id}`);
+            msgEl.textContent = "Guardando...";
+            try {
+                const res = await fetch("/api/tienda/admin/cupones", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload(card, id))
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
+                msgEl.textContent = "Guardado";
+                await cargar();
+            } catch (e) {
+                msgEl.style.color = "#b91c1c";
+                msgEl.textContent = e.message || "Error";
+            }
+        }
+
+        async function eliminarCupon(id) {
+            if (!confirm("Eliminar este cupon?")) return;
+            try {
+                const res = await fetch(`/api/tienda/admin/cupones/${id}/eliminar`, { method: "POST" });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo eliminar");
+                await cargar();
+            } catch (e) {
+                alert(e.message || "Error");
+            }
+        }
+
+        function nuevoCupon() {
+            cupones.unshift({
+                id: 0, codigo: "", nombre: "", tipo_descuento: "porcentaje", valor_descuento: 0,
+                activo: 1, fecha_inicio: "", fecha_fin: "", hora_inicio: "", hora_fin: "",
+                usos_max_total: null, usos_max_por_cliente: null, monto_minimo: 0, solo_sin_oferta: 0
+            });
+            render();
+        }
+
+        window.guardar = guardar;
+        window.eliminarCupon = eliminarCupon;
+        window.nuevoCupon = nuevoCupon;
+        cargar();
+    </script>
+</body>
+</html>

@@ -21,6 +21,7 @@
             font-family: "Segoe UI", Tahoma, sans-serif;
             background: var(--bg);
             color: var(--text);
+            overflow-x: hidden;
         }
         .topbar {
             position: sticky;
@@ -105,11 +106,8 @@
         }
         .scroller {
             display: grid;
-            grid-auto-flow: column;
-            grid-auto-columns: minmax(190px, 190px);
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
             gap: 10px;
-            overflow-x: auto;
-            padding-bottom: 4px;
         }
         .grid {
             display: grid;
@@ -124,6 +122,17 @@
             display: grid;
             grid-template-rows: 190px auto;
             position: relative;
+        }
+        .fav-tag {
+            position: absolute;
+            top: 7px;
+            left: 7px;
+            background: #059669;
+            color: #fff;
+            border-radius: 7px;
+            padding: 2px 7px;
+            font-size: 0.72rem;
+            font-weight: 800;
         }
         .item-photo {
             background: #faf5f0;
@@ -207,6 +216,7 @@
             position: sticky;
             top: 70px;
             padding: 12px;
+            align-self: start;
         }
         .cart-panel h3 {
             margin: 0 0 9px;
@@ -255,6 +265,13 @@
             border-radius: 9px;
             padding: 9px 10px;
         }
+        .cart-meta label {
+            display: grid;
+            gap: 4px;
+            color: #64748b;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
         .total {
             margin: 10px 0;
             display: flex;
@@ -277,6 +294,61 @@
             margin-top: 8px;
             color: var(--muted);
             font-size: 0.88rem;
+        }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, .55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 40;
+            padding: 14px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            width: min(460px, 96vw);
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            padding: 14px;
+            display: grid;
+            gap: 10px;
+        }
+        .modal h3 { margin: 0; }
+        .modal .two {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .modal input {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            padding: 10px;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .btn-muted {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #374151;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-primary {
+            border: 0;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-weight: 800;
+            cursor: pointer;
         }
         @media (max-width: 1180px) {
             .layout {
@@ -320,7 +392,8 @@
             <h3>Tu compra</h3>
             <div class="cart-list" id="cart-list"></div>
             <div class="cart-meta">
-                <input id="codigo-pedido" type="text" maxlength="80" placeholder="Codigo pedido (opcional)">
+                <label for="codigo-descuento">Codigo de descuento</label>
+                <input id="codigo-descuento" type="text" maxlength="40" placeholder="Ej: SUCREE10">
             </div>
             <div class="total">
                 <span>Total</span>
@@ -330,6 +403,31 @@
             <div class="msg" id="msg"></div>
         </aside>
     </main>
+
+    <div class="modal-overlay" id="modal-cliente">
+        <div class="modal">
+            <h3>Datos para confirmar pedido</h3>
+            <div style="font-size:.9rem;color:#64748b;">Necesitamos tu correo y telefono para contactarte.</div>
+            <div class="two">
+                <input id="cliente-email" type="email" placeholder="Correo electronico">
+                <input id="cliente-telefono" type="tel" placeholder="Telefono">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="modal-cliente-cancel">Cancelar</button>
+                <button class="btn-primary" type="button" id="modal-cliente-ok">Enviar pedido</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-exito-pedido">
+        <div class="modal">
+            <h3>Pedido recibido</h3>
+            <div id="modal-exito-texto" style="font-size:.92rem;color:#374151;"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" type="button" id="modal-exito-cerrar">Entendido</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
@@ -341,7 +439,12 @@
         const totalEl = document.getElementById("total");
         const msgEl = document.getElementById("msg");
         const searchInputEl = document.getElementById("search-input");
-        const codigoPedidoEl = document.getElementById("codigo-pedido");
+        const codigoDescuentoEl = document.getElementById("codigo-descuento");
+        const modalClienteEl = document.getElementById("modal-cliente");
+        const clienteEmailEl = document.getElementById("cliente-email");
+        const clienteTelefonoEl = document.getElementById("cliente-telefono");
+        const modalExitoEl = document.getElementById("modal-exito-pedido");
+        const modalExitoTextoEl = document.getElementById("modal-exito-texto");
 
         let productos = [];
         let carrito = [];
@@ -410,6 +513,7 @@
             const stock = Math.max(0, Number(p.max_compra || 0));
             return `
                 <article class="item-card">
+                    ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
                     <div class="item-photo">${fotoHtml(p)}</div>
                     <div class="item-body">
                         <div class="item-name">${esc(p.nombre)}</div>
@@ -565,10 +669,38 @@
 
         async function checkout() {
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            modalClienteEl.classList.add("active");
+        }
+
+        function cerrarModalCliente() {
+            modalClienteEl.classList.remove("active");
+        }
+
+        function abrirModalExito(texto) {
+            modalExitoTextoEl.textContent = texto || "Pedido ingresado correctamente. Te contactaremos a la brevedad.";
+            modalExitoEl.classList.add("active");
+        }
+
+        function cerrarModalExito() {
+            modalExitoEl.classList.remove("active");
+        }
+
+        async function confirmarCheckoutDesdeModal() {
+            if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            const email = String(clienteEmailEl.value || "").trim().toLowerCase();
+            const telefono = String(clienteTelefonoEl.value || "").trim();
+            if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+                return msg("Ingresa un correo valido.", true);
+            }
+            if ((telefono.replace(/\D+/g, "")).length < 8) {
+                return msg("Ingresa un telefono valido.", true);
+            }
             msg("Procesando compra...");
             const payload = {
                 items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
-                codigo_pedido: String(codigoPedidoEl.value || "").trim(),
+                codigo_descuento: String(codigoDescuentoEl.value || "").trim(),
+                cliente_email: email,
+                cliente_telefono: telefono,
                 fecha_venta: new Date().toISOString().slice(0, 10)
             };
             try {
@@ -580,8 +712,10 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
                 carrito = [];
-                codigoPedidoEl.value = "";
+                codigoDescuentoEl.value = "";
                 renderCart();
+                cerrarModalCliente();
+                abrirModalExito("Tu pedido fue ingresado correctamente y sera contactado a la brevedad.");
                 msg(`Compra confirmada. Venta #${data.venta_id}`);
                 await cargarProductos();
             } catch (e) {
@@ -596,6 +730,11 @@
 
         searchInputEl.addEventListener("input", renderSecciones);
         document.getElementById("btn-checkout").addEventListener("click", checkout);
+        document.getElementById("modal-cliente-cancel").addEventListener("click", cerrarModalCliente);
+        document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
+        document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
+        modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
+        modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
 
         renderCart();
         cargarProductos();

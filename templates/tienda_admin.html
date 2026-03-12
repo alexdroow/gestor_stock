@@ -194,8 +194,18 @@
                         <label>Categoria
                             <input type="text" name="categoria_tienda" value="${esc(p.categoria_tienda || "General")}">
                         </label>
+                        <label>Precio tienda
+                            <input type="number" min="0" step="1" name="precio" value="${Math.round(n(p.precio || 0))}">
+                        </label>
+                    </div>
+
+                    <div class="two">
                         <label>Descuento (%)
                             <input type="number" min="0" max="100" step="1" name="descuento_tienda_pct" value="${Math.round(n(p.descuento_tienda_pct))}">
+                        </label>
+                        <label class="check" style="margin-top: 20px;">
+                            <input type="checkbox" name="activo_tienda" ${p.activo_tienda ? "checked" : ""}>
+                            Producto activo en tienda
                         </label>
                     </div>
 
@@ -244,12 +254,14 @@
         function payloadDesdeCard(card) {
             return {
                 categoria_tienda: card.querySelector('[name="categoria_tienda"]').value,
+                precio: Number(card.querySelector('[name="precio"]').value || 0),
                 descripcion_tienda: card.querySelector('[name="descripcion_tienda"]').value,
                 descuento_tienda_pct: Number(card.querySelector('[name="descuento_tienda_pct"]').value || 0),
                 foto_fit_tienda: card.querySelector('[name="foto_fit_tienda"]').value,
                 foto_pos_tienda: card.querySelector('[name="foto_pos_tienda"]').value,
                 orden_tienda: Number(card.querySelector('[name="orden_tienda"]').value || 0),
-                destacado_tienda: card.querySelector('[name="destacado_tienda"]').checked
+                destacado_tienda: card.querySelector('[name="destacado_tienda"]').checked,
+                activo_tienda: card.querySelector('[name="activo_tienda"]').checked
             };
         }
 

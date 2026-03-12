@@ -836,9 +836,128 @@ def _serializar_producto_tienda(producto):
         "descripcion_tienda": descripcion,
         "destacado_tienda": bool(item.get("destacado_tienda")),
         "orden_tienda": int(item.get("orden_tienda") or 0),
+        "activo_tienda": bool(item.get("activo_tienda") if item.get("activo_tienda") is not None else 1),
         "icono": item.get("icono") or "package",
         "max_compra": max_compra,
     }
+
+
+def _normalizar_cupon_codigo(codigo):
+    raw = str(codigo or "").strip().upper()
+    raw = re.sub(r"[^A-Z0-9_-]+", "", raw)
+    return raw[:40]
+
+
+def _normalizar_cliente_ref(email, telefono):
+    em = str(email or "").strip().lower()
+    te = re.sub(r"\D+", "", str(telefono or ""))
+    if em and te:
+        return f"{em}|{te}"
+    return em or te or ""
+
+
+def _parse_hora_hhmm(valor):
+    v = str(valor or "").strip()
+    if not v:
+        return None
+    m = re.match(r"^(\d{1,2}):(\d{2})$", v)
+    if not m:
+        return None
+    hh = int(m.group(1))
+    mm = int(m.group(2))
+    if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+        return None
+    return hh, mm
+
+
+def _obtener_cupon_por_codigo(codigo):
+    codigo_norm = _normalizar_cupon_codigo(codigo)
+    if not codigo_norm:
+        return None
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM tienda_cupones WHERE codigo = ? LIMIT 1", (codigo_norm,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        if conn:
+            conn.close()
+
+
+def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref):
+    if not cupon:
+        return {"ok": False, "error": "Cupon no encontrado"}
+    if not int(cupon.get("activo") or 0):
+        return {"ok": False, "error": "Cupon inactivo"}
+
+    now_dt = datetime.now()
+    hoy = now_dt.date().isoformat()
+    hora_actual = now_dt.strftime("%H:%M")
+
+    fecha_inicio = str(cupon.get("fecha_inicio") or "").strip()
+    fecha_fin = str(cupon.get("fecha_fin") or "").strip()
+    if fecha_inicio and hoy < fecha_inicio:
+        return {"ok": False, "error": "Cupon aun no disponible"}
+    if fecha_fin and hoy > fecha_fin:
+        return {"ok": False, "error": "Cupon vencido"}
+
+    hora_inicio = _parse_hora_hhmm(cupon.get("hora_inicio"))
+    hora_fin = _parse_hora_hhmm(cupon.get("hora_fin"))
+    if hora_inicio and hora_actual < f"{hora_inicio[0]:02d}:{hora_inicio[1]:02d}":
+        return {"ok": False, "error": "Cupon fuera de horario"}
+    if hora_fin and hora_actual > f"{hora_fin[0]:02d}:{hora_fin[1]:02d}":
+        return {"ok": False, "error": "Cupon fuera de horario"}
+
+    monto_minimo = float(cupon.get("monto_minimo") or 0)
+    if subtotal < monto_minimo:
+        return {"ok": False, "error": f"Compra minima para este cupon: ${monto_minimo:,.0f}"}
+
+    solo_sin_oferta = bool(cupon.get("solo_sin_oferta"))
+    if solo_sin_oferta:
+        if any(float(it.get("descuento_tienda_pct") or 0) > 0 for it in (items_serializados or [])):
+            return {"ok": False, "error": "Este cupon solo aplica a productos sin oferta"}
+
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        usos_total_max = cupon.get("usos_max_total")
+        if usos_total_max is not None and str(usos_total_max).strip() != "":
+            max_total = int(usos_total_max)
+            cursor.execute("SELECT COUNT(*) AS total FROM tienda_cupon_usos WHERE cupon_id = ?", (int(cupon["id"]),))
+            total_usos = int(cursor.fetchone()["total"] or 0)
+            if total_usos >= max_total:
+                return {"ok": False, "error": "Cupon sin usos disponibles"}
+
+        usos_por_cliente_max = cupon.get("usos_max_por_cliente")
+        if cliente_ref and usos_por_cliente_max is not None and str(usos_por_cliente_max).strip() != "":
+            max_por_cliente = int(usos_por_cliente_max)
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM tienda_cupon_usos WHERE cupon_id = ? AND cliente_ref = ?",
+                (int(cupon["id"]), cliente_ref),
+            )
+            total_cliente = int(cursor.fetchone()["total"] or 0)
+            if total_cliente >= max_por_cliente:
+                return {"ok": False, "error": "Ya alcanzaste el limite de uso de este cupon"}
+    finally:
+        if conn:
+            conn.close()
+
+    tipo = str(cupon.get("tipo_descuento") or "porcentaje").strip().lower()
+    valor = float(cupon.get("valor_descuento") or 0)
+    descuento = 0.0
+    if tipo == "monto_fijo":
+        descuento = min(max(0.0, valor), max(0.0, subtotal))
+    else:
+        pct = max(0.0, min(100.0, valor))
+        descuento = subtotal * (pct / 100.0)
+    if descuento < 0:
+        descuento = 0
+    if descuento > subtotal:
+        descuento = subtotal
+    return {"ok": True, "descuento_monto": round(descuento, 2)}
 
 
 @app.route('/api/tienda/productos', methods=['GET'])
@@ -848,7 +967,7 @@ def api_tienda_productos():
         disponibles = [
             _serializar_producto_tienda(p)
             for p in productos
-            if int(p.get("porciones_disponibles") or 0) > 0
+            if int(p.get("porciones_disponibles") or 0) > 0 and int(p.get("activo_tienda") if p.get("activo_tienda") is not None else 1) == 1
         ]
         return jsonify({"success": True, "productos": disponibles})
     except Exception as e:
@@ -858,6 +977,11 @@ def api_tienda_productos():
 @app.route('/ventas/admin-catalogo')
 def ventas_admin_catalogo():
     return render_template('tienda_admin.html')
+
+
+@app.route('/ventas/cupones')
+def ventas_admin_cupones():
+    return render_template('cupones_admin.html')
 
 
 @app.route('/api/tienda/admin/productos', methods=['GET'])
@@ -887,6 +1011,175 @@ def api_tienda_admin_productos():
         return jsonify({"success": True, "productos": productos})
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/cupones', methods=['GET'])
+def api_tienda_admin_cupones_list():
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+            FROM tienda_cupones
+            ORDER BY COALESCE(actualizado_en, creado_en) DESC, id DESC
+            """
+        )
+        cupones = [dict(r) for r in cursor.fetchall()]
+        return jsonify({"success": True, "cupones": cupones})
+    except Exception as e:
+        return jsonify({"success": False, "cupones": [], "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/cupones', methods=['POST'])
+def api_tienda_admin_cupones_save():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        cupon_id = int(data.get("id") or 0)
+        codigo = _normalizar_cupon_codigo(data.get("codigo"))
+        if not codigo:
+            return jsonify({"success": False, "error": "Codigo invalido"}), 400
+        nombre = str(data.get("nombre") or "").strip()[:120]
+        tipo = str(data.get("tipo_descuento") or "porcentaje").strip().lower()
+        if tipo not in {"porcentaje", "monto_fijo"}:
+            tipo = "porcentaje"
+        valor = float(data.get("valor_descuento") or 0)
+        if valor < 0:
+            return jsonify({"success": False, "error": "Valor de descuento invalido"}), 400
+        if tipo == "porcentaje" and valor > 100:
+            return jsonify({"success": False, "error": "El porcentaje no puede superar 100"}), 400
+        activo = 1 if bool(data.get("activo", True)) else 0
+        fecha_inicio = str(data.get("fecha_inicio") or "").strip() or None
+        fecha_fin = str(data.get("fecha_fin") or "").strip() or None
+        hora_inicio = str(data.get("hora_inicio") or "").strip() or None
+        hora_fin = str(data.get("hora_fin") or "").strip() or None
+        usos_max_total = data.get("usos_max_total")
+        usos_max_por_cliente = data.get("usos_max_por_cliente")
+        monto_minimo = float(data.get("monto_minimo") or 0)
+        solo_sin_oferta = 1 if bool(data.get("solo_sin_oferta")) else 0
+
+        def _to_int_or_none(v):
+            if v in (None, "", 0, "0"):
+                return None
+            iv = int(v)
+            if iv < 0:
+                return None
+            return iv
+
+        usos_max_total = _to_int_or_none(usos_max_total)
+        usos_max_por_cliente = _to_int_or_none(usos_max_por_cliente)
+        if monto_minimo < 0:
+            monto_minimo = 0
+        if hora_inicio and not _parse_hora_hhmm(hora_inicio):
+            return jsonify({"success": False, "error": "Hora inicio invalida (HH:MM)"}), 400
+        if hora_fin and not _parse_hora_hhmm(hora_fin):
+            return jsonify({"success": False, "error": "Hora fin invalida (HH:MM)"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        if cupon_id > 0:
+            cursor.execute("SELECT id FROM tienda_cupones WHERE id = ?", (cupon_id,))
+            if not cursor.fetchone():
+                return jsonify({"success": False, "error": "Cupon no encontrado"}), 404
+            cursor.execute(
+                """
+                UPDATE tienda_cupones
+                SET codigo = ?, nombre = ?, tipo_descuento = ?, valor_descuento = ?, activo = ?,
+                    fecha_inicio = ?, fecha_fin = ?, hora_inicio = ?, hora_fin = ?,
+                    usos_max_total = ?, usos_max_por_cliente = ?, monto_minimo = ?, solo_sin_oferta = ?,
+                    actualizado_en = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    codigo, nombre, tipo, valor, activo,
+                    fecha_inicio, fecha_fin, hora_inicio, hora_fin,
+                    usos_max_total, usos_max_por_cliente, monto_minimo, solo_sin_oferta,
+                    cupon_id,
+                ),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO tienda_cupones (
+                    codigo, nombre, tipo_descuento, valor_descuento, activo,
+                    fecha_inicio, fecha_fin, hora_inicio, hora_fin,
+                    usos_max_total, usos_max_por_cliente, monto_minimo, solo_sin_oferta
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    codigo, nombre, tipo, valor, activo,
+                    fecha_inicio, fecha_fin, hora_inicio, hora_fin,
+                    usos_max_total, usos_max_por_cliente, monto_minimo, solo_sin_oferta,
+                ),
+            )
+            cupon_id = int(cursor.lastrowid)
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "id": cupon_id})
+    except sqlite3.IntegrityError:
+        return jsonify({"success": False, "error": "Codigo de cupon ya existe"}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/cupones/<int:cupon_id>/eliminar', methods=['POST'])
+def api_tienda_admin_cupones_delete(cupon_id):
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tienda_cupones WHERE id = ?", (cupon_id,))
+        if cursor.rowcount <= 0:
+            return jsonify({"success": False, "error": "Cupon no encontrado"}), 404
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/pedidos-nuevos', methods=['GET'])
+def api_tienda_admin_pedidos_nuevos():
+    conn = None
+    try:
+        since_id = int(request.args.get("since_id") or 0)
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, fecha_hora, total_monto, cliente_email, cliente_telefono, codigo_pedido
+            FROM ventas
+            WHERE canal_venta = 'tienda_online' AND id > ?
+            ORDER BY id ASC
+            LIMIT 50
+            """,
+            (since_id,),
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        max_id = since_id
+        if rows:
+            max_id = max(int(r.get("id") or 0) for r in rows)
+        return jsonify({"success": True, "pedidos": rows, "max_id": max_id})
+    except Exception as e:
+        return jsonify({"success": False, "pedidos": [], "max_id": 0, "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
@@ -1195,6 +1488,12 @@ def api_actualizar_producto(id):
                 data["destacado_tienda"] = bool(raw_dest)
         if "orden_tienda" in data:
             data["orden_tienda"] = int(data.get("orden_tienda") or 0)
+        if "activo_tienda" in data:
+            raw_activo = data.get("activo_tienda")
+            if isinstance(raw_activo, str):
+                data["activo_tienda"] = raw_activo.strip().lower() in {"1", "true", "si", "yes", "on"}
+            else:
+                data["activo_tienda"] = bool(raw_activo)
         if "insumos_venta" in data:
             if not isinstance(data.get("insumos_venta"), list):
                 raise ValueError("Los insumos asociados deben enviarse en una lista")
@@ -3710,10 +4009,19 @@ def api_tienda_checkout():
         items_req = data.get('items') or []
         if not isinstance(items_req, list) or not items_req:
             return jsonify({'success': False, 'error': 'Carrito vacio'}), 400
+        cliente_email = str(data.get("cliente_email") or "").strip().lower()
+        cliente_telefono = str(data.get("cliente_telefono") or "").strip()
+        if not cliente_email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", cliente_email):
+            return jsonify({'success': False, 'error': 'Correo electronico invalido'}), 400
+        if len(re.sub(r"\D+", "", cliente_telefono)) < 8:
+            return jsonify({'success': False, 'error': 'Telefono invalido'}), 400
+        cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
+        cliente_ref = _normalizar_cliente_ref(cliente_email, cliente_telefono)
 
         catalogo = _obtener_productos_para_venta()
         mapa = {int(p.get("id") or 0): _serializar_producto_tienda(p) for p in catalogo}
         items_limpios = []
+        items_serializados = []
         for idx, raw in enumerate(items_req, start=1):
             if not isinstance(raw, dict):
                 return jsonify({'success': False, 'error': f'Item #{idx} invalido'}), 400
@@ -3733,13 +4041,33 @@ def api_tienda_checkout():
             if cantidad > max_compra:
                 return jsonify({'success': False, 'error': f'{prod.get("nombre")}: maximo {max_compra} unidad(es)'}), 400
 
+            precio_final = float(prod.get("precio_final") or 0)
             items_limpios.append(
                 {
                     "id": pid,
                     "cantidad": cantidad,
-                    "precio_unitario": float(prod.get("precio_final") or 0),
+                    "precio_unitario": precio_final,
                 }
             )
+            items_serializados.append(
+                {
+                    "id": pid,
+                    "cantidad": cantidad,
+                    "precio_unitario": precio_final,
+                    "descuento_tienda_pct": float(prod.get("descuento_tienda_pct") or 0),
+                }
+            )
+
+        subtotal = sum(float(it["precio_unitario"]) * int(it["cantidad"]) for it in items_limpios)
+        descuento_monto = 0.0
+        cupon_aplicado = None
+        if cupon_codigo:
+            cupon = _obtener_cupon_por_codigo(cupon_codigo)
+            valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref)
+            if not valid.get("ok"):
+                return jsonify({'success': False, 'error': valid.get("error", "Cupon invalido")}), 400
+            descuento_monto = float(valid.get("descuento_monto") or 0)
+            cupon_aplicado = cupon
 
         payload_seguro = {
             "items": items_limpios,
@@ -3752,6 +4080,46 @@ def api_tienda_checkout():
             permitir_canal_usuario=False,
             permitir_agenda=False,
         )
+        venta_id = int(respuesta.get("venta_id") or 0)
+        total_neto = subtotal - descuento_monto
+        if total_neto < 0:
+            total_neto = 0
+        conn = None
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE ventas
+                SET cliente_email = ?, cliente_telefono = ?, descuento_codigo = ?, descuento_monto = ?, total_monto = ?
+                WHERE id = ?
+                """,
+                (
+                    cliente_email,
+                    cliente_telefono,
+                    (cupon_codigo or None),
+                    descuento_monto,
+                    total_neto,
+                    venta_id,
+                ),
+            )
+            if cupon_aplicado and descuento_monto > 0:
+                cursor.execute(
+                    """
+                    INSERT INTO tienda_cupon_usos (cupon_id, venta_id, cliente_ref, descuento_aplicado)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (int(cupon_aplicado["id"]), venta_id, (cliente_ref or None), descuento_monto),
+                )
+            conn.commit()
+        finally:
+            if conn:
+                conn.close()
+
+        respuesta["subtotal"] = round(subtotal, 2)
+        respuesta["descuento_monto"] = round(descuento_monto, 2)
+        respuesta["codigo_descuento"] = cupon_codigo or None
+        respuesta["total_monto"] = round(total_neto, 2)
         return jsonify(respuesta)
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400

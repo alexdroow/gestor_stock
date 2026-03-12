@@ -1901,6 +1901,7 @@ def actualizar_producto(producto_id, data):
         foto_pos_tienda_actual = (actual["foto_pos_tienda"] if "foto_pos_tienda" in actual.keys() else None) or "center"
         destacado_tienda_actual = int(actual["destacado_tienda"] or 0) if "destacado_tienda" in actual.keys() else 0
         orden_tienda_actual = int(actual["orden_tienda"] or 0) if "orden_tienda" in actual.keys() else 0
+        activo_tienda_actual = int(actual["activo_tienda"] or 0) if "activo_tienda" in actual.keys() else 1
         categoria_tienda = str(data.get("categoria_tienda", categoria_tienda_actual) or "").strip()[:60] or "General"
         descripcion_tienda = str(data.get("descripcion_tienda", descripcion_tienda_actual) or "").strip()[:800]
         descuento_tienda_pct = float(data.get("descuento_tienda_pct", descuento_tienda_actual) or 0)
@@ -1912,6 +1913,11 @@ def actualizar_producto(producto_id, data):
         else:
             destacado_tienda = 1 if bool(destacado_raw) else 0
         orden_tienda = int(data.get("orden_tienda", orden_tienda_actual) or 0)
+        activo_raw = data.get("activo_tienda", activo_tienda_actual)
+        if isinstance(activo_raw, str):
+            activo_tienda = 1 if activo_raw.strip().lower() in {"1", "true", "si", "yes", "on"} else 0
+        else:
+            activo_tienda = 1 if bool(activo_raw) else 0
         insumos_venta = data.get("insumos_venta", None)
         productos_venta = data.get("productos_venta", None)
         tipo_dep_actual = str(actual["stock_dependencia_tipo"] or "").strip().lower() if "stock_dependencia_tipo" in actual.keys() else ""
@@ -2089,7 +2095,7 @@ def actualizar_producto(producto_id, data):
                 porcion_cantidad = ?, porcion_unidad = ?,
                 stock_dependencia_tipo = ?, stock_dependencia_id = ?, stock_dependencia_cantidad = ?,
                 categoria_tienda = ?, descripcion_tienda = ?, descuento_tienda_pct = ?,
-                foto_fit_tienda = ?, foto_pos_tienda = ?, destacado_tienda = ?, orden_tienda = ?
+                foto_fit_tienda = ?, foto_pos_tienda = ?, destacado_tienda = ?, orden_tienda = ?, activo_tienda = ?
             WHERE id = ?
             """,
             (
@@ -2113,6 +2119,7 @@ def actualizar_producto(producto_id, data):
                 foto_pos_tienda,
                 destacado_tienda,
                 orden_tienda,
+                activo_tienda,
                 producto_id,
             ),
         )
@@ -7082,11 +7089,16 @@ def migrar_db():
         _ensure_column(conn, "productos", "foto_pos_tienda", "TEXT DEFAULT 'center'")
         _ensure_column(conn, "productos", "destacado_tienda", "INTEGER DEFAULT 0")
         _ensure_column(conn, "productos", "orden_tienda", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "productos", "activo_tienda", "INTEGER DEFAULT 1")
         _ensure_column(conn, "agenda_eventos", "codigo_operacion", "TEXT")
         _ensure_column(conn, "ventas", "codigo_pedido", "TEXT")
         _ensure_column(conn, "ventas", "canal_venta", "TEXT DEFAULT 'presencial'")
         _ensure_column(conn, "ventas", "codigo_operacion", "TEXT")
         _ensure_column(conn, "ventas", "total_monto", "REAL DEFAULT 0")
+        _ensure_column(conn, "ventas", "cliente_email", "TEXT")
+        _ensure_column(conn, "ventas", "cliente_telefono", "TEXT")
+        _ensure_column(conn, "ventas", "descuento_codigo", "TEXT")
+        _ensure_column(conn, "ventas", "descuento_monto", "REAL DEFAULT 0")
         _ensure_column(conn, "recetas", "rendimiento", "REAL DEFAULT 1")
         _ensure_column(conn, "producciones", "cantidad_resultado", "REAL DEFAULT 0")
         _ensure_column(conn, "producciones", "metadata_json", "TEXT")
@@ -7204,6 +7216,64 @@ def migrar_db():
                 WHEN orden_tienda IS NULL OR orden_tienda < 0 THEN 0
                 ELSE orden_tienda
             END
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET activo_tienda = CASE
+                WHEN activo_tienda IS NULL OR activo_tienda = 0 THEN 0
+                ELSE 1
+            END
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_cupones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo TEXT NOT NULL UNIQUE,
+                nombre TEXT NOT NULL DEFAULT '',
+                tipo_descuento TEXT NOT NULL DEFAULT 'porcentaje',
+                valor_descuento REAL NOT NULL DEFAULT 0,
+                activo INTEGER NOT NULL DEFAULT 1,
+                fecha_inicio TEXT,
+                fecha_fin TEXT,
+                hora_inicio TEXT,
+                hora_fin TEXT,
+                usos_max_total INTEGER,
+                usos_max_por_cliente INTEGER,
+                monto_minimo REAL NOT NULL DEFAULT 0,
+                solo_sin_oferta INTEGER NOT NULL DEFAULT 0,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_cupon_usos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cupon_id INTEGER NOT NULL,
+                venta_id INTEGER NOT NULL,
+                cliente_ref TEXT,
+                descuento_aplicado REAL NOT NULL DEFAULT 0,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(cupon_id) REFERENCES tienda_cupones(id),
+                FOREIGN KEY(venta_id) REFERENCES ventas(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_cupon_usos_cupon_cliente
+            ON tienda_cupon_usos(cupon_id, cliente_ref)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ventas_canal_id
+            ON ventas(canal_venta, id)
             """
         )
 
