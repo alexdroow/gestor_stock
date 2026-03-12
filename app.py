@@ -21,6 +21,7 @@ from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError
 from datetime import datetime, timedelta
 from io import BytesIO, StringIO
+from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
 from camera_hub import CameraHub
 
@@ -881,6 +882,111 @@ def _parse_hora_hhmm(valor):
     return hh, mm
 
 
+def _obtener_tienda_config():
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT modo_manual, horario_habilitado, hora_apertura, hora_cierre, actualizado_en
+            FROM tienda_config
+            WHERE id = 1
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        if row:
+            item = dict(row)
+        else:
+            item = {}
+        modo_raw = str(item.get("modo_manual") or "auto").strip().lower()
+        if modo_raw not in {"auto", "abierta", "cerrada"}:
+            modo_raw = "auto"
+        hora_apertura = str(item.get("hora_apertura") or "09:00").strip()
+        hora_cierre = str(item.get("hora_cierre") or "19:00").strip()
+        if not _parse_hora_hhmm(hora_apertura):
+            hora_apertura = "09:00"
+        if not _parse_hora_hhmm(hora_cierre):
+            hora_cierre = "19:00"
+        return {
+            "modo_manual": modo_raw,
+            "horario_habilitado": bool(item.get("horario_habilitado")),
+            "hora_apertura": hora_apertura,
+            "hora_cierre": hora_cierre,
+            "actualizado_en": item.get("actualizado_en"),
+        }
+    finally:
+        if conn:
+            conn.close()
+
+
+def _evaluar_estado_tienda(config):
+    cfg = dict(config or {})
+    modo = str(cfg.get("modo_manual") or "auto").strip().lower()
+    horario_habilitado = bool(cfg.get("horario_habilitado"))
+    hora_apertura = str(cfg.get("hora_apertura") or "09:00").strip()
+    hora_cierre = str(cfg.get("hora_cierre") or "19:00").strip()
+    now_local = datetime.now(ZoneInfo("America/Santiago"))
+    hora_actual = now_local.strftime("%H:%M")
+
+    if modo == "abierta":
+        return {
+            "abierta": True,
+            "modo": "manual_abierta",
+            "mensaje": "La tienda esta abierta por control manual del administrador.",
+            "hora_actual": hora_actual,
+        }
+    if modo == "cerrada":
+        return {
+            "abierta": False,
+            "modo": "manual_cerrada",
+            "mensaje": "La tienda esta cerrada por control manual del administrador.",
+            "hora_actual": hora_actual,
+        }
+    if not horario_habilitado:
+        return {
+            "abierta": True,
+            "modo": "auto_sin_horario",
+            "mensaje": "La tienda esta abierta (sin horario restringido).",
+            "hora_actual": hora_actual,
+        }
+
+    inicio = _parse_hora_hhmm(hora_apertura)
+    fin = _parse_hora_hhmm(hora_cierre)
+    if not inicio or not fin:
+        return {
+            "abierta": True,
+            "modo": "auto_error_horario",
+            "mensaje": "Horario invalido en configuracion. Se mantiene abierta.",
+            "hora_actual": hora_actual,
+        }
+
+    min_inicio = inicio[0] * 60 + inicio[1]
+    min_fin = fin[0] * 60 + fin[1]
+    min_actual = now_local.hour * 60 + now_local.minute
+    if min_inicio == min_fin:
+        abierta = True
+    elif min_inicio < min_fin:
+        abierta = min_inicio <= min_actual < min_fin
+    else:
+        # tramo que cruza medianoche, ejemplo 22:00 -> 06:00
+        abierta = min_actual >= min_inicio or min_actual < min_fin
+
+    if abierta:
+        msg = f"Tienda abierta por horario ({hora_apertura} - {hora_cierre})."
+        modo_final = "auto_horario_abierta"
+    else:
+        msg = f"Tienda cerrada por horario ({hora_apertura} - {hora_cierre})."
+        modo_final = "auto_horario_cerrada"
+    return {
+        "abierta": bool(abierta),
+        "modo": modo_final,
+        "mensaje": msg,
+        "hora_actual": hora_actual,
+    }
+
+
 def _obtener_cupon_por_codigo(codigo):
     codigo_norm = _normalizar_cupon_codigo(codigo)
     if not codigo_norm:
@@ -974,13 +1080,22 @@ def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cli
 @app.route('/api/tienda/productos', methods=['GET'])
 def api_tienda_productos():
     try:
+        config = _obtener_tienda_config()
+        estado = _evaluar_estado_tienda(config)
         productos = _obtener_productos_para_venta()
         disponibles = [
             _serializar_producto_tienda(p)
             for p in productos
             if int(p.get("porciones_disponibles") or 0) > 0 and int(p.get("activo_tienda") if p.get("activo_tienda") is not None else 1) == 1
         ]
-        return jsonify({"success": True, "productos": disponibles})
+        return jsonify(
+            {
+                "success": True,
+                "productos": disponibles,
+                "tienda_abierta": bool(estado.get("abierta")),
+                "estado_tienda": estado,
+            }
+        )
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
 
@@ -993,6 +1108,69 @@ def ventas_admin_catalogo():
 @app.route('/ventas/cupones')
 def ventas_admin_cupones():
     return render_template('cupones_admin.html')
+
+
+@app.route('/api/tienda/estado', methods=['GET'])
+def api_tienda_estado():
+    try:
+        config = _obtener_tienda_config()
+        estado = _evaluar_estado_tienda(config)
+        return jsonify({"success": True, "config": config, "estado": estado})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/admin/config', methods=['GET', 'POST'])
+def api_tienda_admin_config():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+
+    conn = None
+    try:
+        if request.method == 'GET':
+            config = _obtener_tienda_config()
+            estado = _evaluar_estado_tienda(config)
+            return jsonify({"success": True, "config": config, "estado": estado})
+
+        data = request.get_json(silent=True) or {}
+        modo_manual = str(data.get("modo_manual") or "auto").strip().lower()
+        if modo_manual not in {"auto", "abierta", "cerrada"}:
+            modo_manual = "auto"
+        horario_habilitado = 1 if bool(data.get("horario_habilitado")) else 0
+        hora_apertura = str(data.get("hora_apertura") or "09:00").strip()
+        hora_cierre = str(data.get("hora_cierre") or "19:00").strip()
+        if not _parse_hora_hhmm(hora_apertura):
+            return jsonify({"success": False, "error": "Hora apertura invalida (HH:MM)"}), 400
+        if not _parse_hora_hhmm(hora_cierre):
+            return jsonify({"success": False, "error": "Hora cierre invalida (HH:MM)"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO tienda_config (id, modo_manual, horario_habilitado, hora_apertura, hora_cierre, actualizado_en)
+            VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                modo_manual = excluded.modo_manual,
+                horario_habilitado = excluded.horario_habilitado,
+                hora_apertura = excluded.hora_apertura,
+                hora_cierre = excluded.hora_cierre,
+                actualizado_en = CURRENT_TIMESTAMP
+            """,
+            (modo_manual, horario_habilitado, hora_apertura, hora_cierre),
+        )
+        conn.commit()
+        crear_backup()
+        config = _obtener_tienda_config()
+        estado = _evaluar_estado_tienda(config)
+        return jsonify({"success": True, "config": config, "estado": estado})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/tienda/admin/productos', methods=['GET'])
@@ -1212,6 +1390,9 @@ def api_tienda_admin_pedidos_nuevos():
 @app.route('/api/tienda/cupon/validar', methods=['POST'])
 def api_tienda_validar_cupon():
     try:
+        estado_tienda = _evaluar_estado_tienda(_obtener_tienda_config())
+        if not bool(estado_tienda.get("abierta")):
+            return jsonify({"success": False, "error": "La tienda esta cerrada por el momento"}), 403
         data = request.get_json(silent=True) or {}
         cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
         if not cupon_codigo:
@@ -4094,6 +4275,9 @@ def procesar_venta():
 @app.route('/api/tienda/checkout', methods=['POST'])
 def api_tienda_checkout():
     try:
+        estado_tienda = _evaluar_estado_tienda(_obtener_tienda_config())
+        if not bool(estado_tienda.get("abierta")):
+            return jsonify({'success': False, 'error': 'La tienda esta cerrada por el momento'}), 403
         data = request.get_json(silent=True) or {}
         items_req = data.get('items') or []
         if not isinstance(items_req, list) or not items_req:

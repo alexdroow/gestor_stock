@@ -7269,6 +7269,53 @@ def migrar_db():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                modo_manual TEXT NOT NULL DEFAULT 'auto',
+                horario_habilitado INTEGER NOT NULL DEFAULT 0,
+                hora_apertura TEXT NOT NULL DEFAULT '09:00',
+                hora_cierre TEXT NOT NULL DEFAULT '19:00',
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO tienda_config (id, modo_manual, horario_habilitado, hora_apertura, hora_cierre)
+            VALUES (1, 'auto', 0, '09:00', '19:00')
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_config
+            SET modo_manual = CASE
+                WHEN LOWER(TRIM(COALESCE(modo_manual, ''))) IN ('auto', 'abierta', 'cerrada')
+                THEN LOWER(TRIM(modo_manual))
+                ELSE 'auto'
+            END
+            WHERE id = 1
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_config
+            SET horario_habilitado = CASE
+                WHEN horario_habilitado IS NULL OR horario_habilitado = 0 THEN 0
+                ELSE 1
+            END
+            WHERE id = 1
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_config
+            SET hora_apertura = COALESCE(NULLIF(TRIM(hora_apertura), ''), '09:00'),
+                hora_cierre = COALESCE(NULLIF(TRIM(hora_cierre), ''), '19:00')
+            WHERE id = 1
+            """
+        )
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_tienda_cupon_usos_cupon_cliente
             ON tienda_cupon_usos(cupon_id, cliente_ref)
             """

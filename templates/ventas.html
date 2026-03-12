@@ -254,6 +254,48 @@
             background: #fff;
             padding: 6px 8px;
         }
+
+        .tienda-op-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid #86efac;
+            color: #166534;
+            background: #f0fdf4;
+        }
+
+        .tienda-op-pill.cerrada {
+            border-color: #fecaca;
+            color: #991b1b;
+            background: #fff1f2;
+        }
+
+        .tienda-config-inline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tienda-config-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            color: #1f2937;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        .tienda-config-btn:hover {
+            border-color: #f59e0b;
+            color: #9a3412;
+        }
         
         .ventas-layout {
             display: grid;
@@ -1416,7 +1458,13 @@
             border-color: #334155;
             color: #e2e8f0;
         }
-        
+
+        body.dark-mode .tienda-config-btn {
+            background: #0f172a;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
+
         @media (max-width: 1024px) {
             .sidebar { width: 240px; }
             .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
@@ -1479,6 +1527,30 @@
                                 <option value="sirena_corta" selected>Sirena corta</option>
                             </select>
                         </label>
+                        <span class="tienda-op-pill" id="tienda-op-indicator" title="Estado de atencion de la tienda publica">Tienda: Abierta</span>
+                        <div class="tienda-config-inline">
+                            <label class="alert-tool-label">
+                                Modo tienda
+                                <select id="tienda-modo-manual" class="alert-tool-select">
+                                    <option value="auto">Automatico</option>
+                                    <option value="abierta">Forzar abierta</option>
+                                    <option value="cerrada">Forzar cerrada</option>
+                                </select>
+                            </label>
+                            <label class="alert-tool-label">
+                                <input id="tienda-horario-habilitado" type="checkbox">
+                                Usar horario
+                            </label>
+                            <label class="alert-tool-label">
+                                Abre
+                                <input id="tienda-hora-apertura" type="time" class="alert-tool-select">
+                            </label>
+                            <label class="alert-tool-label">
+                                Cierra
+                                <input id="tienda-hora-cierre" type="time" class="alert-tool-select">
+                            </label>
+                            <button type="button" id="btn-guardar-tienda-config" class="tienda-config-btn">Guardar tienda</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2987,6 +3059,7 @@
         let _pedidosPendientesAtencion = [];
         let _pedidoAlertVolume = String(localStorage.getItem(PEDIDO_ALERT_VOLUME_KEY) || 'alto').trim() || 'alto';
         let _pedidoAlertTone = String(localStorage.getItem(PEDIDO_ALERT_TONE_KEY) || 'sirena_corta').trim() || 'sirena_corta';
+        let _tiendaConfigCache = null;
 
         function _setVentasOnlineIndicator(online, detalle) {
             const pill = document.getElementById('ventas-online-indicator');
@@ -3013,6 +3086,91 @@
             const val = String(value || '').trim().toLowerCase();
             if (val === 'beep' || val === 'sirena_corta') return val;
             return 'sirena_corta';
+        }
+
+        function _setTiendaOperacionIndicator(abierta, mensaje) {
+            const el = document.getElementById('tienda-op-indicator');
+            if (!el) return;
+            if (abierta) {
+                el.classList.remove('cerrada');
+                el.textContent = 'Tienda: Abierta';
+            } else {
+                el.classList.add('cerrada');
+                el.textContent = 'Tienda: Cerrada';
+            }
+            if (mensaje) el.title = mensaje;
+        }
+
+        async function _cargarConfigTiendaAdmin() {
+            try {
+                const res = await fetch('/api/tienda/admin/config', { headers: { Accept: 'application/json' } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo cargar config de tienda');
+                const cfg = data.config || {};
+                const estado = data.estado || {};
+                _tiendaConfigCache = cfg;
+
+                const modoSel = document.getElementById('tienda-modo-manual');
+                const chkHorario = document.getElementById('tienda-horario-habilitado');
+                const apertura = document.getElementById('tienda-hora-apertura');
+                const cierre = document.getElementById('tienda-hora-cierre');
+
+                if (modoSel) modoSel.value = String(cfg.modo_manual || 'auto');
+                if (chkHorario) chkHorario.checked = Boolean(cfg.horario_habilitado);
+                if (apertura) apertura.value = String(cfg.hora_apertura || '09:00');
+                if (cierre) cierre.value = String(cfg.hora_cierre || '19:00');
+
+                _setTiendaOperacionIndicator(Boolean(estado.abierta), String(estado.mensaje || ''));
+            } catch (err) {
+                _setTiendaOperacionIndicator(false, 'No se pudo cargar la configuracion de tienda');
+                console.warn('Error cargando config tienda admin:', err);
+            }
+        }
+
+        async function _guardarConfigTiendaAdmin() {
+            const btn = document.getElementById('btn-guardar-tienda-config');
+            const modoSel = document.getElementById('tienda-modo-manual');
+            const chkHorario = document.getElementById('tienda-horario-habilitado');
+            const apertura = document.getElementById('tienda-hora-apertura');
+            const cierre = document.getElementById('tienda-hora-cierre');
+            if (!modoSel || !chkHorario || !apertura || !cierre) return;
+
+            const payload = {
+                modo_manual: modoSel.value,
+                horario_habilitado: Boolean(chkHorario.checked),
+                hora_apertura: apertura.value || '09:00',
+                hora_cierre: cierre.value || '19:00',
+            };
+            const textoOriginal = btn ? btn.textContent : '';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Guardando...';
+                }
+                const res = await fetch('/api/tienda/admin/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo guardar config');
+                _tiendaConfigCache = data.config || null;
+                _setTiendaOperacionIndicator(Boolean((data.estado || {}).abierta), String((data.estado || {}).mensaje || ''));
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess('Configuracion de tienda actualizada.');
+                }
+            } catch (err) {
+                if (window.AppUX && typeof window.AppUX.toastError === 'function') {
+                    window.AppUX.toastError(err.message || 'Error guardando configuracion de tienda');
+                } else {
+                    alert(err.message || 'Error guardando configuracion de tienda');
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal || 'Guardar tienda';
+                }
+            }
         }
 
         function _valorGananciaVolumenAlerta() {
@@ -3237,6 +3395,8 @@
         }
 
         _initPedidoAlertSettings();
+        document.getElementById('btn-guardar-tienda-config')?.addEventListener('click', _guardarConfigTiendaAdmin);
+        _cargarConfigTiendaAdmin();
         _setVentasOnlineIndicator(false, 'Esperando conexión');
         window.addEventListener('offline', () => _setVentasOnlineIndicator(false, 'Sin conexión a internet'));
         window.addEventListener('online', () => {
