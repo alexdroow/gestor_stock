@@ -1184,10 +1184,17 @@ def api_tienda_admin_pedidos_nuevos():
         max_online_id = int(cursor.fetchone()["max_online_id"] or 0)
         cursor.execute(
             """
-            SELECT id, fecha_hora, total_monto, cliente_nombre, cliente_email, cliente_telefono, codigo_pedido
-            FROM ventas
-            WHERE canal_venta = 'tienda_online' AND id > ?
-            ORDER BY id ASC
+            SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.codigo_pedido,
+                   COALESCE(vp.productos, '') AS productos
+            FROM ventas v
+            LEFT JOIN (
+                SELECT venta_id,
+                       GROUP_CONCAT(producto_nombre || ' (x' || cantidad || ')', ', ') AS productos
+                FROM venta_items
+                GROUP BY venta_id
+            ) vp ON vp.venta_id = v.id
+            WHERE v.canal_venta = 'tienda_online' AND v.id > ?
+            ORDER BY v.id ASC
             LIMIT 50
             """,
             (since_id,),
