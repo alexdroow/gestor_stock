@@ -810,6 +810,7 @@ def _serializar_producto_tienda(producto):
         "stock_visual_label": item.get("stock_visual_label") or _formatear_numero_simple(item.get("stock_visual")),
         "stock_visual_unidad": item.get("stock_visual_unidad") or item.get("unidad") or "unidad",
         "foto_url": foto_url,
+        "foto": str(item.get("foto") or "").strip(),
         "icono": item.get("icono") or "package",
         "max_compra": max_compra,
     }

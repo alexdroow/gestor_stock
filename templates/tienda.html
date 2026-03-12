@@ -267,7 +267,13 @@
             catalogoEl.innerHTML = visibles.map((p) => `
                 <article class="card">
                     <div class="foto">
-                        ${p.foto_url ? `<img src="${p.foto_url}" alt="${p.nombre}">` : `<div class="icono">*</div>`}
+                        ${(() => {
+                            const direct = String(p.foto_url || "").trim();
+                            const rel = String(p.foto || "").trim();
+                            const src = direct || (rel ? `/static/${rel}` : "");
+                            if (!src) return `<div class="icono">*</div>`;
+                            return `<img src="${src}?v=${Date.now()}" alt="${p.nombre}">`;
+                        })()}
                     </div>
                     <div class="card-body">
                         <div class="nombre">${p.nombre}</div>
