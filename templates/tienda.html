@@ -783,6 +783,32 @@
             display: grid;
             gap: 8px;
         }
+        .pedido-steps {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin: 6px 0 8px;
+        }
+        .pedido-step {
+            border: 1px solid #e5e7eb;
+            background: #f8fafc;
+            color: #64748b;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: .82rem;
+            font-weight: 700;
+            text-align: center;
+        }
+        .pedido-step.active {
+            border-color: #86efac;
+            background: #f0fdf4;
+            color: #166534;
+        }
+        .pedido-step.current {
+            border-color: #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+        }
         @media (max-width: 980px) {
             .layout {
                 grid-template-columns: 1fr;
@@ -1006,6 +1032,11 @@
             <h3>Pedido recibido</h3>
             <div id="modal-exito-texto" style="font-size:.92rem;color:#374151;"></div>
             <div id="modal-exito-estado" style="font-size:.9rem;color:#334155;font-weight:700;"></div>
+            <div class="pedido-steps" id="modal-exito-steps">
+                <div class="pedido-step" data-step="aceptado">Aceptado</div>
+                <div class="pedido-step" data-step="preparando">Preparando</div>
+                <div class="pedido-step" data-step="listo">Listo para retirar</div>
+            </div>
             <div id="modal-exito-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-exito-pdf">Descargar comprobante PDF</button>
@@ -1041,6 +1072,7 @@
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
         const modalExitoEstadoEl = document.getElementById("modal-exito-estado");
+        const modalExitoStepsEl = document.getElementById("modal-exito-steps");
         const modalExitoDetalleEl = document.getElementById("modal-exito-detalle");
         const modalCuentaEl = document.getElementById("modal-cuenta");
         const cuentaEstadoEl = document.getElementById("cuenta-estado");
@@ -1730,6 +1762,7 @@
             if (modalExitoEstadoEl) {
                 const estadoInicial = String((ultimoComprobantePedido && ultimoComprobantePedido.estado) || "recibido");
                 modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estadoInicial)}`;
+                _renderPedidoSteps(estadoInicial);
             }
             if (modalExitoDetalleEl) {
                 if (ultimoComprobantePedido) {
@@ -1766,13 +1799,54 @@
         function _labelPedidoEstado(estado) {
             const map = {
                 recibido: "Recibido",
-                confirmado: "Confirmado",
+                confirmado: "Aceptado",
                 preparando: "En preparacion",
-                listo: "Listo para entregar",
+                listo: "Listo para retirar",
                 entregado: "Entregado",
                 cancelado: "Cancelado",
             };
             return map[String(estado || "").toLowerCase()] || "Recibido";
+        }
+
+        function _renderPedidoSteps(estadoRaw) {
+            if (!modalExitoStepsEl) return;
+            const estado = String(estadoRaw || "").toLowerCase();
+            const aceptadoEl = modalExitoStepsEl.querySelector('[data-step="aceptado"]');
+            const preparandoEl = modalExitoStepsEl.querySelector('[data-step="preparando"]');
+            const listoEl = modalExitoStepsEl.querySelector('[data-step="listo"]');
+            [aceptadoEl, preparandoEl, listoEl].forEach((el) => {
+                if (!el) return;
+                el.classList.remove("active", "current");
+            });
+            if (aceptadoEl) {
+                aceptadoEl.textContent = "Aceptado";
+                aceptadoEl.style.display = "";
+            }
+            if (preparandoEl) {
+                preparandoEl.textContent = "Preparando";
+                preparandoEl.style.display = "";
+            }
+            if (listoEl) {
+                listoEl.textContent = "Listo para retirar";
+                listoEl.style.display = "";
+            }
+            if (estado === "confirmado") {
+                if (aceptadoEl) aceptadoEl.classList.add("current");
+            } else if (estado === "preparando") {
+                if (aceptadoEl) aceptadoEl.classList.add("active");
+                if (preparandoEl) preparandoEl.classList.add("current");
+            } else if (estado === "listo" || estado === "entregado") {
+                if (aceptadoEl) aceptadoEl.classList.add("active");
+                if (preparandoEl) preparandoEl.classList.add("active");
+                if (listoEl) listoEl.classList.add("current");
+            } else if (estado === "cancelado") {
+                if (aceptadoEl) {
+                    aceptadoEl.classList.add("current");
+                    aceptadoEl.textContent = "Pedido cancelado";
+                }
+                if (preparandoEl) preparandoEl.style.display = "none";
+                if (listoEl) listoEl.style.display = "none";
+            }
         }
 
         async function _pollEstadoPedidoCliente() {
@@ -1787,6 +1861,7 @@
                 if (modalExitoEstadoEl) {
                     modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estado)}`;
                 }
+                _renderPedidoSteps(estado);
             } catch (_) {}
         }
 
