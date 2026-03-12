@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tienda</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --bg: #f5f5f5;
@@ -1004,7 +1005,9 @@
         <div class="modal">
             <h3>Pedido recibido</h3>
             <div id="modal-exito-texto" style="font-size:.92rem;color:#374151;"></div>
+            <div id="modal-exito-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
             <div class="modal-actions">
+                <button class="btn-muted" type="button" id="modal-exito-pdf">Descargar comprobante PDF</button>
                 <button class="btn-primary" type="button" id="modal-exito-cerrar">Entendido</button>
             </div>
         </div>
@@ -1036,6 +1039,7 @@
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
+        const modalExitoDetalleEl = document.getElementById("modal-exito-detalle");
         const modalCuentaEl = document.getElementById("modal-cuenta");
         const cuentaEstadoEl = document.getElementById("cuenta-estado");
         const cuentaEmailEl = document.getElementById("cuenta-email");
@@ -1067,6 +1071,7 @@
         let tiendaAbierta = true;
         let tiendaEstadoMensaje = "";
         let mensajePostPedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.";
+        let ultimoComprobantePedido = null;
         let clienteRegistrado = null;
         let historialComprasCliente = [];
         const tiendaSessionId = (() => {
@@ -1645,6 +1650,16 @@
 
         async function enviarCheckoutCliente(datosCliente) {
             msg("Procesando compra...");
+            const itemsSnapshot = carrito.map((it) => ({
+                id: it.id,
+                nombre: it.nombre,
+                cantidad: Number(it.cantidad || 0),
+                precio_unitario: Number(it.precio_unitario || 0),
+                subtotal: Number(it.cantidad || 0) * Number(it.precio_unitario || 0),
+            }));
+            const subtotalSnapshot = itemsSnapshot.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
+            const descuentoSnapshot = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const totalSnapshot = Math.max(0, subtotalSnapshot - descuentoSnapshot);
             const payload = {
                 items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
                 codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
@@ -1664,6 +1679,18 @@
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
+                ultimoComprobantePedido = {
+                    venta_id: Number(data.venta_id || 0),
+                    codigo_operacion: String(data.codigo_operacion || ""),
+                    fecha_hora_local: new Date().toLocaleString("es-CL"),
+                    cliente_nombre: String(datosCliente?.nombre || ""),
+                    cliente_email: String(datosCliente?.email || ""),
+                    cliente_telefono: String(datosCliente?.telefono || ""),
+                    subtotal: Number(data.subtotal || subtotalSnapshot || 0),
+                    descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
+                    total: Number(data.total_monto || totalSnapshot || 0),
+                    items: itemsSnapshot,
+                };
                 carrito = [];
                 codigoDescuentoEl.value = "";
                 if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = "";
@@ -1696,6 +1723,29 @@
 
         function abrirModalExito(texto) {
             modalExitoTextoEl.textContent = texto || mensajePostPedido || "Pedido ingresado correctamente. Te contactaremos a la brevedad.";
+            if (modalExitoDetalleEl) {
+                if (ultimoComprobantePedido) {
+                    const p = ultimoComprobantePedido;
+                    const itemsHtml = (p.items || []).map((it) => `
+                        <div style="display:flex;justify-content:space-between;gap:8px;">
+                            <span>${esc(it.nombre)} x${Number(it.cantidad || 0)}</span>
+                            <span>${money.format(Number(it.subtotal || 0))}</span>
+                        </div>
+                    `).join("");
+                    modalExitoDetalleEl.innerHTML = `
+                        <div><strong>Pedido #${Number(p.venta_id || 0)}</strong></div>
+                        <div style="color:#64748b;">${esc(p.fecha_hora_local || "")}</div>
+                        <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+                        <div style="display:grid;gap:6px;">${itemsHtml || "<div>Sin detalle de productos.</div>"}</div>
+                        <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+                        <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong>${money.format(Number(p.subtotal || 0))}</strong></div>
+                        <div style="display:flex;justify-content:space-between;color:#b91c1c;"><span>Descuento</span><strong>-${money.format(Number(p.descuento || 0))}</strong></div>
+                        <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${money.format(Number(p.total || 0))}</strong></div>
+                    `;
+                } else {
+                    modalExitoDetalleEl.innerHTML = `<div style="color:#64748b;">No hay detalle disponible.</div>`;
+                }
+            }
             modalExitoEl.classList.add("active");
         }
 
@@ -1766,6 +1816,48 @@
         window.abrirMenuMobile = abrirMenuMobile;
         window.abrirCarritoMobile = abrirCarritoMobile;
         window.repetirCompraVenta = repetirCompraVenta;
+        window.descargarComprobanteUltimoPedido = () => {
+            const p = ultimoComprobantePedido;
+            if (!p) return msg("No hay comprobante disponible.", true);
+            const jspdf = window.jspdf || null;
+            if (!jspdf || !jspdf.jsPDF) return msg("No se pudo cargar generador PDF.", true);
+            const { jsPDF } = jspdf;
+            const doc = new jsPDF({ unit: "pt", format: "a4" });
+            const left = 40;
+            let y = 48;
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text("Comprobante de pedido - Pasteleria Sucree", left, y);
+            y += 22;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(11);
+            doc.text(`Pedido #${Number(p.venta_id || 0)}`, left, y); y += 16;
+            doc.text(`Fecha y hora: ${String(p.fecha_hora_local || "")}`, left, y); y += 16;
+            doc.text(`Cliente: ${String(p.cliente_nombre || "")}`, left, y); y += 16;
+            doc.text(`Correo: ${String(p.cliente_email || "")}`, left, y); y += 16;
+            doc.text(`Telefono: ${String(p.cliente_telefono || "")}`, left, y); y += 20;
+            doc.setFont("helvetica", "bold");
+            doc.text("Detalle", left, y); y += 14;
+            doc.setFont("helvetica", "normal");
+            (p.items || []).forEach((it) => {
+                const linea = `- ${it.nombre} x${Number(it.cantidad || 0)} | ${money.format(Number(it.subtotal || 0))}`;
+                doc.text(linea, left + 4, y);
+                y += 14;
+                if (y > 760) {
+                    doc.addPage();
+                    y = 48;
+                }
+            });
+            y += 8;
+            doc.setFont("helvetica", "bold");
+            doc.text(`Subtotal: ${money.format(Number(p.subtotal || 0))}`, left, y); y += 16;
+            doc.text(`Descuento: -${money.format(Number(p.descuento || 0))}`, left, y); y += 16;
+            doc.text(`Total: ${money.format(Number(p.total || 0))}`, left, y); y += 20;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text("Este documento sirve como comprobante de tu pedido.", left, y);
+            doc.save(`comprobante_pedido_${Number(p.venta_id || 0)}.pdf`);
+        };
         window.vaciarCarrito = () => {
             carrito = [];
             cuponAplicado = { codigo: "", descuento_monto: 0 };
@@ -1791,6 +1883,7 @@
         document.getElementById("modal-cliente-cancel").addEventListener("click", cerrarModalCliente);
         document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
+        document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
         document.getElementById("modal-cuenta-cerrar")?.addEventListener("click", cerrarModalCuenta);
         document.getElementById("cuenta-guardar")?.addEventListener("click", registrarCuentaCliente);
         btnCuentaEl?.addEventListener("click", abrirModalCuenta);
