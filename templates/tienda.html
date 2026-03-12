@@ -147,10 +147,41 @@
             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 10px;
         }
-        .ofertas-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        .ofertas-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .ofertas-head h2 {
+            margin: 0;
+        }
+        .ofertas-nav {
+            display: inline-flex;
+            gap: 6px;
+        }
+        .ofertas-nav-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #334155;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .ofertas-track {
+            display: flex;
             gap: 12px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            padding-bottom: 4px;
+        }
+        .ofertas-track .item-card {
+            flex: 0 0 min(320px, 88vw);
+            width: min(320px, 88vw);
+            scroll-snap-align: start;
         }
         .item-card {
             border: 1px solid #ececec;
@@ -616,8 +647,14 @@
         <section class="content">
             <div class="tienda-estado-banner" id="tienda-estado-banner">Cargando estado de tienda...</div>
             <div class="section" id="sec-ofertas">
-                <h2>Ofertas</h2>
-                <div class="ofertas-grid" id="ofertas-list"></div>
+                <div class="ofertas-head">
+                    <h2>Ofertas</h2>
+                    <div class="ofertas-nav">
+                        <button type="button" class="ofertas-nav-btn" id="ofertas-prev" aria-label="Ver ofertas anteriores">&#8249;</button>
+                        <button type="button" class="ofertas-nav-btn" id="ofertas-next" aria-label="Ver más ofertas">&#8250;</button>
+                    </div>
+                </div>
+                <div class="ofertas-track" id="ofertas-list"></div>
             </div>
 
             <div class="section" id="sec-destacados">
@@ -718,6 +755,8 @@
         const mobileCartFabEl = document.getElementById("mobile-cart-fab");
         const mobileCartCountEl = document.getElementById("mobile-cart-count");
         const tiendaEstadoBannerEl = document.getElementById("tienda-estado-banner");
+        const ofertasPrevBtnEl = document.getElementById("ofertas-prev");
+        const ofertasNextBtnEl = document.getElementById("ofertas-next");
 
         let productos = [];
         let categoriasDisponibles = [];
@@ -1102,6 +1141,12 @@
             leftNavEl.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
+        function scrollOfertas(dir) {
+            if (!ofertasListEl) return;
+            const delta = Math.max(260, Math.round(ofertasListEl.clientWidth * 0.72));
+            ofertasListEl.scrollBy({ left: dir * delta, behavior: "smooth" });
+        }
+
         function abrirCarritoMobile() {
             if (!cartPanelEl || !mobileOverlayEl) return;
             cartPanelEl.classList.add("mobile-open");
@@ -1185,6 +1230,8 @@
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
         if (btnMenuQuickEl) btnMenuQuickEl.addEventListener("click", abrirMenuMobile);
         if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirMenuMobile);
+        if (ofertasPrevBtnEl) ofertasPrevBtnEl.addEventListener("click", () => scrollOfertas(-1));
+        if (ofertasNextBtnEl) ofertasNextBtnEl.addEventListener("click", () => scrollOfertas(1));
         if (mobileCartFabEl) mobileCartFabEl.addEventListener("click", abrirCarritoMobile);
         if (mobileOverlayEl) mobileOverlayEl.addEventListener("click", cerrarPanelesMobile);
         if (clienteTelefonoEl) {
