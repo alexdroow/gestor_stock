@@ -560,6 +560,24 @@
             box-shadow: 0 8px 20px rgba(0,0,0,.25);
             cursor: pointer;
         }
+        body.mobile-ui .left-nav { display: none; }
+        body.mobile-ui .cart-panel { display: none; }
+        body.mobile-ui .mobile-cat-strip { display: flex; }
+        body.mobile-ui .mobile-cart-fab {
+            display: inline-flex;
+            align-items: center;
+        }
+        body.mobile-ui .mobile-menu-fab {
+            display: inline-flex;
+            align-items: center;
+        }
+        body.mobile-ui .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+        body.mobile-ui .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+        body.mobile-ui .item-name { font-size: .98rem; min-height: 32px; }
+        body.mobile-ui .item-desc { font-size: .79rem; min-height: 22px; }
+        body.mobile-ui .item-body { padding: 8px 8px 10px; }
+        body.mobile-ui .quick-add { width: 31px; height: 31px; font-size: 1.08rem; }
+        body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(240px, 78vw); width: min(240px, 78vw); }
         .mobile-cart-fab .total-chip {
             margin-left: 8px;
             font-size: .82rem;
@@ -877,6 +895,12 @@
             }
             return value;
         })();
+        const _urlParams = new URLSearchParams(window.location.search);
+        const _forceMobileParam = _urlParams.get("mobile") === "1";
+        const _uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
+        if (_forceMobileParam || _uaMobile) {
+            document.body.classList.add("mobile-ui");
+        }
 
         function esc(text) {
             return String(text || "")
