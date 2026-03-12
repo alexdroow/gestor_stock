@@ -480,6 +480,51 @@
             cropModalEl.classList.add("active");
         }
 
+        function _cargarImagenDesdeArchivo(file) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(img);
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error("No se pudo leer la imagen seleccionada."));
+                };
+                img.src = url;
+            });
+        }
+
+        async function _generarBlobEncuadre(file, posX, posY, zoom) {
+            const img = await _cargarImagenDesdeArchivo(file);
+            const outW = 1263;
+            const outH = 1000;
+            const canvas = document.createElement("canvas");
+            canvas.width = outW;
+            canvas.height = outH;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("No se pudo preparar el encuadre.");
+
+            const baseScale = Math.max(outW / img.width, outH / img.height);
+            const zoomFactor = Math.max(0.5, Math.min(2.2, Number(zoom || 100) / 100));
+            const finalScale = baseScale * zoomFactor;
+            const drawW = img.width * finalScale;
+            const drawH = img.height * finalScale;
+            const xPct = Math.max(0, Math.min(100, Number(posX || 50))) / 100;
+            const yPct = Math.max(0, Math.min(100, Number(posY || 50))) / 100;
+            const dx = (outW - drawW) * xPct;
+            const dy = (outH - drawH) * yPct;
+
+            ctx.fillStyle = "#faf5f0";
+            ctx.fillRect(0, 0, outW, outH);
+            ctx.drawImage(img, dx, dy, drawW, drawH);
+
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+            if (!blob) throw new Error("No se pudo exportar la imagen encuadrada.");
+            return blob;
+        }
+
         async function aplicarEncuadre() {
             if (!cropState.open || !cropState.productId || !cropState.file) return;
             const id = Number(cropState.productId || 0);
@@ -487,12 +532,13 @@
             if (!card) return;
             const msg = card.querySelector(`#msg-${id}`);
             const applyBtn = document.getElementById("crop-apply");
-            const fd = new FormData();
-            fd.append("foto", cropState.file);
             msg.className = "sub";
             msg.textContent = "Subiendo foto y guardando encuadre...";
             applyBtn.disabled = true;
             try {
+                const blob = await _generarBlobEncuadre(cropState.file, cropState.posX, cropState.posY, cropState.zoom);
+                const fd = new FormData();
+                fd.append("foto", blob, `producto_${id}_encuadre.jpg`);
                 const res = await fetch(`/api/producto/${id}/foto`, {
                     method: "POST",
                     body: fd
@@ -502,9 +548,9 @@
                 const encuadre = {
                     foto_fit_tienda: "cover",
                     foto_pos_tienda: "center",
-                    foto_pos_x_tienda: Number(cropState.posX || 50),
-                    foto_pos_y_tienda: Number(cropState.posY || 50),
-                    foto_zoom_tienda: Number(cropState.zoom || 100),
+                    foto_pos_x_tienda: 50,
+                    foto_pos_y_tienda: 50,
+                    foto_zoom_tienda: 100,
                 };
                 const resUpd = await fetch(`/api/producto/${id}/actualizar`, {
                     method: "POST",
