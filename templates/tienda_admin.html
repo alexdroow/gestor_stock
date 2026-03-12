@@ -90,12 +90,26 @@
         textarea { min-height: 64px; resize: vertical; }
         .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .four { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
         .check {
             display: flex;
             align-items: center;
             gap: 6px;
             font-size: .86rem;
             color: #334155;
+        }
+        .range-wrap {
+            display: grid;
+            gap: 4px;
+        }
+        .range-wrap input[type="range"] {
+            width: 100%;
+            padding: 0;
+        }
+        .range-note {
+            font-size: .78rem;
+            color: #64748b;
+            font-weight: 700;
         }
         .actions { display: flex; gap: 8px; }
         .photo-tools {
@@ -160,8 +174,10 @@
 
         function fitStyle(p) {
             const fit = p.foto_fit_tienda === "contain" ? "contain" : "cover";
-            const pos = ["center", "top", "bottom"].includes(String(p.foto_pos_tienda || "")) ? p.foto_pos_tienda : "center";
-            return `object-fit:${fit};object-position:${pos};`;
+            const posX = Math.max(0, Math.min(100, Number(p.foto_pos_x_tienda ?? 50)));
+            const posY = Math.max(0, Math.min(100, Number(p.foto_pos_y_tienda ?? 50)));
+            const zoomPct = Math.max(50, Math.min(220, Number(p.foto_zoom_tienda ?? 100)));
+            return `object-fit:${fit};object-position:${posX}% ${posY}%;transform:scale(${zoomPct / 100});transform-origin:${posX}% ${posY}%;`;
         }
 
         function render() {
@@ -231,6 +247,21 @@
                             <input type="number" min="0" step="1" name="orden_tienda" value="${Math.max(0, parseInt(p.orden_tienda || 0, 10) || 0)}">
                         </label>
                     </div>
+                    <div class="four">
+                        <label class="range-wrap">Centrado X
+                            <input type="range" min="0" max="100" step="1" name="foto_pos_x_tienda" value="${Math.max(0, Math.min(100, Number(p.foto_pos_x_tienda ?? 50)))}">
+                            <span class="range-note"><span data-range-x>${Math.round(Math.max(0, Math.min(100, Number(p.foto_pos_x_tienda ?? 50))))}</span>%</span>
+                        </label>
+                        <label class="range-wrap">Centrado Y
+                            <input type="range" min="0" max="100" step="1" name="foto_pos_y_tienda" value="${Math.max(0, Math.min(100, Number(p.foto_pos_y_tienda ?? 50)))}">
+                            <span class="range-note"><span data-range-y>${Math.round(Math.max(0, Math.min(100, Number(p.foto_pos_y_tienda ?? 50))))}</span>%</span>
+                        </label>
+                        <label class="range-wrap">Zoom foto
+                            <input type="range" min="50" max="220" step="1" name="foto_zoom_tienda" value="${Math.max(50, Math.min(220, Number(p.foto_zoom_tienda ?? 100)))}">
+                            <span class="range-note"><span data-range-z>${Math.round(Math.max(50, Math.min(220, Number(p.foto_zoom_tienda ?? 100))))}</span>%</span>
+                        </label>
+                        <div class="range-note" style="align-self:end;padding-bottom:6px;">Ajusta hasta centrar la foto.</div>
+                    </div>
 
                     <label class="check">
                         <input type="checkbox" name="destacado_tienda" ${p.destacado_tienda ? "checked" : ""}>
@@ -259,10 +290,36 @@
                 descuento_tienda_pct: Number(card.querySelector('[name="descuento_tienda_pct"]').value || 0),
                 foto_fit_tienda: card.querySelector('[name="foto_fit_tienda"]').value,
                 foto_pos_tienda: card.querySelector('[name="foto_pos_tienda"]').value,
+                foto_pos_x_tienda: Number(card.querySelector('[name="foto_pos_x_tienda"]').value || 50),
+                foto_pos_y_tienda: Number(card.querySelector('[name="foto_pos_y_tienda"]').value || 50),
+                foto_zoom_tienda: Number(card.querySelector('[name="foto_zoom_tienda"]').value || 100),
                 orden_tienda: Number(card.querySelector('[name="orden_tienda"]').value || 0),
                 destacado_tienda: card.querySelector('[name="destacado_tienda"]').checked,
                 activo_tienda: card.querySelector('[name="activo_tienda"]').checked
             };
+        }
+
+        function actualizarPreviewCard(card) {
+            if (!card) return;
+            const img = card.querySelector(".thumb img");
+            if (!img) return;
+            const fit = card.querySelector('[name="foto_fit_tienda"]')?.value || "cover";
+            const posX = Number(card.querySelector('[name="foto_pos_x_tienda"]')?.value || 50);
+            const posY = Number(card.querySelector('[name="foto_pos_y_tienda"]')?.value || 50);
+            const zoom = Number(card.querySelector('[name="foto_zoom_tienda"]')?.value || 100);
+            const x = Math.max(0, Math.min(100, posX));
+            const y = Math.max(0, Math.min(100, posY));
+            const z = Math.max(50, Math.min(220, zoom));
+            img.style.objectFit = fit === "contain" ? "contain" : "cover";
+            img.style.objectPosition = `${x}% ${y}%`;
+            img.style.transform = `scale(${z / 100})`;
+            img.style.transformOrigin = `${x}% ${y}%`;
+            const labelX = card.querySelector("[data-range-x]");
+            const labelY = card.querySelector("[data-range-y]");
+            const labelZ = card.querySelector("[data-range-z]");
+            if (labelX) labelX.textContent = String(Math.round(x));
+            if (labelY) labelY.textContent = String(Math.round(y));
+            if (labelZ) labelZ.textContent = String(Math.round(z));
         }
 
         async function guardar(id) {
@@ -333,6 +390,13 @@
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar");
                 productos = Array.isArray(data.productos) ? data.productos : [];
                 render();
+                gridEl.querySelectorAll(".card").forEach((card) => {
+                    card.querySelectorAll('[name="foto_fit_tienda"], [name="foto_pos_x_tienda"], [name="foto_pos_y_tienda"], [name="foto_zoom_tienda"]').forEach((field) => {
+                        field.addEventListener("input", () => actualizarPreviewCard(card));
+                        field.addEventListener("change", () => actualizarPreviewCard(card));
+                    });
+                    actualizarPreviewCard(card);
+                });
             } catch (e) {
                 gridEl.innerHTML = `<p style="color:#b91c1c;">${esc(e.message || "Error cargando")}</p>`;
             }

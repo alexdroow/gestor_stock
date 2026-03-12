@@ -1901,6 +1901,9 @@ def actualizar_producto(producto_id, data):
         descuento_tienda_actual = float(actual["descuento_tienda_pct"] or 0) if "descuento_tienda_pct" in actual.keys() else 0.0
         foto_fit_tienda_actual = (actual["foto_fit_tienda"] if "foto_fit_tienda" in actual.keys() else None) or "cover"
         foto_pos_tienda_actual = (actual["foto_pos_tienda"] if "foto_pos_tienda" in actual.keys() else None) or "center"
+        foto_pos_x_tienda_actual = float(actual["foto_pos_x_tienda"] or 50) if "foto_pos_x_tienda" in actual.keys() else 50.0
+        foto_pos_y_tienda_actual = float(actual["foto_pos_y_tienda"] or 50) if "foto_pos_y_tienda" in actual.keys() else 50.0
+        foto_zoom_tienda_actual = float(actual["foto_zoom_tienda"] or 100) if "foto_zoom_tienda" in actual.keys() else 100.0
         destacado_tienda_actual = int(actual["destacado_tienda"] or 0) if "destacado_tienda" in actual.keys() else 0
         orden_tienda_actual = int(actual["orden_tienda"] or 0) if "orden_tienda" in actual.keys() else 0
         activo_tienda_actual = int(actual["activo_tienda"] or 0) if "activo_tienda" in actual.keys() else 1
@@ -1909,6 +1912,9 @@ def actualizar_producto(producto_id, data):
         descuento_tienda_pct = float(data.get("descuento_tienda_pct", descuento_tienda_actual) or 0)
         foto_fit_tienda = str(data.get("foto_fit_tienda", foto_fit_tienda_actual) or "cover").strip().lower()
         foto_pos_tienda = str(data.get("foto_pos_tienda", foto_pos_tienda_actual) or "center").strip().lower()
+        foto_pos_x_tienda = float(data.get("foto_pos_x_tienda", foto_pos_x_tienda_actual) or 50)
+        foto_pos_y_tienda = float(data.get("foto_pos_y_tienda", foto_pos_y_tienda_actual) or 50)
+        foto_zoom_tienda = float(data.get("foto_zoom_tienda", foto_zoom_tienda_actual) or 100)
         destacado_raw = data.get("destacado_tienda", destacado_tienda_actual)
         if isinstance(destacado_raw, str):
             destacado_tienda = 1 if destacado_raw.strip().lower() in {"1", "true", "si", "yes", "on"} else 0
@@ -1958,6 +1964,12 @@ def actualizar_producto(producto_id, data):
             raise ValueError("El ajuste de foto de tienda es invalido")
         if foto_pos_tienda not in {"center", "top", "bottom"}:
             raise ValueError("La posicion de foto de tienda es invalida")
+        if foto_pos_x_tienda < 0 or foto_pos_x_tienda > 100:
+            raise ValueError("La posicion horizontal de foto debe estar entre 0 y 100")
+        if foto_pos_y_tienda < 0 or foto_pos_y_tienda > 100:
+            raise ValueError("La posicion vertical de foto debe estar entre 0 y 100")
+        if foto_zoom_tienda < 50 or foto_zoom_tienda > 220:
+            raise ValueError("El zoom de foto debe estar entre 50 y 220")
         if orden_tienda < 0:
             raise ValueError("El orden de tienda no puede ser negativo")
         if not icono:
@@ -2097,7 +2109,8 @@ def actualizar_producto(producto_id, data):
                 porcion_cantidad = ?, porcion_unidad = ?,
                 stock_dependencia_tipo = ?, stock_dependencia_id = ?, stock_dependencia_cantidad = ?,
                 categoria_tienda = ?, descripcion_tienda = ?, descuento_tienda_pct = ?,
-                foto_fit_tienda = ?, foto_pos_tienda = ?, destacado_tienda = ?, orden_tienda = ?, activo_tienda = ?
+                foto_fit_tienda = ?, foto_pos_tienda = ?, foto_pos_x_tienda = ?, foto_pos_y_tienda = ?, foto_zoom_tienda = ?,
+                destacado_tienda = ?, orden_tienda = ?, activo_tienda = ?
             WHERE id = ?
             """,
             (
@@ -2119,6 +2132,9 @@ def actualizar_producto(producto_id, data):
                 descuento_tienda_pct,
                 foto_fit_tienda,
                 foto_pos_tienda,
+                foto_pos_x_tienda,
+                foto_pos_y_tienda,
+                foto_zoom_tienda,
                 destacado_tienda,
                 orden_tienda,
                 activo_tienda,
@@ -7089,6 +7105,9 @@ def migrar_db():
         _ensure_column(conn, "productos", "descuento_tienda_pct", "REAL DEFAULT 0")
         _ensure_column(conn, "productos", "foto_fit_tienda", "TEXT DEFAULT 'cover'")
         _ensure_column(conn, "productos", "foto_pos_tienda", "TEXT DEFAULT 'center'")
+        _ensure_column(conn, "productos", "foto_pos_x_tienda", "REAL DEFAULT 50")
+        _ensure_column(conn, "productos", "foto_pos_y_tienda", "REAL DEFAULT 50")
+        _ensure_column(conn, "productos", "foto_zoom_tienda", "REAL DEFAULT 100")
         _ensure_column(conn, "productos", "destacado_tienda", "INTEGER DEFAULT 0")
         _ensure_column(conn, "productos", "orden_tienda", "INTEGER DEFAULT 0")
         _ensure_column(conn, "productos", "activo_tienda", "INTEGER DEFAULT 1")
@@ -7201,6 +7220,27 @@ def migrar_db():
                 THEN LOWER(TRIM(foto_pos_tienda))
                 ELSE 'center'
             END
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET foto_pos_x_tienda = 50
+            WHERE foto_pos_x_tienda IS NULL OR foto_pos_x_tienda < 0 OR foto_pos_x_tienda > 100
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET foto_pos_y_tienda = 50
+            WHERE foto_pos_y_tienda IS NULL OR foto_pos_y_tienda < 0 OR foto_pos_y_tienda > 100
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET foto_zoom_tienda = 100
+            WHERE foto_zoom_tienda IS NULL OR foto_zoom_tienda < 50 OR foto_zoom_tienda > 220
             """
         )
         conn.execute(

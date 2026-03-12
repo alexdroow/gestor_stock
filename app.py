@@ -820,6 +820,21 @@ def _serializar_producto_tienda(producto):
     foto_pos = str(item.get("foto_pos_tienda") or "center").strip().lower()
     if foto_pos not in {"center", "top", "bottom"}:
         foto_pos = "center"
+    try:
+        foto_pos_x = float(item.get("foto_pos_x_tienda") if item.get("foto_pos_x_tienda") is not None else 50)
+    except (TypeError, ValueError):
+        foto_pos_x = 50.0
+    try:
+        foto_pos_y = float(item.get("foto_pos_y_tienda") if item.get("foto_pos_y_tienda") is not None else 50)
+    except (TypeError, ValueError):
+        foto_pos_y = 50.0
+    try:
+        foto_zoom = float(item.get("foto_zoom_tienda") if item.get("foto_zoom_tienda") is not None else 100)
+    except (TypeError, ValueError):
+        foto_zoom = 100.0
+    foto_pos_x = max(0.0, min(100.0, foto_pos_x))
+    foto_pos_y = max(0.0, min(100.0, foto_pos_y))
+    foto_zoom = max(50.0, min(220.0, foto_zoom))
     return {
         "id": int(item.get("id") or 0),
         "nombre": item.get("nombre") or "Producto",
@@ -833,6 +848,9 @@ def _serializar_producto_tienda(producto):
         "foto": str(item.get("foto") or "").strip(),
         "foto_fit_tienda": foto_fit,
         "foto_pos_tienda": foto_pos,
+        "foto_pos_x_tienda": round(foto_pos_x, 2),
+        "foto_pos_y_tienda": round(foto_pos_y, 2),
+        "foto_zoom_tienda": round(foto_zoom, 2),
         "categoria_tienda": categoria,
         "descripcion_tienda": descripcion,
         "destacado_tienda": bool(item.get("destacado_tienda")),
@@ -1750,6 +1768,12 @@ def api_actualizar_producto(id):
         if "foto_pos_tienda" in data:
             pos = str(data.get("foto_pos_tienda") or "center").strip().lower()
             data["foto_pos_tienda"] = pos if pos in {"center", "top", "bottom"} else "center"
+        if "foto_pos_x_tienda" in data:
+            data["foto_pos_x_tienda"] = float(data.get("foto_pos_x_tienda") or 50)
+        if "foto_pos_y_tienda" in data:
+            data["foto_pos_y_tienda"] = float(data.get("foto_pos_y_tienda") or 50)
+        if "foto_zoom_tienda" in data:
+            data["foto_zoom_tienda"] = float(data.get("foto_zoom_tienda") or 100)
         if "destacado_tienda" in data:
             raw_dest = data.get("destacado_tienda")
             if isinstance(raw_dest, str):

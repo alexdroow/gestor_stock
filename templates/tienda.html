@@ -719,8 +719,17 @@
 
         function imgStyle(p) {
             const fit = p.foto_fit_tienda === "contain" ? "contain" : "cover";
-            const pos = ["center", "top", "bottom"].includes(String(p.foto_pos_tienda || "")) ? p.foto_pos_tienda : "center";
-            return `object-fit:${fit};object-position:${pos};`;
+            const legacyPos = ["center", "top", "bottom"].includes(String(p.foto_pos_tienda || "")) ? p.foto_pos_tienda : "center";
+            let posX = Number(p.foto_pos_x_tienda ?? 50);
+            let posY = Number(p.foto_pos_y_tienda ?? 50);
+            if (!Number.isFinite(posX)) posX = 50;
+            if (!Number.isFinite(posY)) posY = legacyPos === "top" ? 0 : legacyPos === "bottom" ? 100 : 50;
+            posX = Math.max(0, Math.min(100, posX));
+            posY = Math.max(0, Math.min(100, posY));
+            let zoom = Number(p.foto_zoom_tienda ?? 100);
+            if (!Number.isFinite(zoom)) zoom = 100;
+            zoom = Math.max(50, Math.min(220, zoom));
+            return `object-fit:${fit};object-position:${posX}% ${posY}%;transform:scale(${zoom / 100});transform-origin:${posX}% ${posY}%;`;
         }
 
         function fotoHtml(p) {
