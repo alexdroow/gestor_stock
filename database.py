@@ -1894,6 +1894,24 @@ def actualizar_producto(producto_id, data):
         porcion_unidad_actual = (actual["porcion_unidad"] if "porcion_unidad" in actual.keys() else None) or unidad
         porcion_cantidad = float(data.get("porcion_cantidad", porcion_actual) or 1)
         porcion_unidad = _normalizar_unidad_producto(data.get("porcion_unidad", porcion_unidad_actual))
+        categoria_tienda_actual = (actual["categoria_tienda"] if "categoria_tienda" in actual.keys() else None) or "General"
+        descripcion_tienda_actual = (actual["descripcion_tienda"] if "descripcion_tienda" in actual.keys() else None) or ""
+        descuento_tienda_actual = float(actual["descuento_tienda_pct"] or 0) if "descuento_tienda_pct" in actual.keys() else 0.0
+        foto_fit_tienda_actual = (actual["foto_fit_tienda"] if "foto_fit_tienda" in actual.keys() else None) or "cover"
+        foto_pos_tienda_actual = (actual["foto_pos_tienda"] if "foto_pos_tienda" in actual.keys() else None) or "center"
+        destacado_tienda_actual = int(actual["destacado_tienda"] or 0) if "destacado_tienda" in actual.keys() else 0
+        orden_tienda_actual = int(actual["orden_tienda"] or 0) if "orden_tienda" in actual.keys() else 0
+        categoria_tienda = str(data.get("categoria_tienda", categoria_tienda_actual) or "").strip()[:60] or "General"
+        descripcion_tienda = str(data.get("descripcion_tienda", descripcion_tienda_actual) or "").strip()[:800]
+        descuento_tienda_pct = float(data.get("descuento_tienda_pct", descuento_tienda_actual) or 0)
+        foto_fit_tienda = str(data.get("foto_fit_tienda", foto_fit_tienda_actual) or "cover").strip().lower()
+        foto_pos_tienda = str(data.get("foto_pos_tienda", foto_pos_tienda_actual) or "center").strip().lower()
+        destacado_raw = data.get("destacado_tienda", destacado_tienda_actual)
+        if isinstance(destacado_raw, str):
+            destacado_tienda = 1 if destacado_raw.strip().lower() in {"1", "true", "si", "yes", "on"} else 0
+        else:
+            destacado_tienda = 1 if bool(destacado_raw) else 0
+        orden_tienda = int(data.get("orden_tienda", orden_tienda_actual) or 0)
         insumos_venta = data.get("insumos_venta", None)
         productos_venta = data.get("productos_venta", None)
         tipo_dep_actual = str(actual["stock_dependencia_tipo"] or "").strip().lower() if "stock_dependencia_tipo" in actual.keys() else ""
@@ -1926,6 +1944,14 @@ def actualizar_producto(producto_id, data):
             raise ValueError("La porción debe ser mayor a 0")
         if not _unidades_compatibles_porcion(unidad, porcion_unidad):
             raise ValueError(f"La unidad de porción ({porcion_unidad}) no es compatible con la unidad del stock ({unidad})")
+        if descuento_tienda_pct < 0 or descuento_tienda_pct > 100:
+            raise ValueError("El descuento de tienda debe estar entre 0 y 100")
+        if foto_fit_tienda not in {"cover", "contain"}:
+            raise ValueError("El ajuste de foto de tienda es invalido")
+        if foto_pos_tienda not in {"center", "top", "bottom"}:
+            raise ValueError("La posicion de foto de tienda es invalida")
+        if orden_tienda < 0:
+            raise ValueError("El orden de tienda no puede ser negativo")
         if not icono:
             icono = "cupcake"
         if dep_cantidad <= 0:
@@ -2061,7 +2087,9 @@ def actualizar_producto(producto_id, data):
             SET nombre = ?, stock_minimo = ?, unidad = ?, fecha_vencimiento = ?,
                 alerta_dias = ?, precio = ?, vida_util_dias = ?, icono = ?,
                 porcion_cantidad = ?, porcion_unidad = ?,
-                stock_dependencia_tipo = ?, stock_dependencia_id = ?, stock_dependencia_cantidad = ?
+                stock_dependencia_tipo = ?, stock_dependencia_id = ?, stock_dependencia_cantidad = ?,
+                categoria_tienda = ?, descripcion_tienda = ?, descuento_tienda_pct = ?,
+                foto_fit_tienda = ?, foto_pos_tienda = ?, destacado_tienda = ?, orden_tienda = ?
             WHERE id = ?
             """,
             (
@@ -2078,6 +2106,13 @@ def actualizar_producto(producto_id, data):
                 tipo_dep,
                 (dep_id if dep_id > 0 else None),
                 dep_cantidad,
+                categoria_tienda,
+                descripcion_tienda,
+                descuento_tienda_pct,
+                foto_fit_tienda,
+                foto_pos_tienda,
+                destacado_tienda,
+                orden_tienda,
                 producto_id,
             ),
         )
@@ -7040,6 +7075,13 @@ def migrar_db():
         _ensure_column(conn, "productos", "stock_dependencia_tipo", "TEXT")
         _ensure_column(conn, "productos", "stock_dependencia_id", "INTEGER")
         _ensure_column(conn, "productos", "stock_dependencia_cantidad", "REAL DEFAULT 1")
+        _ensure_column(conn, "productos", "categoria_tienda", "TEXT DEFAULT 'General'")
+        _ensure_column(conn, "productos", "descripcion_tienda", "TEXT DEFAULT ''")
+        _ensure_column(conn, "productos", "descuento_tienda_pct", "REAL DEFAULT 0")
+        _ensure_column(conn, "productos", "foto_fit_tienda", "TEXT DEFAULT 'cover'")
+        _ensure_column(conn, "productos", "foto_pos_tienda", "TEXT DEFAULT 'center'")
+        _ensure_column(conn, "productos", "destacado_tienda", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "productos", "orden_tienda", "INTEGER DEFAULT 0")
         _ensure_column(conn, "agenda_eventos", "codigo_operacion", "TEXT")
         _ensure_column(conn, "ventas", "codigo_pedido", "TEXT")
         _ensure_column(conn, "ventas", "canal_venta", "TEXT DEFAULT 'presencial'")
@@ -7105,6 +7147,63 @@ def migrar_db():
                 stock_dependencia_id = NULL,
                 stock_dependencia_cantidad = 1
             WHERE stock_dependencia_tipo IS NULL
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET categoria_tienda = COALESCE(NULLIF(TRIM(categoria_tienda), ''), 'General')
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET descripcion_tienda = COALESCE(descripcion_tienda, '')
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET descuento_tienda_pct = 0
+            WHERE descuento_tienda_pct IS NULL OR descuento_tienda_pct < 0 OR descuento_tienda_pct > 100
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET foto_fit_tienda = CASE
+                WHEN LOWER(TRIM(COALESCE(foto_fit_tienda, ''))) IN ('cover', 'contain')
+                THEN LOWER(TRIM(foto_fit_tienda))
+                ELSE 'cover'
+            END
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET foto_pos_tienda = CASE
+                WHEN LOWER(TRIM(COALESCE(foto_pos_tienda, ''))) IN ('center', 'top', 'bottom')
+                THEN LOWER(TRIM(foto_pos_tienda))
+                ELSE 'center'
+            END
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET destacado_tienda = CASE
+                WHEN destacado_tienda IS NULL OR destacado_tienda = 0 THEN 0
+                ELSE 1
+            END
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET orden_tienda = CASE
+                WHEN orden_tienda IS NULL OR orden_tienda < 0 THEN 0
+                ELSE orden_tienda
+            END
             """
         )
 

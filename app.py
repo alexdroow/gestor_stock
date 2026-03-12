@@ -802,15 +802,40 @@ def _serializar_producto_tienda(producto):
         foto_rel = str(item.get("foto") or "").strip()
         if foto_rel:
             foto_url = url_for('static', filename=foto_rel)
+    categoria = str(item.get("categoria_tienda") or "").strip() or "General"
+    descripcion = str(item.get("descripcion_tienda") or "").strip()
+    descuento = float(item.get("descuento_tienda_pct") or 0)
+    if descuento < 0:
+        descuento = 0.0
+    if descuento > 100:
+        descuento = 100.0
+    precio_base = float(item.get("precio") or 0)
+    precio_final = precio_base * (1 - (descuento / 100.0))
+    if precio_final < 0:
+        precio_final = 0
+    foto_fit = str(item.get("foto_fit_tienda") or "cover").strip().lower()
+    if foto_fit not in {"cover", "contain"}:
+        foto_fit = "cover"
+    foto_pos = str(item.get("foto_pos_tienda") or "center").strip().lower()
+    if foto_pos not in {"center", "top", "bottom"}:
+        foto_pos = "center"
     return {
         "id": int(item.get("id") or 0),
         "nombre": item.get("nombre") or "Producto",
-        "precio": float(item.get("precio") or 0),
+        "precio_base": precio_base,
+        "precio_final": round(precio_final, 2),
+        "descuento_tienda_pct": descuento,
         "stock_visual": float(item.get("stock_visual") or 0),
         "stock_visual_label": item.get("stock_visual_label") or _formatear_numero_simple(item.get("stock_visual")),
         "stock_visual_unidad": item.get("stock_visual_unidad") or item.get("unidad") or "unidad",
         "foto_url": foto_url,
         "foto": str(item.get("foto") or "").strip(),
+        "foto_fit_tienda": foto_fit,
+        "foto_pos_tienda": foto_pos,
+        "categoria_tienda": categoria,
+        "descripcion_tienda": descripcion,
+        "destacado_tienda": bool(item.get("destacado_tienda")),
+        "orden_tienda": int(item.get("orden_tienda") or 0),
         "icono": item.get("icono") or "package",
         "max_compra": max_compra,
     }
@@ -828,6 +853,43 @@ def api_tienda_productos():
         return jsonify({"success": True, "productos": disponibles})
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
+
+
+@app.route('/ventas/admin-catalogo')
+def ventas_admin_catalogo():
+    return render_template('tienda_admin.html')
+
+
+@app.route('/api/tienda/admin/productos', methods=['GET'])
+def api_tienda_admin_productos():
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+            FROM productos
+            WHERE COALESCE(eliminado, 0) = 0
+            ORDER BY
+                COALESCE(NULLIF(TRIM(categoria_tienda), ''), 'General') COLLATE NOCASE ASC,
+                COALESCE(orden_tienda, 0) ASC,
+                nombre COLLATE NOCASE ASC
+            """
+        )
+        productos = []
+        for row in cursor.fetchall():
+            item = dict(row)
+            serial = _serializar_producto_tienda(item)
+            serial["precio"] = float(item.get("precio") or 0)
+            serial["stock"] = float(item.get("stock") or 0)
+            productos.append(serial)
+        return jsonify({"success": True, "productos": productos})
+    except Exception as e:
+        return jsonify({"success": False, "productos": [], "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/historial-cambios')
@@ -1113,6 +1175,26 @@ def api_actualizar_producto(id):
                 data["stock_dependencia_id"] = int(raw_id)
         if "stock_dependencia_cantidad" in data:
             data["stock_dependencia_cantidad"] = float(data.get("stock_dependencia_cantidad") or 1)
+        if "categoria_tienda" in data:
+            data["categoria_tienda"] = str(data.get("categoria_tienda") or "").strip()[:60] or "General"
+        if "descripcion_tienda" in data:
+            data["descripcion_tienda"] = str(data.get("descripcion_tienda") or "").strip()[:800]
+        if "descuento_tienda_pct" in data:
+            data["descuento_tienda_pct"] = float(data.get("descuento_tienda_pct") or 0)
+        if "foto_fit_tienda" in data:
+            fit = str(data.get("foto_fit_tienda") or "cover").strip().lower()
+            data["foto_fit_tienda"] = fit if fit in {"cover", "contain"} else "cover"
+        if "foto_pos_tienda" in data:
+            pos = str(data.get("foto_pos_tienda") or "center").strip().lower()
+            data["foto_pos_tienda"] = pos if pos in {"center", "top", "bottom"} else "center"
+        if "destacado_tienda" in data:
+            raw_dest = data.get("destacado_tienda")
+            if isinstance(raw_dest, str):
+                data["destacado_tienda"] = raw_dest.strip().lower() in {"1", "true", "si", "yes", "on"}
+            else:
+                data["destacado_tienda"] = bool(raw_dest)
+        if "orden_tienda" in data:
+            data["orden_tienda"] = int(data.get("orden_tienda") or 0)
         if "insumos_venta" in data:
             if not isinstance(data.get("insumos_venta"), list):
                 raise ValueError("Los insumos asociados deben enviarse en una lista")
@@ -3625,8 +3707,47 @@ def procesar_venta():
 def api_tienda_checkout():
     try:
         data = request.get_json(silent=True) or {}
+        items_req = data.get('items') or []
+        if not isinstance(items_req, list) or not items_req:
+            return jsonify({'success': False, 'error': 'Carrito vacio'}), 400
+
+        catalogo = _obtener_productos_para_venta()
+        mapa = {int(p.get("id") or 0): _serializar_producto_tienda(p) for p in catalogo}
+        items_limpios = []
+        for idx, raw in enumerate(items_req, start=1):
+            if not isinstance(raw, dict):
+                return jsonify({'success': False, 'error': f'Item #{idx} invalido'}), 400
+            try:
+                pid = int(raw.get("id") or 0)
+                cantidad = int(raw.get("cantidad") or 0)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': f'Item #{idx}: formato invalido'}), 400
+            if pid <= 0 or cantidad <= 0:
+                return jsonify({'success': False, 'error': f'Item #{idx}: datos invalidos'}), 400
+            prod = mapa.get(pid)
+            if not prod:
+                return jsonify({'success': False, 'error': f'Producto #{pid} no disponible'}), 400
+            max_compra = int(prod.get("max_compra") or 0)
+            if max_compra <= 0:
+                return jsonify({'success': False, 'error': f'{prod.get("nombre")} sin stock disponible'}), 400
+            if cantidad > max_compra:
+                return jsonify({'success': False, 'error': f'{prod.get("nombre")}: maximo {max_compra} unidad(es)'}), 400
+
+            items_limpios.append(
+                {
+                    "id": pid,
+                    "cantidad": cantidad,
+                    "precio_unitario": float(prod.get("precio_final") or 0),
+                }
+            )
+
+        payload_seguro = {
+            "items": items_limpios,
+            "codigo_pedido": str(data.get("codigo_pedido") or "").strip()[:80],
+            "fecha_venta": str(data.get("fecha_venta") or "").strip() or None,
+        }
         respuesta = _procesar_venta_desde_payload(
-            data,
+            payload_seguro,
             canal_por_defecto='tienda_online',
             permitir_canal_usuario=False,
             permitir_agenda=False,

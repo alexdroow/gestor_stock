@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalogo tienda admin</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --line: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+            --accent: #ea580c;
+            --ok: #16a34a;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
+        .wrap { max-width: 1220px; margin: 0 auto; padding: 16px; display: grid; gap: 12px; }
+        .top {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .top a {
+            text-decoration: none;
+            color: #334155;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 7px 10px;
+            background: #fff;
+            font-weight: 700;
+        }
+        .search { width: min(420px, 100%); }
+        .search input {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 9px 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 12px;
+        }
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 11px;
+            display: grid;
+            gap: 8px;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 88px 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+        .thumb {
+            width: 88px;
+            height: 88px;
+            border-radius: 10px;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        .thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+        }
+        .name { font-weight: 800; line-height: 1.2; }
+        .sub { font-size: .85rem; color: var(--muted); }
+        label { display: grid; gap: 4px; font-size: .84rem; color: #475569; font-weight: 600; }
+        input, select, textarea {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 9px;
+            font: inherit;
+        }
+        textarea { min-height: 64px; resize: vertical; }
+        .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .check {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: .86rem;
+            color: #334155;
+        }
+        .actions { display: flex; gap: 8px; }
+        .save {
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 800;
+            padding: 9px 12px;
+            cursor: pointer;
+        }
+        .save:disabled { opacity: .65; cursor: not-allowed; }
+        .ok { color: var(--ok); font-size: .84rem; font-weight: 700; }
+        .err { color: #b91c1c; font-size: .84rem; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="top">
+            <div>
+                <strong>Herramientas de tienda</strong>
+                <div class="sub">Categoria, descripcion, descuento y ajuste de foto por producto.</div>
+            </div>
+            <div class="search">
+                <input id="q" type="search" placeholder="Buscar por nombre o categoria...">
+            </div>
+            <a href="{{ url_for('ventas') }}">Volver a ventas</a>
+        </div>
+        <div class="grid" id="grid"></div>
+    </div>
+
+    <script>
+        const gridEl = document.getElementById("grid");
+        const qEl = document.getElementById("q");
+        let productos = [];
+
+        function esc(text) {
+            return String(text || "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#39;");
+        }
+
+        function n(v) {
+            const x = Number(v || 0);
+            return Number.isFinite(x) ? x : 0;
+        }
+
+        function imgSrc(p) {
+            const direct = String(p.foto_url || "").trim();
+            const rel = String(p.foto || "").trim();
+            return direct || (rel ? `/static/${rel}` : "");
+        }
+
+        function fitStyle(p) {
+            const fit = p.foto_fit_tienda === "contain" ? "contain" : "cover";
+            const pos = ["center", "top", "bottom"].includes(String(p.foto_pos_tienda || "")) ? p.foto_pos_tienda : "center";
+            return `object-fit:${fit};object-position:${pos};`;
+        }
+
+        function render() {
+            const q = String(qEl.value || "").trim().toLowerCase();
+            const items = !q ? productos : productos.filter((p) => {
+                const blob = `${p.nombre || ""} ${p.categoria_tienda || ""}`.toLowerCase();
+                return blob.includes(q);
+            });
+
+            if (!items.length) {
+                gridEl.innerHTML = "<p>No hay productos para mostrar.</p>";
+                return;
+            }
+
+            gridEl.innerHTML = items.map((p) => `
+                <article class="card" data-id="${p.id}">
+                    <div class="row">
+                        <div class="thumb">
+                            ${imgSrc(p)
+                                ? `<img src="${esc(imgSrc(p))}?v=${Date.now()}" style="${fitStyle(p)}" alt="${esc(p.nombre)}">`
+                                : ""}
+                        </div>
+                        <div>
+                            <div class="name">${esc(p.nombre)}</div>
+                            <div class="sub">Precio base: $${Math.round(n(p.precio)).toLocaleString("es-CL")} | Stock: ${Math.max(0, Number(p.stock || 0))}</div>
+                        </div>
+                    </div>
+
+                    <div class="two">
+                        <label>Categoria
+                            <input type="text" name="categoria_tienda" value="${esc(p.categoria_tienda || "General")}">
+                        </label>
+                        <label>Descuento (%)
+                            <input type="number" min="0" max="100" step="1" name="descuento_tienda_pct" value="${Math.round(n(p.descuento_tienda_pct))}">
+                        </label>
+                    </div>
+
+                    <label>Descripcion
+                        <textarea name="descripcion_tienda">${esc(p.descripcion_tienda || "")}</textarea>
+                    </label>
+
+                    <div class="three">
+                        <label>Ajuste foto
+                            <select name="foto_fit_tienda">
+                                <option value="cover" ${p.foto_fit_tienda === "cover" ? "selected" : ""}>Cover</option>
+                                <option value="contain" ${p.foto_fit_tienda === "contain" ? "selected" : ""}>Contain</option>
+                            </select>
+                        </label>
+                        <label>Posicion foto
+                            <select name="foto_pos_tienda">
+                                <option value="center" ${p.foto_pos_tienda === "center" ? "selected" : ""}>Centro</option>
+                                <option value="top" ${p.foto_pos_tienda === "top" ? "selected" : ""}>Arriba</option>
+                                <option value="bottom" ${p.foto_pos_tienda === "bottom" ? "selected" : ""}>Abajo</option>
+                            </select>
+                        </label>
+                        <label>Orden
+                            <input type="number" min="0" step="1" name="orden_tienda" value="${Math.max(0, parseInt(p.orden_tienda || 0, 10) || 0)}">
+                        </label>
+                    </div>
+
+                    <label class="check">
+                        <input type="checkbox" name="destacado_tienda" ${p.destacado_tienda ? "checked" : ""}>
+                        Mostrar en destacados
+                    </label>
+
+                    <div class="actions">
+                        <button class="save" type="button" onclick="guardar(${p.id})">Guardar</button>
+                        <span class="sub">Foto: usar panel de ventas para subir/cambiar imagen.</span>
+                    </div>
+                    <div class="sub" id="msg-${p.id}"></div>
+                </article>
+            `).join("");
+        }
+
+        function payloadDesdeCard(card) {
+            return {
+                categoria_tienda: card.querySelector('[name="categoria_tienda"]').value,
+                descripcion_tienda: card.querySelector('[name="descripcion_tienda"]').value,
+                descuento_tienda_pct: Number(card.querySelector('[name="descuento_tienda_pct"]').value || 0),
+                foto_fit_tienda: card.querySelector('[name="foto_fit_tienda"]').value,
+                foto_pos_tienda: card.querySelector('[name="foto_pos_tienda"]').value,
+                orden_tienda: Number(card.querySelector('[name="orden_tienda"]').value || 0),
+                destacado_tienda: card.querySelector('[name="destacado_tienda"]').checked
+            };
+        }
+
+        async function guardar(id) {
+            const card = document.querySelector(`article[data-id="${id}"]`);
+            if (!card) return;
+            const btn = card.querySelector(".save");
+            const msg = card.querySelector(`#msg-${id}`);
+            btn.disabled = true;
+            msg.className = "sub";
+            msg.textContent = "Guardando...";
+            try {
+                const payload = payloadDesdeCard(card);
+                const res = await fetch(`/api/producto/${id}/actualizar`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
+                msg.className = "ok";
+                msg.textContent = "Guardado";
+                await cargar();
+            } catch (e) {
+                msg.className = "err";
+                msg.textContent = e.message || "Error guardando";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function cargar() {
+            gridEl.innerHTML = "<p>Cargando...</p>";
+            try {
+                const res = await fetch("/api/tienda/admin/productos", { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar");
+                productos = Array.isArray(data.productos) ? data.productos : [];
+                render();
+            } catch (e) {
+                gridEl.innerHTML = `<p style="color:#b91c1c;">${esc(e.message || "Error cargando")}</p>`;
+            }
+        }
+
+        window.guardar = guardar;
+        qEl.addEventListener("input", render);
+        cargar();
+    </script>
+</body>
+</html>
