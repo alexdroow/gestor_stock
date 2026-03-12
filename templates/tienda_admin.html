@@ -59,16 +59,16 @@
         }
         .row {
             display: grid;
-            grid-template-columns: 88px 1fr;
+            grid-template-columns: 126px 1fr;
             gap: 8px;
             align-items: center;
         }
         .thumb {
-            width: 88px;
-            height: 88px;
+            width: 126px;
+            height: 100px;
             border-radius: 10px;
-            background: #f1f5f9;
-            border: 1px solid #e2e8f0;
+            background: #faf5f0;
+            border: 1px solid #e5e7eb;
             overflow: hidden;
         }
         .thumb img {
@@ -76,6 +76,15 @@
             height: 100%;
             object-fit: cover;
             object-position: center;
+        }
+        .thumb-fallback {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            place-items: center;
+            color: #fdba74;
+            font-size: 1.5rem;
+            font-weight: 800;
         }
         .name { font-weight: 800; line-height: 1.2; }
         .sub { font-size: .85rem; color: var(--muted); }
@@ -198,11 +207,12 @@
                         <div class="thumb">
                             ${imgSrc(p)
                                 ? `<img src="${esc(imgSrc(p))}?v=${Date.now()}" style="${fitStyle(p)}" alt="${esc(p.nombre)}">`
-                                : ""}
+                                : `<div class="thumb-fallback">*</div>`}
                         </div>
                         <div>
                             <div class="name">${esc(p.nombre)}</div>
                             <div class="sub">Precio base: $${Math.round(n(p.precio)).toLocaleString("es-CL")} | Stock: ${Math.max(0, Number(p.stock || 0))}</div>
+                            <div class="sub">Vista previa con proporcion real de tienda.</div>
                         </div>
                     </div>
 
