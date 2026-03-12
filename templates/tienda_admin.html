@@ -698,14 +698,14 @@
                 const list = Array.isArray(data.abandonados) ? data.abandonados : [];
                 document.getElementById("act-abandonados-list").innerHTML = list.length
                     ? list.map((x) => `<div class="tiny-item">#${esc((x.session_id || "").slice(0, 8))} - ${Math.max(0, Number(x.carrito_items || 0))} items - $${Math.round(Number(x.carrito_total || 0)).toLocaleString("es-CL")} - ${esc(x.ultima_actividad || "")}</div>`).join("")
-                    : "<div class="tiny-item">Sin abandonos detectados.</div>";
+                    : '<div class="tiny-item">Sin abandonos detectados.</div>';
 
                 const ips = Array.isArray(data.top_ips) ? data.top_ips : [];
                 const ipsEl = document.getElementById("act-top-ips-list");
                 if (ipsEl) {
                     ipsEl.innerHTML = ips.length
                         ? ips.map((x) => `<div class="tiny-item">${esc(x.ip_address || "desconocida")} - ${Math.max(0, Number(x.sesiones || 0))} sesion(es)</div>`).join("")
-                        : "<div class="tiny-item">Sin conexiones recientes.</div>";
+                        : '<div class="tiny-item">Sin conexiones recientes.</div>';
                 }
                 const updEl = document.getElementById("act-actualizado");
                 if (updEl) {
