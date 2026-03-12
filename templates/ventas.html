@@ -2879,39 +2879,98 @@
         let _pedidosTiendaLastId = Number(localStorage.getItem(PEDIDOS_TIENDA_LAST_ID_KEY) || 0) || 0;
         let _pedidosTiendaPollTimer = null;
         let _pedidosTiendaInicializado = false;
+        let _pedidoAlarmTimer = null;
+        let _pedidosPendientesAtencion = [];
 
-        function _toastPedidoNuevo(texto) {
-            let host = document.getElementById('toast-pedidos-online');
-            if (!host) {
-                host = document.createElement('div');
-                host.id = 'toast-pedidos-online';
-                host.style.position = 'fixed';
-                host.style.right = '18px';
-                host.style.top = '18px';
-                host.style.zIndex = '99999';
-                host.style.display = 'grid';
-                host.style.gap = '10px';
-                host.style.maxWidth = '360px';
-                document.body.appendChild(host);
-            }
-            const item = document.createElement('div');
-            item.style.background = '#111827';
-            item.style.color = '#fff';
-            item.style.padding = '12px 14px';
-            item.style.borderRadius = '12px';
-            item.style.boxShadow = '0 10px 24px rgba(0,0,0,.25)';
-            item.style.border = '1px solid rgba(255,255,255,.12)';
-            item.innerHTML = `
-                <div style="font-weight:800; margin-bottom:4px;">Nuevo pedido online</div>
-                <div style="font-size:.9rem; line-height:1.35;">${texto}</div>
+        function _ensurePedidoModal() {
+            let overlay = document.getElementById('pedido-alert-overlay');
+            if (overlay) return overlay;
+
+            overlay = document.createElement('div');
+            overlay.id = 'pedido-alert-overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.inset = '0';
+            overlay.style.background = 'rgba(15,23,42,.72)';
+            overlay.style.zIndex = '130000';
+            overlay.style.display = 'none';
+            overlay.style.alignItems = 'center';
+            overlay.style.justifyContent = 'center';
+            overlay.style.padding = '20px';
+
+            const panel = document.createElement('div');
+            panel.style.width = 'min(880px, 96vw)';
+            panel.style.maxHeight = '86vh';
+            panel.style.overflow = 'auto';
+            panel.style.background = '#ffffff';
+            panel.style.borderRadius = '16px';
+            panel.style.border = '2px solid #ef4444';
+            panel.style.boxShadow = '0 26px 46px rgba(0,0,0,.34)';
+            panel.style.padding = '18px';
+            panel.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">
+                    <div>
+                        <div style="font-size:1.22rem;font-weight:900;color:#991b1b;">Nuevo pedido online pendiente</div>
+                        <div style="font-size:.96rem;color:#475569;">Esta alerta y sonido continuarán hasta confirmar que el pedido fue atendido.</div>
+                    </div>
+                    <div style="background:#fee2e2;color:#991b1b;padding:8px 11px;border-radius:999px;font-weight:800;" id="pedido-alert-count">0</div>
+                </div>
+                <div id="pedido-alert-body" style="display:grid;gap:10px;"></div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;">
+                    <button type="button" id="pedido-alert-open-historial" style="border:1px solid #cbd5e1;background:#fff;color:#334155;padding:10px 12px;border-radius:10px;font-weight:700;cursor:pointer;">Ir a historial</button>
+                    <button type="button" id="pedido-alert-confirm" style="border:0;background:#16a34a;color:#fff;padding:10px 14px;border-radius:10px;font-weight:800;cursor:pointer;">Confirmar pedido atendido</button>
+                </div>
             `;
-            host.appendChild(item);
-            setTimeout(() => {
-                item.style.transition = 'all .25s ease';
-                item.style.opacity = '0';
-                item.style.transform = 'translateY(-6px)';
-                setTimeout(() => item.remove(), 260);
-            }, 5500);
+            overlay.appendChild(panel);
+            document.body.appendChild(overlay);
+
+            panel.querySelector('#pedido-alert-open-historial')?.addEventListener('click', () => {
+                window.location.href = '/historial-ventas';
+            });
+            panel.querySelector('#pedido-alert-confirm')?.addEventListener('click', () => {
+                _pedidosPendientesAtencion = [];
+                _stopPedidoAlarm();
+                _renderPedidoAlert();
+                overlay.style.display = 'none';
+            });
+            return overlay;
+        }
+
+        function _startPedidoAlarm() {
+            if (_pedidoAlarmTimer) return;
+            _beepPedidoNuevo();
+            _pedidoAlarmTimer = setInterval(_beepPedidoNuevo, 1200);
+        }
+
+        function _stopPedidoAlarm() {
+            if (_pedidoAlarmTimer) {
+                clearInterval(_pedidoAlarmTimer);
+                _pedidoAlarmTimer = null;
+            }
+        }
+
+        function _renderPedidoAlert() {
+            const overlay = _ensurePedidoModal();
+            const countEl = document.getElementById('pedido-alert-count');
+            const bodyEl = document.getElementById('pedido-alert-body');
+            if (!overlay || !countEl || !bodyEl) return;
+
+            const total = _pedidosPendientesAtencion.length;
+            countEl.textContent = String(total);
+            bodyEl.innerHTML = _pedidosPendientesAtencion.map((p, idx) => {
+                const nombre = String(p.cliente_nombre || '').trim() || 'sin nombre';
+                const email = String(p.cliente_email || '').trim() || '-';
+                const telefono = String(p.cliente_telefono || '').trim() || '-';
+                const totalMonto = Number(p.total_monto || 0);
+                return `
+                    <div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
+                        <div style="font-weight:800;color:#1f2937;">Pedido #${p.id || '?'} ${idx === total - 1 ? '(nuevo)' : ''}</div>
+                        <div style="font-size:.9rem;color:#475569;">Cliente: <strong>${nombre}</strong></div>
+                        <div style="font-size:.9rem;color:#475569;">Correo: <strong>${email}</strong></div>
+                        <div style="font-size:.9rem;color:#475569;">Telefono: <strong>${telefono}</strong></div>
+                        <div style="font-size:.92rem;color:#111827;font-weight:700;">Total: $${Math.round(totalMonto).toLocaleString('es-CL')}</div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function _beepPedidoNuevo() {
@@ -2953,18 +3012,22 @@
                 if (pedidos.length > 0) {
                     _pedidosTiendaLastId = maxIdResp || Number(_pedidosTiendaLastId || 0);
                     localStorage.setItem(PEDIDOS_TIENDA_LAST_ID_KEY, String(_pedidosTiendaLastId));
-                    _beepPedidoNuevo();
-                    const totalNuevos = pedidos.length;
-                    const ultimo = pedidos[pedidos.length - 1] || {};
-                    const nombre = String(ultimo.cliente_nombre || '').trim();
-                    const telefono = String(ultimo.cliente_telefono || '').trim();
-                    const email = String(ultimo.cliente_email || '').trim();
-                    const contacto = telefono || email || 'sin contacto';
-                    _toastPedidoNuevo(`${totalNuevos} pedido(s) nuevo(s). Cliente: ${nombre || 'sin nombre'} · Contacto: ${contacto}.`);
+                    const idsPend = new Set(_pedidosPendientesAtencion.map((p) => Number(p.id || 0)));
+                    for (const p of pedidos) {
+                        const pid = Number(p.id || 0);
+                        if (!idsPend.has(pid)) {
+                            _pedidosPendientesAtencion.push(p);
+                            idsPend.add(pid);
+                        }
+                    }
+                    _renderPedidoAlert();
+                    _startPedidoAlarm();
+                    const overlay = document.getElementById('pedido-alert-overlay');
+                    if (overlay) overlay.style.display = 'flex';
                     if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
-                        window.AppUX.toastSuccess(`${totalNuevos} pedido(s) nuevo(s) desde tienda online.`);
+                        window.AppUX.toastSuccess(`${pedidos.length} pedido(s) nuevo(s) desde tienda online.`);
                     } else {
-                        alert(`${totalNuevos} pedido(s) nuevo(s) desde tienda online.`);
+                        alert(`${pedidos.length} pedido(s) nuevo(s) desde tienda online.`);
                     }
                 } else if (maxIdResp > _pedidosTiendaLastId) {
                     _pedidosTiendaLastId = maxIdResp;
