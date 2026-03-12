@@ -1005,6 +1005,7 @@
         <div class="modal">
             <h3>Pedido recibido</h3>
             <div id="modal-exito-texto" style="font-size:.92rem;color:#374151;"></div>
+            <div id="modal-exito-estado" style="font-size:.9rem;color:#334155;font-weight:700;"></div>
             <div id="modal-exito-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-exito-pdf">Descargar comprobante PDF</button>
@@ -1039,6 +1040,7 @@
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
+        const modalExitoEstadoEl = document.getElementById("modal-exito-estado");
         const modalExitoDetalleEl = document.getElementById("modal-exito-detalle");
         const modalCuentaEl = document.getElementById("modal-cuenta");
         const cuentaEstadoEl = document.getElementById("cuenta-estado");
@@ -1072,6 +1074,7 @@
         let tiendaEstadoMensaje = "";
         let mensajePostPedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.";
         let ultimoComprobantePedido = null;
+        let pedidoEstadoPollTimer = null;
         let clienteRegistrado = null;
         let historialComprasCliente = [];
         const tiendaSessionId = (() => {
@@ -1683,6 +1686,7 @@
                     venta_id: Number(data.venta_id || 0),
                     codigo_operacion: String(data.codigo_operacion || ""),
                     fecha_hora_local: new Date().toLocaleString("es-CL"),
+                    estado: "recibido",
                     cliente_nombre: String(datosCliente?.nombre || ""),
                     cliente_email: String(datosCliente?.email || ""),
                     cliente_telefono: String(datosCliente?.telefono || ""),
@@ -1723,6 +1727,10 @@
 
         function abrirModalExito(texto) {
             modalExitoTextoEl.textContent = texto || mensajePostPedido || "Pedido ingresado correctamente. Te contactaremos a la brevedad.";
+            if (modalExitoEstadoEl) {
+                const estadoInicial = String((ultimoComprobantePedido && ultimoComprobantePedido.estado) || "recibido");
+                modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estadoInicial)}`;
+            }
             if (modalExitoDetalleEl) {
                 if (ultimoComprobantePedido) {
                     const p = ultimoComprobantePedido;
@@ -1747,10 +1755,52 @@
                 }
             }
             modalExitoEl.classList.add("active");
+            _startPedidoEstadoPoll();
         }
 
         function cerrarModalExito() {
             modalExitoEl.classList.remove("active");
+            _stopPedidoEstadoPoll();
+        }
+
+        function _labelPedidoEstado(estado) {
+            const map = {
+                recibido: "Recibido",
+                confirmado: "Confirmado",
+                preparando: "En preparacion",
+                listo: "Listo para entregar",
+                entregado: "Entregado",
+                cancelado: "Cancelado",
+            };
+            return map[String(estado || "").toLowerCase()] || "Recibido";
+        }
+
+        async function _pollEstadoPedidoCliente() {
+            const p = ultimoComprobantePedido;
+            if (!p || !Number(p.venta_id || 0)) return;
+            try {
+                const res = await fetch(`/api/tienda/pedido/${Number(p.venta_id || 0)}/estado`, { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) return;
+                const estado = String(((data.pedido || {}).estado) || "recibido");
+                p.estado = estado;
+                if (modalExitoEstadoEl) {
+                    modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estado)}`;
+                }
+            } catch (_) {}
+        }
+
+        function _startPedidoEstadoPoll() {
+            _stopPedidoEstadoPoll();
+            _pollEstadoPedidoCliente();
+            pedidoEstadoPollTimer = setInterval(_pollEstadoPedidoCliente, 5000);
+        }
+
+        function _stopPedidoEstadoPoll() {
+            if (pedidoEstadoPollTimer) {
+                clearInterval(pedidoEstadoPollTimer);
+                pedidoEstadoPollTimer = null;
+            }
         }
 
         function abrirMenuMobile() {

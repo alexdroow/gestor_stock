@@ -934,6 +934,26 @@ def _nombre_desde_email(email):
     return " ".join(part.capitalize() for part in base.split() if part)[:80] or "Cliente tienda"
 
 
+def _normalizar_pedido_estado(raw):
+    v = str(raw or "").strip().lower()
+    if v in {"recibido", "confirmado", "preparando", "listo", "entregado", "cancelado"}:
+        return v
+    return "recibido"
+
+
+def _pedido_estado_label(estado):
+    est = _normalizar_pedido_estado(estado)
+    labels = {
+        "recibido": "Recibido",
+        "confirmado": "Confirmado",
+        "preparando": "En preparacion",
+        "listo": "Listo para entregar",
+        "entregado": "Entregado",
+        "cancelado": "Cancelado",
+    }
+    return labels.get(est, "Recibido")
+
+
 def _normalizar_telefono_cl(raw):
     dig = re.sub(r"\D+", "", str(raw or ""))
     if dig.startswith("56"):
@@ -1873,6 +1893,24 @@ def api_tienda_admin_actividad():
             """
         )
         abandonados = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM ventas
+            WHERE canal_venta = 'tienda_online'
+              AND COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') = 'preparando'
+            """
+        )
+        pedidos_preparando = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM ventas
+            WHERE canal_venta = 'tienda_online'
+              AND COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') = 'recibido'
+            """
+        )
+        pedidos_recibidos = int(cursor.fetchone()["total"] or 0)
         try:
             cursor.execute(
                 """
@@ -1899,6 +1937,8 @@ def api_tienda_admin_actividad():
                     "conectados": conectados,
                     "carritos_activos": carritos_activos,
                     "carritos_abandonados": len(abandonados),
+                    "pedidos_preparando": pedidos_preparando,
+                    "pedidos_recibidos": pedidos_recibidos,
                 },
                 "abandonados": abandonados,
                 "top_ips": top_ips,
@@ -2122,6 +2162,8 @@ def api_tienda_admin_pedidos_nuevos():
         cursor.execute(
             """
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.codigo_pedido,
+                   COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
+                   v.pedido_estado_actualizado,
                    COALESCE(vp.productos, '') AS productos
             FROM ventas v
             LEFT JOIN (
@@ -2141,6 +2183,79 @@ def api_tienda_admin_pedidos_nuevos():
         return jsonify({"success": True, "pedidos": rows, "max_id": max_id})
     except Exception as e:
         return jsonify({"success": False, "pedidos": [], "max_id": 0, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/pedido/<int:venta_id>/estado', methods=['POST'])
+def api_tienda_admin_pedido_estado(venta_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        nuevo_estado = _normalizar_pedido_estado(data.get("estado"))
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE ventas
+            SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP
+            WHERE id = ? AND canal_venta = 'tienda_online'
+            """,
+            (nuevo_estado, int(venta_id)),
+        )
+        if cursor.rowcount <= 0:
+            return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+        conn.commit()
+        return jsonify({"success": True, "estado": nuevo_estado, "estado_label": _pedido_estado_label(nuevo_estado)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/pedido/<int:venta_id>/estado', methods=['GET'])
+def api_tienda_pedido_estado(venta_id):
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, fecha_hora, total_monto,
+                   COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
+                   pedido_estado_actualizado
+            FROM ventas
+            WHERE id = ? AND canal_venta = 'tienda_online'
+            LIMIT 1
+            """,
+            (int(venta_id),),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+        item = dict(row)
+        estado = _normalizar_pedido_estado(item.get("pedido_estado"))
+        return jsonify(
+            {
+                "success": True,
+                "pedido": {
+                    "id": int(item.get("id") or 0),
+                    "estado": estado,
+                    "estado_label": _pedido_estado_label(estado),
+                    "estado_actualizado": item.get("pedido_estado_actualizado"),
+                    "fecha_hora": item.get("fecha_hora"),
+                    "total_monto": float(item.get("total_monto") or 0),
+                },
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
@@ -5162,7 +5277,8 @@ def api_tienda_checkout():
             cursor.execute(
                 """
                 UPDATE ventas
-                SET cliente_nombre = ?, cliente_email = ?, cliente_telefono = ?, descuento_codigo = ?, descuento_monto = ?, total_monto = ?
+                SET cliente_nombre = ?, cliente_email = ?, cliente_telefono = ?, descuento_codigo = ?, descuento_monto = ?, total_monto = ?,
+                    pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
                 (

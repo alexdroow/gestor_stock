@@ -282,6 +282,34 @@
             flex-wrap: wrap;
         }
 
+        .tienda-live-mini {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border: 1px solid #dbeafe;
+            border-radius: 10px;
+            background: #eff6ff;
+        }
+
+        .tienda-live-mini .mini-item {
+            display: grid;
+            gap: 1px;
+            min-width: 78px;
+        }
+
+        .tienda-live-mini .mini-label {
+            font-size: 10px;
+            color: #475569;
+            font-weight: 700;
+        }
+
+        .tienda-live-mini .mini-value {
+            font-size: 13px;
+            color: #0f172a;
+            font-weight: 800;
+        }
+
         .tienda-config-btn {
             border: 1px solid #cbd5e1;
             border-radius: 8px;
@@ -1513,6 +1541,20 @@
                             <span class="estado-online-dot"></span>
                             <span id="ventas-online-text">Desconectado</span>
                         </span>
+                        <div class="tienda-live-mini" id="tienda-live-mini" title="Actividad tienda online en tiempo real">
+                            <div class="mini-item">
+                                <span class="mini-label">Conectados</span>
+                                <span class="mini-value" id="ventas-live-conectados">0</span>
+                            </div>
+                            <div class="mini-item">
+                                <span class="mini-label">Carritos</span>
+                                <span class="mini-value" id="ventas-live-carritos">0</span>
+                            </div>
+                            <div class="mini-item">
+                                <span class="mini-label">Preparando</span>
+                                <span class="mini-value" id="ventas-live-preparando">0</span>
+                            </div>
+                        </div>
                         <label class="alert-tool-label">
                             Volumen
                             <select id="pedido-alert-volume" class="alert-tool-select">
@@ -3061,6 +3103,19 @@
         let _pedidoAlertVolume = String(localStorage.getItem(PEDIDO_ALERT_VOLUME_KEY) || 'alto').trim() || 'alto';
         let _pedidoAlertTone = String(localStorage.getItem(PEDIDO_ALERT_TONE_KEY) || 'sirena_corta').trim() || 'sirena_corta';
         let _tiendaConfigCache = null;
+        let _actividadTiendaPollTimer = null;
+
+        function _labelEstadoPedido(estado) {
+            const map = {
+                recibido: 'Recibido',
+                confirmado: 'Confirmado',
+                preparando: 'En preparacion',
+                listo: 'Listo',
+                entregado: 'Entregado',
+                cancelado: 'Cancelado',
+            };
+            return map[String(estado || '').toLowerCase()] || 'Recibido';
+        }
 
         function _setVentasOnlineIndicator(online, detalle) {
             const pill = document.getElementById('ventas-online-indicator');
@@ -3292,6 +3347,8 @@
                 const telefono = String(p.cliente_telefono || '').trim() || '-';
                 const totalMonto = Number(p.total_monto || 0);
                 const productos = String(p.productos || '').trim() || '-';
+                const estado = String(p.pedido_estado || 'recibido').trim().toLowerCase();
+                const estadoTxt = _labelEstadoPedido(estado);
                 return `
                     <div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
                         <div style="font-weight:800;color:#1f2937;">Pedido #${p.id || '?'} ${idx === total - 1 ? '(nuevo)' : ''}</div>
@@ -3299,10 +3356,60 @@
                         <div style="font-size:.9rem;color:#475569;">Correo: <strong>${email}</strong></div>
                         <div style="font-size:.9rem;color:#475569;">Telefono: <strong>${telefono}</strong></div>
                         <div style="font-size:.9rem;color:#334155;margin-top:6px;"><strong>Productos:</strong> ${productos}</div>
+                        <div style="font-size:.9rem;color:#0f172a;margin-top:6px;"><strong>Estado:</strong> ${estadoTxt}</div>
                         <div style="font-size:.92rem;color:#111827;font-weight:700;">Total: $${Math.round(totalMonto).toLocaleString('es-CL')}</div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                            <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'confirmado')" style="border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Confirmado</button>
+                            <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'preparando')" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Preparando</button>
+                            <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo</button>
+                        </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        async function _actualizarEstadoPedidoOnline(ventaId, estado) {
+            const idNum = Number(ventaId || 0);
+            if (!idNum) return;
+            try {
+                const response = await fetch(`/api/tienda/admin/pedido/${idNum}/estado`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ estado }),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar estado');
+                _pedidosPendientesAtencion = _pedidosPendientesAtencion.map((p) => {
+                    if (Number(p.id || 0) !== idNum) return p;
+                    return { ...p, pedido_estado: String(data.estado || estado) };
+                });
+                _renderPedidoAlert();
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess(`Pedido #${idNum} actualizado a ${_labelEstadoPedido(data.estado)}.`);
+                }
+            } catch (err) {
+                if (window.AppUX && typeof window.AppUX.toastError === 'function') {
+                    window.AppUX.toastError(err.message || 'No se pudo actualizar estado');
+                } else {
+                    alert(err.message || 'No se pudo actualizar estado');
+                }
+            }
+        }
+        window._actualizarEstadoPedidoOnline = _actualizarEstadoPedidoOnline;
+
+        async function _pollActividadTiendaEnVentas() {
+            try {
+                const response = await fetch('/api/tienda/admin/actividad', { headers: { Accept: 'application/json' } });
+                const data = await response.json();
+                if (!response.ok || !data.success) return;
+                const resumen = data.resumen || {};
+                const c = document.getElementById('ventas-live-conectados');
+                const a = document.getElementById('ventas-live-carritos');
+                const p = document.getElementById('ventas-live-preparando');
+                if (c) c.textContent = String(Number(resumen.conectados || 0));
+                if (a) a.textContent = String(Number(resumen.carritos_activos || 0));
+                if (p) p.textContent = String(Number(resumen.pedidos_preparando || 0));
+            } catch (_) {}
         }
 
         function _beepPedidoNuevo() {
@@ -3406,6 +3513,8 @@
         });
         _pollPedidosTiendaNuevos();
         _pedidosTiendaPollTimer = setInterval(_pollPedidosTiendaNuevos, 12000);
+        _pollActividadTiendaEnVentas();
+        _actividadTiendaPollTimer = setInterval(_pollActividadTiendaEnVentas, 5000);
     </script>
 
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>

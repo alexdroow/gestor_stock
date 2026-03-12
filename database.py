@@ -7135,6 +7135,8 @@ def migrar_db():
         _ensure_column(conn, "ventas", "cliente_telefono", "TEXT")
         _ensure_column(conn, "ventas", "descuento_codigo", "TEXT")
         _ensure_column(conn, "ventas", "descuento_monto", "REAL DEFAULT 0")
+        _ensure_column(conn, "ventas", "pedido_estado", "TEXT DEFAULT 'recibido'")
+        _ensure_column(conn, "ventas", "pedido_estado_actualizado", "TEXT")
         _ensure_column(conn, "recetas", "rendimiento", "REAL DEFAULT 1")
         _ensure_column(conn, "producciones", "cantidad_resultado", "REAL DEFAULT 0")
         _ensure_column(conn, "producciones", "metadata_json", "TEXT")
@@ -7142,6 +7144,8 @@ def migrar_db():
         conn.execute("UPDATE agenda_eventos SET codigo_operacion = COALESCE(NULLIF(codigo_operacion, ''), 'OPA-LEGACY-' || id)")
         conn.execute("UPDATE ventas SET canal_venta = COALESCE(NULLIF(TRIM(canal_venta), ''), 'presencial')")
         conn.execute("UPDATE ventas SET codigo_operacion = COALESCE(NULLIF(codigo_operacion, ''), 'OPV-LEGACY-' || id)")
+        conn.execute("UPDATE ventas SET pedido_estado = COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido')")
+        conn.execute("UPDATE ventas SET pedido_estado_actualizado = COALESCE(pedido_estado_actualizado, fecha_hora)")
         conn.execute("UPDATE producciones SET codigo_operacion = COALESCE(NULLIF(codigo_operacion, ''), 'OPP-LEGACY-' || id)")
         conn.execute(
             """
