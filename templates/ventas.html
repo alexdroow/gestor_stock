@@ -188,6 +188,71 @@
         .header-actions {
             display: flex;
             gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .ventas-status-tools {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+
+        .estado-online-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            background: #fff1f2;
+        }
+
+        .estado-online-pill.online {
+            border-color: #86efac;
+            color: #166534;
+            background: #f0fdf4;
+        }
+
+        .estado-online-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+        }
+
+        .estado-online-pill.online .estado-online-dot {
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+        }
+
+        .alert-tool-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .alert-tool-select {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1e293b;
+            background: #fff;
+            padding: 6px 8px;
         }
         
         .ventas-layout {
@@ -1336,6 +1401,21 @@
             border-color: #f59e0b;
             color: #fbbf24;
         }
+
+        body.dark-mode .ventas-status-tools {
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        body.dark-mode .alert-tool-label {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .alert-tool-select {
+            background: #0f172a;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
         
         @media (max-width: 1024px) {
             .sidebar { width: 240px; }
@@ -1349,6 +1429,7 @@
             .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
             .productos-grid { grid-template-columns: repeat(2, 1fr); }
             .header-actions { flex-direction: column; }
+            .ventas-status-tools { width: 100%; justify-content: flex-start; }
         }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
@@ -1378,6 +1459,27 @@
                     <a href="/historial-ventas" class="btn btn-secondary btn-header">
                         &#128221; Ver Historial
                     </a>
+                    <div class="ventas-status-tools">
+                        <span class="estado-online-pill" id="ventas-online-indicator" title="Estado de conexión del panel de ventas">
+                            <span class="estado-online-dot"></span>
+                            <span id="ventas-online-text">Desconectado</span>
+                        </span>
+                        <label class="alert-tool-label">
+                            Volumen
+                            <select id="pedido-alert-volume" class="alert-tool-select">
+                                <option value="normal">Normal</option>
+                                <option value="alto" selected>Alto</option>
+                                <option value="maximo">Máximo</option>
+                            </select>
+                        </label>
+                        <label class="alert-tool-label">
+                            Sonido
+                            <select id="pedido-alert-tone" class="alert-tool-select">
+                                <option value="beep">Beep</option>
+                                <option value="sirena_corta" selected>Sirena corta</option>
+                            </select>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -2876,11 +2978,80 @@
             });
 
         const PEDIDOS_TIENDA_LAST_ID_KEY = 'ventas_online_last_seen_id';
+        const PEDIDO_ALERT_VOLUME_KEY = 'ventas_alert_volume';
+        const PEDIDO_ALERT_TONE_KEY = 'ventas_alert_tone';
         let _pedidosTiendaLastId = Number(localStorage.getItem(PEDIDOS_TIENDA_LAST_ID_KEY) || 0) || 0;
         let _pedidosTiendaPollTimer = null;
         let _pedidosTiendaInicializado = false;
         let _pedidoAlarmTimer = null;
         let _pedidosPendientesAtencion = [];
+        let _pedidoAlertVolume = String(localStorage.getItem(PEDIDO_ALERT_VOLUME_KEY) || 'alto').trim() || 'alto';
+        let _pedidoAlertTone = String(localStorage.getItem(PEDIDO_ALERT_TONE_KEY) || 'sirena_corta').trim() || 'sirena_corta';
+
+        function _setVentasOnlineIndicator(online, detalle) {
+            const pill = document.getElementById('ventas-online-indicator');
+            const text = document.getElementById('ventas-online-text');
+            if (!pill || !text) return;
+            if (online) {
+                pill.classList.add('online');
+                text.textContent = 'Online';
+                pill.title = detalle || 'Conectado';
+            } else {
+                pill.classList.remove('online');
+                text.textContent = 'Apagada';
+                pill.title = detalle || 'Sin conexión';
+            }
+        }
+
+        function _normalizarVolumenAlerta(value) {
+            const val = String(value || '').trim().toLowerCase();
+            if (val === 'normal' || val === 'alto' || val === 'maximo') return val;
+            return 'alto';
+        }
+
+        function _normalizarSonidoAlerta(value) {
+            const val = String(value || '').trim().toLowerCase();
+            if (val === 'beep' || val === 'sirena_corta') return val;
+            return 'sirena_corta';
+        }
+
+        function _valorGananciaVolumenAlerta() {
+            if (_pedidoAlertVolume === 'maximo') return 1.4;
+            if (_pedidoAlertVolume === 'normal') return 0.55;
+            return 0.95;
+        }
+
+        function _intervaloAlarmaPedidoMs() {
+            return _pedidoAlertTone === 'sirena_corta' ? 1700 : 1200;
+        }
+
+        function _initPedidoAlertSettings() {
+            _pedidoAlertVolume = _normalizarVolumenAlerta(_pedidoAlertVolume);
+            _pedidoAlertTone = _normalizarSonidoAlerta(_pedidoAlertTone);
+            localStorage.setItem(PEDIDO_ALERT_VOLUME_KEY, _pedidoAlertVolume);
+            localStorage.setItem(PEDIDO_ALERT_TONE_KEY, _pedidoAlertTone);
+
+            const selectVolume = document.getElementById('pedido-alert-volume');
+            const selectTone = document.getElementById('pedido-alert-tone');
+            if (selectVolume) {
+                selectVolume.value = _pedidoAlertVolume;
+                selectVolume.addEventListener('change', () => {
+                    _pedidoAlertVolume = _normalizarVolumenAlerta(selectVolume.value);
+                    localStorage.setItem(PEDIDO_ALERT_VOLUME_KEY, _pedidoAlertVolume);
+                });
+            }
+            if (selectTone) {
+                selectTone.value = _pedidoAlertTone;
+                selectTone.addEventListener('change', () => {
+                    _pedidoAlertTone = _normalizarSonidoAlerta(selectTone.value);
+                    localStorage.setItem(PEDIDO_ALERT_TONE_KEY, _pedidoAlertTone);
+                    if (_pedidoAlarmTimer) {
+                        _stopPedidoAlarm();
+                        _startPedidoAlarm();
+                    }
+                });
+            }
+        }
 
         function _ensurePedidoModal() {
             let overlay = document.getElementById('pedido-alert-overlay');
@@ -2938,7 +3109,7 @@
         function _startPedidoAlarm() {
             if (_pedidoAlarmTimer) return;
             _beepPedidoNuevo();
-            _pedidoAlarmTimer = setInterval(_beepPedidoNuevo, 1200);
+            _pedidoAlarmTimer = setInterval(_beepPedidoNuevo, _intervaloAlarmaPedidoMs());
         }
 
         function _stopPedidoAlarm() {
@@ -2981,27 +3152,36 @@
                 if (!AudioCtx) return;
                 const ctx = new AudioCtx();
                 const master = ctx.createGain();
-                master.gain.value = 0.65;
+                master.gain.value = _valorGananciaVolumenAlerta();
                 master.connect(ctx.destination);
-                const pattern = [
-                    { t: 0.00, f: 1250, d: 0.16 },
-                    { t: 0.24, f: 980, d: 0.16 },
-                    { t: 0.48, f: 1250, d: 0.24 },
-                ];
+                const tone = _normalizarSonidoAlerta(_pedidoAlertTone);
+                const pattern = tone === 'beep'
+                    ? [
+                        { t: 0.00, f: 1280, d: 0.16, type: 'square', boost: 0.85 },
+                        { t: 0.25, f: 980, d: 0.16, type: 'square', boost: 0.82 },
+                        { t: 0.50, f: 1280, d: 0.24, type: 'square', boost: 0.92 },
+                    ]
+                    : [
+                        { t: 0.00, f: 680, d: 0.20, type: 'sawtooth', boost: 0.95 },
+                        { t: 0.22, f: 980, d: 0.20, type: 'sawtooth', boost: 0.95 },
+                        { t: 0.44, f: 680, d: 0.20, type: 'sawtooth', boost: 0.95 },
+                        { t: 0.66, f: 980, d: 0.20, type: 'sawtooth', boost: 0.95 },
+                        { t: 0.92, f: 1250, d: 0.28, type: 'square', boost: 1.0 },
+                    ];
                 for (const step of pattern) {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
-                    osc.type = 'square';
+                    osc.type = step.type || 'square';
                     osc.frequency.setValueAtTime(step.f, ctx.currentTime + step.t);
                     gain.gain.setValueAtTime(0.0001, ctx.currentTime + step.t);
-                    gain.gain.exponentialRampToValueAtTime(0.95, ctx.currentTime + step.t + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(step.boost || 0.95, ctx.currentTime + step.t + 0.02);
                     gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + step.t + step.d);
                     osc.connect(gain);
                     gain.connect(master);
                     osc.start(ctx.currentTime + step.t);
                     osc.stop(ctx.currentTime + step.t + step.d + 0.02);
                 }
-                setTimeout(() => { try { ctx.close(); } catch (_) {} }, 1300);
+                setTimeout(() => { try { ctx.close(); } catch (_) {} }, tone === 'beep' ? 1300 : 1900);
             } catch (_) {}
         }
 
@@ -3011,7 +3191,11 @@
                     headers: { Accept: 'application/json' }
                 });
                 const data = await response.json();
-                if (!response.ok || !data.success) return;
+                if (!response.ok || !data.success) {
+                    _setVentasOnlineIndicator(false, 'Error consultando pedidos');
+                    return;
+                }
+                _setVentasOnlineIndicator(true, 'Conectado y recibiendo pedidos');
                 const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
                 const maxIdResp = Number(data.max_id || 0) || 0;
 
@@ -3047,10 +3231,18 @@
                     localStorage.setItem(PEDIDOS_TIENDA_LAST_ID_KEY, String(_pedidosTiendaLastId));
                 }
             } catch (err) {
+                _setVentasOnlineIndicator(false, 'Sin conexión a internet o servidor');
                 console.warn('No se pudo consultar pedidos nuevos de tienda:', err);
             }
         }
 
+        _initPedidoAlertSettings();
+        _setVentasOnlineIndicator(false, 'Esperando conexión');
+        window.addEventListener('offline', () => _setVentasOnlineIndicator(false, 'Sin conexión a internet'));
+        window.addEventListener('online', () => {
+            _setVentasOnlineIndicator(false, 'Reconectando...');
+            _pollPedidosTiendaNuevos();
+        });
         _pollPedidosTiendaNuevos();
         _pedidosTiendaPollTimer = setInterval(_pollPedidosTiendaNuevos, 12000);
     </script>
