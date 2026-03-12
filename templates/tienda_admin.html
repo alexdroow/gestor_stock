@@ -127,6 +127,15 @@
             align-items: center;
             flex-wrap: wrap;
         }
+        .btn-lite {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            color: #334155;
+            font-weight: 700;
+            padding: 8px 10px;
+            cursor: pointer;
+        }
         .save {
             border: 0;
             border-radius: 8px;
@@ -139,6 +148,71 @@
         .save:disabled { opacity: .65; cursor: not-allowed; }
         .ok { color: var(--ok); font-size: .84rem; font-weight: 700; }
         .err { color: #b91c1c; font-size: .84rem; font-weight: 700; }
+        .crop-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .72);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+        }
+        .crop-modal.active { display: flex; }
+        .crop-panel {
+            width: min(900px, 96vw);
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            display: grid;
+            gap: 10px;
+        }
+        .crop-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .crop-stage-wrap {
+            display: grid;
+            place-items: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .crop-stage {
+            width: min(640px, 90vw);
+            aspect-ratio: 1.2631578947;
+            background: #faf5f0;
+            border: 2px dashed #fb923c;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            touch-action: none;
+            cursor: grab;
+        }
+        .crop-stage.dragging { cursor: grabbing; }
+        .crop-stage img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: 50% 50%;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+        }
+        .crop-controls {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(180px, 1fr));
+            gap: 10px;
+        }
+        .crop-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -146,7 +220,7 @@
         <div class="top">
             <div>
                 <strong>Herramientas de tienda</strong>
-                <div class="sub">Categoria, descripcion, descuento y ajuste de foto por producto.</div>
+                <div class="sub">Categoria, descripcion, descuento y encuadre de foto por producto.</div>
             </div>
             <div class="search">
                 <input id="q" type="search" placeholder="Buscar por nombre o categoria...">
@@ -155,11 +229,66 @@
         </div>
         <div class="grid" id="grid"></div>
     </div>
+    <div class="crop-modal" id="crop-modal">
+        <div class="crop-panel">
+            <div class="crop-head">
+                <div>
+                    <strong>Encuadre de foto para tienda</strong>
+                    <div class="sub">Esta vista respeta el marco real usado en la tarjeta de la tienda.</div>
+                </div>
+                <button type="button" class="btn-lite" id="crop-reset">Reiniciar</button>
+            </div>
+            <div class="crop-stage-wrap">
+                <div class="crop-stage" id="crop-stage">
+                    <img id="crop-image" alt="Previsualizacion foto tienda">
+                </div>
+            </div>
+            <div class="crop-controls">
+                <label class="range-wrap">Centrado X
+                    <input type="range" id="crop-pos-x" min="0" max="100" step="1" value="50">
+                    <span class="range-note"><span id="crop-pos-x-label">50</span>%</span>
+                </label>
+                <label class="range-wrap">Centrado Y
+                    <input type="range" id="crop-pos-y" min="0" max="100" step="1" value="50">
+                    <span class="range-note"><span id="crop-pos-y-label">50</span>%</span>
+                </label>
+                <label class="range-wrap">Zoom foto
+                    <input type="range" id="crop-zoom" min="50" max="220" step="1" value="100">
+                    <span class="range-note"><span id="crop-zoom-label">100</span>%</span>
+                </label>
+            </div>
+            <div class="crop-actions">
+                <button type="button" class="btn-lite" id="crop-cancel">Cancelar</button>
+                <button type="button" class="save" id="crop-apply">Usar esta foto</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const gridEl = document.getElementById("grid");
         const qEl = document.getElementById("q");
+        const cropModalEl = document.getElementById("crop-modal");
+        const cropStageEl = document.getElementById("crop-stage");
+        const cropImageEl = document.getElementById("crop-image");
+        const cropPosXEl = document.getElementById("crop-pos-x");
+        const cropPosYEl = document.getElementById("crop-pos-y");
+        const cropZoomEl = document.getElementById("crop-zoom");
+        const cropPosXLabelEl = document.getElementById("crop-pos-x-label");
+        const cropPosYLabelEl = document.getElementById("crop-pos-y-label");
+        const cropZoomLabelEl = document.getElementById("crop-zoom-label");
         let productos = [];
+        let cropState = {
+            open: false,
+            productId: 0,
+            file: null,
+            posX: 50,
+            posY: 50,
+            zoom: 100,
+            dragging: false,
+            dragLastX: 0,
+            dragLastY: 0,
+            objectUrl: "",
+        };
 
         function esc(text) {
             return String(text || "")
@@ -182,11 +311,10 @@
         }
 
         function fitStyle(p) {
-            const fit = p.foto_fit_tienda === "contain" ? "contain" : "cover";
             const posX = Math.max(0, Math.min(100, Number(p.foto_pos_x_tienda ?? 50)));
             const posY = Math.max(0, Math.min(100, Number(p.foto_pos_y_tienda ?? 50)));
             const zoomPct = Math.max(50, Math.min(220, Number(p.foto_zoom_tienda ?? 100)));
-            return `object-fit:${fit};object-position:${posX}% ${posY}%;transform:scale(${zoomPct / 100});transform-origin:${posX}% ${posY}%;`;
+            return `object-fit:cover;object-position:${posX}% ${posY}%;transform:scale(${zoomPct / 100});transform-origin:${posX}% ${posY}%;`;
         }
 
         function render() {
@@ -239,48 +367,15 @@
                         <textarea name="descripcion_tienda">${esc(p.descripcion_tienda || "")}</textarea>
                     </label>
 
-                    <div class="three">
-                        <label>Ajuste foto
-                            <select name="foto_fit_tienda">
-                                <option value="cover" ${p.foto_fit_tienda === "cover" ? "selected" : ""}>Cover</option>
-                                <option value="contain" ${p.foto_fit_tienda === "contain" ? "selected" : ""}>Contain</option>
-                            </select>
-                        </label>
-                        <label>Posicion foto
-                            <select name="foto_pos_tienda">
-                                <option value="center" ${p.foto_pos_tienda === "center" ? "selected" : ""}>Centro</option>
-                                <option value="top" ${p.foto_pos_tienda === "top" ? "selected" : ""}>Arriba</option>
-                                <option value="bottom" ${p.foto_pos_tienda === "bottom" ? "selected" : ""}>Abajo</option>
-                            </select>
-                        </label>
-                        <label>Orden
-                            <input type="number" min="0" step="1" name="orden_tienda" value="${Math.max(0, parseInt(p.orden_tienda || 0, 10) || 0)}">
-                        </label>
-                    </div>
-                    <div class="four">
-                        <label class="range-wrap">Centrado X
-                            <input type="range" min="0" max="100" step="1" name="foto_pos_x_tienda" value="${Math.max(0, Math.min(100, Number(p.foto_pos_x_tienda ?? 50)))}">
-                            <span class="range-note"><span data-range-x>${Math.round(Math.max(0, Math.min(100, Number(p.foto_pos_x_tienda ?? 50))))}</span>%</span>
-                        </label>
-                        <label class="range-wrap">Centrado Y
-                            <input type="range" min="0" max="100" step="1" name="foto_pos_y_tienda" value="${Math.max(0, Math.min(100, Number(p.foto_pos_y_tienda ?? 50)))}">
-                            <span class="range-note"><span data-range-y>${Math.round(Math.max(0, Math.min(100, Number(p.foto_pos_y_tienda ?? 50))))}</span>%</span>
-                        </label>
-                        <label class="range-wrap">Zoom foto
-                            <input type="range" min="50" max="220" step="1" name="foto_zoom_tienda" value="${Math.max(50, Math.min(220, Number(p.foto_zoom_tienda ?? 100)))}">
-                            <span class="range-note"><span data-range-z>${Math.round(Math.max(50, Math.min(220, Number(p.foto_zoom_tienda ?? 100))))}</span>%</span>
-                        </label>
-                        <div class="range-note" style="align-self:end;padding-bottom:6px;">Ajusta hasta centrar la foto.</div>
-                    </div>
-
                     <label class="check">
                         <input type="checkbox" name="destacado_tienda" ${p.destacado_tienda ? "checked" : ""}>
                         Mostrar en destacados
                     </label>
 
                     <div class="photo-tools">
-                        <input type="file" id="foto-file-${p.id}" accept="image/*">
-                        <button class="save" type="button" onclick="subirFoto(${p.id})">Subir foto</button>
+                        <input type="file" id="foto-file-${p.id}" accept="image/*" style="display:none;">
+                        <button class="btn-lite" type="button" onclick="seleccionarFoto(${p.id})">Seleccionar foto</button>
+                        <button class="save" type="button" onclick="abrirEncuadre(${p.id})">Subir y encuadrar</button>
                     </div>
 
                     <div class="actions">
@@ -298,38 +393,9 @@
                 precio: Number(card.querySelector('[name="precio"]').value || 0),
                 descripcion_tienda: card.querySelector('[name="descripcion_tienda"]').value,
                 descuento_tienda_pct: Number(card.querySelector('[name="descuento_tienda_pct"]').value || 0),
-                foto_fit_tienda: card.querySelector('[name="foto_fit_tienda"]').value,
-                foto_pos_tienda: card.querySelector('[name="foto_pos_tienda"]').value,
-                foto_pos_x_tienda: Number(card.querySelector('[name="foto_pos_x_tienda"]').value || 50),
-                foto_pos_y_tienda: Number(card.querySelector('[name="foto_pos_y_tienda"]').value || 50),
-                foto_zoom_tienda: Number(card.querySelector('[name="foto_zoom_tienda"]').value || 100),
-                orden_tienda: Number(card.querySelector('[name="orden_tienda"]').value || 0),
                 destacado_tienda: card.querySelector('[name="destacado_tienda"]').checked,
                 activo_tienda: card.querySelector('[name="activo_tienda"]').checked
             };
-        }
-
-        function actualizarPreviewCard(card) {
-            if (!card) return;
-            const img = card.querySelector(".thumb img");
-            if (!img) return;
-            const fit = card.querySelector('[name="foto_fit_tienda"]')?.value || "cover";
-            const posX = Number(card.querySelector('[name="foto_pos_x_tienda"]')?.value || 50);
-            const posY = Number(card.querySelector('[name="foto_pos_y_tienda"]')?.value || 50);
-            const zoom = Number(card.querySelector('[name="foto_zoom_tienda"]')?.value || 100);
-            const x = Math.max(0, Math.min(100, posX));
-            const y = Math.max(0, Math.min(100, posY));
-            const z = Math.max(50, Math.min(220, zoom));
-            img.style.objectFit = fit === "contain" ? "contain" : "cover";
-            img.style.objectPosition = `${x}% ${y}%`;
-            img.style.transform = `scale(${z / 100})`;
-            img.style.transformOrigin = `${x}% ${y}%`;
-            const labelX = card.querySelector("[data-range-x]");
-            const labelY = card.querySelector("[data-range-y]");
-            const labelZ = card.querySelector("[data-range-z]");
-            if (labelX) labelX.textContent = String(Math.round(x));
-            if (labelY) labelY.textContent = String(Math.round(y));
-            if (labelZ) labelZ.textContent = String(Math.round(z));
         }
 
         async function guardar(id) {
@@ -360,7 +426,39 @@
             }
         }
 
-        async function subirFoto(id) {
+        function seleccionarFoto(id) {
+            const fileInput = document.getElementById(`foto-file-${id}`);
+            if (fileInput) fileInput.click();
+        }
+
+        function _setCropValues(posX, posY, zoom) {
+            cropState.posX = Math.max(0, Math.min(100, Number(posX || 50)));
+            cropState.posY = Math.max(0, Math.min(100, Number(posY || 50)));
+            cropState.zoom = Math.max(50, Math.min(220, Number(zoom || 100)));
+            cropPosXEl.value = String(Math.round(cropState.posX));
+            cropPosYEl.value = String(Math.round(cropState.posY));
+            cropZoomEl.value = String(Math.round(cropState.zoom));
+            cropPosXLabelEl.textContent = String(Math.round(cropState.posX));
+            cropPosYLabelEl.textContent = String(Math.round(cropState.posY));
+            cropZoomLabelEl.textContent = String(Math.round(cropState.zoom));
+            cropImageEl.style.objectPosition = `${cropState.posX}% ${cropState.posY}%`;
+            cropImageEl.style.transform = `scale(${cropState.zoom / 100})`;
+            cropImageEl.style.transformOrigin = `${cropState.posX}% ${cropState.posY}%`;
+        }
+
+        function cerrarEncuadre() {
+            cropState.open = false;
+            cropState.dragging = false;
+            cropModalEl.classList.remove("active");
+            cropStageEl.classList.remove("dragging");
+            if (cropState.objectUrl) {
+                URL.revokeObjectURL(cropState.objectUrl);
+                cropState.objectUrl = "";
+            }
+            cropImageEl.removeAttribute("src");
+        }
+
+        function abrirEncuadre(id) {
             const card = document.querySelector(`article[data-id="${id}"]`);
             if (!card) return;
             const fileInput = document.getElementById(`foto-file-${id}`);
@@ -368,14 +466,32 @@
             const file = fileInput && fileInput.files ? fileInput.files[0] : null;
             if (!file) {
                 msg.className = "err";
-                msg.textContent = "Selecciona una imagen antes de subir.";
+                msg.textContent = "Primero selecciona una imagen.";
                 return;
             }
+            if (cropState.objectUrl) URL.revokeObjectURL(cropState.objectUrl);
+            cropState.objectUrl = URL.createObjectURL(file);
+            cropState.file = file;
+            cropState.productId = id;
+            cropState.open = true;
+            cropImageEl.src = cropState.objectUrl;
+            const p = productos.find((x) => Number(x.id || 0) === Number(id || 0)) || {};
+            _setCropValues(p.foto_pos_x_tienda ?? 50, p.foto_pos_y_tienda ?? 50, p.foto_zoom_tienda ?? 100);
+            cropModalEl.classList.add("active");
+        }
 
+        async function aplicarEncuadre() {
+            if (!cropState.open || !cropState.productId || !cropState.file) return;
+            const id = Number(cropState.productId || 0);
+            const card = document.querySelector(`article[data-id="${id}"]`);
+            if (!card) return;
+            const msg = card.querySelector(`#msg-${id}`);
+            const applyBtn = document.getElementById("crop-apply");
             const fd = new FormData();
-            fd.append("foto", file);
+            fd.append("foto", cropState.file);
             msg.className = "sub";
-            msg.textContent = "Subiendo foto...";
+            msg.textContent = "Subiendo foto y guardando encuadre...";
+            applyBtn.disabled = true;
             try {
                 const res = await fetch(`/api/producto/${id}/foto`, {
                     method: "POST",
@@ -383,12 +499,29 @@
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir la foto");
+                const encuadre = {
+                    foto_fit_tienda: "cover",
+                    foto_pos_tienda: "center",
+                    foto_pos_x_tienda: Number(cropState.posX || 50),
+                    foto_pos_y_tienda: Number(cropState.posY || 50),
+                    foto_zoom_tienda: Number(cropState.zoom || 100),
+                };
+                const resUpd = await fetch(`/api/producto/${id}/actualizar`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(encuadre),
+                });
+                const upd = await resUpd.json();
+                if (!resUpd.ok || !upd.success) throw new Error(upd.error || "No se pudo guardar el encuadre");
                 msg.className = "ok";
                 msg.textContent = "Foto subida correctamente.";
+                cerrarEncuadre();
                 await cargar();
             } catch (e) {
                 msg.className = "err";
                 msg.textContent = e.message || "Error subiendo foto";
+            } finally {
+                applyBtn.disabled = false;
             }
         }
 
@@ -400,21 +533,55 @@
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar");
                 productos = Array.isArray(data.productos) ? data.productos : [];
                 render();
-                gridEl.querySelectorAll(".card").forEach((card) => {
-                    card.querySelectorAll('[name="foto_fit_tienda"], [name="foto_pos_x_tienda"], [name="foto_pos_y_tienda"], [name="foto_zoom_tienda"]').forEach((field) => {
-                        field.addEventListener("input", () => actualizarPreviewCard(card));
-                        field.addEventListener("change", () => actualizarPreviewCard(card));
-                    });
-                    actualizarPreviewCard(card);
-                });
             } catch (e) {
                 gridEl.innerHTML = `<p style="color:#b91c1c;">${esc(e.message || "Error cargando")}</p>`;
             }
         }
 
         window.guardar = guardar;
-        window.subirFoto = subirFoto;
+        window.seleccionarFoto = seleccionarFoto;
+        window.abrirEncuadre = abrirEncuadre;
         qEl.addEventListener("input", render);
+        cropPosXEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
+        cropPosYEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
+        cropZoomEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
+        document.getElementById("crop-cancel").addEventListener("click", cerrarEncuadre);
+        document.getElementById("crop-apply").addEventListener("click", aplicarEncuadre);
+        document.getElementById("crop-reset").addEventListener("click", () => _setCropValues(50, 50, 100));
+        cropModalEl.addEventListener("click", (ev) => {
+            if (ev.target === cropModalEl) cerrarEncuadre();
+        });
+        cropStageEl.addEventListener("pointerdown", (ev) => {
+            if (!cropState.open) return;
+            cropState.dragging = true;
+            cropState.dragLastX = ev.clientX;
+            cropState.dragLastY = ev.clientY;
+            cropStageEl.classList.add("dragging");
+            cropStageEl.setPointerCapture(ev.pointerId);
+        });
+        cropStageEl.addEventListener("pointermove", (ev) => {
+            if (!cropState.dragging) return;
+            const rect = cropStageEl.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            const dx = ev.clientX - cropState.dragLastX;
+            const dy = ev.clientY - cropState.dragLastY;
+            cropState.dragLastX = ev.clientX;
+            cropState.dragLastY = ev.clientY;
+            const sensibilidad = 100 / Math.max(rect.width, rect.height);
+            _setCropValues(cropState.posX - (dx * sensibilidad), cropState.posY - (dy * sensibilidad), cropState.zoom);
+        });
+        const finDrag = () => {
+            cropState.dragging = false;
+            cropStageEl.classList.remove("dragging");
+        };
+        cropStageEl.addEventListener("pointerup", finDrag);
+        cropStageEl.addEventListener("pointercancel", finDrag);
+        cropStageEl.addEventListener("wheel", (ev) => {
+            if (!cropState.open) return;
+            ev.preventDefault();
+            const delta = ev.deltaY > 0 ? -4 : 4;
+            _setCropValues(cropState.posX, cropState.posY, cropState.zoom + delta);
+        }, { passive: false });
         cargar();
     </script>
 </body>
