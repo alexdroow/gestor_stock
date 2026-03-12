@@ -1350,6 +1350,30 @@
             } catch (_) {}
         }
 
+        function _trackTiendaLeave() {
+            try {
+                const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
+                const payload = {
+                    session_id: tiendaSessionId,
+                    evento: "leave",
+                    pagina: "/tienda",
+                    carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
+                    carrito_total: Math.max(0, Number(total || 0)),
+                };
+                if (navigator.sendBeacon) {
+                    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+                    navigator.sendBeacon("/api/tienda/track", blob);
+                    return;
+                }
+                fetch("/api/tienda/track", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    keepalive: true,
+                }).catch(() => {});
+            } catch (_) {}
+        }
+
         function renderSecciones() {
             const visibles = productos.filter((p) => productoFiltrado(p));
 
@@ -2055,7 +2079,9 @@
         renderCart();
         cargarProductos();
         _trackTienda("view");
-        setInterval(() => _trackTienda("heartbeat"), 30000);
+        setInterval(() => _trackTienda("heartbeat"), 5000);
+        window.addEventListener("pagehide", _trackTiendaLeave);
+        window.addEventListener("beforeunload", _trackTiendaLeave);
     </script>
 </body>
 </html>

@@ -1810,6 +1810,20 @@ def api_tienda_track():
 
         conn = get_db()
         cursor = conn.cursor()
+        if evento in {"leave", "close", "salida"}:
+            cursor.execute(
+                """
+                UPDATE tienda_visitas
+                SET ultima_actividad = datetime('now', '-1 day'),
+                    carrito_items = 0,
+                    carrito_total = 0,
+                    pagina = ?
+                WHERE session_id = ?
+                """,
+                (pagina, session_id),
+            )
+            conn.commit()
+            return jsonify({"success": True, "left": True})
         try:
             cursor.execute(
                 """
@@ -1871,7 +1885,7 @@ def api_tienda_admin_actividad():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-120 seconds')")
+        cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-15 seconds')")
         conectados = int(cursor.fetchone()["total"] or 0)
         cursor.execute(
             """
@@ -1919,7 +1933,7 @@ def api_tienda_admin_actividad():
                     COUNT(*) AS sesiones,
                     MAX(ultima_actividad) AS ultima_actividad
                 FROM tienda_visitas
-                WHERE datetime(ultima_actividad) >= datetime('now', '-120 seconds')
+                WHERE datetime(ultima_actividad) >= datetime('now', '-15 seconds')
                 GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida')
                 ORDER BY sesiones DESC, datetime(ultima_actividad) DESC
                 LIMIT 5
