@@ -325,6 +325,14 @@
                     <button class="btn-lite" type="button" id="cat-clear">Limpiar</button>
                 </div>
                 <div class="tiny-list" id="cat-list"></div>
+                <hr style="border:none;border-top:1px solid #e2e8f0;">
+                <strong>Mensaje post pedido</strong>
+                <label>Texto que verá el cliente al enviar el pedido
+                    <textarea id="msg-post-pedido" maxlength="600" style="min-height:90px;"></textarea>
+                </label>
+                <div class="actions">
+                    <button class="save" type="button" id="msg-post-save">Guardar mensaje</button>
+                </div>
             </article>
         </section>
         <div class="grid" id="grid"></div>
@@ -641,6 +649,45 @@
             await cargar();
         }
 
+        async function cargarMensajePostPedido() {
+            try {
+                const res = await fetch("/api/tienda/admin/config", { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar configuracion");
+                const txt = String((data.config || {}).mensaje_post_pedido || "").trim();
+                const el = document.getElementById("msg-post-pedido");
+                if (el) el.value = txt;
+            } catch (_) {}
+        }
+
+        async function guardarMensajePostPedido() {
+            const btn = document.getElementById("msg-post-save");
+            const txtEl = document.getElementById("msg-post-pedido");
+            const txt = String((txtEl && txtEl.value) || "").trim();
+            const old = btn ? btn.textContent : "";
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = "Guardando...";
+                }
+                const res = await fetch("/api/tienda/admin/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify({ mensaje_post_pedido: txt }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar mensaje");
+                alert("Mensaje guardado.");
+            } catch (err) {
+                alert(err.message || "Error guardando mensaje");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = old || "Guardar mensaje";
+                }
+            }
+        }
+
         async function guardar(id) {
             const card = document.querySelector(`article[data-id="${id}"]`);
             if (!card) return;
@@ -849,6 +896,7 @@
         qEl.addEventListener("input", render);
         document.getElementById("cat-save").addEventListener("click", guardarCategoria);
         document.getElementById("cat-clear").addEventListener("click", limpiarFormularioCategoria);
+        document.getElementById("msg-post-save")?.addEventListener("click", guardarMensajePostPedido);
         cropPosXEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
         cropPosYEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
         cropZoomEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
@@ -890,6 +938,7 @@
             _setCropValues(cropState.posX, cropState.posY, cropState.zoom + delta);
         }, { passive: false });
         setInterval(() => { cargarActividad(); }, 30000);
+        cargarMensajePostPedido();
         cargar();
     </script>
 </body>

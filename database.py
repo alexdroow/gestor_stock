@@ -7352,14 +7352,28 @@ def migrar_db():
                 horario_habilitado INTEGER NOT NULL DEFAULT 0,
                 hora_apertura TEXT NOT NULL DEFAULT '09:00',
                 hora_cierre TEXT NOT NULL DEFAULT '19:00',
+                mensaje_post_pedido TEXT DEFAULT 'Tu pedido fue ingresado correctamente y sera contactado a la brevedad.',
                 actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
+        )
+        _ensure_column(
+            conn,
+            "tienda_config",
+            "mensaje_post_pedido",
+            "TEXT DEFAULT 'Tu pedido fue ingresado correctamente y sera contactado a la brevedad.'",
         )
         conn.execute(
             """
             INSERT OR IGNORE INTO tienda_config (id, modo_manual, horario_habilitado, hora_apertura, hora_cierre)
             VALUES (1, 'auto', 0, '09:00', '19:00')
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_config
+            SET mensaje_post_pedido = COALESCE(NULLIF(TRIM(mensaje_post_pedido), ''), 'Tu pedido fue ingresado correctamente y sera contactado a la brevedad.')
+            WHERE id = 1
             """
         )
         conn.execute(

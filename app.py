@@ -918,7 +918,7 @@ def _obtener_tienda_config():
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT modo_manual, horario_habilitado, hora_apertura, hora_cierre, actualizado_en
+            SELECT modo_manual, horario_habilitado, hora_apertura, hora_cierre, mensaje_post_pedido, actualizado_en
             FROM tienda_config
             WHERE id = 1
             LIMIT 1
@@ -943,6 +943,7 @@ def _obtener_tienda_config():
             "horario_habilitado": bool(item.get("horario_habilitado")),
             "hora_apertura": hora_apertura,
             "hora_cierre": hora_cierre,
+            "mensaje_post_pedido": str(item.get("mensaje_post_pedido") or "").strip() or "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.",
             "actualizado_en": item.get("actualizado_en"),
         }
     finally:
@@ -1218,6 +1219,7 @@ def api_tienda_productos():
                 "categorias": categorias_payload,
                 "tienda_abierta": bool(estado.get("abierta")),
                 "estado_tienda": estado,
+                "mensaje_post_pedido": str(config.get("mensaje_post_pedido") or "").strip(),
             }
         )
     except Exception as e:
@@ -1257,12 +1259,20 @@ def api_tienda_admin_config():
             return jsonify({"success": True, "config": config, "estado": estado})
 
         data = request.get_json(silent=True) or {}
+        current_cfg = _obtener_tienda_config()
         modo_manual = str(data.get("modo_manual") or "auto").strip().lower()
         if modo_manual not in {"auto", "abierta", "cerrada"}:
-            modo_manual = "auto"
-        horario_habilitado = 1 if bool(data.get("horario_habilitado")) else 0
-        hora_apertura = str(data.get("hora_apertura") or "09:00").strip()
-        hora_cierre = str(data.get("hora_cierre") or "19:00").strip()
+            modo_manual = str(current_cfg.get("modo_manual") or "auto").strip().lower()
+        horario_habilitado = 1 if bool(data.get("horario_habilitado", current_cfg.get("horario_habilitado"))) else 0
+        hora_apertura = str(data.get("hora_apertura") or current_cfg.get("hora_apertura") or "09:00").strip()
+        hora_cierre = str(data.get("hora_cierre") or current_cfg.get("hora_cierre") or "19:00").strip()
+        mensaje_post_pedido = str(
+            data.get("mensaje_post_pedido")
+            if "mensaje_post_pedido" in data
+            else current_cfg.get("mensaje_post_pedido")
+        ).strip()[:600]
+        if not mensaje_post_pedido:
+            mensaje_post_pedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad."
         if not _parse_hora_hhmm(hora_apertura):
             return jsonify({"success": False, "error": "Hora apertura invalida (HH:MM)"}), 400
         if not _parse_hora_hhmm(hora_cierre):
@@ -1272,16 +1282,17 @@ def api_tienda_admin_config():
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO tienda_config (id, modo_manual, horario_habilitado, hora_apertura, hora_cierre, actualizado_en)
-            VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO tienda_config (id, modo_manual, horario_habilitado, hora_apertura, hora_cierre, mensaje_post_pedido, actualizado_en)
+            VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(id) DO UPDATE SET
                 modo_manual = excluded.modo_manual,
                 horario_habilitado = excluded.horario_habilitado,
                 hora_apertura = excluded.hora_apertura,
                 hora_cierre = excluded.hora_cierre,
+                mensaje_post_pedido = excluded.mensaje_post_pedido,
                 actualizado_en = CURRENT_TIMESTAMP
             """,
-            (modo_manual, horario_habilitado, hora_apertura, hora_cierre),
+            (modo_manual, horario_habilitado, hora_apertura, hora_cierre, mensaje_post_pedido),
         )
         conn.commit()
         crear_backup()
