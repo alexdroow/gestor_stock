@@ -928,6 +928,18 @@ def _normalizar_telefono_cl(raw):
     return f"+569{dig}"
 
 
+def _obtener_ip_cliente():
+    xff = str(request.headers.get("X-Forwarded-For") or "").strip()
+    if xff:
+        ip = xff.split(",")[0].strip()
+        if ip:
+            return ip[:64]
+    xr = str(request.headers.get("X-Real-IP") or "").strip()
+    if xr:
+        return xr[:64]
+    return str(request.remote_addr or "")[:64]
+
+
 def _bool_env(name, default=False):
     raw = str(os.environ.get(name, "1" if default else "0")).strip().lower()
     return raw in {"1", "true", "yes", "on", "si"}
@@ -1625,6 +1637,7 @@ def api_tienda_track():
         evento = str(data.get("evento") or "heartbeat").strip().lower()
         checkout_delta = 1 if evento == "checkout" else 0
         user_agent = str(request.headers.get("User-Agent") or "")[:260]
+        ip_address = _obtener_ip_cliente()
 
         conn = get_db()
         cursor = conn.cursor()
@@ -1632,9 +1645,9 @@ def api_tienda_track():
             """
             INSERT INTO tienda_visitas (
                 session_id, primera_visita, ultima_actividad, pagina,
-                carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent
+                carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent, ip_address
             )
-            VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?)
+            VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?, ?)
             ON CONFLICT(session_id) DO UPDATE SET
                 ultima_actividad = CURRENT_TIMESTAMP,
                 pagina = excluded.pagina,
@@ -1642,9 +1655,10 @@ def api_tienda_track():
                 carrito_total = excluded.carrito_total,
                 checkouts = tienda_visitas.checkouts + excluded.checkouts,
                 ultimo_checkout = CASE WHEN excluded.checkouts > 0 THEN CURRENT_TIMESTAMP ELSE tienda_visitas.ultimo_checkout END,
-                user_agent = excluded.user_agent
+                user_agent = excluded.user_agent,
+                ip_address = excluded.ip_address
             """,
-            (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent),
+            (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent, ip_address),
         )
         conn.commit()
         return jsonify({"success": True})
@@ -1687,6 +1701,20 @@ def api_tienda_admin_actividad():
             """
         )
         abandonados = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida') AS ip_address,
+                COUNT(*) AS sesiones,
+                MAX(ultima_actividad) AS ultima_actividad
+            FROM tienda_visitas
+            WHERE datetime(ultima_actividad) >= datetime('now', '-120 seconds')
+            GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida')
+            ORDER BY sesiones DESC, datetime(ultima_actividad) DESC
+            LIMIT 5
+            """
+        )
+        top_ips = [dict(r) for r in cursor.fetchall()]
         return jsonify(
             {
                 "success": True,
@@ -1696,6 +1724,7 @@ def api_tienda_admin_actividad():
                     "carritos_abandonados": len(abandonados),
                 },
                 "abandonados": abandonados,
+                "top_ips": top_ips,
             }
         )
     except Exception as e:

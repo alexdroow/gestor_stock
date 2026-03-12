@@ -7446,10 +7446,12 @@ def migrar_db():
                 carrito_total REAL NOT NULL DEFAULT 0,
                 checkouts INTEGER NOT NULL DEFAULT 0,
                 ultimo_checkout TEXT,
-                user_agent TEXT
+                user_agent TEXT,
+                ip_address TEXT
             )
             """
         )
+        _ensure_column(conn, "tienda_visitas", "ip_address", "TEXT")
         conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_tienda_visitas_actividad

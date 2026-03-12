@@ -325,6 +325,9 @@
                 </div>
                 <div class="sub">Abandonados (ultimos):</div>
                 <div class="tiny-list" id="act-abandonados-list"></div>
+                <div class="sub">Top IP conectadas (ultimos 120s):</div>
+                <div class="tiny-list" id="act-top-ips-list"></div>
+                <div class="sub" id="act-actualizado" style="font-size:.75rem;">Actualizando...</div>
             </article>
             <article class="panel">
                 <strong>Categorias administrables</strong>
@@ -689,9 +692,28 @@
                 document.getElementById("act-abandonados").textContent = String(Number(resumen.carritos_abandonados || 0));
                 const list = Array.isArray(data.abandonados) ? data.abandonados : [];
                 document.getElementById("act-abandonados-list").innerHTML = list.length
-                    ? list.map((x) => `<div class="tiny-item">#${esc((x.session_id || "").slice(0, 8))} · ${Math.max(0, Number(x.carrito_items || 0))} items · $${Math.round(Number(x.carrito_total || 0)).toLocaleString("es-CL")} · ${esc(x.ultima_actividad || "")}</div>`).join("")
-                    : "<div class=\"tiny-item\">Sin abandonos detectados.</div>";
-            } catch (_) {}
+                    ? list.map((x) => `<div class="tiny-item">#${esc((x.session_id || "").slice(0, 8))} - ${Math.max(0, Number(x.carrito_items || 0))} items - $${Math.round(Number(x.carrito_total || 0)).toLocaleString("es-CL")} - ${esc(x.ultima_actividad || "")}</div>`).join("")
+                    : "<div class="tiny-item">Sin abandonos detectados.</div>";
+
+                const ips = Array.isArray(data.top_ips) ? data.top_ips : [];
+                const ipsEl = document.getElementById("act-top-ips-list");
+                if (ipsEl) {
+                    ipsEl.innerHTML = ips.length
+                        ? ips.map((x) => `<div class="tiny-item">${esc(x.ip_address || "desconocida")} - ${Math.max(0, Number(x.sesiones || 0))} sesion(es)</div>`).join("")
+                        : "<div class="tiny-item">Sin conexiones recientes.</div>";
+                }
+                const updEl = document.getElementById("act-actualizado");
+                if (updEl) {
+                    updEl.textContent = `Actualizado: ${new Date().toLocaleTimeString("es-CL")}`;
+                    updEl.style.color = "#64748b";
+                }
+            } catch (err) {
+                const updEl = document.getElementById("act-actualizado");
+                if (updEl) {
+                    updEl.textContent = `Error actividad: ${String((err && err.message) || "sin detalle")}`;
+                    updEl.style.color = "#b91c1c";
+                }
+            }
         }
 
         async function cargarCategorias() {
@@ -1107,7 +1129,10 @@
             const delta = ev.deltaY > 0 ? -4 : 4;
             _setCropValues(cropState.posX, cropState.posY, cropState.zoom + delta);
         }, { passive: false });
-        setInterval(() => { cargarActividad(); }, 30000);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) cargarActividad();
+        });
+        setInterval(() => { cargarActividad(); }, 10000);
         cargarMensajePostPedido();
         cargar();
     </script>
