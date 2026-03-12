@@ -1185,6 +1185,71 @@ def api_tienda_admin_pedidos_nuevos():
             conn.close()
 
 
+@app.route('/api/tienda/cupon/validar', methods=['POST'])
+def api_tienda_validar_cupon():
+    try:
+        data = request.get_json(silent=True) or {}
+        cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
+        if not cupon_codigo:
+            return jsonify({"success": False, "error": "Ingresa un codigo de descuento"}), 400
+        items_req = data.get("items") or []
+        if not isinstance(items_req, list) or not items_req:
+            return jsonify({"success": False, "error": "Carrito vacio"}), 400
+
+        catalogo = _obtener_productos_para_venta()
+        mapa = {int(p.get("id") or 0): _serializar_producto_tienda(p) for p in catalogo}
+        items_serializados = []
+        subtotal = 0.0
+        for idx, raw in enumerate(items_req, start=1):
+            if not isinstance(raw, dict):
+                return jsonify({'success': False, 'error': f'Item #{idx} invalido'}), 400
+            try:
+                pid = int(raw.get("id") or 0)
+                cantidad = int(raw.get("cantidad") or 0)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': f'Item #{idx}: formato invalido'}), 400
+            if pid <= 0 or cantidad <= 0:
+                return jsonify({'success': False, 'error': f'Item #{idx}: datos invalidos'}), 400
+            prod = mapa.get(pid)
+            if not prod:
+                return jsonify({'success': False, 'error': f'Producto #{pid} no disponible'}), 400
+            max_compra = int(prod.get("max_compra") or 0)
+            if cantidad > max_compra:
+                return jsonify({'success': False, 'error': f'{prod.get("nombre")}: maximo {max_compra} unidad(es)'}), 400
+            precio_final = float(prod.get("precio_final") or 0)
+            subtotal += (precio_final * cantidad)
+            items_serializados.append(
+                {
+                    "id": pid,
+                    "cantidad": cantidad,
+                    "precio_unitario": precio_final,
+                    "descuento_tienda_pct": float(prod.get("descuento_tienda_pct") or 0),
+                }
+            )
+
+        cliente_ref = _normalizar_cliente_ref(data.get("cliente_email"), data.get("cliente_telefono"))
+        cupon = _obtener_cupon_por_codigo(cupon_codigo)
+        valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref)
+        if not valid.get("ok"):
+            return jsonify({"success": False, "error": valid.get("error", "Cupon invalido")}), 400
+
+        descuento_monto = float(valid.get("descuento_monto") or 0)
+        total = subtotal - descuento_monto
+        if total < 0:
+            total = 0
+        return jsonify(
+            {
+                "success": True,
+                "codigo_descuento": cupon_codigo,
+                "subtotal": round(subtotal, 2),
+                "descuento_monto": round(descuento_monto, 2),
+                "total_monto": round(total, 2),
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/historial-cambios')
 def historial_cambios():
     try:

@@ -265,12 +265,40 @@
             border-radius: 9px;
             padding: 9px 10px;
         }
+        .coupon-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 6px;
+            align-items: center;
+        }
+        .coupon-btn {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #374151;
+            border-radius: 8px;
+            padding: 9px 10px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .coupon-btn:hover { border-color: #94a3b8; }
         .cart-meta label {
             display: grid;
             gap: 4px;
             color: #64748b;
             font-size: 0.82rem;
             font-weight: 700;
+        }
+        .line-total {
+            margin: 6px 0 0;
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            color: #374151;
+            font-size: 0.9rem;
+        }
+        .line-total.discount {
+            color: #b91c1c;
         }
         .total {
             margin: 10px 0;
@@ -393,7 +421,18 @@
             <div class="cart-list" id="cart-list"></div>
             <div class="cart-meta">
                 <label for="codigo-descuento">Codigo de descuento</label>
-                <input id="codigo-descuento" type="text" maxlength="40" placeholder="Ej: SUCREE10">
+                <div class="coupon-row">
+                    <input id="codigo-descuento" type="text" maxlength="40" placeholder="Ej: SUCREE10">
+                    <button type="button" id="btn-aplicar-cupon" class="coupon-btn">Aplicar</button>
+                </div>
+            </div>
+            <div class="line-total">
+                <span>Subtotal</span>
+                <span id="subtotal-monto">$0</span>
+            </div>
+            <div class="line-total discount">
+                <span>Descuento</span>
+                <span id="descuento-monto">-$0</span>
             </div>
             <div class="total">
                 <span>Total</span>
@@ -436,10 +475,13 @@
         const ofertasListEl = document.getElementById("ofertas-list");
         const categoriasWrapEl = document.getElementById("categorias-wrap");
         const cartListEl = document.getElementById("cart-list");
+        const subtotalMontoEl = document.getElementById("subtotal-monto");
+        const descuentoMontoEl = document.getElementById("descuento-monto");
         const totalEl = document.getElementById("total");
         const msgEl = document.getElementById("msg");
         const searchInputEl = document.getElementById("search-input");
         const codigoDescuentoEl = document.getElementById("codigo-descuento");
+        const btnAplicarCuponEl = document.getElementById("btn-aplicar-cupon");
         const modalClienteEl = document.getElementById("modal-cliente");
         const clienteEmailEl = document.getElementById("cliente-email");
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
@@ -449,6 +491,7 @@
         let productos = [];
         let carrito = [];
         let categoriaActiva = "TODOS";
+        let cuponAplicado = { codigo: "", descuento_monto: 0 };
 
         function esc(text) {
             return String(text || "")
@@ -582,6 +625,8 @@
         function renderCart() {
             if (!carrito.length) {
                 cartListEl.innerHTML = "<div>El carrito esta vacio.</div>";
+                subtotalMontoEl.textContent = money.format(0);
+                descuentoMontoEl.textContent = `-${money.format(0)}`;
                 totalEl.textContent = money.format(0);
                 return;
             }
@@ -598,8 +643,50 @@
                     </div>
                 </div>
             `).join("");
-            const total = carrito.reduce((acc, it) => acc + (it.cantidad * it.precio_unitario), 0);
+            const subtotal = carrito.reduce((acc, it) => acc + (it.cantidad * it.precio_unitario), 0);
+            const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const total = Math.max(0, subtotal - descuento);
+            subtotalMontoEl.textContent = money.format(subtotal);
+            descuentoMontoEl.textContent = `-${money.format(descuento)}`;
             totalEl.textContent = money.format(total);
+        }
+
+        function limpiarCuponAplicado() {
+            if (!cuponAplicado.codigo && !cuponAplicado.descuento_monto) return;
+            cuponAplicado = { codigo: "", descuento_monto: 0 };
+            renderCart();
+            msg("Se reinicio el cupon por cambios en el carrito.");
+        }
+
+        async function aplicarCupon() {
+            const codigo = String(codigoDescuentoEl.value || "").trim();
+            if (!codigo) return msg("Ingresa un codigo de descuento.", true);
+            if (!carrito.length) return msg("Agrega productos antes de aplicar cupón.", true);
+            msg("Validando cupon...");
+            try {
+                const payload = {
+                    codigo_descuento: codigo,
+                    items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad }))
+                };
+                const res = await fetch("/api/tienda/cupon/validar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "Cupon invalido");
+                cuponAplicado = {
+                    codigo: String(data.codigo_descuento || codigo).trim(),
+                    descuento_monto: Number(data.descuento_monto || 0)
+                };
+                codigoDescuentoEl.value = cuponAplicado.codigo;
+                renderCart();
+                msg(`Cupon aplicado. Descuento: ${money.format(cuponAplicado.descuento_monto)}`);
+            } catch (e) {
+                cuponAplicado = { codigo: "", descuento_monto: 0 };
+                renderCart();
+                msg(e.message || "No se pudo aplicar el cupon", true);
+            }
         }
 
         function agregar(id) {
@@ -619,6 +706,7 @@
                     precio_unitario: n(p.precio_final)
                 });
             }
+            limpiarCuponAplicado();
             msg("");
             renderCart();
         }
@@ -630,6 +718,7 @@
             const max = Math.max(0, Number(p.max_compra || 0));
             if (it.cantidad >= max) return msg(`No puedes superar ${max} unidad(es).`, true);
             it.cantidad += 1;
+            limpiarCuponAplicado();
             renderCart();
         }
 
@@ -640,6 +729,7 @@
             if (it.cantidad <= 0) {
                 carrito = carrito.filter((x) => x.id !== id);
             }
+            limpiarCuponAplicado();
             renderCart();
         }
 
@@ -713,6 +803,7 @@
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
                 carrito = [];
                 codigoDescuentoEl.value = "";
+                cuponAplicado = { codigo: "", descuento_monto: 0 };
                 renderCart();
                 cerrarModalCliente();
                 abrirModalExito("Tu pedido fue ingresado correctamente y sera contactado a la brevedad.");
@@ -730,6 +821,7 @@
 
         searchInputEl.addEventListener("input", renderSecciones);
         document.getElementById("btn-checkout").addEventListener("click", checkout);
+        btnAplicarCuponEl.addEventListener("click", aplicarCupon);
         document.getElementById("modal-cliente-cancel").addEventListener("click", cerrarModalCliente);
         document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
