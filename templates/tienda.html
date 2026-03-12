@@ -45,6 +45,15 @@
             font-weight: 800;
             cursor: pointer;
         }
+        .menu-quick-btn {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #111827;
+            border-radius: 9px;
+            padding: 8px 10px;
+            font-weight: 800;
+            cursor: pointer;
+        }
         .brand {
             font-weight: 800;
             color: #1f2937;
@@ -138,6 +147,11 @@
             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 10px;
         }
+        .ofertas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
         .item-card {
             border: 1px solid #ececec;
             border-radius: 12px;
@@ -146,6 +160,19 @@
             display: grid;
             grid-template-rows: auto 1fr;
             position: relative;
+        }
+        .item-card.oferta {
+            border: 1px solid #fdba74;
+            box-shadow: 0 0 0 1px rgba(251, 146, 60, .35), 0 14px 26px rgba(251, 146, 60, .26);
+        }
+        .item-card.oferta::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            border-radius: 12px;
+            pointer-events: none;
+            border: 1px solid rgba(249, 115, 22, .7);
+            box-shadow: 0 0 22px rgba(251, 146, 60, .45);
         }
         .fav-tag {
             position: absolute;
@@ -204,6 +231,10 @@
             color: #7c2d12;
             font-weight: 800;
             font-size: 1.03rem;
+        }
+        .item-card.oferta .price-final {
+            font-size: 1.34rem;
+            color: #9a3412;
         }
         .price-old {
             color: #9ca3af;
@@ -482,6 +513,21 @@
             margin-left: 6px;
             padding: 0 6px;
         }
+        .mobile-menu-fab {
+            display: none;
+            position: fixed;
+            left: 14px;
+            bottom: 14px;
+            z-index: 46;
+            border: 0;
+            border-radius: 999px;
+            background: #111827;
+            color: #fff;
+            padding: 12px 14px;
+            font-weight: 800;
+            box-shadow: 0 8px 20px rgba(0,0,0,.25);
+            cursor: pointer;
+        }
         @media (max-width: 1180px) {
             .layout {
                 grid-template-columns: 1fr;
@@ -544,6 +590,10 @@
                 display: inline-flex;
                 align-items: center;
             }
+            .mobile-menu-fab {
+                display: inline-flex;
+                align-items: center;
+            }
         }
     </style>
 </head>
@@ -554,6 +604,7 @@
         <div class="search">
             <input id="search-input" type="search" placeholder="Buscar productos...">
         </div>
+        <button type="button" class="menu-quick-btn" id="btn-menu-quick">Categorias</button>
     </header>
 
     <main class="layout">
@@ -564,14 +615,14 @@
 
         <section class="content">
             <div class="tienda-estado-banner" id="tienda-estado-banner">Cargando estado de tienda...</div>
+            <div class="section" id="sec-ofertas">
+                <h2>Ofertas</h2>
+                <div class="ofertas-grid" id="ofertas-list"></div>
+            </div>
+
             <div class="section" id="sec-destacados">
                 <h2>Articulos destacados</h2>
                 <div class="scroller" id="destacados-list"></div>
-            </div>
-
-            <div class="section" id="sec-ofertas">
-                <h2>Ofertas</h2>
-                <div class="grid" id="ofertas-list"></div>
             </div>
 
             <div id="categorias-wrap"></div>
@@ -606,6 +657,7 @@
     </main>
 
     <div class="mobile-overlay" id="mobile-overlay"></div>
+    <button type="button" class="mobile-menu-fab" id="mobile-menu-fab">Menu</button>
     <button type="button" class="mobile-cart-fab" id="mobile-cart-fab">Carrito <span class="badge" id="mobile-cart-count">0</span></button>
 
     <div class="modal-overlay" id="modal-cliente">
@@ -660,6 +712,8 @@
         const leftNavEl = document.querySelector(".left-nav");
         const cartPanelEl = document.querySelector(".cart-panel");
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
+        const btnMenuQuickEl = document.getElementById("btn-menu-quick");
+        const mobileMenuFabEl = document.getElementById("mobile-menu-fab");
         const mobileOverlayEl = document.getElementById("mobile-overlay");
         const mobileCartFabEl = document.getElementById("mobile-cart-fab");
         const mobileCartCountEl = document.getElementById("mobile-cart-count");
@@ -770,8 +824,9 @@
             const desc = String(p.descripcion_tienda || "").trim();
             const stock = Math.max(0, Number(p.max_compra || 0));
             const agotado = stock <= 0;
+            const esOferta = hasDiscount;
             return `
-                <article class="item-card">
+                <article class="item-card ${esOferta ? "oferta" : ""}">
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
                     <div class="item-photo">${fotoHtml(p)}</div>
                     <div class="item-body">
@@ -1038,8 +1093,13 @@
 
         function abrirMenuMobile() {
             if (!leftNavEl || !mobileOverlayEl) return;
-            leftNavEl.classList.add("mobile-open");
-            mobileOverlayEl.classList.add("active");
+            const isMobile = window.matchMedia("(max-width: 900px)").matches;
+            if (isMobile) {
+                leftNavEl.classList.add("mobile-open");
+                mobileOverlayEl.classList.add("active");
+                return;
+            }
+            leftNavEl.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
         function abrirCarritoMobile() {
@@ -1123,6 +1183,8 @@
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
+        if (btnMenuQuickEl) btnMenuQuickEl.addEventListener("click", abrirMenuMobile);
+        if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirMenuMobile);
         if (mobileCartFabEl) mobileCartFabEl.addEventListener("click", abrirCarritoMobile);
         if (mobileOverlayEl) mobileOverlayEl.addEventListener("click", cerrarPanelesMobile);
         if (clienteTelefonoEl) {
