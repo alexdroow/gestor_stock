@@ -1285,6 +1285,8 @@ def _normalizar_canal_venta(valor):
         return "uber_eats"
     if raw in {"pedidosya", "pedidos_ya", "pedidos ya", "py"}:
         return "pedidosya"
+    if raw in {"tienda_online", "tienda", "online", "web", "ecommerce", "e-commerce"}:
+        return "tienda_online"
     return "presencial"
 
 
@@ -7095,6 +7097,7 @@ def migrar_db():
         _ensure_column(conn, "ventas", "canal_venta", "TEXT DEFAULT 'presencial'")
         _ensure_column(conn, "ventas", "codigo_operacion", "TEXT")
         _ensure_column(conn, "ventas", "total_monto", "REAL DEFAULT 0")
+        _ensure_column(conn, "ventas", "cliente_nombre", "TEXT")
         _ensure_column(conn, "ventas", "cliente_email", "TEXT")
         _ensure_column(conn, "ventas", "cliente_telefono", "TEXT")
         _ensure_column(conn, "ventas", "descuento_codigo", "TEXT")

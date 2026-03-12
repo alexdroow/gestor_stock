@@ -359,6 +359,22 @@
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
+        .phone-wrap {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 6px;
+            align-items: center;
+        }
+        .phone-prefix {
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            background: #f8fafc;
+            padding: 10px;
+            font-weight: 700;
+            color: #334155;
+            min-width: 58px;
+            text-align: center;
+        }
         .modal input {
             width: 100%;
             border: 1px solid #d1d5db;
@@ -553,9 +569,13 @@
         <div class="modal">
             <h3>Datos para confirmar pedido</h3>
             <div style="font-size:.9rem;color:#64748b;">Necesitamos tu correo y telefono para contactarte.</div>
+            <input id="cliente-nombre" type="text" placeholder="Nombre completo">
             <div class="two">
                 <input id="cliente-email" type="email" placeholder="Correo electronico">
-                <input id="cliente-telefono" type="tel" placeholder="Telefono">
+                <div class="phone-wrap">
+                    <span class="phone-prefix">+569</span>
+                    <input id="cliente-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-cliente-cancel">Cancelar</button>
@@ -589,6 +609,7 @@
         const codigoDescuentoEl = document.getElementById("codigo-descuento");
         const btnAplicarCuponEl = document.getElementById("btn-aplicar-cupon");
         const modalClienteEl = document.getElementById("modal-cliente");
+        const clienteNombreEl = document.getElementById("cliente-nombre");
         const clienteEmailEl = document.getElementById("cliente-email");
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
@@ -912,18 +933,24 @@
 
         async function confirmarCheckoutDesdeModal() {
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            const nombre = String(clienteNombreEl.value || "").trim();
             const email = String(clienteEmailEl.value || "").trim().toLowerCase();
-            const telefono = String(clienteTelefonoEl.value || "").trim();
+            const telefonoDig = String(clienteTelefonoEl.value || "").replace(/\D+/g, "");
+            const telefono = `+569${telefonoDig}`;
+            if (nombre.length < 2) {
+                return msg("Ingresa tu nombre.", true);
+            }
             if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
                 return msg("Ingresa un correo valido.", true);
             }
-            if ((telefono.replace(/\D+/g, "")).length < 8) {
-                return msg("Ingresa un telefono valido.", true);
+            if (telefonoDig.length !== 8) {
+                return msg("El telefono debe tener exactamente 8 digitos.", true);
             }
             msg("Procesando compra...");
             const payload = {
                 items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
                 codigo_descuento: String(codigoDescuentoEl.value || "").trim(),
+                cliente_nombre: nombre,
                 cliente_email: email,
                 cliente_telefono: telefono,
                 fecha_venta: new Date().toISOString().slice(0, 10)
@@ -965,6 +992,12 @@
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
         if (mobileCartFabEl) mobileCartFabEl.addEventListener("click", abrirCarritoMobile);
         if (mobileOverlayEl) mobileOverlayEl.addEventListener("click", cerrarPanelesMobile);
+        if (clienteTelefonoEl) {
+            clienteTelefonoEl.addEventListener("input", () => {
+                const onlyDigits = String(clienteTelefonoEl.value || "").replace(/\D+/g, "").slice(0, 8);
+                clienteTelefonoEl.value = onlyDigits;
+            });
+        }
 
         renderCart();
         cargarProductos();

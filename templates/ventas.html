@@ -2956,10 +2956,11 @@
                     _beepPedidoNuevo();
                     const totalNuevos = pedidos.length;
                     const ultimo = pedidos[pedidos.length - 1] || {};
+                    const nombre = String(ultimo.cliente_nombre || '').trim();
                     const telefono = String(ultimo.cliente_telefono || '').trim();
                     const email = String(ultimo.cliente_email || '').trim();
                     const contacto = telefono || email || 'sin contacto';
-                    _toastPedidoNuevo(`${totalNuevos} pedido(s) nuevo(s). Ultimo contacto: ${contacto}.`);
+                    _toastPedidoNuevo(`${totalNuevos} pedido(s) nuevo(s). Cliente: ${nombre || 'sin nombre'} · Contacto: ${contacto}.`);
                     if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
                         window.AppUX.toastSuccess(`${totalNuevos} pedido(s) nuevo(s) desde tienda online.`);
                     } else {

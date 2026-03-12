@@ -856,6 +856,17 @@ def _normalizar_cliente_ref(email, telefono):
     return em or te or ""
 
 
+def _normalizar_telefono_cl(raw):
+    dig = re.sub(r"\D+", "", str(raw or ""))
+    if dig.startswith("56"):
+        dig = dig[2:]
+    if dig.startswith("9") and len(dig) == 9:
+        dig = dig[1:]
+    if len(dig) != 8:
+        return None
+    return f"+569{dig}"
+
+
 def _parse_hora_hhmm(valor):
     v = str(valor or "").strip()
     if not v:
@@ -1173,7 +1184,7 @@ def api_tienda_admin_pedidos_nuevos():
         max_online_id = int(cursor.fetchone()["max_online_id"] or 0)
         cursor.execute(
             """
-            SELECT id, fecha_hora, total_monto, cliente_email, cliente_telefono, codigo_pedido
+            SELECT id, fecha_hora, total_monto, cliente_nombre, cliente_email, cliente_telefono, codigo_pedido
             FROM ventas
             WHERE canal_venta = 'tienda_online' AND id > ?
             ORDER BY id ASC
@@ -4080,12 +4091,17 @@ def api_tienda_checkout():
         items_req = data.get('items') or []
         if not isinstance(items_req, list) or not items_req:
             return jsonify({'success': False, 'error': 'Carrito vacio'}), 400
+        cliente_nombre = str(data.get("cliente_nombre") or "").strip()
+        if len(cliente_nombre) < 2:
+            return jsonify({'success': False, 'error': 'Nombre invalido'}), 400
         cliente_email = str(data.get("cliente_email") or "").strip().lower()
         cliente_telefono = str(data.get("cliente_telefono") or "").strip()
         if not cliente_email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", cliente_email):
             return jsonify({'success': False, 'error': 'Correo electronico invalido'}), 400
-        if len(re.sub(r"\D+", "", cliente_telefono)) < 8:
-            return jsonify({'success': False, 'error': 'Telefono invalido'}), 400
+        telefono_norm = _normalizar_telefono_cl(cliente_telefono)
+        if not telefono_norm:
+            return jsonify({'success': False, 'error': 'Telefono invalido. Debe tener 8 digitos.'}), 400
+        cliente_telefono = telefono_norm
         cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
         cliente_ref = _normalizar_cliente_ref(cliente_email, cliente_telefono)
 
@@ -4162,10 +4178,11 @@ def api_tienda_checkout():
             cursor.execute(
                 """
                 UPDATE ventas
-                SET cliente_email = ?, cliente_telefono = ?, descuento_codigo = ?, descuento_monto = ?, total_monto = ?
+                SET cliente_nombre = ?, cliente_email = ?, cliente_telefono = ?, descuento_codigo = ?, descuento_monto = ?, total_monto = ?
                 WHERE id = ?
                 """,
                 (
+                    cliente_nombre,
                     cliente_email,
                     cliente_telefono,
                     (cupon_codigo or None),
@@ -4190,6 +4207,9 @@ def api_tienda_checkout():
         respuesta["subtotal"] = round(subtotal, 2)
         respuesta["descuento_monto"] = round(descuento_monto, 2)
         respuesta["codigo_descuento"] = cupon_codigo or None
+        respuesta["cliente_nombre"] = cliente_nombre
+        respuesta["cliente_email"] = cliente_email
+        respuesta["cliente_telefono"] = cliente_telefono
         respuesta["total_monto"] = round(total_neto, 2)
         return jsonify(respuesta)
     except ValueError as e:
