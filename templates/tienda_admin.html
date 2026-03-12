@@ -464,6 +464,11 @@
             return Number.isFinite(x) ? x : 0;
         }
 
+        function nn(v, fallback) {
+            const has = v !== undefined && v !== null && v !== "";
+            return has ? v : fallback;
+        }
+
         function imgSrc(p) {
             const direct = String(p.foto_url || "").trim();
             const rel = String(p.foto || "").trim();
@@ -471,9 +476,9 @@
         }
 
         function fitStyle(p) {
-            const posX = Math.max(0, Math.min(100, Number(p.foto_pos_x_tienda ?? 50)));
-            const posY = Math.max(0, Math.min(100, Number(p.foto_pos_y_tienda ?? 50)));
-            const zoomPct = Math.max(50, Math.min(220, Number(p.foto_zoom_tienda ?? 100)));
+            const posX = Math.max(0, Math.min(100, Number(nn(p.foto_pos_x_tienda, 50))));
+            const posY = Math.max(0, Math.min(100, Number(nn(p.foto_pos_y_tienda, 50))));
+            const zoomPct = Math.max(50, Math.min(220, Number(nn(p.foto_zoom_tienda, 100))));
             return `object-fit:cover;object-position:${posX}% ${posY}%;transform:scale(${zoomPct / 100});transform-origin:${posX}% ${posY}%;`;
         }
 
@@ -554,7 +559,7 @@
 
                     <div class="two">
                         <label>Descuento (%)
-                            <input type="number" min="0" max="100" step="1" name="descuento_tienda_pct" value="${Math.round(n(p.descuento_tienda_base_pct ?? p.descuento_tienda_pct))}">
+                            <input type="number" min="0" max="100" step="1" name="descuento_tienda_pct" value="${Math.round(n(nn(p.descuento_tienda_base_pct, p.descuento_tienda_pct)))}">
                         </label>
                         <label class="check" style="margin-top: 20px;">
                             <input type="checkbox" name="activo_tienda" ${p.activo_tienda ? "checked" : ""}>
@@ -613,14 +618,14 @@
 
         function renderOfertasAdmin() {
             if (!ofertasAdminListEl) return;
-            const ofertas = (productos || []).filter((p) => n(p.descuento_tienda_base_pct ?? p.descuento_tienda_pct) > 0);
+            const ofertas = (productos || []).filter((p) => n(nn(p.descuento_tienda_base_pct, p.descuento_tienda_pct)) > 0);
             if (!ofertas.length) {
                 ofertasAdminListEl.innerHTML = "<div class=\"tiny-item\">No hay productos con descuento configurado.</div>";
                 return;
             }
             ofertasAdminListEl.innerHTML = ofertas.map((p) => {
                 const activa = _ofertaActivaAhora(p);
-                const pct = Math.round(n(p.descuento_tienda_base_pct ?? p.descuento_tienda_pct));
+                const pct = Math.round(n(nn(p.descuento_tienda_base_pct, p.descuento_tienda_pct)));
                 return `
                     <div class="oferta-admin-item" data-oferta-id="${p.id}">
                         <div class="oferta-admin-head">
@@ -850,9 +855,9 @@
             const box = document.querySelector(`.oferta-admin-item[data-oferta-id="${id}"]`);
             if (!box) return;
             const payload = {
-                descuento_tienda_pct: Number(box.querySelector('[name="o-desc"]')?.value || 0),
-                oferta_inicio_tienda: box.querySelector('[name="o-ini"]')?.value || null,
-                oferta_fin_tienda: box.querySelector('[name="o-fin"]')?.value || null,
+                descuento_tienda_pct: Number((box.querySelector('[name="o-desc"]') || {}).value || 0),
+                oferta_inicio_tienda: (box.querySelector('[name="o-ini"]') || {}).value || null,
+                oferta_fin_tienda: (box.querySelector('[name="o-fin"]') || {}).value || null,
             };
             const res = await fetch(`/api/producto/${id}/actualizar`, {
                 method: "POST",
@@ -955,7 +960,7 @@
             cropState.open = true;
             cropImageEl.src = cropState.objectUrl;
             const p = productos.find((x) => Number(x.id || 0) === Number(id || 0)) || {};
-            _setCropValues(p.foto_pos_x_tienda ?? 50, p.foto_pos_y_tienda ?? 50, p.foto_zoom_tienda ?? 100);
+            _setCropValues(nn(p.foto_pos_x_tienda, 50), nn(p.foto_pos_y_tienda, 50), nn(p.foto_zoom_tienda, 100));
             cropModalEl.classList.add("active");
         }
 
@@ -1088,7 +1093,8 @@
         qEl.addEventListener("input", render);
         document.getElementById("cat-save").addEventListener("click", guardarCategoria);
         document.getElementById("cat-clear").addEventListener("click", limpiarFormularioCategoria);
-        document.getElementById("msg-post-save")?.addEventListener("click", guardarMensajePostPedido);
+        const _msgPostSaveBtn = document.getElementById("msg-post-save");
+        if (_msgPostSaveBtn) _msgPostSaveBtn.addEventListener("click", guardarMensajePostPedido);
         cropPosXEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
         cropPosYEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
         cropZoomEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));

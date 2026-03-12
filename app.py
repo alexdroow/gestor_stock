@@ -1790,25 +1790,48 @@ def api_tienda_track():
 
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO tienda_visitas (
-                session_id, primera_visita, ultima_actividad, pagina,
-                carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent, ip_address
+        try:
+            cursor.execute(
+                """
+                INSERT INTO tienda_visitas (
+                    session_id, primera_visita, ultima_actividad, pagina,
+                    carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent, ip_address
+                )
+                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    ultima_actividad = CURRENT_TIMESTAMP,
+                    pagina = excluded.pagina,
+                    carrito_items = excluded.carrito_items,
+                    carrito_total = excluded.carrito_total,
+                    checkouts = tienda_visitas.checkouts + excluded.checkouts,
+                    ultimo_checkout = CASE WHEN excluded.checkouts > 0 THEN CURRENT_TIMESTAMP ELSE tienda_visitas.ultimo_checkout END,
+                    user_agent = excluded.user_agent,
+                    ip_address = excluded.ip_address
+                """,
+                (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent, ip_address),
             )
-            VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?, ?)
-            ON CONFLICT(session_id) DO UPDATE SET
-                ultima_actividad = CURRENT_TIMESTAMP,
-                pagina = excluded.pagina,
-                carrito_items = excluded.carrito_items,
-                carrito_total = excluded.carrito_total,
-                checkouts = tienda_visitas.checkouts + excluded.checkouts,
-                ultimo_checkout = CASE WHEN excluded.checkouts > 0 THEN CURRENT_TIMESTAMP ELSE tienda_visitas.ultimo_checkout END,
-                user_agent = excluded.user_agent,
-                ip_address = excluded.ip_address
-            """,
-            (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent, ip_address),
-        )
+        except sqlite3.OperationalError as e:
+            if "ip_address" not in str(e).lower():
+                raise
+            # Compatibilidad temporal si la columna ip_address aun no existe.
+            cursor.execute(
+                """
+                INSERT INTO tienda_visitas (
+                    session_id, primera_visita, ultima_actividad, pagina,
+                    carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent
+                )
+                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    ultima_actividad = CURRENT_TIMESTAMP,
+                    pagina = excluded.pagina,
+                    carrito_items = excluded.carrito_items,
+                    carrito_total = excluded.carrito_total,
+                    checkouts = tienda_visitas.checkouts + excluded.checkouts,
+                    ultimo_checkout = CASE WHEN excluded.checkouts > 0 THEN CURRENT_TIMESTAMP ELSE tienda_visitas.ultimo_checkout END,
+                    user_agent = excluded.user_agent
+                """,
+                (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent),
+            )
         conn.commit()
         return jsonify({"success": True})
     except Exception as e:
@@ -1850,20 +1873,25 @@ def api_tienda_admin_actividad():
             """
         )
         abandonados = [dict(r) for r in cursor.fetchall()]
-        cursor.execute(
-            """
-            SELECT
-                COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida') AS ip_address,
-                COUNT(*) AS sesiones,
-                MAX(ultima_actividad) AS ultima_actividad
-            FROM tienda_visitas
-            WHERE datetime(ultima_actividad) >= datetime('now', '-120 seconds')
-            GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida')
-            ORDER BY sesiones DESC, datetime(ultima_actividad) DESC
-            LIMIT 5
-            """
-        )
-        top_ips = [dict(r) for r in cursor.fetchall()]
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida') AS ip_address,
+                    COUNT(*) AS sesiones,
+                    MAX(ultima_actividad) AS ultima_actividad
+                FROM tienda_visitas
+                WHERE datetime(ultima_actividad) >= datetime('now', '-120 seconds')
+                GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida')
+                ORDER BY sesiones DESC, datetime(ultima_actividad) DESC
+                LIMIT 5
+                """
+            )
+            top_ips = [dict(r) for r in cursor.fetchall()]
+        except sqlite3.OperationalError as e:
+            if "ip_address" not in str(e).lower():
+                raise
+            top_ips = []
         return jsonify(
             {
                 "success": True,
