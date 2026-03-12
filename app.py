@@ -1186,12 +1186,11 @@ def api_tienda_productos():
             for c in categorias
             if _evaluar_categoria_activa(c, now_local=now_local).get("activa")
         }
-        productos = _obtener_productos_para_venta()
+        productos = _obtener_productos_para_venta(include_zero_stock=True)
         disponibles = [
             _serializar_producto_tienda(p, categorias_map=categorias_map, now_local=now_local)
             for p in productos
-            if int(p.get("porciones_disponibles") or 0) > 0
-            and int(p.get("activo_tienda") if p.get("activo_tienda") is not None else 1) == 1
+            if int(p.get("activo_tienda") if p.get("activo_tienda") is not None else 1) == 1
             and (str(p.get("categoria_tienda") or "General").strip().lower() in categorias_activas_map or not categorias_activas_map)
         ]
         categorias_payload = []
@@ -4374,16 +4373,17 @@ def _enriquecer_productos_con_dependencias_venta(cursor, productos):
     return productos
 
 
-def _obtener_productos_para_venta():
+def _obtener_productos_para_venta(include_zero_stock=False):
     conn = get_db()
     cursor = conn.cursor()
     try:
+        filtro_stock = "" if include_zero_stock else "AND stock > 0"
         cursor.execute(
-            """
+            f"""
             SELECT *
             FROM productos
             WHERE COALESCE(eliminado, 0) = 0
-              AND stock > 0
+              {filtro_stock}
             ORDER BY nombre
             """
         )

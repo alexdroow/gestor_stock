@@ -218,6 +218,14 @@
             border-radius: 999px;
             padding: 2px 6px;
         }
+        .agotado-chip {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #fff;
+            background: #64748b;
+            border-radius: 999px;
+            padding: 2px 6px;
+        }
         .stock {
             font-size: 0.82rem;
             color: #6b7280;
@@ -236,6 +244,10 @@
             cursor: pointer;
             color: #111827;
             font-weight: 700;
+        }
+        .quick-add:disabled {
+            opacity: .45;
+            cursor: not-allowed;
         }
         .cart-panel {
             position: sticky;
@@ -757,6 +769,7 @@
             const hasDiscount = n(p.descuento_tienda_pct) > 0 && oldPrice > finalPrice;
             const desc = String(p.descripcion_tienda || "").trim();
             const stock = Math.max(0, Number(p.max_compra || 0));
+            const agotado = stock <= 0;
             return `
                 <article class="item-card">
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
@@ -767,11 +780,12 @@
                             <span class="price-final">${money.format(finalPrice)}</span>
                             ${hasDiscount ? `<span class="price-old">${money.format(oldPrice)}</span>` : ""}
                             ${hasDiscount ? `<span class="discount-chip">-${Math.round(n(p.descuento_tienda_pct))}%</span>` : ""}
+                            ${agotado ? `<span class="agotado-chip">Agotado</span>` : ""}
                         </div>
                         <div class="item-desc">${esc(desc || "Sin descripcion")}</div>
                         <div class="stock">Disponible: ${stock} unidad(es)</div>
                     </div>
-                    <button class="quick-add" type="button" onclick="agregar(${p.id})">+</button>
+                    <button class="quick-add" type="button" onclick="agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : ""}>+</button>
                 </article>
             `;
         }
