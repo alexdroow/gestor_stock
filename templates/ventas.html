@@ -2880,6 +2880,40 @@
         let _pedidosTiendaPollTimer = null;
         let _pedidosTiendaInicializado = false;
 
+        function _toastPedidoNuevo(texto) {
+            let host = document.getElementById('toast-pedidos-online');
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'toast-pedidos-online';
+                host.style.position = 'fixed';
+                host.style.right = '18px';
+                host.style.top = '18px';
+                host.style.zIndex = '99999';
+                host.style.display = 'grid';
+                host.style.gap = '10px';
+                host.style.maxWidth = '360px';
+                document.body.appendChild(host);
+            }
+            const item = document.createElement('div');
+            item.style.background = '#111827';
+            item.style.color = '#fff';
+            item.style.padding = '12px 14px';
+            item.style.borderRadius = '12px';
+            item.style.boxShadow = '0 10px 24px rgba(0,0,0,.25)';
+            item.style.border = '1px solid rgba(255,255,255,.12)';
+            item.innerHTML = `
+                <div style="font-weight:800; margin-bottom:4px;">Nuevo pedido online</div>
+                <div style="font-size:.9rem; line-height:1.35;">${texto}</div>
+            `;
+            host.appendChild(item);
+            setTimeout(() => {
+                item.style.transition = 'all .25s ease';
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(-6px)';
+                setTimeout(() => item.remove(), 260);
+            }, 5500);
+        }
+
         function _beepPedidoNuevo() {
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -2921,6 +2955,11 @@
                     localStorage.setItem(PEDIDOS_TIENDA_LAST_ID_KEY, String(_pedidosTiendaLastId));
                     _beepPedidoNuevo();
                     const totalNuevos = pedidos.length;
+                    const ultimo = pedidos[pedidos.length - 1] || {};
+                    const telefono = String(ultimo.cliente_telefono || '').trim();
+                    const email = String(ultimo.cliente_email || '').trim();
+                    const contacto = telefono || email || 'sin contacto';
+                    _toastPedidoNuevo(`${totalNuevos} pedido(s) nuevo(s). Ultimo contacto: ${contacto}.`);
                     if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
                         window.AppUX.toastSuccess(`${totalNuevos} pedido(s) nuevo(s) desde tienda online.`);
                     } else {
