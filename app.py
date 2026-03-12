@@ -1165,6 +1165,14 @@ def api_tienda_admin_pedidos_nuevos():
         cursor = conn.cursor()
         cursor.execute(
             """
+            SELECT COALESCE(MAX(id), 0) AS max_online_id
+            FROM ventas
+            WHERE canal_venta = 'tienda_online'
+            """
+        )
+        max_online_id = int(cursor.fetchone()["max_online_id"] or 0)
+        cursor.execute(
+            """
             SELECT id, fecha_hora, total_monto, cliente_email, cliente_telefono, codigo_pedido
             FROM ventas
             WHERE canal_venta = 'tienda_online' AND id > ?
@@ -1174,9 +1182,7 @@ def api_tienda_admin_pedidos_nuevos():
             (since_id,),
         )
         rows = [dict(r) for r in cursor.fetchall()]
-        max_id = since_id
-        if rows:
-            max_id = max(int(r.get("id") or 0) for r in rows)
+        max_id = max(since_id, max_online_id)
         return jsonify({"success": True, "pedidos": rows, "max_id": max_id})
     except Exception as e:
         return jsonify({"success": False, "pedidos": [], "max_id": 0, "error": str(e)}), 500

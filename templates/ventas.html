@@ -2875,8 +2875,10 @@
                 badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
             });
 
-        let _pedidosTiendaLastId = 0;
+        const PEDIDOS_TIENDA_LAST_ID_KEY = 'ventas_online_last_seen_id';
+        let _pedidosTiendaLastId = Number(localStorage.getItem(PEDIDOS_TIENDA_LAST_ID_KEY) || 0) || 0;
         let _pedidosTiendaPollTimer = null;
+        let _pedidosTiendaInicializado = false;
 
         function _beepPedidoNuevo() {
             try {
@@ -2905,8 +2907,18 @@
                 const data = await response.json();
                 if (!response.ok || !data.success) return;
                 const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                const maxIdResp = Number(data.max_id || 0) || 0;
+
+                if (!_pedidosTiendaInicializado) {
+                    _pedidosTiendaInicializado = true;
+                    _pedidosTiendaLastId = Math.max(_pedidosTiendaLastId, maxIdResp);
+                    localStorage.setItem(PEDIDOS_TIENDA_LAST_ID_KEY, String(_pedidosTiendaLastId));
+                    return;
+                }
+
                 if (pedidos.length > 0) {
-                    _pedidosTiendaLastId = Number(data.max_id || _pedidosTiendaLastId || 0);
+                    _pedidosTiendaLastId = maxIdResp || Number(_pedidosTiendaLastId || 0);
+                    localStorage.setItem(PEDIDOS_TIENDA_LAST_ID_KEY, String(_pedidosTiendaLastId));
                     _beepPedidoNuevo();
                     const totalNuevos = pedidos.length;
                     if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
@@ -2914,10 +2926,16 @@
                     } else {
                         alert(`${totalNuevos} pedido(s) nuevo(s) desde tienda online.`);
                     }
+                } else if (maxIdResp > _pedidosTiendaLastId) {
+                    _pedidosTiendaLastId = maxIdResp;
+                    localStorage.setItem(PEDIDOS_TIENDA_LAST_ID_KEY, String(_pedidosTiendaLastId));
                 }
-            } catch (_) {}
+            } catch (err) {
+                console.warn('No se pudo consultar pedidos nuevos de tienda:', err);
+            }
         }
 
+        _pollPedidosTiendaNuevos();
         _pedidosTiendaPollTimer = setInterval(_pollPedidosTiendaNuevos, 12000);
     </script>
 
