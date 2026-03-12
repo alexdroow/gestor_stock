@@ -49,6 +49,45 @@
             grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
             gap: 12px;
         }
+        .admin-panels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 11px;
+            display: grid;
+            gap: 8px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .stat {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 8px;
+            background: #f8fafc;
+        }
+        .stat .v {
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+        .tiny-list {
+            max-height: 140px;
+            overflow: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 8px;
+            background: #fff;
+            display: grid;
+            gap: 6px;
+        }
+        .tiny-item { font-size: .8rem; color: #475569; }
         .card {
             background: var(--panel);
             border: 1px solid var(--line);
@@ -227,6 +266,67 @@
             </div>
             <a href="{{ url_for('ventas') }}">Volver a ventas</a>
         </div>
+        <section class="admin-panels">
+            <article class="panel">
+                <strong>Actividad tienda en vivo</strong>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="sub">Conectados</div>
+                        <div class="v" id="act-conectados">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="sub">Carritos activos</div>
+                        <div class="v" id="act-carritos">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="sub">Carritos abandonados</div>
+                        <div class="v" id="act-abandonados">0</div>
+                    </div>
+                </div>
+                <div class="sub">Abandonados (ultimos):</div>
+                <div class="tiny-list" id="act-abandonados-list"></div>
+            </article>
+            <article class="panel">
+                <strong>Categorias administrables</strong>
+                <div class="three">
+                    <label>Nombre
+                        <input id="cat-nombre" type="text" maxlength="60" placeholder="Ej: Nuevos sabores">
+                    </label>
+                    <label>Descuento categoria (%)
+                        <input id="cat-descuento" type="number" min="0" max="100" step="1" value="0">
+                    </label>
+                    <label>Orden
+                        <input id="cat-orden" type="number" min="0" step="1" value="0">
+                    </label>
+                </div>
+                <div class="three">
+                    <label class="check" style="margin-top:20px;">
+                        <input id="cat-activo" type="checkbox" checked>
+                        Categoria activa
+                    </label>
+                    <label class="check" style="margin-top:20px;">
+                        <input id="cat-horario" type="checkbox">
+                        Habilitar por dias/horarios
+                    </label>
+                    <label>Dias (1-7, ej: 1,2,3,4,5)
+                        <input id="cat-dias" type="text" placeholder="1,2,3,4,5">
+                    </label>
+                </div>
+                <div class="two">
+                    <label>Hora inicio
+                        <input id="cat-hora-inicio" type="time">
+                    </label>
+                    <label>Hora fin
+                        <input id="cat-hora-fin" type="time">
+                    </label>
+                </div>
+                <div class="actions">
+                    <button class="save" type="button" id="cat-save">Crear categoria</button>
+                    <button class="btn-lite" type="button" id="cat-clear">Limpiar</button>
+                </div>
+                <div class="tiny-list" id="cat-list"></div>
+            </article>
+        </section>
         <div class="grid" id="grid"></div>
     </div>
     <div class="crop-modal" id="crop-modal">
@@ -276,7 +376,10 @@
         const cropPosXLabelEl = document.getElementById("crop-pos-x-label");
         const cropPosYLabelEl = document.getElementById("crop-pos-y-label");
         const cropZoomLabelEl = document.getElementById("crop-zoom-label");
+        const catListEl = document.getElementById("cat-list");
         let productos = [];
+        let categorias = [];
+        let categoriaEdicionId = 0;
         let cropState = {
             open: false,
             productId: 0,
@@ -317,6 +420,45 @@
             return `object-fit:cover;object-position:${posX}% ${posY}%;transform:scale(${zoomPct / 100});transform-origin:${posX}% ${posY}%;`;
         }
 
+        function opcionesCategoria(selectedName) {
+            const nombreSel = String(selectedName || "General").trim() || "General";
+            const names = Array.from(new Set(["General", ...categorias.map((c) => String(c.nombre || "").trim()).filter(Boolean)]));
+            return names.map((name) => {
+                const selected = name.toLowerCase() === nombreSel.toLowerCase() ? "selected" : "";
+                return `<option value="${esc(name)}" ${selected}>${esc(name)}</option>`;
+            }).join("");
+        }
+
+        function renderCategoriasAdmin() {
+            if (!Array.isArray(categorias) || !categorias.length) {
+                catListEl.innerHTML = "<div class=\"tiny-item\">Sin categorias.</div>";
+                return;
+            }
+            catListEl.innerHTML = categorias.map((c) => `
+                <div class="tiny-item">
+                    <strong>${esc(c.nombre)}</strong>
+                    · ${c.activa_en_tienda ? "visible" : "no visible"}
+                    · desc ${Math.round(Number(c.descuento_pct || 0))}%
+                    <button type="button" class="btn-lite" style="margin-left:6px;padding:2px 6px;font-size:.72rem;" onclick="editarCategoria(${Number(c.id || 0)})">Editar</button>
+                    ${String(c.nombre || "").trim().toLowerCase() === "general" ? "" : `<button type="button" class="btn-lite" style="margin-left:4px;padding:2px 6px;font-size:.72rem;" onclick="eliminarCategoria(${Number(c.id || 0)})">Eliminar</button>`}
+                </div>
+            `).join("");
+        }
+
+        function limpiarFormularioCategoria() {
+            categoriaEdicionId = 0;
+            document.getElementById("cat-nombre").value = "";
+            document.getElementById("cat-descuento").value = "0";
+            document.getElementById("cat-orden").value = "0";
+            document.getElementById("cat-activo").checked = true;
+            document.getElementById("cat-horario").checked = false;
+            document.getElementById("cat-dias").value = "";
+            document.getElementById("cat-hora-inicio").value = "";
+            document.getElementById("cat-hora-fin").value = "";
+            const btn = document.getElementById("cat-save");
+            if (btn) btn.textContent = "Crear categoria";
+        }
+
         function render() {
             const q = String(qEl.value || "").trim().toLowerCase();
             const items = !q ? productos : productos.filter((p) => {
@@ -346,7 +488,7 @@
 
                     <div class="two">
                         <label>Categoria
-                            <input type="text" name="categoria_tienda" value="${esc(p.categoria_tienda || "General")}">
+                            <select name="categoria_tienda">${opcionesCategoria(p.categoria_tienda || "General")}</select>
                         </label>
                         <label>Precio tienda
                             <input type="number" min="0" step="1" name="precio" value="${Math.round(n(p.precio || 0))}">
@@ -396,6 +538,84 @@
                 destacado_tienda: card.querySelector('[name="destacado_tienda"]').checked,
                 activo_tienda: card.querySelector('[name="activo_tienda"]').checked
             };
+        }
+
+        async function cargarActividad() {
+            try {
+                const res = await fetch("/api/tienda/admin/actividad", { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar actividad");
+                const resumen = data.resumen || {};
+                document.getElementById("act-conectados").textContent = String(Number(resumen.conectados || 0));
+                document.getElementById("act-carritos").textContent = String(Number(resumen.carritos_activos || 0));
+                document.getElementById("act-abandonados").textContent = String(Number(resumen.carritos_abandonados || 0));
+                const list = Array.isArray(data.abandonados) ? data.abandonados : [];
+                document.getElementById("act-abandonados-list").innerHTML = list.length
+                    ? list.map((x) => `<div class="tiny-item">#${esc((x.session_id || "").slice(0, 8))} · ${Math.max(0, Number(x.carrito_items || 0))} items · $${Math.round(Number(x.carrito_total || 0)).toLocaleString("es-CL")} · ${esc(x.ultima_actividad || "")}</div>`).join("")
+                    : "<div class=\"tiny-item\">Sin abandonos detectados.</div>";
+            } catch (_) {}
+        }
+
+        async function cargarCategorias() {
+            const res = await fetch("/api/tienda/admin/categorias", { headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar categorias");
+            categorias = Array.isArray(data.categorias) ? data.categorias : [];
+            renderCategoriasAdmin();
+        }
+
+        function editarCategoria(id) {
+            const c = categorias.find((x) => Number(x.id || 0) === Number(id || 0));
+            if (!c) return;
+            categoriaEdicionId = Number(c.id || 0);
+            document.getElementById("cat-nombre").value = String(c.nombre || "");
+            document.getElementById("cat-descuento").value = String(Math.round(Number(c.descuento_pct || 0)));
+            document.getElementById("cat-orden").value = String(Math.max(0, Number(c.orden || 0)));
+            document.getElementById("cat-activo").checked = Boolean(c.activo);
+            document.getElementById("cat-horario").checked = Boolean(c.horario_habilitado);
+            document.getElementById("cat-dias").value = String(c.dias_semana || "");
+            document.getElementById("cat-hora-inicio").value = String(c.hora_inicio || "");
+            document.getElementById("cat-hora-fin").value = String(c.hora_fin || "");
+            const btn = document.getElementById("cat-save");
+            if (btn) btn.textContent = "Guardar categoria";
+        }
+
+        async function eliminarCategoria(id) {
+            const ok = confirm("Eliminar categoria? Los productos pasaran a General.");
+            if (!ok) return;
+            const res = await fetch(`/api/tienda/admin/categorias/${Number(id)}/eliminar`, { method: "POST", headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                alert(data.error || "No se pudo eliminar categoria");
+                return;
+            }
+            await cargar();
+        }
+
+        async function guardarCategoria() {
+            const payload = {
+                id: categoriaEdicionId || 0,
+                nombre: document.getElementById("cat-nombre").value.trim(),
+                descuento_pct: Number(document.getElementById("cat-descuento").value || 0),
+                orden: Number(document.getElementById("cat-orden").value || 0),
+                activo: document.getElementById("cat-activo").checked,
+                horario_habilitado: document.getElementById("cat-horario").checked,
+                dias_semana: document.getElementById("cat-dias").value.trim(),
+                hora_inicio: document.getElementById("cat-hora-inicio").value || null,
+                hora_fin: document.getElementById("cat-hora-fin").value || null,
+            };
+            const res = await fetch("/api/tienda/admin/categorias", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                alert(data.error || "No se pudo guardar categoria");
+                return;
+            }
+            limpiarFormularioCategoria();
+            await cargar();
         }
 
         async function guardar(id) {
@@ -577,8 +797,11 @@
                 const res = await fetch("/api/tienda/admin/productos", { headers: { Accept: "application/json" } });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar");
+                categorias = Array.isArray(data.categorias) ? data.categorias : [];
+                renderCategoriasAdmin();
                 productos = Array.isArray(data.productos) ? data.productos : [];
                 render();
+                await cargarActividad();
             } catch (e) {
                 gridEl.innerHTML = `<p style="color:#b91c1c;">${esc(e.message || "Error cargando")}</p>`;
             }
@@ -587,7 +810,11 @@
         window.guardar = guardar;
         window.seleccionarFoto = seleccionarFoto;
         window.abrirEncuadre = abrirEncuadre;
+        window.editarCategoria = editarCategoria;
+        window.eliminarCategoria = eliminarCategoria;
         qEl.addEventListener("input", render);
+        document.getElementById("cat-save").addEventListener("click", guardarCategoria);
+        document.getElementById("cat-clear").addEventListener("click", limpiarFormularioCategoria);
         cropPosXEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
         cropPosYEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
         cropZoomEl.addEventListener("input", () => _setCropValues(cropPosXEl.value, cropPosYEl.value, cropZoomEl.value));
@@ -628,6 +855,7 @@
             const delta = ev.deltaY > 0 ? -4 : 4;
             _setCropValues(cropState.posX, cropState.posY, cropState.zoom + delta);
         }, { passive: false });
+        setInterval(() => { cargarActividad(); }, 30000);
         cargar();
     </script>
 </body>

@@ -654,11 +654,21 @@
         const tiendaEstadoBannerEl = document.getElementById("tienda-estado-banner");
 
         let productos = [];
+        let categoriasDisponibles = [];
         let carrito = [];
         let categoriaActiva = "TODOS";
         let cuponAplicado = { codigo: "", descuento_monto: 0 };
         let tiendaAbierta = true;
         let tiendaEstadoMensaje = "";
+        const tiendaSessionId = (() => {
+            const key = "tienda_session_id";
+            let value = localStorage.getItem(key);
+            if (!value) {
+                value = `ts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+                localStorage.setItem(key, value);
+            }
+            return value;
+        })();
 
         function esc(text) {
             return String(text || "")
@@ -768,13 +778,39 @@
 
         function renderCategoriasMenu() {
             const cats = new Set(["TODOS", "DESTACADOS", "OFERTAS"]);
-            productos.forEach((p) => cats.add(nombreCategoria(p)));
+            if (Array.isArray(categoriasDisponibles) && categoriasDisponibles.length) {
+                categoriasDisponibles.forEach((c) => {
+                    const nombre = String(c.nombre || "").trim();
+                    if (nombre) cats.add(nombre);
+                });
+            } else {
+                productos.forEach((p) => cats.add(nombreCategoria(p)));
+            }
             const all = Array.from(cats);
             catListEl.innerHTML = all.map((c) => {
                 const label = c === "TODOS" ? "Todos" : c === "DESTACADOS" ? "Articulos destacados" : c === "OFERTAS" ? "Ofertas" : c;
                 const active = c === categoriaActiva ? "active" : "";
                 return `<button type="button" class="cat-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
             }).join("");
+        }
+
+        function _trackTienda(evento = "heartbeat") {
+            try {
+                const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
+                const payload = {
+                    session_id: tiendaSessionId,
+                    evento,
+                    pagina: "/tienda",
+                    carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
+                    carrito_total: Math.max(0, Number(total || 0)),
+                };
+                fetch("/api/tienda/track", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    keepalive: true,
+                }).catch(() => {});
+            } catch (_) {}
         }
 
         function renderSecciones() {
@@ -822,6 +858,7 @@
                 descuentoMontoEl.textContent = `-${money.format(0)}`;
                 totalEl.textContent = money.format(0);
                 if (mobileCartCountEl) mobileCartCountEl.textContent = "0";
+                _trackTienda("cart");
                 return;
             }
             cartListEl.innerHTML = carrito.map((it) => `
@@ -847,6 +884,7 @@
                 const count = carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0);
                 mobileCartCountEl.textContent = String(count);
             }
+            _trackTienda("cart");
         }
 
         function limpiarCuponAplicado() {
@@ -947,12 +985,17 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar el catalogo");
                 productos = Array.isArray(data.productos) ? data.productos : [];
+                categoriasDisponibles = Array.isArray(data.categorias)
+                    ? data.categorias.filter((c) => Boolean(c.activa_en_tienda))
+                    : [];
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 renderCategoriasMenu();
                 renderSecciones();
                 msg("");
+                _trackTienda("view");
             } catch (e) {
                 productos = [];
+                categoriasDisponibles = [];
                 setEstadoTienda(false, "No se pudo validar el estado de la tienda.");
                 renderCategoriasMenu();
                 renderSecciones();
@@ -1037,6 +1080,7 @@
                 cerrarModalCliente();
                 abrirModalExito("Tu pedido fue ingresado correctamente y sera contactado a la brevedad.");
                 msg(`Compra confirmada. Venta #${data.venta_id}`);
+                _trackTienda("checkout");
                 await cargarProductos();
             } catch (e) {
                 msg(e.message || "Error procesando compra", true);
@@ -1076,6 +1120,8 @@
 
         renderCart();
         cargarProductos();
+        _trackTienda("view");
+        setInterval(() => _trackTienda("heartbeat"), 30000);
     </script>
 </body>
 </html>

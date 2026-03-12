@@ -7273,6 +7273,43 @@ def migrar_db():
 
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_categorias (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL UNIQUE,
+                activo INTEGER NOT NULL DEFAULT 1,
+                orden INTEGER NOT NULL DEFAULT 0,
+                descuento_pct REAL NOT NULL DEFAULT 0,
+                horario_habilitado INTEGER NOT NULL DEFAULT 0,
+                dias_semana TEXT DEFAULT '',
+                hora_inicio TEXT,
+                hora_fin TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO tienda_categorias (nombre, activo, orden, descuento_pct, horario_habilitado, dias_semana, hora_inicio, hora_fin)
+            VALUES ('General', 1, 0, 0, 0, '', NULL, NULL)
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_categorias
+            SET activo = CASE WHEN activo IS NULL OR activo = 0 THEN 0 ELSE 1 END,
+                orden = CASE WHEN orden IS NULL OR orden < 0 THEN 0 ELSE orden END,
+                descuento_pct = CASE
+                    WHEN descuento_pct IS NULL OR descuento_pct < 0 THEN 0
+                    WHEN descuento_pct > 100 THEN 100
+                    ELSE descuento_pct
+                END,
+                horario_habilitado = CASE WHEN horario_habilitado IS NULL OR horario_habilitado = 0 THEN 0 ELSE 1 END,
+                dias_semana = COALESCE(TRIM(dias_semana), '')
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS tienda_cupones (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 codigo TEXT NOT NULL UNIQUE,
@@ -7352,6 +7389,33 @@ def migrar_db():
             SET hora_apertura = COALESCE(NULLIF(TRIM(hora_apertura), ''), '09:00'),
                 hora_cierre = COALESCE(NULLIF(TRIM(hora_cierre), ''), '19:00')
             WHERE id = 1
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_visitas (
+                session_id TEXT PRIMARY KEY,
+                primera_visita TEXT DEFAULT CURRENT_TIMESTAMP,
+                ultima_actividad TEXT DEFAULT CURRENT_TIMESTAMP,
+                pagina TEXT DEFAULT '/tienda',
+                carrito_items INTEGER NOT NULL DEFAULT 0,
+                carrito_total REAL NOT NULL DEFAULT 0,
+                checkouts INTEGER NOT NULL DEFAULT 0,
+                ultimo_checkout TEXT,
+                user_agent TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_visitas_actividad
+            ON tienda_visitas(ultima_actividad)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_visitas_carrito
+            ON tienda_visitas(carrito_items, ultima_actividad)
             """
         )
         conn.execute(

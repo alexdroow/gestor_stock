@@ -793,7 +793,7 @@ def tienda_publica():
     return render_template('tienda.html')
 
 
-def _serializar_producto_tienda(producto):
+def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
     item = dict(producto or {})
     max_compra = int(item.get("porciones_disponibles") or 0)
     if max_compra < 0:
@@ -804,8 +804,17 @@ def _serializar_producto_tienda(producto):
         if foto_rel:
             foto_url = url_for('static', filename=foto_rel)
     categoria = str(item.get("categoria_tienda") or "").strip() or "General"
+    categoria_cfg = (categorias_map or {}).get(categoria.lower().strip()) if categorias_map else None
+    categoria_descuento = 0.0
+    categoria_activa = True
+    if categoria_cfg:
+        eval_cat = _evaluar_categoria_activa(categoria_cfg, now_local=now_local)
+        categoria_activa = bool(eval_cat.get("activa"))
+        categoria_descuento = float(categoria_cfg.get("descuento_pct") or 0) if categoria_activa else 0.0
     descripcion = str(item.get("descripcion_tienda") or "").strip()
     descuento = float(item.get("descuento_tienda_pct") or 0)
+    if categoria_descuento > descuento:
+        descuento = categoria_descuento
     if descuento < 0:
         descuento = 0.0
     if descuento > 100:
@@ -852,6 +861,8 @@ def _serializar_producto_tienda(producto):
         "foto_pos_y_tienda": round(foto_pos_y, 2),
         "foto_zoom_tienda": round(foto_zoom, 2),
         "categoria_tienda": categoria,
+        "categoria_descuento_pct": round(float(categoria_descuento or 0), 2),
+        "categoria_activa": bool(categoria_activa),
         "descripcion_tienda": descripcion,
         "destacado_tienda": bool(item.get("destacado_tienda")),
         "orden_tienda": int(item.get("orden_tienda") or 0),
@@ -1005,6 +1016,73 @@ def _evaluar_estado_tienda(config):
     }
 
 
+def _parse_dias_semana(raw):
+    txt = str(raw or "").strip()
+    if not txt:
+        return set()
+    dias = set()
+    for part in re.split(r"[\s,;|]+", txt):
+        if not part:
+            continue
+        try:
+            d = int(part)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= d <= 7:
+            dias.add(d)
+    return dias
+
+
+def _franja_horaria_activa(hora_inicio, hora_fin, now_local):
+    ini = _parse_hora_hhmm(hora_inicio)
+    fin = _parse_hora_hhmm(hora_fin)
+    if not ini or not fin:
+        return True
+    min_ini = ini[0] * 60 + ini[1]
+    min_fin = fin[0] * 60 + fin[1]
+    min_now = now_local.hour * 60 + now_local.minute
+    if min_ini == min_fin:
+        return True
+    if min_ini < min_fin:
+        return min_ini <= min_now < min_fin
+    return min_now >= min_ini or min_now < min_fin
+
+
+def _cargar_categorias_tienda():
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, nombre, activo, orden, descuento_pct, horario_habilitado, dias_semana, hora_inicio, hora_fin
+            FROM tienda_categorias
+            ORDER BY orden ASC, nombre COLLATE NOCASE ASC
+            """
+        )
+        return [dict(r) for r in cursor.fetchall()]
+    finally:
+        if conn:
+            conn.close()
+
+
+def _evaluar_categoria_activa(cat, now_local=None):
+    item = dict(cat or {})
+    if not now_local:
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
+    if not bool(item.get("activo")):
+        return {"activa": False, "motivo": "Categoria desactivada"}
+    if not bool(item.get("horario_habilitado")):
+        return {"activa": True, "motivo": "Sin restriccion horaria"}
+
+    dias = _parse_dias_semana(item.get("dias_semana"))
+    if dias and now_local.isoweekday() not in dias:
+        return {"activa": False, "motivo": "Fuera de dias habilitados"}
+    if not _franja_horaria_activa(item.get("hora_inicio"), item.get("hora_fin"), now_local):
+        return {"activa": False, "motivo": "Fuera de horario"}
+    return {"activa": True, "motivo": "Activa por horario"}
+
+
 def _obtener_cupon_por_codigo(codigo):
     codigo_norm = _normalizar_cupon_codigo(codigo)
     if not codigo_norm:
@@ -1100,16 +1178,45 @@ def api_tienda_productos():
     try:
         config = _obtener_tienda_config()
         estado = _evaluar_estado_tienda(config)
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
+        categorias = _cargar_categorias_tienda()
+        categorias_map = {str(c.get("nombre") or "").strip().lower(): c for c in categorias}
+        categorias_activas_map = {
+            str(c.get("nombre") or "").strip().lower(): c
+            for c in categorias
+            if _evaluar_categoria_activa(c, now_local=now_local).get("activa")
+        }
         productos = _obtener_productos_para_venta()
         disponibles = [
-            _serializar_producto_tienda(p)
+            _serializar_producto_tienda(p, categorias_map=categorias_map, now_local=now_local)
             for p in productos
-            if int(p.get("porciones_disponibles") or 0) > 0 and int(p.get("activo_tienda") if p.get("activo_tienda") is not None else 1) == 1
+            if int(p.get("porciones_disponibles") or 0) > 0
+            and int(p.get("activo_tienda") if p.get("activo_tienda") is not None else 1) == 1
+            and (str(p.get("categoria_tienda") or "General").strip().lower() in categorias_activas_map or not categorias_activas_map)
         ]
+        categorias_payload = []
+        for c in categorias:
+            eval_cat = _evaluar_categoria_activa(c, now_local=now_local)
+            categorias_payload.append(
+                {
+                    "id": int(c.get("id") or 0),
+                    "nombre": str(c.get("nombre") or "").strip() or "General",
+                    "activo": bool(c.get("activo")),
+                    "orden": int(c.get("orden") or 0),
+                    "descuento_pct": float(c.get("descuento_pct") or 0),
+                    "horario_habilitado": bool(c.get("horario_habilitado")),
+                    "dias_semana": str(c.get("dias_semana") or ""),
+                    "hora_inicio": c.get("hora_inicio"),
+                    "hora_fin": c.get("hora_fin"),
+                    "activa_en_tienda": bool(eval_cat.get("activa")),
+                    "motivo_estado": eval_cat.get("motivo"),
+                }
+            )
         return jsonify(
             {
                 "success": True,
                 "productos": disponibles,
+                "categorias": categorias_payload,
                 "tienda_abierta": bool(estado.get("abierta")),
                 "estado_tienda": estado,
             }
@@ -1191,6 +1298,225 @@ def api_tienda_admin_config():
             conn.close()
 
 
+@app.route('/api/tienda/admin/categorias', methods=['GET', 'POST'])
+def api_tienda_admin_categorias():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        if request.method == 'GET':
+            now_local = datetime.now(ZoneInfo("America/Santiago"))
+            categorias = _cargar_categorias_tienda()
+            payload = []
+            for c in categorias:
+                ev = _evaluar_categoria_activa(c, now_local=now_local)
+                payload.append(
+                    {
+                        "id": int(c.get("id") or 0),
+                        "nombre": str(c.get("nombre") or "").strip() or "General",
+                        "activo": bool(c.get("activo")),
+                        "orden": int(c.get("orden") or 0),
+                        "descuento_pct": float(c.get("descuento_pct") or 0),
+                        "horario_habilitado": bool(c.get("horario_habilitado")),
+                        "dias_semana": str(c.get("dias_semana") or ""),
+                        "hora_inicio": c.get("hora_inicio"),
+                        "hora_fin": c.get("hora_fin"),
+                        "activa_en_tienda": bool(ev.get("activa")),
+                        "motivo_estado": ev.get("motivo"),
+                    }
+                )
+            return jsonify({"success": True, "categorias": payload})
+
+        data = request.get_json(silent=True) or {}
+        categoria_id = int(data.get("id") or 0)
+        nombre = str(data.get("nombre") or "").strip()[:60]
+        if not nombre:
+            return jsonify({"success": False, "error": "Nombre de categoria obligatorio"}), 400
+        activo = 1 if bool(data.get("activo", True)) else 0
+        orden = int(data.get("orden") or 0)
+        if orden < 0:
+            orden = 0
+        descuento_pct = float(data.get("descuento_pct") or 0)
+        if descuento_pct < 0:
+            descuento_pct = 0
+        if descuento_pct > 100:
+            descuento_pct = 100
+        horario_habilitado = 1 if bool(data.get("horario_habilitado")) else 0
+        dias_semana = str(data.get("dias_semana") or "").strip()
+        dias_normalizados = sorted(_parse_dias_semana(dias_semana))
+        dias_semana_db = ",".join(str(d) for d in dias_normalizados)
+        hora_inicio = str(data.get("hora_inicio") or "").strip() or None
+        hora_fin = str(data.get("hora_fin") or "").strip() or None
+        if hora_inicio and not _parse_hora_hhmm(hora_inicio):
+            return jsonify({"success": False, "error": "Hora inicio invalida (HH:MM)"}), 400
+        if hora_fin and not _parse_hora_hhmm(hora_fin):
+            return jsonify({"success": False, "error": "Hora fin invalida (HH:MM)"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        if categoria_id > 0:
+            cursor.execute("SELECT id FROM tienda_categorias WHERE id = ?", (categoria_id,))
+            if not cursor.fetchone():
+                return jsonify({"success": False, "error": "Categoria no encontrada"}), 404
+            cursor.execute(
+                """
+                UPDATE tienda_categorias
+                SET nombre = ?, activo = ?, orden = ?, descuento_pct = ?, horario_habilitado = ?,
+                    dias_semana = ?, hora_inicio = ?, hora_fin = ?, actualizado_en = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (nombre, activo, orden, descuento_pct, horario_habilitado, dias_semana_db, hora_inicio, hora_fin, categoria_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO tienda_categorias (nombre, activo, orden, descuento_pct, horario_habilitado, dias_semana, hora_inicio, hora_fin)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (nombre, activo, orden, descuento_pct, horario_habilitado, dias_semana_db, hora_inicio, hora_fin),
+            )
+            categoria_id = int(cursor.lastrowid)
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "id": categoria_id})
+    except sqlite3.IntegrityError:
+        return jsonify({"success": False, "error": "Ya existe una categoria con ese nombre"}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/categorias/<int:categoria_id>/eliminar', methods=['POST'])
+def api_tienda_admin_categorias_eliminar(categoria_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT nombre FROM tienda_categorias WHERE id = ?", (categoria_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Categoria no encontrada"}), 404
+        nombre = str(row["nombre"] or "").strip()
+        if nombre.lower() == "general":
+            return jsonify({"success": False, "error": "No puedes eliminar la categoria General"}), 400
+        cursor.execute("UPDATE productos SET categoria_tienda = 'General' WHERE LOWER(TRIM(categoria_tienda)) = LOWER(TRIM(?))", (nombre,))
+        cursor.execute("DELETE FROM tienda_categorias WHERE id = ?", (categoria_id,))
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/track', methods=['POST'])
+def api_tienda_track():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        session_id = str(data.get("session_id") or "").strip()
+        if not re.match(r"^[A-Za-z0-9._:-]{8,80}$", session_id):
+            return jsonify({"success": False, "error": "session_id invalido"}), 400
+        pagina = str(data.get("pagina") or "/tienda").strip()[:120] or "/tienda"
+        carrito_items = int(data.get("carrito_items") or 0)
+        if carrito_items < 0:
+            carrito_items = 0
+        carrito_total = float(data.get("carrito_total") or 0)
+        if carrito_total < 0:
+            carrito_total = 0
+        evento = str(data.get("evento") or "heartbeat").strip().lower()
+        checkout_delta = 1 if evento == "checkout" else 0
+        user_agent = str(request.headers.get("User-Agent") or "")[:260]
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO tienda_visitas (
+                session_id, primera_visita, ultima_actividad, pagina,
+                carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent
+            )
+            VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                ultima_actividad = CURRENT_TIMESTAMP,
+                pagina = excluded.pagina,
+                carrito_items = excluded.carrito_items,
+                carrito_total = excluded.carrito_total,
+                checkouts = tienda_visitas.checkouts + excluded.checkouts,
+                ultimo_checkout = CASE WHEN excluded.checkouts > 0 THEN CURRENT_TIMESTAMP ELSE tienda_visitas.ultimo_checkout END,
+                user_agent = excluded.user_agent
+            """,
+            (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent),
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/actividad', methods=['GET'])
+def api_tienda_admin_actividad():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-120 seconds')")
+        conectados = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tienda_visitas
+            WHERE carrito_items > 0
+              AND datetime(ultima_actividad) >= datetime('now', '-30 minutes')
+            """
+        )
+        carritos_activos = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT session_id, ultima_actividad, carrito_items, carrito_total, pagina
+            FROM tienda_visitas
+            WHERE carrito_items > 0
+              AND datetime(ultima_actividad) < datetime('now', '-30 minutes')
+            ORDER BY datetime(ultima_actividad) DESC
+            LIMIT 50
+            """
+        )
+        abandonados = [dict(r) for r in cursor.fetchall()]
+        return jsonify(
+            {
+                "success": True,
+                "resumen": {
+                    "conectados": conectados,
+                    "carritos_activos": carritos_activos,
+                    "carritos_abandonados": len(abandonados),
+                },
+                "abandonados": abandonados,
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/tienda/admin/productos', methods=['GET'])
 def api_tienda_admin_productos():
     conn = None
@@ -1208,14 +1534,35 @@ def api_tienda_admin_productos():
                 nombre COLLATE NOCASE ASC
             """
         )
+        categorias = _cargar_categorias_tienda()
+        categorias_map = {str(c.get("nombre") or "").strip().lower(): c for c in categorias}
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
         productos = []
         for row in cursor.fetchall():
             item = dict(row)
-            serial = _serializar_producto_tienda(item)
+            serial = _serializar_producto_tienda(item, categorias_map=categorias_map, now_local=now_local)
             serial["precio"] = float(item.get("precio") or 0)
             serial["stock"] = float(item.get("stock") or 0)
             productos.append(serial)
-        return jsonify({"success": True, "productos": productos})
+        categorias_payload = []
+        for c in categorias:
+            eval_cat = _evaluar_categoria_activa(c, now_local=now_local)
+            categorias_payload.append(
+                {
+                    "id": int(c.get("id") or 0),
+                    "nombre": str(c.get("nombre") or "").strip() or "General",
+                    "activo": bool(c.get("activo")),
+                    "orden": int(c.get("orden") or 0),
+                    "descuento_pct": float(c.get("descuento_pct") or 0),
+                    "horario_habilitado": bool(c.get("horario_habilitado")),
+                    "dias_semana": str(c.get("dias_semana") or ""),
+                    "hora_inicio": c.get("hora_inicio"),
+                    "hora_fin": c.get("hora_fin"),
+                    "activa_en_tienda": bool(eval_cat.get("activa")),
+                    "motivo_estado": eval_cat.get("motivo"),
+                }
+            )
+        return jsonify({"success": True, "productos": productos, "categorias": categorias_payload})
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
     finally:
@@ -1419,8 +1766,13 @@ def api_tienda_validar_cupon():
         if not isinstance(items_req, list) or not items_req:
             return jsonify({"success": False, "error": "Carrito vacio"}), 400
 
-        catalogo = _obtener_productos_para_venta()
-        mapa = {int(p.get("id") or 0): _serializar_producto_tienda(p) for p in catalogo}
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
+        categorias = _cargar_categorias_tienda()
+        categorias_map = {str(c.get("nombre") or "").strip().lower(): c for c in categorias}
+        mapa = {
+            int(p.get("id") or 0): _serializar_producto_tienda(p, categorias_map=categorias_map, now_local=now_local)
+            for p in _obtener_productos_para_venta()
+        }
         items_serializados = []
         subtotal = 0.0
         for idx, raw in enumerate(items_req, start=1):
@@ -1436,6 +1788,8 @@ def api_tienda_validar_cupon():
             prod = mapa.get(pid)
             if not prod:
                 return jsonify({'success': False, 'error': f'Producto #{pid} no disponible'}), 400
+            if not bool(prod.get("categoria_activa", True)):
+                return jsonify({'success': False, 'error': f'{prod.get("nombre")}: categoria no disponible en este horario'}), 400
             max_compra = int(prod.get("max_compra") or 0)
             if cantidad > max_compra:
                 return jsonify({'success': False, 'error': f'{prod.get("nombre")}: maximo {max_compra} unidad(es)'}), 400
@@ -4320,8 +4674,13 @@ def api_tienda_checkout():
         cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
         cliente_ref = _normalizar_cliente_ref(cliente_email, cliente_telefono)
 
-        catalogo = _obtener_productos_para_venta()
-        mapa = {int(p.get("id") or 0): _serializar_producto_tienda(p) for p in catalogo}
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
+        categorias = _cargar_categorias_tienda()
+        categorias_map = {str(c.get("nombre") or "").strip().lower(): c for c in categorias}
+        mapa = {
+            int(p.get("id") or 0): _serializar_producto_tienda(p, categorias_map=categorias_map, now_local=now_local)
+            for p in _obtener_productos_para_venta()
+        }
         items_limpios = []
         items_serializados = []
         for idx, raw in enumerate(items_req, start=1):
@@ -4337,6 +4696,8 @@ def api_tienda_checkout():
             prod = mapa.get(pid)
             if not prod:
                 return jsonify({'success': False, 'error': f'Producto #{pid} no disponible'}), 400
+            if not bool(prod.get("categoria_activa", True)):
+                return jsonify({'success': False, 'error': f'{prod.get("nombre")}: categoria no disponible en este horario'}), 400
             max_compra = int(prod.get("max_compra") or 0)
             if max_compra <= 0:
                 return jsonify({'success': False, 'error': f'{prod.get("nombre")} sin stock disponible'}), 400
