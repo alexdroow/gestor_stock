@@ -88,6 +88,46 @@
             gap: 6px;
         }
         .tiny-item { font-size: .8rem; color: #475569; }
+        .ofertas-admin-list {
+            display: grid;
+            gap: 8px;
+            max-height: 280px;
+            overflow: auto;
+        }
+        .oferta-admin-item {
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            border-radius: 10px;
+            padding: 8px;
+            display: grid;
+            gap: 6px;
+        }
+        .oferta-admin-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            font-size: .84rem;
+        }
+        .oferta-admin-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto auto;
+            gap: 8px;
+            align-items: end;
+        }
+        .oferta-pill {
+            font-size: .72rem;
+            font-weight: 800;
+            border-radius: 999px;
+            padding: 2px 7px;
+            width: fit-content;
+            background: #e2e8f0;
+            color: #334155;
+        }
+        .oferta-pill.on {
+            background: #dcfce7;
+            color: #166534;
+        }
         .card {
             background: var(--panel);
             border: 1px solid var(--line);
@@ -335,6 +375,11 @@
                 </div>
             </article>
         </section>
+        <article class="panel">
+            <strong>Control de ofertas</strong>
+            <div class="sub">Productos con descuento configurado. Puedes ajustar fechas o quitar descuento rapido.</div>
+            <div class="ofertas-admin-list" id="ofertas-admin-list"></div>
+        </article>
         <div class="grid" id="grid"></div>
     </div>
     <div class="crop-modal" id="crop-modal">
@@ -385,6 +430,7 @@
         const cropPosYLabelEl = document.getElementById("crop-pos-y-label");
         const cropZoomLabelEl = document.getElementById("crop-zoom-label");
         const catListEl = document.getElementById("cat-list");
+        const ofertasAdminListEl = document.getElementById("ofertas-admin-list");
         let productos = [];
         let categorias = [];
         let categoriaEdicionId = 0;
@@ -505,11 +551,19 @@
 
                     <div class="two">
                         <label>Descuento (%)
-                            <input type="number" min="0" max="100" step="1" name="descuento_tienda_pct" value="${Math.round(n(p.descuento_tienda_pct))}">
+                            <input type="number" min="0" max="100" step="1" name="descuento_tienda_pct" value="${Math.round(n(p.descuento_tienda_base_pct ?? p.descuento_tienda_pct))}">
                         </label>
                         <label class="check" style="margin-top: 20px;">
                             <input type="checkbox" name="activo_tienda" ${p.activo_tienda ? "checked" : ""}>
                             Producto activo en tienda
+                        </label>
+                    </div>
+                    <div class="two">
+                        <label>Oferta desde
+                            <input type="date" name="oferta_inicio_tienda" value="${esc(p.oferta_inicio_tienda || "")}">
+                        </label>
+                        <label>Oferta hasta
+                            <input type="date" name="oferta_fin_tienda" value="${esc(p.oferta_fin_tienda || "")}">
                         </label>
                     </div>
 
@@ -537,12 +591,65 @@
             `).join("");
         }
 
+        function _hoyISO() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+        }
+
+        function _ofertaActivaAhora(prod) {
+            const ini = String(prod.oferta_inicio_tienda || "").trim();
+            const fin = String(prod.oferta_fin_tienda || "").trim();
+            const hoy = _hoyISO();
+            if (ini && hoy < ini) return false;
+            if (fin && hoy > fin) return false;
+            return true;
+        }
+
+        function renderOfertasAdmin() {
+            if (!ofertasAdminListEl) return;
+            const ofertas = (productos || []).filter((p) => n(p.descuento_tienda_base_pct ?? p.descuento_tienda_pct) > 0);
+            if (!ofertas.length) {
+                ofertasAdminListEl.innerHTML = "<div class=\"tiny-item\">No hay productos con descuento configurado.</div>";
+                return;
+            }
+            ofertasAdminListEl.innerHTML = ofertas.map((p) => {
+                const activa = _ofertaActivaAhora(p);
+                const pct = Math.round(n(p.descuento_tienda_base_pct ?? p.descuento_tienda_pct));
+                return `
+                    <div class="oferta-admin-item" data-oferta-id="${p.id}">
+                        <div class="oferta-admin-head">
+                            <strong>${esc(p.nombre || "Producto")}</strong>
+                            <span class="oferta-pill ${activa ? "on" : ""}">${activa ? "Activa ahora" : "Programada"}</span>
+                        </div>
+                        <div class="oferta-admin-row">
+                            <label>Descuento (%)
+                                <input type="number" min="0" max="100" step="1" name="o-desc" value="${pct}">
+                            </label>
+                            <label>Desde
+                                <input type="date" name="o-ini" value="${esc(p.oferta_inicio_tienda || "")}">
+                            </label>
+                            <label>Hasta
+                                <input type="date" name="o-fin" value="${esc(p.oferta_fin_tienda || "")}">
+                            </label>
+                            <button class="save" type="button" onclick="guardarOferta(${p.id})">Guardar</button>
+                            <button class="btn-lite" type="button" onclick="quitarOferta(${p.id})">Quitar</button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
         function payloadDesdeCard(card) {
             return {
                 categoria_tienda: card.querySelector('[name="categoria_tienda"]').value,
                 precio: Number(card.querySelector('[name="precio"]').value || 0),
                 descripcion_tienda: card.querySelector('[name="descripcion_tienda"]').value,
                 descuento_tienda_pct: Number(card.querySelector('[name="descuento_tienda_pct"]').value || 0),
+                oferta_inicio_tienda: card.querySelector('[name="oferta_inicio_tienda"]').value || null,
+                oferta_fin_tienda: card.querySelector('[name="oferta_fin_tienda"]').value || null,
                 destacado_tienda: card.querySelector('[name="destacado_tienda"]').checked,
                 activo_tienda: card.querySelector('[name="activo_tienda"]').checked
             };
@@ -706,6 +813,7 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
                 actualizarProductoLocal(id, payload);
+                renderOfertasAdmin();
                 msg.className = "ok";
                 msg.textContent = "Guardado";
             } catch (e) {
@@ -714,6 +822,65 @@
             } finally {
                 btn.disabled = false;
             }
+        }
+
+        async function guardarOferta(id) {
+            const box = document.querySelector(`.oferta-admin-item[data-oferta-id="${id}"]`);
+            if (!box) return;
+            const payload = {
+                descuento_tienda_pct: Number(box.querySelector('[name="o-desc"]')?.value || 0),
+                oferta_inicio_tienda: box.querySelector('[name="o-ini"]')?.value || null,
+                oferta_fin_tienda: box.querySelector('[name="o-fin"]')?.value || null,
+            };
+            const res = await fetch(`/api/producto/${id}/actualizar`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                alert(data.error || "No se pudo guardar oferta");
+                return;
+            }
+            actualizarProductoLocal(id, {
+                descuento_tienda_pct: payload.descuento_tienda_pct,
+                descuento_tienda_base_pct: payload.descuento_tienda_pct,
+                oferta_inicio_tienda: payload.oferta_inicio_tienda || "",
+                oferta_fin_tienda: payload.oferta_fin_tienda || "",
+            });
+            render();
+            renderOfertasAdmin();
+        }
+
+        async function quitarOferta(id) {
+            const ok = confirm("Quitar descuento de este producto?");
+            if (!ok) return;
+            await guardarOfertaConPayload(id, {
+                descuento_tienda_pct: 0,
+                oferta_inicio_tienda: null,
+                oferta_fin_tienda: null,
+            });
+        }
+
+        async function guardarOfertaConPayload(id, payload) {
+            const res = await fetch(`/api/producto/${id}/actualizar`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                alert(data.error || "No se pudo actualizar oferta");
+                return;
+            }
+            actualizarProductoLocal(id, {
+                descuento_tienda_pct: payload.descuento_tienda_pct,
+                descuento_tienda_base_pct: payload.descuento_tienda_pct,
+                oferta_inicio_tienda: payload.oferta_inicio_tienda || "",
+                oferta_fin_tienda: payload.oferta_fin_tienda || "",
+            });
+            render();
+            renderOfertasAdmin();
         }
 
         function seleccionarFoto(id) {
@@ -882,6 +1049,7 @@
                 renderCategoriasAdmin();
                 productos = Array.isArray(data.productos) ? data.productos : [];
                 render();
+                renderOfertasAdmin();
                 await cargarActividad();
             } catch (e) {
                 gridEl.innerHTML = `<p style="color:#b91c1c;">${esc(e.message || "Error cargando")}</p>`;
@@ -893,6 +1061,8 @@
         window.abrirEncuadre = abrirEncuadre;
         window.editarCategoria = editarCategoria;
         window.eliminarCategoria = eliminarCategoria;
+        window.guardarOferta = guardarOferta;
+        window.quitarOferta = quitarOferta;
         qEl.addEventListener("input", render);
         document.getElementById("cat-save").addEventListener("click", guardarCategoria);
         document.getElementById("cat-clear").addEventListener("click", limpiarFormularioCategoria);

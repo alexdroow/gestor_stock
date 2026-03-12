@@ -1899,6 +1899,8 @@ def actualizar_producto(producto_id, data):
         categoria_tienda_actual = (actual["categoria_tienda"] if "categoria_tienda" in actual.keys() else None) or "General"
         descripcion_tienda_actual = (actual["descripcion_tienda"] if "descripcion_tienda" in actual.keys() else None) or ""
         descuento_tienda_actual = float(actual["descuento_tienda_pct"] or 0) if "descuento_tienda_pct" in actual.keys() else 0.0
+        oferta_inicio_tienda_actual = (actual["oferta_inicio_tienda"] if "oferta_inicio_tienda" in actual.keys() else None) or None
+        oferta_fin_tienda_actual = (actual["oferta_fin_tienda"] if "oferta_fin_tienda" in actual.keys() else None) or None
         foto_fit_tienda_actual = (actual["foto_fit_tienda"] if "foto_fit_tienda" in actual.keys() else None) or "cover"
         foto_pos_tienda_actual = (actual["foto_pos_tienda"] if "foto_pos_tienda" in actual.keys() else None) or "center"
         foto_pos_x_tienda_actual = float(actual["foto_pos_x_tienda"] or 50) if "foto_pos_x_tienda" in actual.keys() else 50.0
@@ -1910,6 +1912,8 @@ def actualizar_producto(producto_id, data):
         categoria_tienda = str(data.get("categoria_tienda", categoria_tienda_actual) or "").strip()[:60] or "General"
         descripcion_tienda = str(data.get("descripcion_tienda", descripcion_tienda_actual) or "").strip()[:800]
         descuento_tienda_pct = float(data.get("descuento_tienda_pct", descuento_tienda_actual) or 0)
+        oferta_inicio_tienda = _normalizar_fecha_iso(data.get("oferta_inicio_tienda", oferta_inicio_tienda_actual), "Fecha inicio oferta")
+        oferta_fin_tienda = _normalizar_fecha_iso(data.get("oferta_fin_tienda", oferta_fin_tienda_actual), "Fecha fin oferta")
         foto_fit_tienda = str(data.get("foto_fit_tienda", foto_fit_tienda_actual) or "cover").strip().lower()
         foto_pos_tienda = str(data.get("foto_pos_tienda", foto_pos_tienda_actual) or "center").strip().lower()
         foto_pos_x_tienda = float(data.get("foto_pos_x_tienda", foto_pos_x_tienda_actual) or 50)
@@ -1960,6 +1964,11 @@ def actualizar_producto(producto_id, data):
             raise ValueError(f"La unidad de porción ({porcion_unidad}) no es compatible con la unidad del stock ({unidad})")
         if descuento_tienda_pct < 0 or descuento_tienda_pct > 100:
             raise ValueError("El descuento de tienda debe estar entre 0 y 100")
+        if oferta_inicio_tienda and oferta_fin_tienda:
+            dt_ini = datetime.strptime(oferta_inicio_tienda, "%Y-%m-%d")
+            dt_fin = datetime.strptime(oferta_fin_tienda, "%Y-%m-%d")
+            if dt_fin < dt_ini:
+                raise ValueError("La fecha fin de oferta no puede ser menor a la fecha inicio")
         if foto_fit_tienda not in {"cover", "contain"}:
             raise ValueError("El ajuste de foto de tienda es invalido")
         if foto_pos_tienda not in {"center", "top", "bottom"}:
@@ -2109,6 +2118,7 @@ def actualizar_producto(producto_id, data):
                 porcion_cantidad = ?, porcion_unidad = ?,
                 stock_dependencia_tipo = ?, stock_dependencia_id = ?, stock_dependencia_cantidad = ?,
                 categoria_tienda = ?, descripcion_tienda = ?, descuento_tienda_pct = ?,
+                oferta_inicio_tienda = ?, oferta_fin_tienda = ?,
                 foto_fit_tienda = ?, foto_pos_tienda = ?, foto_pos_x_tienda = ?, foto_pos_y_tienda = ?, foto_zoom_tienda = ?,
                 destacado_tienda = ?, orden_tienda = ?, activo_tienda = ?
             WHERE id = ?
@@ -2130,6 +2140,8 @@ def actualizar_producto(producto_id, data):
                 categoria_tienda,
                 descripcion_tienda,
                 descuento_tienda_pct,
+                oferta_inicio_tienda,
+                oferta_fin_tienda,
                 foto_fit_tienda,
                 foto_pos_tienda,
                 foto_pos_x_tienda,
@@ -7103,6 +7115,8 @@ def migrar_db():
         _ensure_column(conn, "productos", "categoria_tienda", "TEXT DEFAULT 'General'")
         _ensure_column(conn, "productos", "descripcion_tienda", "TEXT DEFAULT ''")
         _ensure_column(conn, "productos", "descuento_tienda_pct", "REAL DEFAULT 0")
+        _ensure_column(conn, "productos", "oferta_inicio_tienda", "TEXT")
+        _ensure_column(conn, "productos", "oferta_fin_tienda", "TEXT")
         _ensure_column(conn, "productos", "foto_fit_tienda", "TEXT DEFAULT 'cover'")
         _ensure_column(conn, "productos", "foto_pos_tienda", "TEXT DEFAULT 'center'")
         _ensure_column(conn, "productos", "foto_pos_x_tienda", "REAL DEFAULT 50")
@@ -7200,6 +7214,22 @@ def migrar_db():
             UPDATE productos
             SET descuento_tienda_pct = 0
             WHERE descuento_tienda_pct IS NULL OR descuento_tienda_pct < 0 OR descuento_tienda_pct > 100
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET oferta_inicio_tienda = NULL
+            WHERE oferta_inicio_tienda IS NOT NULL
+              AND TRIM(oferta_inicio_tienda) = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE productos
+            SET oferta_fin_tienda = NULL
+            WHERE oferta_fin_tienda IS NOT NULL
+              AND TRIM(oferta_fin_tienda) = ''
             """
         )
         conn.execute(

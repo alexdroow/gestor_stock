@@ -795,6 +795,17 @@ def tienda_publica():
     return render_template('tienda.html')
 
 
+def _parse_fecha_yyyy_mm_dd(valor):
+    raw = str(valor or "").strip()
+    if not raw:
+        return None
+    raw = raw[:10]
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
 def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
     item = dict(producto or {})
     max_compra = int(item.get("porciones_disponibles") or 0)
@@ -814,7 +825,21 @@ def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
         categoria_activa = bool(eval_cat.get("activa"))
         categoria_descuento = float(categoria_cfg.get("descuento_pct") or 0) if categoria_activa else 0.0
     descripcion = str(item.get("descripcion_tienda") or "").strip()
-    descuento = float(item.get("descuento_tienda_pct") or 0)
+    descuento_base_producto = float(item.get("descuento_tienda_pct") or 0)
+    oferta_inicio_tienda = str(item.get("oferta_inicio_tienda") or "").strip()
+    oferta_fin_tienda = str(item.get("oferta_fin_tienda") or "").strip()
+    fecha_inicio = _parse_fecha_yyyy_mm_dd(oferta_inicio_tienda)
+    fecha_fin = _parse_fecha_yyyy_mm_dd(oferta_fin_tienda)
+    if not now_local:
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
+    hoy = now_local.date()
+    oferta_programada_activa = True
+    if fecha_inicio and hoy < fecha_inicio:
+        oferta_programada_activa = False
+    if fecha_fin and hoy > fecha_fin:
+        oferta_programada_activa = False
+    descuento_producto_efectivo = descuento_base_producto if oferta_programada_activa else 0.0
+    descuento = descuento_producto_efectivo
     if categoria_descuento > descuento:
         descuento = categoria_descuento
     if descuento < 0:
@@ -852,6 +877,7 @@ def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
         "precio_base": precio_base,
         "precio_final": round(precio_final, 2),
         "descuento_tienda_pct": descuento,
+        "descuento_tienda_base_pct": round(float(descuento_base_producto or 0), 2),
         "stock_visual": float(item.get("stock_visual") or 0),
         "stock_visual_label": item.get("stock_visual_label") or _formatear_numero_simple(item.get("stock_visual")),
         "stock_visual_unidad": item.get("stock_visual_unidad") or item.get("unidad") or "unidad",
@@ -866,6 +892,9 @@ def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
         "categoria_descuento_pct": round(float(categoria_descuento or 0), 2),
         "categoria_activa": bool(categoria_activa),
         "descripcion_tienda": descripcion,
+        "oferta_inicio_tienda": oferta_inicio_tienda,
+        "oferta_fin_tienda": oferta_fin_tienda,
+        "oferta_programada_activa": bool(oferta_programada_activa),
         "destacado_tienda": bool(item.get("destacado_tienda")),
         "orden_tienda": int(item.get("orden_tienda") or 0),
         "activo_tienda": bool(item.get("activo_tienda") if item.get("activo_tienda") is not None else 1),
@@ -2275,6 +2304,10 @@ def api_actualizar_producto(id):
             data["descripcion_tienda"] = str(data.get("descripcion_tienda") or "").strip()[:800]
         if "descuento_tienda_pct" in data:
             data["descuento_tienda_pct"] = float(data.get("descuento_tienda_pct") or 0)
+        if "oferta_inicio_tienda" in data:
+            data["oferta_inicio_tienda"] = str(data.get("oferta_inicio_tienda") or "").strip() or None
+        if "oferta_fin_tienda" in data:
+            data["oferta_fin_tienda"] = str(data.get("oferta_fin_tienda") or "").strip() or None
         if "foto_fit_tienda" in data:
             fit = str(data.get("foto_fit_tienda") or "cover").strip().lower()
             data["foto_fit_tienda"] = fit if fit in {"cover", "contain"} else "cover"
