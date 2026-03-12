@@ -520,14 +520,15 @@
         .mobile-cart-fab {
             display: none;
             position: fixed;
-            right: 14px;
+            left: 50%;
+            transform: translateX(-50%);
             bottom: 14px;
             z-index: 46;
             border: 0;
             border-radius: 999px;
-            background: var(--accent);
+            background: #111827;
             color: #fff;
-            padding: 12px 14px;
+            padding: 12px 16px;
             font-weight: 800;
             box-shadow: 0 8px 20px rgba(0,0,0,.25);
             cursor: pointer;
@@ -557,6 +558,75 @@
             padding: 12px 14px;
             font-weight: 800;
             box-shadow: 0 8px 20px rgba(0,0,0,.25);
+            cursor: pointer;
+        }
+        .mobile-cart-fab .total-chip {
+            margin-left: 8px;
+            font-size: .82rem;
+            color: #cbd5e1;
+            font-weight: 700;
+        }
+        .mobile-cat-strip {
+            display: none;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 2px 0;
+            margin-bottom: 8px;
+        }
+        .mobile-cat-chip {
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            background: #fff;
+            color: #334155;
+            padding: 7px 11px;
+            font-size: .82rem;
+            font-weight: 700;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .mobile-cat-chip.active {
+            background: #ffedd5;
+            color: #9a3412;
+            border-color: #fdba74;
+        }
+        .mobile-cart-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 62;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            background: rgba(15, 23, 42, .58);
+        }
+        .mobile-cart-modal.active {
+            display: flex;
+        }
+        .mobile-cart-panel {
+            width: 100%;
+            max-width: 540px;
+            max-height: 88vh;
+            overflow: auto;
+            background: #fff;
+            border-radius: 16px 16px 0 0;
+            border: 1px solid #e2e8f0;
+            border-bottom: 0;
+            padding: 14px;
+            display: grid;
+            gap: 10px;
+        }
+        .mobile-cart-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .mobile-cart-close {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: #fff;
+            color: #334155;
+            font-weight: 800;
+            padding: 7px 10px;
             cursor: pointer;
         }
         @media (max-width: 1180px) {
@@ -601,22 +671,15 @@
             .left-nav.mobile-open {
                 transform: translateX(0);
             }
-            .cart-panel {
-                position: fixed;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                top: auto;
-                z-index: 50;
-                border-radius: 14px 14px 0 0;
-                transform: translateY(105%);
-                transition: transform .22s ease;
-                max-height: 82vh;
-                overflow: auto;
-            }
-            .cart-panel.mobile-open {
-                transform: translateY(0);
-            }
+            .cart-panel { display: none; }
+            .mobile-cat-strip { display: flex; }
+            .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+            .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+            .item-name { font-size: .98rem; min-height: 32px; }
+            .item-desc { font-size: .79rem; min-height: 22px; }
+            .item-body { padding: 8px 8px 10px; }
+            .quick-add { width: 31px; height: 31px; font-size: 1.08rem; }
+            .ofertas-track .item-card { flex: 0 0 min(240px, 78vw); width: min(240px, 78vw); }
             .mobile-cart-fab {
                 display: inline-flex;
                 align-items: center;
@@ -646,6 +709,7 @@
 
         <section class="content">
             <div class="tienda-estado-banner" id="tienda-estado-banner">Cargando estado de tienda...</div>
+            <div class="mobile-cat-strip" id="mobile-cat-strip"></div>
             <div class="section" id="sec-ofertas">
                 <div class="ofertas-head">
                     <h2>Ofertas</h2>
@@ -695,7 +759,37 @@
 
     <div class="mobile-overlay" id="mobile-overlay"></div>
     <button type="button" class="mobile-menu-fab" id="mobile-menu-fab">Menu</button>
-    <button type="button" class="mobile-cart-fab" id="mobile-cart-fab">Carrito <span class="badge" id="mobile-cart-count">0</span></button>
+    <button type="button" class="mobile-cart-fab" id="mobile-cart-fab">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
+    <div class="mobile-cart-modal" id="mobile-cart-modal">
+        <div class="mobile-cart-panel">
+            <div class="mobile-cart-head">
+                <strong>Tu carrito</strong>
+                <button type="button" class="mobile-cart-close" id="mobile-cart-close">Cerrar</button>
+            </div>
+            <div class="cart-list" id="mobile-cart-list"></div>
+            <div class="cart-meta">
+                <label for="mobile-codigo-descuento">Codigo de descuento</label>
+                <div class="coupon-row">
+                    <input id="mobile-codigo-descuento" type="text" maxlength="40" placeholder="Ej: SUCREE10">
+                    <button type="button" id="mobile-btn-aplicar-cupon" class="coupon-btn">Aplicar</button>
+                </div>
+            </div>
+            <div class="line-total">
+                <span>Subtotal</span>
+                <span id="mobile-subtotal-monto">$0</span>
+            </div>
+            <div class="line-total discount">
+                <span>Descuento</span>
+                <span id="mobile-descuento-monto">-$0</span>
+            </div>
+            <div class="total">
+                <span>Total</span>
+                <span id="mobile-total">$0</span>
+            </div>
+            <button class="checkout-btn" id="mobile-btn-checkout" type="button">Confirmar compra</button>
+            <button class="clear-cart-btn" id="mobile-btn-clear-cart" type="button">Vaciar carrito</button>
+        </div>
+    </div>
 
     <div class="modal-overlay" id="modal-cliente">
         <div class="modal">
@@ -733,13 +827,19 @@
         const ofertasListEl = document.getElementById("ofertas-list");
         const categoriasWrapEl = document.getElementById("categorias-wrap");
         const cartListEl = document.getElementById("cart-list");
+        const mobileCartListEl = document.getElementById("mobile-cart-list");
         const subtotalMontoEl = document.getElementById("subtotal-monto");
+        const mobileSubtotalMontoEl = document.getElementById("mobile-subtotal-monto");
         const descuentoMontoEl = document.getElementById("descuento-monto");
+        const mobileDescuentoMontoEl = document.getElementById("mobile-descuento-monto");
         const totalEl = document.getElementById("total");
+        const mobileTotalEl = document.getElementById("mobile-total");
         const msgEl = document.getElementById("msg");
         const searchInputEl = document.getElementById("search-input");
         const codigoDescuentoEl = document.getElementById("codigo-descuento");
+        const mobileCodigoDescuentoEl = document.getElementById("mobile-codigo-descuento");
         const btnAplicarCuponEl = document.getElementById("btn-aplicar-cupon");
+        const mobileBtnAplicarCuponEl = document.getElementById("mobile-btn-aplicar-cupon");
         const modalClienteEl = document.getElementById("modal-cliente");
         const clienteNombreEl = document.getElementById("cliente-nombre");
         const clienteEmailEl = document.getElementById("cliente-email");
@@ -754,6 +854,9 @@
         const mobileOverlayEl = document.getElementById("mobile-overlay");
         const mobileCartFabEl = document.getElementById("mobile-cart-fab");
         const mobileCartCountEl = document.getElementById("mobile-cart-count");
+        const mobileCartTotalEl = document.getElementById("mobile-cart-total");
+        const mobileCatStripEl = document.getElementById("mobile-cat-strip");
+        const mobileCartModalEl = document.getElementById("mobile-cart-modal");
         const tiendaEstadoBannerEl = document.getElementById("tienda-estado-banner");
         const ofertasPrevBtnEl = document.getElementById("ofertas-prev");
         const ofertasNextBtnEl = document.getElementById("ofertas-next");
@@ -900,6 +1003,13 @@
                 const active = c === categoriaActiva ? "active" : "";
                 return `<button type="button" class="cat-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
             }).join("");
+            if (mobileCatStripEl) {
+                mobileCatStripEl.innerHTML = all.map((c) => {
+                    const label = c === "TODOS" ? "Todos" : c === "DESTACADOS" ? "Destacados" : c === "OFERTAS" ? "Ofertas" : c;
+                    const active = c === categoriaActiva ? "active" : "";
+                    return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
+                }).join("");
+            }
         }
 
         function _trackTienda(evento = "heartbeat") {
@@ -962,14 +1072,19 @@
         function renderCart() {
             if (!carrito.length) {
                 cartListEl.innerHTML = "<div>El carrito esta vacio.</div>";
+                if (mobileCartListEl) mobileCartListEl.innerHTML = "<div>El carrito esta vacio.</div>";
                 subtotalMontoEl.textContent = money.format(0);
+                if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(0);
                 descuentoMontoEl.textContent = `-${money.format(0)}`;
+                if (mobileDescuentoMontoEl) mobileDescuentoMontoEl.textContent = `-${money.format(0)}`;
                 totalEl.textContent = money.format(0);
+                if (mobileTotalEl) mobileTotalEl.textContent = money.format(0);
                 if (mobileCartCountEl) mobileCartCountEl.textContent = "0";
+                if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(0);
                 _trackTienda("cart");
                 return;
             }
-            cartListEl.innerHTML = carrito.map((it) => `
+            const htmlItems = carrito.map((it) => `
                 <div class="cart-item">
                     <div class="cart-item-row"><strong>${esc(it.nombre)}</strong><span>${money.format(it.precio_unitario)}</span></div>
                     <div class="cart-item-row">
@@ -982,16 +1097,22 @@
                     </div>
                 </div>
             `).join("");
+            cartListEl.innerHTML = htmlItems;
+            if (mobileCartListEl) mobileCartListEl.innerHTML = htmlItems;
             const subtotal = carrito.reduce((acc, it) => acc + (it.cantidad * it.precio_unitario), 0);
             const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
             const total = Math.max(0, subtotal - descuento);
             subtotalMontoEl.textContent = money.format(subtotal);
+            if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(subtotal);
             descuentoMontoEl.textContent = `-${money.format(descuento)}`;
+            if (mobileDescuentoMontoEl) mobileDescuentoMontoEl.textContent = `-${money.format(descuento)}`;
             totalEl.textContent = money.format(total);
+            if (mobileTotalEl) mobileTotalEl.textContent = money.format(total);
             if (mobileCartCountEl) {
                 const count = carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0);
                 mobileCartCountEl.textContent = String(count);
             }
+            if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(total);
             _trackTienda("cart");
         }
 
@@ -1004,7 +1125,7 @@
 
         async function aplicarCupon() {
             if (!tiendaAbierta) return msg("La tienda esta cerrada. No se pueden aplicar descuentos.", true);
-            const codigo = String(codigoDescuentoEl.value || "").trim();
+            const codigo = String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim();
             if (!codigo) return msg("Ingresa un codigo de descuento.", true);
             if (!carrito.length) return msg("Agrega productos antes de aplicar cupón.", true);
             msg("Validando cupon...");
@@ -1025,6 +1146,7 @@
                     descuento_monto: Number(data.descuento_monto || 0)
                 };
                 codigoDescuentoEl.value = cuponAplicado.codigo;
+                if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = cuponAplicado.codigo;
                 renderCart();
                 msg(`Cupon aplicado. Descuento: ${money.format(cuponAplicado.descuento_monto)}`);
             } catch (e) {
@@ -1148,14 +1270,13 @@
         }
 
         function abrirCarritoMobile() {
-            if (!cartPanelEl || !mobileOverlayEl) return;
-            cartPanelEl.classList.add("mobile-open");
-            mobileOverlayEl.classList.add("active");
+            if (!mobileCartModalEl) return;
+            mobileCartModalEl.classList.add("active");
         }
 
         function cerrarPanelesMobile() {
             if (leftNavEl) leftNavEl.classList.remove("mobile-open");
-            if (cartPanelEl) cartPanelEl.classList.remove("mobile-open");
+            if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
             if (mobileOverlayEl) mobileOverlayEl.classList.remove("active");
         }
 
@@ -1178,7 +1299,7 @@
             msg("Procesando compra...");
             const payload = {
                 items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
-                codigo_descuento: String(codigoDescuentoEl.value || "").trim(),
+                codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
                 cliente_nombre: nombre,
                 cliente_email: email,
                 cliente_telefono: telefono,
@@ -1194,6 +1315,7 @@
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
                 carrito = [];
                 codigoDescuentoEl.value = "";
+                if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = "";
                 cuponAplicado = { codigo: "", descuento_monto: 0 };
                 renderCart();
                 cerrarModalCliente();
@@ -1214,6 +1336,7 @@
             carrito = [];
             cuponAplicado = { codigo: "", descuento_monto: 0 };
             if (codigoDescuentoEl) codigoDescuentoEl.value = "";
+            if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = "";
             renderCart();
             msg("Carrito vaciado.");
         };
@@ -1222,6 +1345,12 @@
         document.getElementById("btn-checkout").addEventListener("click", checkout);
         document.getElementById("btn-clear-cart").addEventListener("click", () => window.vaciarCarrito());
         btnAplicarCuponEl.addEventListener("click", aplicarCupon);
+        if (mobileBtnAplicarCuponEl) mobileBtnAplicarCuponEl.addEventListener("click", aplicarCupon);
+        document.getElementById("mobile-btn-checkout")?.addEventListener("click", checkout);
+        document.getElementById("mobile-btn-clear-cart")?.addEventListener("click", () => window.vaciarCarrito());
+        document.getElementById("mobile-cart-close")?.addEventListener("click", () => {
+            if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
+        });
         document.getElementById("modal-cliente-cancel").addEventListener("click", cerrarModalCliente);
         document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
@@ -1234,11 +1363,20 @@
         if (ofertasNextBtnEl) ofertasNextBtnEl.addEventListener("click", () => scrollOfertas(1));
         if (mobileCartFabEl) mobileCartFabEl.addEventListener("click", abrirCarritoMobile);
         if (mobileOverlayEl) mobileOverlayEl.addEventListener("click", cerrarPanelesMobile);
+        if (mobileCartModalEl) {
+            mobileCartModalEl.addEventListener("click", (ev) => {
+                if (ev.target === mobileCartModalEl) mobileCartModalEl.classList.remove("active");
+            });
+        }
         if (clienteTelefonoEl) {
             clienteTelefonoEl.addEventListener("input", () => {
                 const onlyDigits = String(clienteTelefonoEl.value || "").replace(/\D+/g, "").slice(0, 8);
                 clienteTelefonoEl.value = onlyDigits;
             });
+        }
+        if (codigoDescuentoEl && mobileCodigoDescuentoEl) {
+            codigoDescuentoEl.addEventListener("input", () => { mobileCodigoDescuentoEl.value = codigoDescuentoEl.value; });
+            mobileCodigoDescuentoEl.addEventListener("input", () => { codigoDescuentoEl.value = mobileCodigoDescuentoEl.value; });
         }
 
         renderCart();
