@@ -797,6 +797,11 @@ def _serializar_producto_tienda(producto):
     max_compra = int(item.get("porciones_disponibles") or 0)
     if max_compra < 0:
         max_compra = 0
+    foto_url = str(item.get("foto_url") or "").strip()
+    if not foto_url:
+        foto_rel = str(item.get("foto") or "").strip()
+        if foto_rel:
+            foto_url = url_for('static', filename=foto_rel)
     return {
         "id": int(item.get("id") or 0),
         "nombre": item.get("nombre") or "Producto",
@@ -804,7 +809,7 @@ def _serializar_producto_tienda(producto):
         "stock_visual": float(item.get("stock_visual") or 0),
         "stock_visual_label": item.get("stock_visual_label") or _formatear_numero_simple(item.get("stock_visual")),
         "stock_visual_unidad": item.get("stock_visual_unidad") or item.get("unidad") or "unidad",
-        "foto_url": item.get("foto_url"),
+        "foto_url": foto_url,
         "icono": item.get("icono") or "package",
         "max_compra": max_compra,
     }
