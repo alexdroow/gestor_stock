@@ -917,6 +917,23 @@ def _normalizar_cliente_ref(email, telefono):
     return em or te or ""
 
 
+def _normalizar_email(raw):
+    email = str(raw or "").strip().lower()
+    if not email:
+        return ""
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return ""
+    return email
+
+
+def _nombre_desde_email(email):
+    base = str(email or "").split("@")[0].strip()
+    if not base:
+        return "Cliente tienda"
+    base = base.replace(".", " ").replace("_", " ").replace("-", " ")
+    return " ".join(part.capitalize() for part in base.split() if part)[:80] or "Cliente tienda"
+
+
 def _normalizar_telefono_cl(raw):
     dig = re.sub(r"\D+", "", str(raw or ""))
     if dig.startswith("56"):
@@ -1414,6 +1431,138 @@ def api_tienda_productos():
         )
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
+
+
+@app.route('/api/tienda/clientes/registrar', methods=['POST'])
+def api_tienda_clientes_registrar():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        email = _normalizar_email(data.get("email"))
+        if not email:
+            return jsonify({"success": False, "error": "Correo electronico invalido"}), 400
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        if not telefono:
+            return jsonify({"success": False, "error": "Telefono invalido. Debe tener 8 digitos"}), 400
+        nombre = str(data.get("nombre") or "").strip()[:80] or _nombre_desde_email(email)
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO tienda_clientes (nombre, email, telefono, activo, actualizado_en, ultimo_login)
+            VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(email, telefono) DO UPDATE SET
+                nombre = excluded.nombre,
+                activo = 1,
+                actualizado_en = CURRENT_TIMESTAMP,
+                ultimo_login = CURRENT_TIMESTAMP
+            """,
+            (nombre, email, telefono),
+        )
+        conn.commit()
+        cursor.execute(
+            """
+            SELECT id, nombre, email, telefono, activo, creado_en, actualizado_en, ultimo_login
+            FROM tienda_clientes
+            WHERE email = ? AND telefono = ?
+            LIMIT 1
+            """,
+            (email, telefono),
+        )
+        row = cursor.fetchone()
+        cliente = dict(row) if row else {"nombre": nombre, "email": email, "telefono": telefono}
+        return jsonify({"success": True, "cliente": cliente})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/clientes/historial', methods=['POST'])
+def api_tienda_clientes_historial():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        email = _normalizar_email(data.get("email"))
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        if not email or not telefono:
+            return jsonify({"success": False, "error": "Debes indicar correo y telefono validos"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, nombre, email, telefono, activo
+            FROM tienda_clientes
+            WHERE email = ? AND telefono = ? AND activo = 1
+            LIMIT 1
+            """,
+            (email, telefono),
+        )
+        cli = cursor.fetchone()
+        if not cli:
+            return jsonify({"success": False, "error": "Cliente no registrado"}), 404
+
+        cursor.execute(
+            """
+            SELECT id, fecha_hora, codigo_pedido, codigo_operacion, total_monto, descuento_codigo, descuento_monto
+            FROM ventas
+            WHERE canal_venta = 'tienda_online'
+              AND LOWER(TRIM(COALESCE(cliente_email, ''))) = LOWER(TRIM(?))
+              AND TRIM(COALESCE(cliente_telefono, '')) = TRIM(?)
+            ORDER BY datetime(fecha_hora) DESC, id DESC
+            LIMIT 30
+            """,
+            (email, telefono),
+        )
+        ventas = []
+        for vrow in cursor.fetchall():
+            venta = dict(vrow)
+            venta_id = int(venta.get("id") or 0)
+            cursor.execute(
+                """
+                SELECT vd.producto_id, COALESCE(p.nombre, '') AS producto_nombre, vd.cantidad, vd.precio_unitario
+                FROM venta_detalles vd
+                LEFT JOIN productos p ON p.id = vd.producto_id
+                WHERE vd.venta_id = ?
+                ORDER BY vd.id ASC
+                """,
+                (venta_id,),
+            )
+            items = [dict(r) for r in cursor.fetchall()]
+            if not items:
+                cursor.execute(
+                    """
+                    SELECT vi.producto_id, COALESCE(vi.producto_nombre, '') AS producto_nombre, vi.cantidad, 0 AS precio_unitario
+                    FROM venta_items vi
+                    WHERE vi.venta_id = ?
+                    ORDER BY vi.id ASC
+                    """,
+                    (venta_id,),
+                )
+                items = [dict(r) for r in cursor.fetchall()]
+            venta["items"] = [
+                {
+                    "producto_id": int(it.get("producto_id") or 0),
+                    "producto_nombre": str(it.get("producto_nombre") or "").strip(),
+                    "cantidad": max(0, int(it.get("cantidad") or 0)),
+                    "precio_unitario": float(it.get("precio_unitario") or 0),
+                }
+                for it in items
+                if int(it.get("producto_id") or 0) > 0 and int(it.get("cantidad") or 0) > 0
+            ]
+            ventas.append(venta)
+
+        return jsonify({"success": True, "cliente": dict(cli), "ventas": ventas})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/ventas/admin-catalogo')
@@ -5006,6 +5155,18 @@ def api_tienda_checkout():
                     """,
                     (int(cupon_aplicado["id"]), venta_id, (cliente_ref or None), descuento_monto),
                 )
+            cursor.execute(
+                """
+                INSERT INTO tienda_clientes (nombre, email, telefono, activo, actualizado_en, ultimo_login)
+                VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(email, telefono) DO UPDATE SET
+                    nombre = excluded.nombre,
+                    activo = 1,
+                    actualizado_en = CURRENT_TIMESTAMP,
+                    ultimo_login = CURRENT_TIMESTAMP
+                """,
+                (cliente_nombre, cliente_email, cliente_telefono),
+            )
             conn.commit()
         finally:
             if conn:

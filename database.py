@@ -7454,6 +7454,30 @@ def migrar_db():
         _ensure_column(conn, "tienda_visitas", "ip_address", "TEXT")
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_clientes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT DEFAULT '',
+                email TEXT NOT NULL,
+                telefono TEXT NOT NULL,
+                activo INTEGER NOT NULL DEFAULT 1,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                ultimo_login TEXT,
+                UNIQUE(email, telefono)
+            )
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_clientes
+            SET email = LOWER(TRIM(COALESCE(email, ''))),
+                telefono = TRIM(COALESCE(telefono, '')),
+                nombre = COALESCE(TRIM(nombre), ''),
+                activo = CASE WHEN activo IS NULL OR activo = 0 THEN 0 ELSE 1 END
+            """
+        )
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_tienda_visitas_actividad
             ON tienda_visitas(ultima_actividad)
             """

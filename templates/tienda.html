@@ -851,6 +851,7 @@
         <div class="search">
             <input id="search-input" type="search" placeholder="Buscar productos...">
         </div>
+        <button type="button" class="menu-quick-btn" id="btn-cuenta">Mi cuenta</button>
         <button type="button" class="menu-quick-btn" id="btn-menu-quick">Categorias</button>
     </header>
 
@@ -956,6 +957,30 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-cuenta">
+        <div class="modal" style="width:min(760px,96vw);">
+            <h3>Mi cuenta</h3>
+            <div id="cuenta-estado" style="font-size:.9rem;color:#334155;">Registra tu correo y telefono para comprar mas rapido.</div>
+            <div class="two">
+                <input id="cuenta-email" type="email" placeholder="Correo electronico">
+                <div class="phone-wrap">
+                    <span class="phone-prefix">+569</span>
+                    <input id="cuenta-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content:flex-start;">
+                <button class="btn-primary" type="button" id="cuenta-guardar">Registrarme / Ingresar</button>
+            </div>
+            <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de compras</div>
+            <div id="cuenta-historial" style="max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
+                <div style="color:#64748b;font-size:.88rem;">Sin historial cargado.</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="modal-cuenta-cerrar">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-cliente">
         <div class="modal">
             <h3>Datos para confirmar pedido</h3>
@@ -1011,6 +1036,12 @@
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
+        const modalCuentaEl = document.getElementById("modal-cuenta");
+        const cuentaEstadoEl = document.getElementById("cuenta-estado");
+        const cuentaEmailEl = document.getElementById("cuenta-email");
+        const cuentaTelefonoEl = document.getElementById("cuenta-telefono");
+        const cuentaHistorialEl = document.getElementById("cuenta-historial");
+        const btnCuentaEl = document.getElementById("btn-cuenta");
         const leftNavEl = document.querySelector(".left-nav");
         const cartPanelEl = document.querySelector(".cart-panel");
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
@@ -1036,6 +1067,8 @@
         let tiendaAbierta = true;
         let tiendaEstadoMensaje = "";
         let mensajePostPedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.";
+        let clienteRegistrado = null;
+        let historialComprasCliente = [];
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -1059,6 +1092,71 @@
                 .replaceAll(">", "&gt;")
                 .replaceAll('"', "&quot;")
                 .replaceAll("'", "&#39;");
+        }
+
+        function normalizarEmailCliente(raw) {
+            const email = String(raw || "").trim().toLowerCase();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return "";
+            return email;
+        }
+
+        function normalizarTelefono8(raw) {
+            let dig = String(raw || "").replace(/\D+/g, "");
+            if (dig.startsWith("56")) dig = dig.slice(2);
+            if (dig.startsWith("9") && dig.length === 9) dig = dig.slice(1);
+            if (dig.length !== 8) return "";
+            return dig;
+        }
+
+        function nombreDesdeEmail(email) {
+            const base = String(email || "").split("@")[0] || "";
+            const limpio = base.replace(/[._-]+/g, " ").trim();
+            if (!limpio) return "Cliente tienda";
+            return limpio.split(/\s+/).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ").slice(0, 80);
+        }
+
+        function cargarClienteLocal() {
+            try {
+                const raw = localStorage.getItem("tienda_cliente_reg");
+                if (!raw) return null;
+                const obj = JSON.parse(raw);
+                const email = normalizarEmailCliente(obj?.email);
+                const tel8 = normalizarTelefono8(obj?.telefono || obj?.telefono_digitos);
+                if (!email || !tel8) return null;
+                return {
+                    nombre: String(obj?.nombre || nombreDesdeEmail(email)).trim() || nombreDesdeEmail(email),
+                    email,
+                    telefono: `+569${tel8}`,
+                    telefono_digitos: tel8,
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function guardarClienteLocal(cliente) {
+            try {
+                if (!cliente) return;
+                localStorage.setItem("tienda_cliente_reg", JSON.stringify({
+                    nombre: String(cliente.nombre || "").trim(),
+                    email: String(cliente.email || "").trim().toLowerCase(),
+                    telefono: String(cliente.telefono || "").trim(),
+                    telefono_digitos: normalizarTelefono8(cliente.telefono || ""),
+                }));
+            } catch (_) {}
+        }
+
+        function renderEstadoCuenta() {
+            if (btnCuentaEl) {
+                btnCuentaEl.textContent = clienteRegistrado ? "Mi cuenta (activa)" : "Mi cuenta";
+            }
+            if (cuentaEstadoEl) {
+                if (clienteRegistrado) {
+                    cuentaEstadoEl.textContent = `Cuenta activa: ${clienteRegistrado.email} / ${clienteRegistrado.telefono}`;
+                } else {
+                    cuentaEstadoEl.textContent = "Registra tu correo y telefono para comprar mas rapido.";
+                }
+            }
         }
 
         function msg(text, isErr = false) {
@@ -1415,10 +1513,180 @@
             }
         }
 
+        function abrirModalCuenta() {
+            if (cuentaEmailEl) cuentaEmailEl.value = clienteRegistrado?.email || "";
+            if (cuentaTelefonoEl) cuentaTelefonoEl.value = clienteRegistrado?.telefono_digitos || normalizarTelefono8(clienteRegistrado?.telefono || "");
+            renderEstadoCuenta();
+            modalCuentaEl?.classList.add("active");
+            if (clienteRegistrado) cargarHistorialCliente();
+        }
+
+        function cerrarModalCuenta() {
+            modalCuentaEl?.classList.remove("active");
+        }
+
+        function renderHistorialCliente(ventas) {
+            if (!cuentaHistorialEl) return;
+            const items = Array.isArray(ventas) ? ventas : [];
+            if (!items.length) {
+                cuentaHistorialEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay compras registradas.</div>`;
+                return;
+            }
+            cuentaHistorialEl.innerHTML = items.map((v) => {
+                const vid = Number(v.id || 0);
+                const total = money.format(Number(v.total_monto || 0));
+                const fecha = String(v.fecha_hora || "");
+                const desc = (Array.isArray(v.items) ? v.items : []).map((it) => `${esc(it.producto_nombre || ("#"+it.producto_id))} x${Number(it.cantidad || 0)}`).join(", ");
+                return `
+                    <div style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:6px;">
+                        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                            <strong>Pedido #${vid}</strong>
+                            <span>${total}</span>
+                        </div>
+                        <div style="font-size:.82rem;color:#64748b;">${esc(fecha)}</div>
+                        <div style="font-size:.84rem;color:#334155;">${desc || "Sin items"}</div>
+                        <div style="display:flex;justify-content:flex-end;">
+                            <button class="btn-primary" type="button" onclick="repetirCompraVenta(${vid})">Repetir compra</button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        async function registrarCuentaCliente() {
+            const email = normalizarEmailCliente(cuentaEmailEl?.value);
+            const tel8 = normalizarTelefono8(cuentaTelefonoEl?.value);
+            if (!email) return msg("Correo invalido para registro.", true);
+            if (!tel8) return msg("Telefono invalido. Debe tener 8 digitos.", true);
+            try {
+                const res = await fetch("/api/tienda/clientes/registrar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email,
+                        telefono: `+569${tel8}`,
+                        nombre: nombreDesdeEmail(email),
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo registrar cliente");
+                clienteRegistrado = {
+                    nombre: String((data.cliente || {}).nombre || nombreDesdeEmail(email)).trim() || nombreDesdeEmail(email),
+                    email,
+                    telefono: `+569${tel8}`,
+                    telefono_digitos: tel8,
+                };
+                guardarClienteLocal(clienteRegistrado);
+                renderEstadoCuenta();
+                await cargarHistorialCliente();
+                msg("Cuenta de cliente registrada.");
+            } catch (e) {
+                msg(e.message || "No se pudo registrar cliente", true);
+            }
+        }
+
+        async function cargarHistorialCliente() {
+            if (!clienteRegistrado) {
+                renderHistorialCliente([]);
+                return;
+            }
+            try {
+                const res = await fetch("/api/tienda/clientes/historial", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: clienteRegistrado.email,
+                        telefono: clienteRegistrado.telefono,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar historial");
+                historialComprasCliente = Array.isArray(data.ventas) ? data.ventas : [];
+                renderHistorialCliente(historialComprasCliente);
+            } catch (e) {
+                historialComprasCliente = [];
+                renderHistorialCliente([]);
+                msg(e.message || "No se pudo cargar historial", true);
+            }
+        }
+
+        function repetirCompraVenta(ventaId) {
+            const venta = (historialComprasCliente || []).find((v) => Number(v.id || 0) === Number(ventaId || 0));
+            if (!venta) return;
+            let agregados = 0;
+            let omitidos = 0;
+            for (const it of (venta.items || [])) {
+                const pid = Number(it.producto_id || 0);
+                const qty = Math.max(0, Number(it.cantidad || 0));
+                if (!pid || !qty) continue;
+                const p = productos.find((x) => Number(x.id || 0) === pid);
+                if (!p) { omitidos += qty; continue; }
+                const max = Math.max(0, Number(p.max_compra || 0));
+                if (max <= 0) { omitidos += qty; continue; }
+                let ci = carrito.find((x) => Number(x.id || 0) === pid);
+                if (!ci) {
+                    ci = { id: p.id, nombre: p.nombre, cantidad: 0, precio_unitario: n(p.precio_final) };
+                    carrito.push(ci);
+                }
+                const disponibles = Math.max(0, max - Number(ci.cantidad || 0));
+                const aAgregar = Math.min(disponibles, qty);
+                ci.cantidad += aAgregar;
+                agregados += aAgregar;
+                omitidos += Math.max(0, qty - aAgregar);
+            }
+            carrito = carrito.filter((x) => Number(x.cantidad || 0) > 0);
+            if (agregados > 0) {
+                limpiarCuponAplicado();
+                renderCart();
+            }
+            cerrarModalCuenta();
+            msg(`Repeticion aplicada: ${agregados} unidad(es) agregadas${omitidos > 0 ? `, ${omitidos} omitidas por stock` : ""}.`, omitidos > 0 && agregados === 0);
+        }
+
+        async function enviarCheckoutCliente(datosCliente) {
+            msg("Procesando compra...");
+            const payload = {
+                items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
+                codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
+                cliente_nombre: String(datosCliente?.nombre || "").trim(),
+                cliente_email: normalizarEmailCliente(datosCliente?.email),
+                cliente_telefono: String(datosCliente?.telefono || "").trim(),
+                fecha_venta: new Date().toISOString().slice(0, 10)
+            };
+            if (payload.cliente_nombre.length < 2) return msg("Ingresa un nombre valido.", true);
+            if (!payload.cliente_email) return msg("Ingresa un correo valido.", true);
+            if (!/^\+569\d{8}$/.test(payload.cliente_telefono)) return msg("Telefono invalido.", true);
+            try {
+                const res = await fetch("/api/tienda/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
+                carrito = [];
+                codigoDescuentoEl.value = "";
+                if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = "";
+                cuponAplicado = { codigo: "", descuento_monto: 0 };
+                renderCart();
+                cerrarModalCliente();
+                abrirModalExito();
+                msg(`Compra confirmada. Venta #${data.venta_id}`);
+                _trackTienda("checkout");
+                await cargarProductos();
+                if (clienteRegistrado) await cargarHistorialCliente();
+            } catch (e) {
+                msg(e.message || "Error procesando compra", true);
+            }
+        }
+
         async function checkout() {
             if (!tiendaAbierta) return msg("La tienda esta cerrada por el momento.", true);
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
+            if (clienteRegistrado && normalizarEmailCliente(clienteRegistrado.email) && /^\+569\d{8}$/.test(String(clienteRegistrado.telefono || ""))) {
+                return enviarCheckoutCliente(clienteRegistrado);
+            }
             modalClienteEl.classList.add("active");
         }
 
@@ -1472,48 +1740,23 @@
             if (!tiendaAbierta) return msg("La tienda esta cerrada por el momento.", true);
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
             const nombre = String(clienteNombreEl.value || "").trim();
-            const email = String(clienteEmailEl.value || "").trim().toLowerCase();
-            const telefonoDig = String(clienteTelefonoEl.value || "").replace(/\D+/g, "");
+            const email = normalizarEmailCliente(String(clienteEmailEl.value || "").trim().toLowerCase());
+            const telefonoDig = normalizarTelefono8(String(clienteTelefonoEl.value || ""));
             const telefono = `+569${telefonoDig}`;
             if (nombre.length < 2) {
                 return msg("Ingresa tu nombre.", true);
             }
-            if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+            if (!email) {
                 return msg("Ingresa un correo valido.", true);
             }
-            if (telefonoDig.length !== 8) {
+            if (!telefonoDig || telefonoDig.length !== 8) {
                 return msg("El telefono debe tener exactamente 8 digitos.", true);
             }
-            msg("Procesando compra...");
-            const payload = {
-                items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
-                codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
-                cliente_nombre: nombre,
-                cliente_email: email,
-                cliente_telefono: telefono,
-                fecha_venta: new Date().toISOString().slice(0, 10)
-            };
-            try {
-                const res = await fetch("/api/tienda/checkout", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
-                carrito = [];
-                codigoDescuentoEl.value = "";
-                if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = "";
-                cuponAplicado = { codigo: "", descuento_monto: 0 };
-                renderCart();
-                cerrarModalCliente();
-                abrirModalExito();
-                msg(`Compra confirmada. Venta #${data.venta_id}`);
-                _trackTienda("checkout");
-                await cargarProductos();
-            } catch (e) {
-                msg(e.message || "Error procesando compra", true);
-            }
+            return enviarCheckoutCliente({
+                nombre,
+                email,
+                telefono,
+            });
         }
 
         window.agregar = agregar;
@@ -1522,6 +1765,7 @@
         window.cambiarCategoria = cambiarCategoria;
         window.abrirMenuMobile = abrirMenuMobile;
         window.abrirCarritoMobile = abrirCarritoMobile;
+        window.repetirCompraVenta = repetirCompraVenta;
         window.vaciarCarrito = () => {
             carrito = [];
             cuponAplicado = { codigo: "", descuento_monto: 0 };
@@ -1547,8 +1791,12 @@
         document.getElementById("modal-cliente-cancel").addEventListener("click", cerrarModalCliente);
         document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
+        document.getElementById("modal-cuenta-cerrar")?.addEventListener("click", cerrarModalCuenta);
+        document.getElementById("cuenta-guardar")?.addEventListener("click", registrarCuentaCliente);
+        btnCuentaEl?.addEventListener("click", abrirModalCuenta);
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
+        modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
         if (btnMenuQuickEl) btnMenuQuickEl.addEventListener("click", abrirMenuMobile);
         if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirMenuMobile);
@@ -1572,11 +1820,20 @@
                 clienteTelefonoEl.value = onlyDigits;
             });
         }
+        if (cuentaTelefonoEl) {
+            cuentaTelefonoEl.addEventListener("input", () => {
+                const onlyDigits = String(cuentaTelefonoEl.value || "").replace(/\D+/g, "").slice(0, 8);
+                cuentaTelefonoEl.value = onlyDigits;
+            });
+        }
         if (codigoDescuentoEl && mobileCodigoDescuentoEl) {
             codigoDescuentoEl.addEventListener("input", () => { mobileCodigoDescuentoEl.value = codigoDescuentoEl.value; });
             mobileCodigoDescuentoEl.addEventListener("input", () => { codigoDescuentoEl.value = mobileCodigoDescuentoEl.value; });
         }
 
+        clienteRegistrado = cargarClienteLocal();
+        renderEstadoCuenta();
+        if (clienteRegistrado) cargarHistorialCliente();
         renderCart();
         cargarProductos();
         _trackTienda("view");
