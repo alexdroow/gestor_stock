@@ -540,6 +540,29 @@
             };
         }
 
+        function actualizarProductoLocal(id, patch) {
+            const idx = productos.findIndex((x) => Number(x.id || 0) === Number(id || 0));
+            if (idx < 0) return null;
+            productos[idx] = { ...productos[idx], ...(patch || {}) };
+            return productos[idx];
+        }
+
+        function refrescarMiniaturaProducto(id) {
+            const card = document.querySelector(`article[data-id="${id}"]`);
+            if (!card) return;
+            const prod = productos.find((x) => Number(x.id || 0) === Number(id || 0));
+            if (!prod) return;
+            const thumb = card.querySelector(".thumb");
+            if (!thumb) return;
+            const src = imgSrc(prod);
+            if (!src) {
+                thumb.innerHTML = `<div class="thumb-fallback">*</div>`;
+                return;
+            }
+            const ts = Date.now();
+            thumb.innerHTML = `<img src="${esc(src)}?v=${ts}" style="${fitStyle(prod)}" alt="${esc(prod.nombre || 'Producto')}">`;
+        }
+
         async function cargarActividad() {
             try {
                 const res = await fetch("/api/tienda/admin/actividad", { headers: { Accept: "application/json" } });
@@ -635,9 +658,9 @@
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
+                actualizarProductoLocal(id, payload);
                 msg.className = "ok";
                 msg.textContent = "Guardado";
-                await cargar();
             } catch (e) {
                 msg.className = "err";
                 msg.textContent = e.message || "Error guardando";
@@ -779,10 +802,21 @@
                 });
                 const upd = await resUpd.json();
                 if (!resUpd.ok || !upd.success) throw new Error(upd.error || "No se pudo guardar el encuadre");
+                const updated = actualizarProductoLocal(id, {
+                    foto_url: data.foto_url || data.foto || "",
+                    foto: data.foto || "",
+                    foto_fit_tienda: "cover",
+                    foto_pos_tienda: "center",
+                    foto_pos_x_tienda: 50,
+                    foto_pos_y_tienda: 50,
+                    foto_zoom_tienda: 100,
+                });
+                if (updated) {
+                    refrescarMiniaturaProducto(id);
+                }
                 msg.className = "ok";
                 msg.textContent = "Foto subida correctamente.";
                 cerrarEncuadre();
-                await cargar();
             } catch (e) {
                 msg.className = "err";
                 msg.textContent = e.message || "Error subiendo foto";
