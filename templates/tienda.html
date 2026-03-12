@@ -48,6 +48,18 @@
             padding: 7px 10px;
             background: #fff;
         }
+        .search-wrap {
+            padding: 10px 16px 0;
+            max-width: 1250px;
+            margin: 0 auto;
+        }
+        .search-wrap input {
+            width: 100%;
+            border: 1px solid #fdba74;
+            border-radius: 12px;
+            padding: 11px 12px;
+            background: #fff;
+        }
         .layout {
             display: grid;
             grid-template-columns: 1fr 350px;
@@ -196,6 +208,9 @@
         <div class="brand">Tienda en linea</div>
         <a href="{{ url_for('admin_login') }}">Administrador</a>
     </header>
+    <div class="search-wrap">
+        <input id="buscador" type="search" placeholder="Buscar producto por nombre...">
+    </div>
 
     <main class="layout">
         <section>
@@ -223,6 +238,7 @@
         const totalEl = document.getElementById("total");
         const msgEl = document.getElementById("msg");
         const codigoPedidoEl = document.getElementById("codigo-pedido");
+        const buscadorEl = document.getElementById("buscador");
         const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 
         let productos = [];
@@ -239,11 +255,16 @@
         }
 
         function renderCatalogo() {
-            if (!productos.length) {
+            const filtro = String((buscadorEl && buscadorEl.value) || "").trim().toLowerCase();
+            const visibles = !filtro
+                ? productos
+                : productos.filter((p) => String(p.nombre || "").toLowerCase().includes(filtro));
+
+            if (!visibles.length) {
                 catalogoEl.innerHTML = "<p>No hay productos disponibles.</p>";
                 return;
             }
-            catalogoEl.innerHTML = productos.map((p) => `
+            catalogoEl.innerHTML = visibles.map((p) => `
                 <article class="card">
                     <div class="foto">
                         ${p.foto_url ? `<img src="${p.foto_url}" alt="${p.nombre}">` : `<div class="icono">*</div>`}
@@ -251,7 +272,7 @@
                     <div class="card-body">
                         <div class="nombre">${p.nombre}</div>
                         <div class="precio">${money.format(precioNum(p.precio))}</div>
-                        <div class="stock">Disponible: ${p.stock_visual_label} ${p.stock_visual_unidad || ""}</div>
+                        <div class="stock">Disponible: ${p.max_compra} unidad(es)</div>
                         <button type="button" onclick="agregar(${p.id})">Agregar</button>
                     </div>
                 </article>
@@ -285,7 +306,16 @@
             const p = productos.find((x) => x.id === id);
             if (!p) return;
             const item = carrito.find((x) => x.id === id);
+            const maxCompra = Math.max(0, Number(p.max_compra || 0));
+            if (maxCompra <= 0) {
+                setMsg("Producto sin stock disponible.", true);
+                return;
+            }
             if (item) {
+                if (item.cantidad >= maxCompra) {
+                    setMsg(`Solo hay ${maxCompra} unidad(es) disponible(s) de ${p.nombre}.`, true);
+                    return;
+                }
                 item.cantidad += 1;
             } else {
                 carrito.push({
@@ -302,6 +332,12 @@
         function sumar(id) {
             const item = carrito.find((x) => x.id === id);
             if (!item) return;
+            const p = productos.find((x) => x.id === id);
+            const maxCompra = Math.max(0, Number((p && p.max_compra) || 0));
+            if (item.cantidad >= maxCompra) {
+                setMsg(`No puedes superar ${maxCompra} unidad(es) en este producto.`, true);
+                return;
+            }
             item.cantidad += 1;
             renderCarrito();
         }
@@ -366,6 +402,7 @@
         }
 
         document.getElementById("btn-checkout").addEventListener("click", checkout);
+        buscadorEl.addEventListener("input", renderCatalogo);
         renderCarrito();
         cargarProductos();
     </script>

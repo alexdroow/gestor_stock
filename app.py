@@ -794,6 +794,9 @@ def tienda_publica():
 
 def _serializar_producto_tienda(producto):
     item = dict(producto or {})
+    max_compra = int(item.get("porciones_disponibles") or 0)
+    if max_compra < 0:
+        max_compra = 0
     return {
         "id": int(item.get("id") or 0),
         "nombre": item.get("nombre") or "Producto",
@@ -803,6 +806,7 @@ def _serializar_producto_tienda(producto):
         "stock_visual_unidad": item.get("stock_visual_unidad") or item.get("unidad") or "unidad",
         "foto_url": item.get("foto_url"),
         "icono": item.get("icono") or "package",
+        "max_compra": max_compra,
     }
 
 
@@ -813,7 +817,7 @@ def api_tienda_productos():
         disponibles = [
             _serializar_producto_tienda(p)
             for p in productos
-            if p.get("disponible") and not p.get("bloqueado") and not p.get("desactivacion_manual_requiere_confirmacion")
+            if int(p.get("porciones_disponibles") or 0) > 0
         ]
         return jsonify({"success": True, "productos": disponibles})
     except Exception as e:
