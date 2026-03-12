@@ -98,6 +98,12 @@
             color: #334155;
         }
         .actions { display: flex; gap: 8px; }
+        .photo-tools {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
         .save {
             border: 0;
             border-radius: 8px;
@@ -221,9 +227,14 @@
                         Mostrar en destacados
                     </label>
 
+                    <div class="photo-tools">
+                        <input type="file" id="foto-file-${p.id}" accept="image/*">
+                        <button class="save" type="button" onclick="subirFoto(${p.id})">Subir foto</button>
+                    </div>
+
                     <div class="actions">
                         <button class="save" type="button" onclick="guardar(${p.id})">Guardar</button>
-                        <span class="sub">Foto: usar panel de ventas para subir/cambiar imagen.</span>
+                        <span class="sub">Ajustes visuales aplican directo en la tienda publica.</span>
                     </div>
                     <div class="sub" id="msg-${p.id}"></div>
                 </article>
@@ -270,6 +281,38 @@
             }
         }
 
+        async function subirFoto(id) {
+            const card = document.querySelector(`article[data-id="${id}"]`);
+            if (!card) return;
+            const fileInput = document.getElementById(`foto-file-${id}`);
+            const msg = card.querySelector(`#msg-${id}`);
+            const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+            if (!file) {
+                msg.className = "err";
+                msg.textContent = "Selecciona una imagen antes de subir.";
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append("foto", file);
+            msg.className = "sub";
+            msg.textContent = "Subiendo foto...";
+            try {
+                const res = await fetch(`/api/producto/${id}/foto`, {
+                    method: "POST",
+                    body: fd
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir la foto");
+                msg.className = "ok";
+                msg.textContent = "Foto subida correctamente.";
+                await cargar();
+            } catch (e) {
+                msg.className = "err";
+                msg.textContent = e.message || "Error subiendo foto";
+            }
+        }
+
         async function cargar() {
             gridEl.innerHTML = "<p>Cargando...</p>";
             try {
@@ -284,6 +327,7 @@
         }
 
         window.guardar = guardar;
+        window.subirFoto = subirFoto;
         qEl.addEventListener("input", render);
         cargar();
     </script>
