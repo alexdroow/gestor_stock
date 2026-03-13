@@ -2350,6 +2350,16 @@
             return agendaTipoActual === "torta" && Boolean(agendaCakeCatalog?.enabled);
         }
 
+        function _catalogoTortaConDatos(cat) {
+            return Boolean(cat && Array.isArray(cat.sizes) && cat.sizes.length);
+        }
+
+        function _setAgendaCakeCatalog(cat) {
+            if (!cat || typeof cat !== "object") return;
+            agendaCakeCatalog = cat;
+            _renderAgendaCakeBuilder();
+        }
+
         function _toggleAgendaCakeBuilder() {
             if (!agendaCakeWrapEl) return;
             agendaCakeWrapEl.style.display = _isAgendaCakeVisible() ? "" : "none";
@@ -2561,14 +2571,28 @@
                 const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar catalogo de tortas");
-                agendaCakeCatalog = data.catalogo || null;
+                const fetched = data.catalogo || null;
+                if (_catalogoTortaConDatos(fetched)) {
+                    agendaCakeCatalog = fetched;
+                } else if (_catalogoTortaConDatos(tiendaUiCfg?.catalogo_torta)) {
+                    agendaCakeCatalog = tiendaUiCfg.catalogo_torta;
+                } else if (_catalogoTortaConDatos(TIENDA_UI_INITIAL?.catalogo_torta)) {
+                    agendaCakeCatalog = TIENDA_UI_INITIAL.catalogo_torta;
+                } else {
+                    agendaCakeCatalog = fetched;
+                }
                 _resetAgendaCakeSelection();
                 _renderAgendaCakeBuilder();
                 if (agendaCakeCatalog && Array.isArray(agendaCakeCatalog.sizes) && !agendaCakeCatalog.sizes.length) {
                     _agendaMsg("Catalogo de tortas sin tamanos activos. Revisa /ventas/admin-catalogo-torta", "err");
                 }
             } catch (err) {
-                agendaCakeCatalog = null;
+                if (!_catalogoTortaConDatos(agendaCakeCatalog)) {
+                    if (_catalogoTortaConDatos(tiendaUiCfg?.catalogo_torta)) agendaCakeCatalog = tiendaUiCfg.catalogo_torta;
+                    else if (_catalogoTortaConDatos(TIENDA_UI_INITIAL?.catalogo_torta)) agendaCakeCatalog = TIENDA_UI_INITIAL.catalogo_torta;
+                    else agendaCakeCatalog = null;
+                }
+                _renderAgendaCakeBuilder();
                 _agendaMsg((err && err.message) ? err.message : "No se pudo cargar catalogo de tortas.", "err");
             }
         }
@@ -3235,6 +3259,9 @@
                     ? data.categorias.filter((c) => Boolean(c.activa_en_tienda))
                     : [];
                 aplicarPersonalizacionTienda(data.personalizacion || tiendaUiCfg || TIENDA_UI_INITIAL);
+                if (_catalogoTortaConDatos(data?.personalizacion?.catalogo_torta)) {
+                    _setAgendaCakeCatalog(data.personalizacion.catalogo_torta);
+                }
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                 renderCategoriasMenu();
