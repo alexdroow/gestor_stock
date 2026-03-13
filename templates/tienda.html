@@ -556,6 +556,16 @@
             font-size: .78rem;
             color: #64748b;
         }
+        .agenda-shipping-note {
+            margin-top: 8px;
+            font-size: .8rem;
+            color: #92400e;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 8px;
+            padding: 7px 9px;
+            font-weight: 700;
+        }
         .agenda-status {
             font-size: .86rem;
             color: var(--muted);
@@ -1584,6 +1594,7 @@
                         </div>
                         <div class="agenda-map" id="agenda-map"></div>
                         <div class="agenda-map-meta" id="agenda-map-meta">Mueve el pin al punto exacto y confirma.</div>
+                        <div class="agenda-shipping-note">Importante: el valor de despacho no esta incluido en esta reserva.</div>
                     </div>
                     <button class="checkout-btn" id="agenda-btn-reservar" type="button">Reservar horario</button>
                     <div class="agenda-status" id="agenda-status-msg"></div>
@@ -3503,6 +3514,7 @@
                 drawSectionTitle("Entrega y Ubicacion");
                 drawField("Direccion informada por cliente", payload.direccion || "-");
                 drawField("Coordenadas", pinTxt);
+                drawField("Nota despacho", "El valor de despacho no esta incluido en esta reserva.");
                 const mapUrl = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(String(payload.lat || ""))}&mlon=${encodeURIComponent(String(payload.lng || ""))}#map=18/${encodeURIComponent(String(payload.lat || ""))}/${encodeURIComponent(String(payload.lng || ""))}`;
                 drawLink("Mapa de referencia (OpenStreetMap)", mapUrl);
             } else {
@@ -3529,6 +3541,7 @@
             const terminos = [
                 "Una vez iniciado el proceso de elaboracion del pedido, el abono no es reembolsable.",
                 "Las imagenes de referencia compartidas por el cliente son orientativas. El producto final puede presentar variaciones de diseno, color o terminaciones.",
+                "El valor de despacho no esta incluido en la cotizacion ni en esta orden de reserva.",
                 "La modalidad principal es retiro en local. En caso de solicitar despacho, este se gestiona mediante Uber Entregas. Sucree Pasteleria entrega el pedido en condiciones optimas, pero no se responsabiliza por danos, demoras o deterioros ocasionados durante el transporte.",
                 "Al realizar el abono, el cliente declara conocer y aceptar estas condiciones.",
             ];
