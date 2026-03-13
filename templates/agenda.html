@@ -2154,6 +2154,7 @@
             const horaInicio = document.getElementById('evento-hora-inicio').value || '00:00';
             const esEnvio = document.getElementById('evento-envio').checked;
             const direccionEntrega = (document.getElementById('evento-direccion').value || '').trim();
+            const confirmarReservaTienda = Boolean(eventoEditando && esReservaTiendaPendiente(eventoEditando));
             
             // Validar que haya fecha
             if (!fecha) {
@@ -2215,9 +2216,18 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    if (confirmarReservaTienda && eventoEditando && eventoEditando.id) {
+                        await fetch(`/api/agenda/evento/${Number(eventoEditando.id)}/estado`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ estado: 'completado' })
+                        });
+                    }
                     cerrarModal();
                     await cargarEventos(); // Recargar desde BD
-                    alert('\u2705 Evento guardado correctamente');
+                    alert(confirmarReservaTienda
+                        ? '\u2705 Reserva confirmada y guardada correctamente'
+                        : '\u2705 Evento guardado correctamente');
                 } else {
                     alert('[ERROR] Error: ' + data.error);
                 }
