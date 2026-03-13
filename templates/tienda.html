@@ -2592,7 +2592,7 @@
                         const sid = String(s.id || "");
                         const active = sid === String(agendaCakeSelection.size_id || "") ? "active" : "";
                         const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(s.precio || 0))}` : ""}`;
-                        return `<button type="button" class="agenda-cake-pill ${active}" onclick="agendaCakeSelectSize('${esc(sid)}')">${esc(label)}</button>`;
+                        return `<button type="button" class="agenda-cake-pill ${active}" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;" onclick="agendaCakeSelectSize('${esc(sid)}')">${esc(label)}</button>`;
                     }).join("")
                     : `<div class="agenda-cake-empty">Sin tamanos configurados.</div>`;
             }
@@ -2641,12 +2641,12 @@
             if (agendaCakeTopperCardsEl) {
                 const toppers = _catalogList("toppers");
                 agendaCakeTopperCardsEl.innerHTML = [
-                    `<button type="button" class="agenda-cake-pill ${!agendaCakeSelection.topper_id ? "active" : ""}" onclick="agendaCakeSelectTopper('')">Sin topper</button>`,
+                    `<button type="button" class="agenda-cake-pill ${!agendaCakeSelection.topper_id ? "active" : ""}" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;" onclick="agendaCakeSelectTopper('')">Sin topper</button>`,
                     ...toppers.map((t) => {
                         const tid = String(t.id || "");
                         const active = tid === String(agendaCakeSelection.topper_id || "") ? "active" : "";
                         const label = `${String(t.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(t.precio || 0))}` : ""}`;
-                        return `<button type="button" class="agenda-cake-pill ${active}" onclick="agendaCakeSelectTopper('${esc(tid)}')">${esc(label)}</button>`;
+                        return `<button type="button" class="agenda-cake-pill ${active}" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;" onclick="agendaCakeSelectTopper('${esc(tid)}')">${esc(label)}</button>`;
                     }),
                 ].join("");
             }
