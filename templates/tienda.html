@@ -231,6 +231,12 @@
             padding: 8px 9px;
             font: inherit;
             background: #fff;
+            color: #0f172a !important;
+            -webkit-text-fill-color: #0f172a !important;
+        }
+        .agenda-cake-builder select option {
+            color: #0f172a;
+            background: #ffffff;
         }
         .agenda-cake-builder textarea {
             min-height: 66px;
@@ -2400,8 +2406,13 @@
             const sabores = Array.isArray(cat.sabores) ? cat.sabores.length : 0;
             const extras = Array.isArray(cat.extras) ? cat.extras.length : 0;
             const toppers = Array.isArray(cat.toppers) ? cat.toppers.length : 0;
+            const sampleNames = (Array.isArray(cat.sizes) ? cat.sizes : [])
+                .slice(0, 3)
+                .map((s) => String(s?.nombre || "").trim())
+                .filter(Boolean)
+                .join(" | ");
             agendaCakeDebugEl.style.display = "";
-            agendaCakeDebugEl.textContent = `Catalogo (${origen || "actual"}): ${sizes} tamanos, ${sabores} sabores, ${extras} extras, ${toppers} toppers.`;
+            agendaCakeDebugEl.textContent = `Catalogo (${origen || "actual"}): ${sizes} tamanos, ${sabores} sabores, ${extras} extras, ${toppers} toppers.${sampleNames ? ` Ej: ${sampleNames}` : ""}`;
         }
 
         function _setAgendaCakeCatalog(cat) {
@@ -2548,6 +2559,9 @@
                 ? sizesAll.filter((s) => String(s.categoria_id || "") === String(agendaCakeCategoriaActiva || ""))
                 : sizesAll;
             const sizesRender = sizes.length ? sizes : sizesAll;
+            if (!agendaCakeSelection.size_id && sizesRender.length) {
+                agendaCakeSelection.size_id = String(sizesRender[0].id || "");
+            }
             if (agendaCakeSelection.size_id && !sizesRender.some((s) => String(s.id || "") === String(agendaCakeSelection.size_id || ""))) {
                 agendaCakeSelection.size_id = "";
                 agendaCakeSelection.sabor_ids = [];
