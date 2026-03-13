@@ -1408,6 +1408,30 @@ def _obtener_tienda_config():
 
 
 def _default_tienda_personalizacion():
+    catalogo_torta_base = {
+        "enabled": True,
+        "show_prices": True,
+        "max_extra_items": 8,
+        "max_reference_images": 3,
+        "sizes": [
+            {"id": "torta-15-bizcocho", "nombre": "15 personas (Bizcocho)", "precio": 25990, "max_sabores": 3, "activo": True},
+            {"id": "torta-20-bizcocho", "nombre": "20 personas (Bizcocho)", "precio": 31990, "max_sabores": 3, "activo": True},
+        ],
+        "sabores": [
+            {"id": "manjar", "nombre": "Manjar", "precio": 0, "activo": True},
+            {"id": "frambuesa", "nombre": "Frambuesa", "precio": 0, "activo": True},
+            {"id": "chocolate", "nombre": "Chocolate", "precio": 0, "activo": True},
+            {"id": "crema-pastelera", "nombre": "Crema pastelera", "precio": 0, "activo": True},
+        ],
+        "extras": [
+            {"id": "extra-fruta", "nombre": "Fruta adicional", "precio": 2500, "max_cantidad": 3, "activo": True},
+            {"id": "extra-relleno", "nombre": "Relleno adicional", "precio": 3000, "max_cantidad": 3, "activo": True},
+        ],
+        "toppers": [
+            {"id": "sin-topper", "nombre": "Sin topper", "precio": 0, "activo": True},
+            {"id": "topper-personalizado", "nombre": "Topper personalizado", "precio": 4500, "activo": True},
+        ],
+    }
     return {
         "brand_text": "Tienda en linea",
         "search_placeholder": "Buscar productos...",
@@ -1466,6 +1490,7 @@ def _default_tienda_personalizacion():
         "agenda_slot_available_bg": "#ecfeff",
         "agenda_slot_unavailable_bg": "#e5e7eb",
         "agenda_slot_unavailable_text": "#64748b",
+        "catalogo_torta": catalogo_torta_base,
         "custom_css": "",
     }
 
@@ -1581,9 +1606,218 @@ def _normalizar_tienda_personalizacion(payload):
     clean["agenda_slot_available_bg"] = _normalizar_color_hex(data.get("agenda_slot_available_bg"), base["agenda_slot_available_bg"])
     clean["agenda_slot_unavailable_bg"] = _normalizar_color_hex(data.get("agenda_slot_unavailable_bg"), base["agenda_slot_unavailable_bg"])
     clean["agenda_slot_unavailable_text"] = _normalizar_color_hex(data.get("agenda_slot_unavailable_text"), base["agenda_slot_unavailable_text"])
+    clean["catalogo_torta"] = _normalizar_catalogo_torta_cfg(data.get("catalogo_torta") or base.get("catalogo_torta"))
 
     clean["custom_css"] = str(data.get("custom_css") or "").strip()[:5000]
     return clean
+
+
+def _normalizar_catalogo_torta_item(item, defaults, allow_max_sabores=False, allow_max_cantidad=False):
+    row = dict(defaults)
+    src = dict(item or {})
+    item_id = str(src.get("id") or "").strip().lower()
+    if not item_id:
+        item_id = _slug_simple(src.get("nombre") or defaults.get("nombre") or "item")
+    row["id"] = re.sub(r"[^a-z0-9\-]+", "-", item_id).strip("-")[:60] or _slug_simple(defaults.get("nombre") or "item")
+    row["nombre"] = str(src.get("nombre") or defaults.get("nombre") or "Item").strip()[:80] or str(defaults.get("nombre") or "Item")
+    try:
+        precio = float(src.get("precio") if src.get("precio") is not None else defaults.get("precio") or 0)
+    except (TypeError, ValueError):
+        precio = float(defaults.get("precio") or 0)
+    row["precio"] = max(0, round(precio, 2))
+    row["activo"] = bool(src.get("activo", defaults.get("activo", True)))
+    if allow_max_sabores:
+        try:
+            max_sabores = int(src.get("max_sabores") if src.get("max_sabores") is not None else defaults.get("max_sabores") or 3)
+        except (TypeError, ValueError):
+            max_sabores = int(defaults.get("max_sabores") or 3)
+        row["max_sabores"] = max(1, min(8, max_sabores))
+    if allow_max_cantidad:
+        try:
+            max_cantidad = int(src.get("max_cantidad") if src.get("max_cantidad") is not None else defaults.get("max_cantidad") or 1)
+        except (TypeError, ValueError):
+            max_cantidad = int(defaults.get("max_cantidad") or 1)
+        row["max_cantidad"] = max(1, min(20, max_cantidad))
+    return row
+
+
+def _normalizar_catalogo_torta_cfg(raw):
+    base = _default_tienda_personalizacion().get("catalogo_torta") or {}
+    data = dict(raw or {})
+    out = {
+        "enabled": bool(data.get("enabled", base.get("enabled", True))),
+        "show_prices": bool(data.get("show_prices", base.get("show_prices", True))),
+        "sizes": [],
+        "sabores": [],
+        "extras": [],
+        "toppers": [],
+    }
+    try:
+        max_extra_items = int(data.get("max_extra_items") or base.get("max_extra_items") or 8)
+    except (TypeError, ValueError):
+        max_extra_items = int(base.get("max_extra_items") or 8)
+    out["max_extra_items"] = max(1, min(20, max_extra_items))
+    try:
+        max_reference_images = int(data.get("max_reference_images") or base.get("max_reference_images") or 3)
+    except (TypeError, ValueError):
+        max_reference_images = int(base.get("max_reference_images") or 3)
+    out["max_reference_images"] = max(0, min(10, max_reference_images))
+
+    sizes_in = data.get("sizes")
+    if not isinstance(sizes_in, list):
+        sizes_in = list(base.get("sizes") or [])
+    for item in sizes_in[:25]:
+        out["sizes"].append(
+            _normalizar_catalogo_torta_item(
+                item,
+                {"id": "size", "nombre": "Tamano", "precio": 0, "max_sabores": 3, "activo": True},
+                allow_max_sabores=True,
+            )
+        )
+
+    sabores_in = data.get("sabores")
+    if not isinstance(sabores_in, list):
+        sabores_in = list(base.get("sabores") or [])
+    for item in sabores_in[:60]:
+        out["sabores"].append(
+            _normalizar_catalogo_torta_item(
+                item,
+                {"id": "sabor", "nombre": "Sabor", "precio": 0, "activo": True},
+            )
+        )
+
+    extras_in = data.get("extras")
+    if not isinstance(extras_in, list):
+        extras_in = list(base.get("extras") or [])
+    for item in extras_in[:80]:
+        out["extras"].append(
+            _normalizar_catalogo_torta_item(
+                item,
+                {"id": "extra", "nombre": "Extra", "precio": 0, "max_cantidad": 1, "activo": True},
+                allow_max_cantidad=True,
+            )
+        )
+
+    toppers_in = data.get("toppers")
+    if not isinstance(toppers_in, list):
+        toppers_in = list(base.get("toppers") or [])
+    for item in toppers_in[:40]:
+        out["toppers"].append(
+            _normalizar_catalogo_torta_item(
+                item,
+                {"id": "topper", "nombre": "Topper", "precio": 0, "activo": True},
+            )
+        )
+
+    if not out["sizes"]:
+        out["sizes"] = list(base.get("sizes") or [])
+    if not out["sabores"]:
+        out["sabores"] = list(base.get("sabores") or [])
+    if not out["extras"]:
+        out["extras"] = list(base.get("extras") or [])
+    if not out["toppers"]:
+        out["toppers"] = list(base.get("toppers") or [])
+    return out
+
+
+def _catalogo_torta_publico(cfg):
+    cat = _normalizar_catalogo_torta_cfg(cfg)
+    return {
+        "enabled": bool(cat.get("enabled")),
+        "show_prices": bool(cat.get("show_prices")),
+        "max_extra_items": int(cat.get("max_extra_items") or 8),
+        "max_reference_images": int(cat.get("max_reference_images") or 3),
+        "sizes": [x for x in (cat.get("sizes") or []) if bool(x.get("activo"))],
+        "sabores": [x for x in (cat.get("sabores") or []) if bool(x.get("activo"))],
+        "extras": [x for x in (cat.get("extras") or []) if bool(x.get("activo"))],
+        "toppers": [x for x in (cat.get("toppers") or []) if bool(x.get("activo"))],
+    }
+
+
+def _validar_payload_catalogo_torta(payload, catalogo_publico):
+    data = dict(payload or {})
+    size_id = str(data.get("size_id") or "").strip().lower()
+    sabor_ids = data.get("sabor_ids") if isinstance(data.get("sabor_ids"), list) else []
+    extra_items = data.get("extra_items") if isinstance(data.get("extra_items"), list) else []
+    topper_id = str(data.get("topper_id") or "").strip().lower()
+    referencia_urls = data.get("referencia_urls") if isinstance(data.get("referencia_urls"), list) else []
+    nota = str(data.get("nota") or "").strip()[:500]
+
+    sizes = {str(x.get("id")): x for x in (catalogo_publico.get("sizes") or [])}
+    sabores = {str(x.get("id")): x for x in (catalogo_publico.get("sabores") or [])}
+    extras = {str(x.get("id")): x for x in (catalogo_publico.get("extras") or [])}
+    toppers = {str(x.get("id")): x for x in (catalogo_publico.get("toppers") or [])}
+
+    size = sizes.get(size_id)
+    if not size:
+        raise ValueError("Debes seleccionar un tamano de torta valido")
+
+    sabores_limpios = []
+    seen_flavors = set()
+    max_sabores = max(1, int(size.get("max_sabores") or 3))
+    for raw_sid in sabor_ids[: max_sabores + 2]:
+        sid = str(raw_sid or "").strip().lower()
+        if not sid or sid in seen_flavors:
+            continue
+        sabor = sabores.get(sid)
+        if not sabor:
+            continue
+        sabores_limpios.append(sabor)
+        seen_flavors.add(sid)
+        if len(sabores_limpios) >= max_sabores:
+            break
+    if not sabores_limpios:
+        raise ValueError("Debes seleccionar al menos un sabor")
+
+    extras_final = []
+    max_extra_items = max(1, int(catalogo_publico.get("max_extra_items") or 8))
+    for raw_item in extra_items[:40]:
+        item = dict(raw_item or {})
+        eid = str(item.get("id") or "").strip().lower()
+        if not eid:
+            continue
+        extra = extras.get(eid)
+        if not extra:
+            continue
+        try:
+            qty = int(item.get("qty") or 0)
+        except (TypeError, ValueError):
+            qty = 0
+        if qty <= 0:
+            continue
+        qty = min(qty, int(extra.get("max_cantidad") or 1))
+        extras_final.append({"id": extra.get("id"), "nombre": extra.get("nombre"), "qty": qty, "precio": float(extra.get("precio") or 0)})
+        if len(extras_final) >= max_extra_items:
+            break
+
+    topper = toppers.get(topper_id) if topper_id else None
+    if topper_id and not topper:
+        raise ValueError("El topper seleccionado no es valido")
+
+    max_refs = max(0, int(catalogo_publico.get("max_reference_images") or 3))
+    refs_limpias = []
+    for raw_url in referencia_urls[: max_refs + 2]:
+        url = _normalizar_url_personalizacion(raw_url)
+        if not url:
+            continue
+        refs_limpias.append(url)
+        if len(refs_limpias) >= max_refs:
+            break
+
+    subtotal = float(size.get("precio") or 0) + sum(float(x.get("precio") or 0) for x in sabores_limpios)
+    subtotal += sum(float(x.get("precio") or 0) * int(x.get("qty") or 0) for x in extras_final)
+    if topper:
+        subtotal += float(topper.get("precio") or 0)
+
+    return {
+        "size": {"id": size.get("id"), "nombre": size.get("nombre"), "precio": float(size.get("precio") or 0), "max_sabores": max_sabores},
+        "sabores": [{"id": s.get("id"), "nombre": s.get("nombre"), "precio": float(s.get("precio") or 0)} for s in sabores_limpios],
+        "extras": extras_final,
+        "topper": {"id": topper.get("id"), "nombre": topper.get("nombre"), "precio": float(topper.get("precio") or 0)} if topper else None,
+        "referencia_urls": refs_limpias,
+        "nota": nota,
+        "subtotal": round(subtotal, 2),
+    }
 
 
 def _obtener_tienda_personalizacion():
@@ -2292,6 +2526,11 @@ def ventas_admin_personalizacion():
     return render_template('tienda_personalizacion_admin.html')
 
 
+@app.route('/ventas/admin-catalogo-torta')
+def ventas_admin_catalogo_torta():
+    return render_template('tienda_catalogo_torta_admin.html')
+
+
 @app.route('/ventas/cupones')
 def ventas_admin_cupones():
     return render_template('cupones_admin.html')
@@ -2308,6 +2547,66 @@ def api_tienda_admin_personalizacion():
         config = _guardar_tienda_personalizacion(data)
         crear_backup()
         return jsonify({"success": True, "config": config})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/admin/catalogo-torta', methods=['GET', 'POST'])
+def api_tienda_admin_catalogo_torta():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        if request.method == "GET":
+            cfg = _obtener_tienda_personalizacion()
+            cat = _normalizar_catalogo_torta_cfg(cfg.get("catalogo_torta"))
+            return jsonify({"success": True, "catalogo": cat})
+        data = request.get_json(silent=True) or {}
+        payload = data.get("catalogo") if isinstance(data.get("catalogo"), dict) else data
+        cfg = _guardar_tienda_personalizacion({"catalogo_torta": payload})
+        crear_backup()
+        return jsonify({"success": True, "catalogo": _normalizar_catalogo_torta_cfg(cfg.get("catalogo_torta"))})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/catalogo-torta', methods=['GET'])
+def api_tienda_catalogo_torta_publico():
+    try:
+        cfg = _obtener_tienda_personalizacion()
+        cat = _catalogo_torta_publico(cfg.get("catalogo_torta") or {})
+        return jsonify({"success": True, "catalogo": cat})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "catalogo": _catalogo_torta_publico({})}), 500
+
+
+@app.route('/api/tienda/agenda/referencia-foto', methods=['POST'])
+def api_tienda_agenda_referencia_foto():
+    try:
+        archivo = request.files.get("foto")
+        if not archivo or not getattr(archivo, "filename", ""):
+            return jsonify({"success": False, "error": "Archivo no recibido"}), 400
+        nombre_seguro = secure_filename(archivo.filename)
+        ext = os.path.splitext(nombre_seguro)[1].lower()
+        permitidas = {".jpg", ".jpeg", ".png", ".webp"}
+        if ext not in permitidas:
+            return jsonify({"success": False, "error": "Formato no permitido. Usa JPG, PNG o WEBP"}), 400
+
+        base_dir = os.path.join(static_dir, "agenda_referencias")
+        os.makedirs(base_dir, exist_ok=True)
+        unique_name = f"ref_{int(time.time())}_{uuid.uuid4().hex[:8]}{ext}"
+        abs_path = os.path.join(base_dir, unique_name)
+        archivo.save(abs_path)
+        try:
+            size_bytes = os.path.getsize(abs_path)
+        except Exception:
+            size_bytes = 0
+        if size_bytes > 4 * 1024 * 1024:
+            try:
+                os.remove(abs_path)
+            except Exception:
+                pass
+            return jsonify({"success": False, "error": "Imagen supera 4MB"}), 400
+        return jsonify({"success": True, "url": f"/static/agenda_referencias/{unique_name}"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -3345,6 +3644,7 @@ def api_tienda_agenda_reservar():
         telefono = _normalizar_telefono_cl(data.get("telefono"))
         tipo_pedido = _normalizar_tipo_reserva_tienda(data.get("tipo"))
         detalle = str(data.get("detalle") or "").strip()[:400]
+        catalogo_torta_payload = data.get("catalogo_torta") if isinstance(data.get("catalogo_torta"), dict) else {}
         entrega_tipo = str(data.get("entrega_tipo") or "retiro").strip().lower()
         if entrega_tipo not in {"retiro", "despacho"}:
             entrega_tipo = "retiro"
@@ -3371,6 +3671,18 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": "Telefono invalido. Debe tener 8 digitos"}), 400
         if tipo_pedido not in {"torta", "pastel"}:
             return jsonify({"success": False, "error": "Selecciona tipo de pedido: Torta o Pastel"}), 400
+
+        catalogo_torta_resumen = None
+        if tipo_pedido == "torta":
+            cfg_tienda = _obtener_tienda_personalizacion()
+            catalogo_publico = _catalogo_torta_publico((cfg_tienda or {}).get("catalogo_torta") or {})
+            if not bool(catalogo_publico.get("enabled")):
+                return jsonify({"success": False, "error": "El armado de tortas no esta habilitado"}), 400
+            try:
+                catalogo_torta_resumen = _validar_payload_catalogo_torta(catalogo_torta_payload, catalogo_publico)
+            except ValueError as ve:
+                return jsonify({"success": False, "error": str(ve)}), 400
+
         if entrega_tipo == "despacho":
             if len(direccion) < 8:
                 return jsonify({"success": False, "error": "Ingresa una direccion valida para despacho"}), 400
@@ -3416,6 +3728,18 @@ def api_tienda_agenda_reservar():
             f"Email: {email}\n"
             f"Entrega: {'Despacho' if entrega_tipo == 'despacho' else 'Retiro'}"
         )
+        if catalogo_torta_resumen:
+            ingredientes = f"{ingredientes}\nTamano: {catalogo_torta_resumen['size']['nombre']}"
+            ingredientes = f"{ingredientes}\nSabores: {', '.join([s['nombre'] for s in (catalogo_torta_resumen.get('sabores') or [])])}"
+            for ex in (catalogo_torta_resumen.get("extras") or []):
+                ingredientes = f"{ingredientes}\nExtra: {ex.get('nombre')} x{int(ex.get('qty') or 0)}"
+            if catalogo_torta_resumen.get("topper"):
+                ingredientes = f"{ingredientes}\nTopper: {catalogo_torta_resumen['topper']['nombre']}"
+            if catalogo_torta_resumen.get("nota"):
+                ingredientes = f"{ingredientes}\nNota catalogo: {catalogo_torta_resumen['nota']}"
+            refs = catalogo_torta_resumen.get("referencia_urls") or []
+            for idx, ref in enumerate(refs, start=1):
+                ingredientes = f"{ingredientes}\nRef {idx}: {ref}"
         if detalle:
             ingredientes = f"{ingredientes}\nDetalle: {detalle}"
         if entrega_tipo == "despacho":
@@ -3463,6 +3787,7 @@ def api_tienda_agenda_reservar():
                     "direccion": direccion if entrega_tipo == "despacho" else "",
                     "lat": latitud if entrega_tipo == "despacho" else None,
                     "lng": longitud if entrega_tipo == "despacho" else None,
+                    "catalogo_torta": catalogo_torta_resumen,
                 },
             }
         )

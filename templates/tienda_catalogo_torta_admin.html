@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalogo torta admin</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --line: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+            --accent: #ea580c;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
+        .wrap { width: min(1300px, 100%); margin: 0 auto; padding: 18px; display: grid; gap: 12px; }
+        .top {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .top h1 { margin: 0; font-size: 1.15rem; }
+        .links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .links a {
+            text-decoration: none;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-weight: 700;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1.4fr .6fr;
+            gap: 12px;
+            align-items: start;
+        }
+        .panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 12px;
+            display: grid;
+            gap: 10px;
+        }
+        .section {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            display: grid;
+            gap: 8px;
+        }
+        .section h2 { margin: 0; font-size: .95rem; }
+        .row {
+            display: grid;
+            grid-template-columns: 1.2fr .6fr .4fr .4fr auto;
+            gap: 8px;
+            align-items: end;
+        }
+        .row.extras { grid-template-columns: 1.2fr .6fr .5fr .4fr auto; }
+        label { display: grid; gap: 4px; font-size: .82rem; font-weight: 700; color: #334155; }
+        input, select {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 9px;
+            font: inherit;
+        }
+        .list { display: grid; gap: 7px; }
+        .btn {
+            border: 0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .btn-main { background: var(--accent); color: #fff; }
+        .btn-alt { background: #e2e8f0; color: #334155; }
+        .btn-out { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+        .btn-del { background: #ef4444; color: #fff; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .muted { color: var(--muted); font-size: .82rem; }
+        .msg { min-height: 20px; font-size: .9rem; }
+        .msg.ok { color: #166534; }
+        .msg.err { color: #b91c1c; }
+        .summary {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            display: grid;
+            gap: 8px;
+            font-size: .86rem;
+        }
+        @media (max-width: 980px) {
+            .grid { grid-template-columns: 1fr; }
+            .row, .row.extras { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <main class="wrap">
+        <div class="top">
+            <h1>Catalogo torta</h1>
+            <div class="links">
+                <a href="/ventas/admin-personalizacion">Personalizacion tienda</a>
+                <a href="/ventas/admin-catalogo">Catalogo tienda</a>
+                <a href="/tienda" target="_blank" rel="noopener">Abrir tienda</a>
+            </div>
+        </div>
+
+        <div class="grid">
+            <section class="panel">
+                <div class="section">
+                    <h2>Reglas generales</h2>
+                    <div class="row" style="grid-template-columns:1fr 1fr 1fr;">
+                        <label><input id="enabled" type="checkbox"> Constructor de torta habilitado</label>
+                        <label><input id="show_prices" type="checkbox"> Mostrar precios al cliente</label>
+                        <label>Max. extras por pedido
+                            <input id="max_extra_items" type="number" min="1" max="20" step="1">
+                        </label>
+                    </div>
+                    <label>Max. imagenes referenciales
+                        <input id="max_reference_images" type="number" min="0" max="10" step="1">
+                    </label>
+                </div>
+
+                <div class="section">
+                    <div class="actions">
+                        <h2 style="margin:0;flex:1;">Tamanos base</h2>
+                        <button class="btn btn-out" type="button" id="add-size">Agregar tamano</button>
+                    </div>
+                    <div class="list" id="list-sizes"></div>
+                    <div class="muted">Ejemplo: 15 personas bizcocho, con maximo de sabores por tamano.</div>
+                </div>
+
+                <div class="section">
+                    <div class="actions">
+                        <h2 style="margin:0;flex:1;">Sabores</h2>
+                        <button class="btn btn-out" type="button" id="add-flavor">Agregar sabor</button>
+                    </div>
+                    <div class="list" id="list-flavors"></div>
+                </div>
+
+                <div class="section">
+                    <div class="actions">
+                        <h2 style="margin:0;flex:1;">Extras</h2>
+                        <button class="btn btn-out" type="button" id="add-extra">Agregar extra</button>
+                    </div>
+                    <div class="list" id="list-extras"></div>
+                </div>
+
+                <div class="section">
+                    <div class="actions">
+                        <h2 style="margin:0;flex:1;">Topper</h2>
+                        <button class="btn btn-out" type="button" id="add-topper">Agregar topper</button>
+                    </div>
+                    <div class="list" id="list-toppers"></div>
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="btn btn-main" id="btn-save">Guardar catalogo torta</button>
+                    <button type="button" class="btn btn-alt" id="btn-reload">Recargar</button>
+                </div>
+                <div class="msg" id="msg"></div>
+            </section>
+
+            <aside class="panel">
+                <h2 style="margin:0;">Resumen rapido</h2>
+                <div class="summary">
+                    <div>Tamanos activos: <strong id="sum-sizes">0</strong></div>
+                    <div>Sabores activos: <strong id="sum-flavors">0</strong></div>
+                    <div>Extras activos: <strong id="sum-extras">0</strong></div>
+                    <div>Toppers activos: <strong id="sum-toppers">0</strong></div>
+                    <div>Precios visibles cliente: <strong id="sum-prices">Si</strong></div>
+                    <div class="muted">Si ocultas precios, el sistema igual calcula subtotal internamente para tu equipo.</div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+<script>
+const ENDPOINT = "/api/tienda/admin/catalogo-torta";
+const msgEl = document.getElementById("msg");
+let state = {
+    enabled: true,
+    show_prices: true,
+    max_extra_items: 8,
+    max_reference_images: 3,
+    sizes: [],
+    sabores: [],
+    extras: [],
+    toppers: [],
+};
+
+function setMsg(text, type = "") {
+    msgEl.textContent = text || "";
+    msgEl.className = `msg ${type}`.trim();
+}
+function slug(text) {
+    return String(text || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || `item-${Date.now()}`;
+}
+function n(v, d = 0) {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : d;
+}
+function esc(v) {
+    return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function activeCount(arr) {
+    return (Array.isArray(arr) ? arr : []).filter((x) => Boolean(x.activo)).length;
+}
+
+function rowHtmlSize(item, idx) {
+    return `
+        <div class="row" data-idx="${idx}">
+            <label>Nombre<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
+            <label>Precio<input data-k="precio" type="number" min="0" step="1" value="${n(item.precio)}"></label>
+            <label>Max sabores<input data-k="max_sabores" type="number" min="1" max="8" step="1" value="${Math.max(1, n(item.max_sabores, 3))}"></label>
+            <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activo</label>
+            <button class="btn btn-del" type="button" onclick="removeRow('sizes', ${idx})">X</button>
+        </div>
+    `;
+}
+function rowHtmlFlavor(item, idx) {
+    return `
+        <div class="row" data-idx="${idx}">
+            <label>Nombre<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
+            <label>Precio<input data-k="precio" type="number" min="0" step="1" value="${n(item.precio)}"></label>
+            <label style="visibility:hidden;">-<input disabled></label>
+            <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activo</label>
+            <button class="btn btn-del" type="button" onclick="removeRow('sabores', ${idx})">X</button>
+        </div>
+    `;
+}
+function rowHtmlExtra(item, idx) {
+    return `
+        <div class="row extras" data-idx="${idx}">
+            <label>Nombre<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
+            <label>Precio<input data-k="precio" type="number" min="0" step="1" value="${n(item.precio)}"></label>
+            <label>Max cant.<input data-k="max_cantidad" type="number" min="1" max="20" step="1" value="${Math.max(1, n(item.max_cantidad, 1))}"></label>
+            <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activo</label>
+            <button class="btn btn-del" type="button" onclick="removeRow('extras', ${idx})">X</button>
+        </div>
+    `;
+}
+function rowHtmlTopper(item, idx) {
+    return `
+        <div class="row" data-idx="${idx}">
+            <label>Nombre<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
+            <label>Precio<input data-k="precio" type="number" min="0" step="1" value="${n(item.precio)}"></label>
+            <label style="visibility:hidden;">-<input disabled></label>
+            <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activo</label>
+            <button class="btn btn-del" type="button" onclick="removeRow('toppers', ${idx})">X</button>
+        </div>
+    `;
+}
+
+function render() {
+    document.getElementById("enabled").checked = Boolean(state.enabled);
+    document.getElementById("show_prices").checked = Boolean(state.show_prices);
+    document.getElementById("max_extra_items").value = Math.max(1, n(state.max_extra_items, 8));
+    document.getElementById("max_reference_images").value = Math.max(0, n(state.max_reference_images, 3));
+    document.getElementById("list-sizes").innerHTML = state.sizes.map((x, i) => rowHtmlSize(x, i)).join("");
+    document.getElementById("list-flavors").innerHTML = state.sabores.map((x, i) => rowHtmlFlavor(x, i)).join("");
+    document.getElementById("list-extras").innerHTML = state.extras.map((x, i) => rowHtmlExtra(x, i)).join("");
+    document.getElementById("list-toppers").innerHTML = state.toppers.map((x, i) => rowHtmlTopper(x, i)).join("");
+    bindListInputs("sizes");
+    bindListInputs("sabores");
+    bindListInputs("extras");
+    bindListInputs("toppers");
+    document.getElementById("sum-sizes").textContent = String(activeCount(state.sizes));
+    document.getElementById("sum-flavors").textContent = String(activeCount(state.sabores));
+    document.getElementById("sum-extras").textContent = String(activeCount(state.extras));
+    document.getElementById("sum-toppers").textContent = String(activeCount(state.toppers));
+    document.getElementById("sum-prices").textContent = state.show_prices ? "Si" : "No";
+}
+
+function bindListInputs(key) {
+    const list = document.getElementById(`list-${key === "sabores" ? "flavors" : key}`);
+    if (!list) return;
+    list.querySelectorAll(".row").forEach((row) => {
+        const idx = Number(row.getAttribute("data-idx") || -1);
+        if (idx < 0 || !state[key] || !state[key][idx]) return;
+        row.querySelectorAll("[data-k]").forEach((inp) => {
+            inp.addEventListener("input", () => {
+                const field = inp.getAttribute("data-k");
+                if (!field) return;
+                if (inp.type === "checkbox") state[key][idx][field] = Boolean(inp.checked);
+                else if (field === "precio" || field === "max_sabores" || field === "max_cantidad") state[key][idx][field] = n(inp.value, 0);
+                else state[key][idx][field] = String(inp.value || "");
+                if (field === "nombre") state[key][idx].id = slug(inp.value);
+                render();
+            });
+        });
+    });
+}
+
+function removeRow(key, idx) {
+    if (!Array.isArray(state[key])) return;
+    state[key].splice(Number(idx || 0), 1);
+    render();
+}
+window.removeRow = removeRow;
+
+function newItem(base) {
+    return { ...base, id: slug(base.nombre || "item") };
+}
+
+async function load() {
+    try {
+        const res = await fetch(ENDPOINT, { headers: { Accept: "application/json" } });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar catalogo");
+        state = { ...state, ...(data.catalogo || {}) };
+        render();
+        setMsg("Catalogo cargado.", "ok");
+    } catch (err) {
+        setMsg(err.message || "No se pudo cargar.", "err");
+    }
+}
+
+function payload() {
+    return {
+        enabled: Boolean(document.getElementById("enabled").checked),
+        show_prices: Boolean(document.getElementById("show_prices").checked),
+        max_extra_items: Math.max(1, Math.min(20, n(document.getElementById("max_extra_items").value, 8))),
+        max_reference_images: Math.max(0, Math.min(10, n(document.getElementById("max_reference_images").value, 3))),
+        sizes: state.sizes.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_sabores: Math.max(1, Math.min(8, n(x.max_sabores, 3))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+        sabores: state.sabores.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+        extras: state.extras.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_cantidad: Math.max(1, Math.min(20, n(x.max_cantidad, 1))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+        toppers: state.toppers.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+    };
+}
+
+async function save() {
+    try {
+        const body = payload();
+        if (!body.sizes.length) throw new Error("Debes agregar al menos un tamano");
+        if (!body.sabores.length) throw new Error("Debes agregar al menos un sabor");
+        const res = await fetch(ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ catalogo: body }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
+        state = { ...state, ...(data.catalogo || {}) };
+        render();
+        setMsg("Catalogo torta guardado correctamente.", "ok");
+    } catch (err) {
+        setMsg(err.message || "No se pudo guardar.", "err");
+    }
+}
+
+document.getElementById("enabled").addEventListener("change", () => { state.enabled = Boolean(document.getElementById("enabled").checked); render(); });
+document.getElementById("show_prices").addEventListener("change", () => { state.show_prices = Boolean(document.getElementById("show_prices").checked); render(); });
+document.getElementById("max_extra_items").addEventListener("input", () => { state.max_extra_items = n(document.getElementById("max_extra_items").value, 8); render(); });
+document.getElementById("max_reference_images").addEventListener("input", () => { state.max_reference_images = n(document.getElementById("max_reference_images").value, 3); render(); });
+document.getElementById("add-size").addEventListener("click", () => { state.sizes.push(newItem({ nombre: "Nuevo tamano", precio: 0, max_sabores: 3, activo: true })); render(); });
+document.getElementById("add-flavor").addEventListener("click", () => { state.sabores.push(newItem({ nombre: "Nuevo sabor", precio: 0, activo: true })); render(); });
+document.getElementById("add-extra").addEventListener("click", () => { state.extras.push(newItem({ nombre: "Nuevo extra", precio: 0, max_cantidad: 1, activo: true })); render(); });
+document.getElementById("add-topper").addEventListener("click", () => { state.toppers.push(newItem({ nombre: "Nuevo topper", precio: 0, activo: true })); render(); });
+document.getElementById("btn-reload").addEventListener("click", load);
+document.getElementById("btn-save").addEventListener("click", save);
+load();
+</script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

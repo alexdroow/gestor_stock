@@ -198,6 +198,100 @@
             background: #ffedd5;
             box-shadow: 0 0 0 2px rgba(244, 93, 8, .14);
         }
+        .agenda-cake-wrap {
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            padding: 10px;
+            background: #fff;
+            display: grid;
+            grid-template-columns: 1.2fr .8fr;
+            gap: 10px;
+        }
+        .agenda-cake-builder, .agenda-cake-cart {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            display: grid;
+            gap: 8px;
+        }
+        .agenda-cake-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            font-size: .85rem;
+            color: #475569;
+            font-weight: 700;
+        }
+        .agenda-cake-list {
+            display: grid;
+            gap: 6px;
+            max-height: 180px;
+            overflow: auto;
+            padding-right: 2px;
+        }
+        .agenda-cake-chip {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            padding: 7px 8px;
+            font-size: .84rem;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+        }
+        .agenda-cake-chip button {
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            background: #fff;
+            font-weight: 800;
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+        .agenda-cake-cart ul {
+            margin: 0;
+            padding-left: 16px;
+            display: grid;
+            gap: 4px;
+            font-size: .84rem;
+            color: #334155;
+        }
+        .agenda-cake-total {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .agenda-cake-files {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .agenda-cake-file-item {
+            border: 1px solid #dbe3ef;
+            border-radius: 8px;
+            background: #fff;
+            padding: 4px 6px;
+            font-size: .78rem;
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .agenda-cake-file-item button {
+            border: 0;
+            background: #ef4444;
+            color: #fff;
+            border-radius: 999px;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            font-size: .72rem;
+            cursor: pointer;
+        }
         .agenda-days {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
@@ -1200,6 +1294,7 @@
             .quick-add { width: 31px; height: 31px; font-size: 1.08rem; }
             .ofertas-track .item-card { flex: 0 0 min(240px, 78vw); width: min(240px, 78vw); }
             .agenda-form .grid2 { grid-template-columns: 1fr; }
+            .agenda-cake-wrap { grid-template-columns: 1fr; }
             .mobile-cart-fab {
                 display: inline-flex;
                 align-items: center;
@@ -1271,6 +1366,43 @@
                 </div>
                 <h2 id="agenda-section-title">Agenda tu pedido</h2>
                 <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
+                <div class="agenda-cake-wrap" id="agenda-cake-wrap" style="display:none;">
+                    <div class="agenda-cake-builder">
+                        <div class="agenda-cake-head">
+                            <span>Arma tu torta</span>
+                            <span id="agenda-cake-price-visibility"></span>
+                        </div>
+                        <label>Tamano
+                            <select id="agenda-cake-size"></select>
+                        </label>
+                        <div>
+                            <div style="font-size:.82rem;font-weight:800;color:#334155;margin-bottom:4px;">Sabores (maximo segun tamano)</div>
+                            <div class="agenda-cake-list" id="agenda-cake-flavors"></div>
+                        </div>
+                        <div>
+                            <div style="font-size:.82rem;font-weight:800;color:#334155;margin-bottom:4px;">Extras</div>
+                            <div class="agenda-cake-list" id="agenda-cake-extras"></div>
+                        </div>
+                        <label>Topper
+                            <select id="agenda-cake-topper"></select>
+                        </label>
+                        <label>Fotos referenciales
+                            <input id="agenda-cake-file" type="file" accept=".jpg,.jpeg,.png,.webp">
+                        </label>
+                        <div class="agenda-cake-files" id="agenda-cake-files"></div>
+                        <label>Indicaciones para decoracion
+                            <textarea id="agenda-cake-note" maxlength="500" placeholder="Colores, estilo, texto del topper, etc."></textarea>
+                        </label>
+                    </div>
+                    <aside class="agenda-cake-cart">
+                        <div style="font-size:.9rem;font-weight:900;color:#0f172a;">Resumen de cotizacion</div>
+                        <ul id="agenda-cake-summary"></ul>
+                        <div class="agenda-cake-total">
+                            <span>Total estimado</span>
+                            <span id="agenda-cake-total">$0</span>
+                        </div>
+                    </aside>
+                </div>
                 <div class="agenda-days" id="agenda-days-list"></div>
                 <div class="agenda-hours" id="agenda-hours-list"></div>
                 <form class="agenda-form" id="agenda-reserva-form">
@@ -1550,6 +1682,17 @@
         const agendaTipoEl = document.getElementById("agenda-tipo");
         const agendaTipoTortaEl = document.getElementById("agenda-tipo-torta");
         const agendaTipoPastelEl = document.getElementById("agenda-tipo-pastel");
+        const agendaCakeWrapEl = document.getElementById("agenda-cake-wrap");
+        const agendaCakeSizeEl = document.getElementById("agenda-cake-size");
+        const agendaCakeFlavorsEl = document.getElementById("agenda-cake-flavors");
+        const agendaCakeExtrasEl = document.getElementById("agenda-cake-extras");
+        const agendaCakeTopperEl = document.getElementById("agenda-cake-topper");
+        const agendaCakeFileEl = document.getElementById("agenda-cake-file");
+        const agendaCakeFilesEl = document.getElementById("agenda-cake-files");
+        const agendaCakeNoteEl = document.getElementById("agenda-cake-note");
+        const agendaCakeSummaryEl = document.getElementById("agenda-cake-summary");
+        const agendaCakeTotalEl = document.getElementById("agenda-cake-total");
+        const agendaCakePriceVisibilityEl = document.getElementById("agenda-cake-price-visibility");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
         const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
@@ -1592,6 +1735,15 @@
         let agendaDireccionPin = { lat: -33.4489, lng: -70.6693 };
         let agendaReservaPendiente = null;
         let agendaTipoActual = "";
+        let agendaCakeCatalog = null;
+        let agendaCakeSelection = {
+            size_id: "",
+            sabor_ids: [],
+            extra_items: [],
+            topper_id: "",
+            referencia_urls: [],
+            nota: "",
+        };
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -2137,6 +2289,195 @@
             if (agendaTipoEl) agendaTipoEl.value = normalizado;
             if (agendaTipoTortaEl) agendaTipoTortaEl.classList.toggle("active", normalizado === "torta");
             if (agendaTipoPastelEl) agendaTipoPastelEl.classList.toggle("active", normalizado === "pastel");
+            _toggleAgendaCakeBuilder();
+        }
+
+        function _isAgendaCakeVisible() {
+            return agendaTipoActual === "torta" && Boolean(agendaCakeCatalog?.enabled);
+        }
+
+        function _toggleAgendaCakeBuilder() {
+            if (!agendaCakeWrapEl) return;
+            agendaCakeWrapEl.style.display = _isAgendaCakeVisible() ? "" : "none";
+        }
+
+        function _catalogList(key) {
+            return Array.isArray(agendaCakeCatalog?.[key]) ? agendaCakeCatalog[key] : [];
+        }
+
+        function _catalogFind(key, id) {
+            const itemId = String(id || "");
+            return _catalogList(key).find((x) => String(x.id || "") === itemId) || null;
+        }
+
+        function _resetAgendaCakeSelection() {
+            agendaCakeSelection = {
+                size_id: "",
+                sabor_ids: [],
+                extra_items: [],
+                topper_id: "",
+                referencia_urls: [],
+                nota: "",
+            };
+            if (agendaCakeNoteEl) agendaCakeNoteEl.value = "";
+            if (agendaCakeFileEl) agendaCakeFileEl.value = "";
+        }
+
+        function _isCakePricesVisible() {
+            return Boolean(agendaCakeCatalog?.show_prices);
+        }
+
+        function _fmtCakePrice(v) {
+            const n = Number(v || 0);
+            if (!_isCakePricesVisible()) return "Incluido";
+            return money.format(n);
+        }
+
+        function _cakeTotalAndItems() {
+            const items = [];
+            let total = 0;
+            const size = _catalogFind("sizes", agendaCakeSelection.size_id);
+            if (size) {
+                const p = Number(size.precio || 0);
+                total += p;
+                items.push(`${size.nombre}: ${_fmtCakePrice(p)}`);
+            }
+            const sabores = _catalogList("sabores").filter((s) => agendaCakeSelection.sabor_ids.includes(String(s.id)));
+            if (sabores.length) {
+                for (const s of sabores) {
+                    const p = Number(s.precio || 0);
+                    total += p;
+                    items.push(`Sabor ${s.nombre}: ${_fmtCakePrice(p)}`);
+                }
+            }
+            for (const ex of (agendaCakeSelection.extra_items || [])) {
+                const extra = _catalogFind("extras", ex.id);
+                if (!extra) continue;
+                const qty = Math.max(1, Number(ex.qty || 1));
+                const pUnit = Number(extra.precio || 0);
+                const pTot = pUnit * qty;
+                total += pTot;
+                items.push(`Extra ${extra.nombre} x${qty}: ${_fmtCakePrice(pTot)}`);
+            }
+            const topper = _catalogFind("toppers", agendaCakeSelection.topper_id);
+            if (topper) {
+                const p = Number(topper.precio || 0);
+                total += p;
+                items.push(`Topper ${topper.nombre}: ${_fmtCakePrice(p)}`);
+            }
+            return { total, items };
+        }
+
+        function _renderAgendaCakeSummary() {
+            if (!agendaCakeSummaryEl || !agendaCakeTotalEl) return;
+            if (!_isAgendaCakeVisible()) {
+                agendaCakeSummaryEl.innerHTML = "";
+                agendaCakeTotalEl.textContent = money.format(0);
+                return;
+            }
+            const quote = _cakeTotalAndItems();
+            agendaCakeSummaryEl.innerHTML = quote.items.length
+                ? quote.items.map((it) => `<li>${esc(it)}</li>`).join("")
+                : "<li>Selecciona tamano y sabores.</li>";
+            agendaCakeTotalEl.textContent = _isCakePricesVisible() ? money.format(quote.total) : "Total calculado internamente";
+            if (agendaCakePriceVisibilityEl) {
+                agendaCakePriceVisibilityEl.textContent = _isCakePricesVisible() ? "Precios visibles" : "Precios ocultos para cliente";
+            }
+        }
+
+        function _renderAgendaCakeFiles() {
+            if (!agendaCakeFilesEl) return;
+            const files = Array.isArray(agendaCakeSelection.referencia_urls) ? agendaCakeSelection.referencia_urls : [];
+            if (!files.length) {
+                agendaCakeFilesEl.innerHTML = "";
+                return;
+            }
+            agendaCakeFilesEl.innerHTML = files.map((u, idx) => `
+                <div class="agenda-cake-file-item">
+                    <a href="${esc(u)}" target="_blank" rel="noopener">Ref ${idx + 1}</a>
+                    <button type="button" onclick="agendaCakeRemoveFile(${idx})">x</button>
+                </div>
+            `).join("");
+        }
+
+        function _renderAgendaCakeBuilder() {
+            if (!agendaCakeCatalog) return;
+            _toggleAgendaCakeBuilder();
+            if (!_isAgendaCakeVisible()) {
+                _renderAgendaCakeSummary();
+                return;
+            }
+
+            const sizes = _catalogList("sizes");
+            if (agendaCakeSizeEl) {
+                agendaCakeSizeEl.innerHTML = `<option value="">Selecciona tamano</option>` + sizes.map((s) => (
+                    `<option value="${esc(String(s.id || ""))}">${esc(String(s.nombre || ""))}${_isCakePricesVisible() ? ` - ${esc(money.format(Number(s.precio || 0)))}` : ""}</option>`
+                )).join("");
+                if (agendaCakeSelection.size_id) agendaCakeSizeEl.value = agendaCakeSelection.size_id;
+            }
+            const sizeSelected = _catalogFind("sizes", agendaCakeSelection.size_id);
+            const maxSabores = Math.max(1, Number(sizeSelected?.max_sabores || 1));
+
+            if (agendaCakeFlavorsEl) {
+                const sabores = _catalogList("sabores");
+                agendaCakeFlavorsEl.innerHTML = sabores.map((s) => {
+                    const sid = String(s.id || "");
+                    const checked = agendaCakeSelection.sabor_ids.includes(sid) ? "checked" : "";
+                    return `
+                        <label class="agenda-cake-chip">
+                            <span>
+                                <input type="checkbox" ${checked} onchange="agendaCakeToggleFlavor('${esc(sid)}')">
+                                ${esc(String(s.nombre || ""))} ${_isCakePricesVisible() ? `(${esc(money.format(Number(s.precio || 0)))})` : ""}
+                            </span>
+                        </label>
+                    `;
+                }).join("");
+            }
+            if (agendaCakeSelection.sabor_ids.length > maxSabores) {
+                agendaCakeSelection.sabor_ids = agendaCakeSelection.sabor_ids.slice(0, maxSabores);
+            }
+
+            if (agendaCakeExtrasEl) {
+                const extras = _catalogList("extras");
+                agendaCakeExtrasEl.innerHTML = extras.map((e) => {
+                    const eid = String(e.id || "");
+                    const curr = (agendaCakeSelection.extra_items || []).find((x) => String(x.id || "") === eid);
+                    const qty = Math.max(0, Number(curr?.qty || 0));
+                    const maxQty = Math.max(1, Number(e.max_cantidad || 1));
+                    return `
+                        <div class="agenda-cake-chip">
+                            <span>${esc(String(e.nombre || ""))} ${_isCakePricesVisible() ? `(${esc(money.format(Number(e.precio || 0)))})` : ""}</span>
+                            <span>
+                                <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', -1)">-</button>
+                                <strong style="display:inline-block;min-width:18px;text-align:center;">${qty}</strong>
+                                <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', 1)" ${qty >= maxQty ? "disabled" : ""}>+</button>
+                            </span>
+                        </div>
+                    `;
+                }).join("");
+            }
+
+            if (agendaCakeTopperEl) {
+                agendaCakeTopperEl.innerHTML = `<option value="">Sin topper</option>` + _catalogList("toppers").map((t) => (
+                    `<option value="${esc(String(t.id || ""))}">${esc(String(t.nombre || ""))}${_isCakePricesVisible() ? ` - ${esc(money.format(Number(t.precio || 0)))}` : ""}</option>`
+                )).join("");
+                if (agendaCakeSelection.topper_id) agendaCakeTopperEl.value = agendaCakeSelection.topper_id;
+            }
+            _renderAgendaCakeFiles();
+            _renderAgendaCakeSummary();
+        }
+
+        async function _cargarCatalogoTortaAgenda() {
+            try {
+                const res = await fetch("/api/tienda/catalogo-torta", { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar catalogo de tortas");
+                agendaCakeCatalog = data.catalogo || null;
+                _resetAgendaCakeSelection();
+                _renderAgendaCakeBuilder();
+            } catch (_) {
+                agendaCakeCatalog = null;
+            }
         }
 
         function _initAgendaMap() {
@@ -2319,6 +2660,14 @@
 
         function _buildAgendaReservaPayload() {
             const tipo = String(agendaTipoEl?.value || "").trim().toLowerCase();
+            const catalogo_torta = tipo === "torta" ? {
+                size_id: String(agendaCakeSelection.size_id || ""),
+                sabor_ids: Array.isArray(agendaCakeSelection.sabor_ids) ? [...agendaCakeSelection.sabor_ids] : [],
+                extra_items: Array.isArray(agendaCakeSelection.extra_items) ? [...agendaCakeSelection.extra_items] : [],
+                topper_id: String(agendaCakeSelection.topper_id || ""),
+                referencia_urls: Array.isArray(agendaCakeSelection.referencia_urls) ? [...agendaCakeSelection.referencia_urls] : [],
+                nota: String(agendaCakeSelection.nota || agendaCakeNoteEl?.value || "").trim(),
+            } : {};
             const payload = {
                 fecha: String(agendaFechaActiva || ""),
                 hora_inicio: String(agendaHoraActiva || ""),
@@ -2332,6 +2681,7 @@
                 direccion_confirmada: agendaEntregaTipo === "retiro" ? true : agendaDireccionConfirmada,
                 lat: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lat : null,
                 lng: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lng : null,
+                catalogo_torta,
             };
             return payload;
         }
@@ -2343,6 +2693,23 @@
             const pinTxt = payload.entrega_tipo === "despacho"
                 ? `${Number(payload.lat || 0).toFixed(6)}, ${Number(payload.lng || 0).toFixed(6)}`
                 : "-";
+            let detalleCatalogoHtml = "";
+            if (String(payload.tipo || "") === "torta" && payload.catalogo_torta) {
+                const cat = payload.catalogo_torta;
+                const quote = _cakeTotalAndItems();
+                const sabores = Array.isArray(cat.sabor_ids) ? cat.sabor_ids.map((sid) => _catalogFind("sabores", sid)?.nombre).filter(Boolean) : [];
+                const sizeName = _catalogFind("sizes", cat.size_id)?.nombre || "-";
+                const topperName = _catalogFind("toppers", cat.topper_id)?.nombre || "Sin topper";
+                detalleCatalogoHtml = `
+                    <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+                    <div><strong>Arma tu torta:</strong></div>
+                    <div><strong>Tamano:</strong> ${esc(sizeName)}</div>
+                    <div><strong>Sabores:</strong> ${esc(sabores.join(", ") || "-")}</div>
+                    <div><strong>Topper:</strong> ${esc(topperName)}</div>
+                    <div><strong>Referencias:</strong> ${Number((cat.referencia_urls || []).length || 0)} imagen(es)</div>
+                    <div><strong>Subtotal estimado:</strong> ${_isCakePricesVisible() ? esc(money.format(Number(quote.total || 0))) : "Calculado internamente"}</div>
+                `;
+            }
             agendaConfirmarDetalleEl.innerHTML = `
                 <div><strong>Cliente:</strong> ${esc(payload.nombre || "-")}</div>
                 <div><strong>Correo:</strong> ${esc(payload.email || "-")}</div>
@@ -2354,6 +2721,7 @@
                 <div><strong>Entrega:</strong> ${esc(entregaTxt)}</div>
                 <div><strong>Direccion:</strong> ${esc(direccionTxt || "-")}</div>
                 <div><strong>Pin mapa:</strong> ${esc(pinTxt)}</div>
+                ${detalleCatalogoHtml}
                 <div style="margin-top:6px;"><strong>Detalle:</strong> ${esc(payload.detalle || "Sin detalle")}</div>
             `;
         }
@@ -2403,6 +2771,27 @@
                 `Pin mapa: ${pinTxt}`,
                 `Detalle: ${payload.detalle || "Sin detalle"}`,
             ];
+            if (String(payload.tipo || "") === "torta" && payload.catalogo_torta) {
+                const cat = payload.catalogo_torta;
+                const sizeName = _catalogFind("sizes", cat.size_id)?.nombre || "-";
+                const sabores = Array.isArray(cat.sabor_ids) ? cat.sabor_ids.map((sid) => _catalogFind("sabores", sid)?.nombre).filter(Boolean) : [];
+                const topperName = _catalogFind("toppers", cat.topper_id)?.nombre || "Sin topper";
+                lineas.push("----- Armado de torta -----");
+                lineas.push(`Tamano: ${sizeName}`);
+                lineas.push(`Sabores: ${sabores.join(", ") || "-"}`);
+                lineas.push(`Topper: ${topperName}`);
+                const extras = Array.isArray(cat.extra_items) ? cat.extra_items : [];
+                if (extras.length) {
+                    for (const ex of extras) {
+                        const extraName = _catalogFind("extras", ex.id)?.nombre || String(ex.id || "Extra");
+                        lineas.push(`Extra: ${extraName} x${Number(ex.qty || 0)}`);
+                    }
+                }
+                if (Array.isArray(cat.referencia_urls) && cat.referencia_urls.length) {
+                    cat.referencia_urls.forEach((u, i) => lineas.push(`Referencia ${i + 1}: ${u}`));
+                }
+                if (cat.nota) lineas.push(`Nota catalogo: ${cat.nota}`);
+            }
             lineas.forEach((linea) => {
                 const partes = doc.splitTextToSize(linea, 510);
                 doc.text(partes, left, y);
@@ -2432,6 +2821,10 @@
                 const reserva = data.reserva || {};
                 _descargarComprobanteReservaAgenda(payload, Number(reserva.id || 0));
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
+                if (String(payload.tipo || "") === "torta") {
+                    _resetAgendaCakeSelection();
+                    _renderAgendaCakeBuilder();
+                }
                 agendaReservaPendiente = null;
                 _cerrarModalAgendaConfirmar();
                 _agendaMsg("Reserva realizada correctamente.", "ok");
@@ -2455,6 +2848,11 @@
             if (!["torta", "pastel"].includes(String(payload.tipo || ""))) {
                 return _agendaMsg("Selecciona el tipo de pedido para aplicar la regla correcta.", "err");
             }
+            if (payload.tipo === "torta") {
+                const cat = payload.catalogo_torta || {};
+                if (!String(cat.size_id || "").trim()) return _agendaMsg("Selecciona tamano de torta.", "err");
+                if (!Array.isArray(cat.sabor_ids) || !cat.sabor_ids.length) return _agendaMsg("Selecciona al menos un sabor.", "err");
+            }
             if (payload.entrega_tipo === "despacho" && payload.direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");
             if (payload.entrega_tipo === "despacho" && !payload.direccion_confirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
             agendaReservaPendiente = payload;
@@ -2471,6 +2869,53 @@
         function seleccionarAgendaHora(hora) {
             agendaHoraActiva = String(hora || "");
             _renderAgendaDiaHora();
+        }
+
+        function agendaCakeToggleFlavor(flavorId) {
+            const sid = String(flavorId || "");
+            if (!sid) return;
+            const size = _catalogFind("sizes", agendaCakeSelection.size_id);
+            const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
+            const current = Array.isArray(agendaCakeSelection.sabor_ids) ? agendaCakeSelection.sabor_ids : [];
+            if (current.includes(sid)) {
+                agendaCakeSelection.sabor_ids = current.filter((x) => x !== sid);
+            } else {
+                if (current.length >= maxSabores) {
+                    _agendaMsg(`Maximo ${maxSabores} sabor(es) para este tamano.`, "err");
+                    return;
+                }
+                agendaCakeSelection.sabor_ids = [...current, sid];
+            }
+            _renderAgendaCakeBuilder();
+        }
+
+        function agendaCakeChangeExtra(extraId, delta) {
+            const eid = String(extraId || "");
+            const step = Number(delta || 0);
+            if (!eid || !step) return;
+            const extra = _catalogFind("extras", eid);
+            if (!extra) return;
+            const maxQty = Math.max(1, Number(extra.max_cantidad || 1));
+            const rows = Array.isArray(agendaCakeSelection.extra_items) ? [...agendaCakeSelection.extra_items] : [];
+            const idx = rows.findIndex((x) => String(x.id || "") === eid);
+            const currQty = idx >= 0 ? Math.max(0, Number(rows[idx].qty || 0)) : 0;
+            const nextQty = Math.max(0, Math.min(maxQty, currQty + step));
+            if (idx >= 0) {
+                if (nextQty <= 0) rows.splice(idx, 1);
+                else rows[idx] = { id: eid, qty: nextQty };
+            } else if (nextQty > 0) {
+                rows.push({ id: eid, qty: nextQty });
+            }
+            const maxItems = Math.max(1, Number(agendaCakeCatalog?.max_extra_items || 8));
+            agendaCakeSelection.extra_items = rows.slice(0, maxItems);
+            _renderAgendaCakeBuilder();
+        }
+
+        function agendaCakeRemoveFile(index) {
+            const idx = Number(index || -1);
+            if (!Array.isArray(agendaCakeSelection.referencia_urls) || idx < 0 || idx >= agendaCakeSelection.referencia_urls.length) return;
+            agendaCakeSelection.referencia_urls.splice(idx, 1);
+            _renderAgendaCakeFiles();
         }
 
         function _startAgendaPoll() {
@@ -3234,6 +3679,9 @@
         window.repetirCompraVenta = repetirCompraVenta;
         window.seleccionarAgendaDia = seleccionarAgendaDia;
         window.seleccionarAgendaHora = seleccionarAgendaHora;
+        window.agendaCakeToggleFlavor = agendaCakeToggleFlavor;
+        window.agendaCakeChangeExtra = agendaCakeChangeExtra;
+        window.agendaCakeRemoveFile = agendaCakeRemoveFile;
         window.descargarComprobanteUltimoPedido = () => {
             const p = ultimoComprobantePedido;
             if (!p) return msg("No hay comprobante disponible.", true);
@@ -3358,6 +3806,49 @@
             agendaHoraActiva = "";
             cargarAgendaDisponibilidad(true);
         });
+        agendaCakeSizeEl?.addEventListener("change", () => {
+            agendaCakeSelection.size_id = String(agendaCakeSizeEl.value || "");
+            const size = _catalogFind("sizes", agendaCakeSelection.size_id);
+            const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
+            agendaCakeSelection.sabor_ids = (agendaCakeSelection.sabor_ids || []).slice(0, maxSabores);
+            _renderAgendaCakeBuilder();
+        });
+        agendaCakeTopperEl?.addEventListener("change", () => {
+            agendaCakeSelection.topper_id = String(agendaCakeTopperEl.value || "");
+            _renderAgendaCakeBuilder();
+        });
+        agendaCakeNoteEl?.addEventListener("input", () => {
+            agendaCakeSelection.nota = String(agendaCakeNoteEl.value || "").trim();
+        });
+        agendaCakeFileEl?.addEventListener("change", async () => {
+            const file = agendaCakeFileEl.files && agendaCakeFileEl.files[0] ? agendaCakeFileEl.files[0] : null;
+            if (!file) return;
+            const maxRefs = Math.max(0, Number(agendaCakeCatalog?.max_reference_images || 0));
+            if (!maxRefs) {
+                _agendaMsg("Las referencias de imagen no estan habilitadas.", "err");
+                agendaCakeFileEl.value = "";
+                return;
+            }
+            if ((agendaCakeSelection.referencia_urls || []).length >= maxRefs) {
+                _agendaMsg(`Maximo ${maxRefs} imagen(es) referencial(es).`, "err");
+                agendaCakeFileEl.value = "";
+                return;
+            }
+            try {
+                const fd = new FormData();
+                fd.append("foto", file);
+                const res = await fetch("/api/tienda/agenda/referencia-foto", { method: "POST", body: fd });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
+                agendaCakeSelection.referencia_urls = [...(agendaCakeSelection.referencia_urls || []), String(data.url || "")];
+                _renderAgendaCakeFiles();
+                _agendaMsg("Imagen referencial subida.", "ok");
+            } catch (err) {
+                _agendaMsg(err.message || "No se pudo subir imagen.", "err");
+            } finally {
+                agendaCakeFileEl.value = "";
+            }
+        });
         agendaDireccionBuscarEl?.addEventListener("input", () => {
             agendaDireccionConfirmada = false;
             if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Direccion editada. Debes confirmar pin.";
@@ -3388,6 +3879,7 @@
         if (clienteRegistrado) cargarHistorialCliente();
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
+        _cargarCatalogoTortaAgenda();
         _startAgendaPoll();
         _setAgendaTipo(String(agendaTipoEl?.value || "").trim().toLowerCase());
         _setAgendaEntregaTipo("retiro");
