@@ -2499,13 +2499,21 @@
             if (!document.body.classList.contains("mobile-ui")) return;
             if (categoriaActiva !== "AGENDA") return;
             if (!agendaBtnReservarEl) return;
-            window.setTimeout(() => {
-                try {
-                    agendaBtnReservarEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                } catch (_) {
-                    agendaBtnReservarEl.scrollIntoView();
-                }
-            }, Math.max(0, Number(delayMs || 0)));
+            const baseDelay = Math.max(0, Number(delayMs || 0));
+            const steps = [0, 170, 380, 620];
+            steps.forEach((extra, idx) => {
+                window.setTimeout(() => {
+                    try {
+                        agendaBtnReservarEl.scrollIntoView({ behavior: idx === 0 ? "smooth" : "auto", block: "end" });
+                    } catch (_) {
+                        agendaBtnReservarEl.scrollIntoView();
+                    }
+                    if (idx >= 1) {
+                        const downExtra = Math.max(120, Math.round(window.innerHeight * 0.28));
+                        window.scrollBy(0, downExtra);
+                    }
+                }, baseDelay + extra);
+            });
         }
 
         function _setAgendaTipo(tipo) {
@@ -3212,6 +3220,7 @@
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar disponibilidad");
                 agendaDias = Array.isArray(data.dias) ? data.dias : [];
                 _renderAgendaDiaHora();
+                if (agendaTipoActual === "torta") _scrollAgendaReservarEnMobile(120);
                 if (!silent) _agendaMsg("Disponibilidad actualizada.", "ok");
             } catch (e) {
                 if (!silent) _agendaMsg(e.message || "Error al cargar disponibilidad", "err");
