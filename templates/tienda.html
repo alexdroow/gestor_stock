@@ -1391,8 +1391,12 @@
     <div class="modal-overlay" id="modal-agenda-confirmar">
         <div class="modal">
             <h3>Confirmar reserva</h3>
+            <div style="font-size:.86rem;color:#b45309;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:8px;">
+                Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.
+            </div>
             <div id="agenda-confirmar-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
             <div class="modal-actions">
+                <button class="btn-muted" type="button" id="agenda-confirmar-pdf">Descargar comprobante</button>
                 <button class="btn-muted" type="button" id="agenda-confirmar-cancelar">Volver</button>
                 <button class="btn-primary" type="button" id="agenda-confirmar-aceptar">Confirmar y generar orden PDF</button>
             </div>
@@ -1491,6 +1495,7 @@
         const agendaMapMetaEl = document.getElementById("agenda-map-meta");
         const modalAgendaConfirmarEl = document.getElementById("modal-agenda-confirmar");
         const agendaConfirmarDetalleEl = document.getElementById("agenda-confirmar-detalle");
+        const agendaConfirmarPdfEl = document.getElementById("agenda-confirmar-pdf");
         const agendaConfirmarCancelarEl = document.getElementById("agenda-confirmar-cancelar");
         const agendaConfirmarAceptarEl = document.getElementById("agenda-confirmar-aceptar");
         const agendaStatusMsgEl = document.getElementById("agenda-status-msg");
@@ -1521,6 +1526,7 @@
         let agendaDireccionConfirmada = false;
         let agendaDireccionPin = { lat: -33.4489, lng: -70.6693 };
         let agendaReservaPendiente = null;
+        let agendaTipoActual = "torta";
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -2197,7 +2203,10 @@
             if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
             if (!silent) _agendaMsg("Cargando disponibilidad...");
             try {
-                const res = await fetch("/api/tienda/agenda/disponibilidad", { headers: { Accept: "application/json" } });
+                const tipoSel = String(agendaTipoEl?.value || agendaTipoActual || "torta").trim().toLowerCase();
+                agendaTipoActual = tipoSel || "torta";
+                const url = `/api/tienda/agenda/disponibilidad?tipo=${encodeURIComponent(agendaTipoActual)}`;
+                const res = await fetch(url, { headers: { Accept: "application/json" } });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar disponibilidad");
                 agendaDias = Array.isArray(data.dias) ? data.dias : [];
@@ -2208,47 +2217,132 @@
             }
         }
 
-        async function reservarAgendaDesdeTienda() {
-            if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
-            const dia = _agendaDiaActual();
-            if (!dia || !agendaFechaActiva) return _agendaMsg("Selecciona un dia de agenda.", "err");
-            if (!agendaHoraActiva) return _agendaMsg("Selecciona una hora disponible.", "err");
+        function _labelTipoReserva(tipoRaw) {
+            const t = String(tipoRaw || "").trim().toLowerCase();
+            if (t === "torta") return "Torta";
+            if (t === "pastel") return "Pastel";
+            if (t === "postre") return "Postre";
+            return "Otro";
+        }
 
-            const nombre = String(agendaNombreEl?.value || clienteRegistrado?.nombre || "").trim();
-            const email = normalizarEmailCliente(String(agendaEmailEl?.value || clienteRegistrado?.email || "").trim());
-            const telefono = _normalizarAgendaTelefono(String(agendaTelefonoEl?.value || clienteRegistrado?.telefono || "").trim());
-            const tipo = String(agendaTipoEl?.value || "torta").trim();
-            const detalle = String(agendaDetalleEl?.value || "").trim();
-            const direccion = String(agendaDireccionBuscarEl?.value || "").trim();
-            if (nombre.length < 2) return _agendaMsg("Ingresa un nombre valido.", "err");
-            if (!email) return _agendaMsg("Ingresa un correo valido.", "err");
-            if (!telefono) return _agendaMsg("Telefono invalido, usa 8 digitos.", "err");
-            if (agendaEntregaTipo === "despacho" && direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");
-            if (agendaEntregaTipo === "despacho" && !agendaDireccionConfirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
+        function _formatearFechaAgenda(fechaIso) {
+            try {
+                const [yy, mm, dd] = String(fechaIso || "").split("-").map((v) => Number(v || 0));
+                if (!yy || !mm || !dd) return String(fechaIso || "");
+                const dt = new Date(yy, mm - 1, dd);
+                return dt.toLocaleDateString("es-CL", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
+            } catch (_) {
+                return String(fechaIso || "");
+            }
+        }
 
+        function _buildAgendaReservaPayload() {
+            const tipo = String(agendaTipoEl?.value || "torta").trim().toLowerCase();
+            const payload = {
+                fecha: String(agendaFechaActiva || ""),
+                hora_inicio: String(agendaHoraActiva || ""),
+                nombre: String(agendaNombreEl?.value || clienteRegistrado?.nombre || "").trim(),
+                email: normalizarEmailCliente(String(agendaEmailEl?.value || clienteRegistrado?.email || "").trim()),
+                telefono: _normalizarAgendaTelefono(String(agendaTelefonoEl?.value || clienteRegistrado?.telefono || "").trim()),
+                tipo,
+                detalle: String(agendaDetalleEl?.value || "").trim(),
+                entrega_tipo: agendaEntregaTipo,
+                direccion: String(agendaDireccionBuscarEl?.value || "").trim(),
+                direccion_confirmada: agendaEntregaTipo === "retiro" ? true : agendaDireccionConfirmada,
+                lat: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lat : null,
+                lng: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lng : null,
+            };
+            return payload;
+        }
+
+        function _renderAgendaConfirmacion(payload) {
+            if (!agendaConfirmarDetalleEl) return;
+            const entregaTxt = payload.entrega_tipo === "despacho" ? "Despacho" : "Retiro en tienda";
+            const direccionTxt = payload.entrega_tipo === "despacho" ? payload.direccion : "No aplica";
+            const pinTxt = payload.entrega_tipo === "despacho"
+                ? `${Number(payload.lat || 0).toFixed(6)}, ${Number(payload.lng || 0).toFixed(6)}`
+                : "-";
+            agendaConfirmarDetalleEl.innerHTML = `
+                <div><strong>Cliente:</strong> ${esc(payload.nombre || "-")}</div>
+                <div><strong>Correo:</strong> ${esc(payload.email || "-")}</div>
+                <div><strong>Telefono:</strong> ${esc(payload.telefono || "-")}</div>
+                <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+                <div><strong>Tipo:</strong> ${esc(_labelTipoReserva(payload.tipo))}</div>
+                <div><strong>Fecha:</strong> ${esc(_formatearFechaAgenda(payload.fecha))}</div>
+                <div><strong>Hora:</strong> ${esc(payload.hora_inicio || "-")}</div>
+                <div><strong>Entrega:</strong> ${esc(entregaTxt)}</div>
+                <div><strong>Direccion:</strong> ${esc(direccionTxt || "-")}</div>
+                <div><strong>Pin mapa:</strong> ${esc(pinTxt)}</div>
+                <div style="margin-top:6px;"><strong>Detalle:</strong> ${esc(payload.detalle || "Sin detalle")}</div>
+            `;
+        }
+
+        function _descargarComprobanteReservaAgenda(payload, reservaId = 0) {
+            const jspdf = window.jspdf || null;
+            if (!jspdf || !jspdf.jsPDF) {
+                _agendaMsg("No se pudo cargar generador PDF.", "err");
+                return;
+            }
+            const { jsPDF } = jspdf;
+            const doc = new jsPDF({ unit: "pt", format: "a4" });
+            const left = 40;
+            let y = 48;
+            const entregaTxt = payload.entrega_tipo === "despacho" ? "Despacho" : "Retiro en tienda";
+            const fechaTxt = _formatearFechaAgenda(payload.fecha);
+            const pinTxt = payload.entrega_tipo === "despacho"
+                ? `${Number(payload.lat || 0).toFixed(6)}, ${Number(payload.lng || 0).toFixed(6)}`
+                : "-";
+            const reservaLabel = Number(reservaId || 0) > 0 ? `#${Number(reservaId)}` : "(borrador)";
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text(`Orden de reserva tienda ${reservaLabel}`, left, y);
+            y += 24;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(11);
+            const lineas = [
+                `Fecha emision: ${new Date().toLocaleString("es-CL")}`,
+                `Cliente: ${payload.nombre || "-"}`,
+                `Correo: ${payload.email || "-"}`,
+                `Telefono: ${payload.telefono || "-"}`,
+                `Tipo pedido: ${_labelTipoReserva(payload.tipo)}`,
+                `Fecha reserva: ${fechaTxt}`,
+                `Hora reserva: ${payload.hora_inicio || "-"}`,
+                `Entrega: ${entregaTxt}`,
+                `Direccion: ${payload.entrega_tipo === "despacho" ? (payload.direccion || "-") : "No aplica"}`,
+                `Pin mapa: ${pinTxt}`,
+                `Detalle: ${payload.detalle || "Sin detalle"}`,
+            ];
+            lineas.forEach((linea) => {
+                const partes = doc.splitTextToSize(linea, 510);
+                doc.text(partes, left, y);
+                y += (partes.length * 14);
+            });
+            y += 8;
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(10);
+            doc.text("Comprobante de reserva sin valores. La valorizacion se realiza en agenda interna.", left, y);
+            const tipoNombre = String(payload.tipo || "reserva").toLowerCase();
+            const fechaArchivo = String(payload.fecha || "").replaceAll("/", "-");
+            doc.save(`orden_reserva_tienda_-_${tipoNombre}_${fechaArchivo || "sin-fecha"}.pdf`);
+        }
+
+        async function _confirmarReservaAgendaPendiente() {
+            const payload = agendaReservaPendiente;
+            if (!payload) return;
             _agendaMsg("Reservando horario...");
             try {
                 const res = await fetch("/api/tienda/agenda/reservar", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        fecha: agendaFechaActiva,
-                        hora_inicio: agendaHoraActiva,
-                        nombre,
-                        email,
-                        telefono,
-                        tipo,
-                        detalle,
-                        entrega_tipo: agendaEntregaTipo,
-                        direccion,
-                        direccion_confirmada: agendaEntregaTipo === "retiro" ? true : agendaDireccionConfirmada,
-                        lat: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lat : null,
-                        lng: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lng : null,
-                    }),
+                    body: JSON.stringify(payload),
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo reservar");
+                const reserva = data.reserva || {};
+                _descargarComprobanteReservaAgenda(payload, Number(reserva.id || 0));
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
+                agendaReservaPendiente = null;
+                modalAgendaConfirmarEl?.classList.remove("active");
                 _agendaMsg("Reserva realizada correctamente.", "ok");
                 await cargarAgendaDisponibilidad(true);
                 _renderAgendaDiaHora();
@@ -2256,6 +2350,22 @@
                 _agendaMsg(e.message || "No se pudo reservar", "err");
                 await cargarAgendaDisponibilidad(true);
             }
+        }
+
+        async function reservarAgendaDesdeTienda() {
+            if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
+            const dia = _agendaDiaActual();
+            if (!dia || !agendaFechaActiva) return _agendaMsg("Selecciona un dia de agenda.", "err");
+            if (!agendaHoraActiva) return _agendaMsg("Selecciona una hora disponible.", "err");
+            const payload = _buildAgendaReservaPayload();
+            if (payload.nombre.length < 2) return _agendaMsg("Ingresa un nombre valido.", "err");
+            if (!payload.email) return _agendaMsg("Ingresa un correo valido.", "err");
+            if (!payload.telefono) return _agendaMsg("Telefono invalido, usa 8 digitos.", "err");
+            if (payload.entrega_tipo === "despacho" && payload.direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");
+            if (payload.entrega_tipo === "despacho" && !payload.direccion_confirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
+            agendaReservaPendiente = payload;
+            _renderAgendaConfirmacion(payload);
+            modalAgendaConfirmarEl?.classList.add("active");
         }
 
         function seleccionarAgendaDia(fecha) {
@@ -3139,6 +3249,12 @@
         }
         agendaEntregaRetiroEl?.addEventListener("click", () => _setAgendaEntregaTipo("retiro"));
         agendaEntregaDespachoEl?.addEventListener("click", () => _setAgendaEntregaTipo("despacho"));
+        agendaTipoEl?.addEventListener("change", () => {
+            agendaTipoActual = String(agendaTipoEl.value || "torta").trim().toLowerCase();
+            agendaFechaActiva = "";
+            agendaHoraActiva = "";
+            cargarAgendaDisponibilidad(true);
+        });
         agendaDireccionBuscarEl?.addEventListener("input", () => {
             agendaDireccionConfirmada = false;
             if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Direccion editada. Debes confirmar pin.";
@@ -3146,6 +3262,17 @@
         agendaBuscarMapaEl?.addEventListener("click", _buscarDireccionAgendaEnMapa);
         agendaConfirmarPinEl?.addEventListener("click", _confirmarPinAgenda);
         agendaBtnReservarEl?.addEventListener("click", reservarAgendaDesdeTienda);
+        agendaConfirmarPdfEl?.addEventListener("click", () => {
+            const payload = agendaReservaPendiente || _buildAgendaReservaPayload();
+            _descargarComprobanteReservaAgenda(payload, 0);
+        });
+        agendaConfirmarCancelarEl?.addEventListener("click", () => {
+            modalAgendaConfirmarEl?.classList.remove("active");
+        });
+        agendaConfirmarAceptarEl?.addEventListener("click", _confirmarReservaAgendaPendiente);
+        modalAgendaConfirmarEl?.addEventListener("click", (ev) => {
+            if (ev.target === modalAgendaConfirmarEl) modalAgendaConfirmarEl.classList.remove("active");
+        });
         if (codigoDescuentoEl && mobileCodigoDescuentoEl) {
             codigoDescuentoEl.addEventListener("input", () => { mobileCodigoDescuentoEl.value = codigoDescuentoEl.value; });
             mobileCodigoDescuentoEl.addEventListener("input", () => { codigoDescuentoEl.value = mobileCodigoDescuentoEl.value; });
@@ -3159,6 +3286,7 @@
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
         _startAgendaPoll();
+        agendaTipoActual = String(agendaTipoEl?.value || "torta").trim().toLowerCase();
         _setAgendaEntregaTipo("retiro");
         renderCart();
         cargarProductos();

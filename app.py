@@ -1144,6 +1144,38 @@ def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fech
     return {"dias": dias, "mapa": disponibilidad_mapa}
 
 
+def _normalizar_tipo_reserva_tienda(raw):
+    tipo = str(raw or "").strip().lower()
+    if tipo in {"torta", "tortas"}:
+        return "torta"
+    if tipo in {"pastel", "pasteles"}:
+        return "pastel"
+    if tipo in {"postre", "postres"}:
+        return "postre"
+    return "otro"
+
+
+def _minutos_anticipacion_reserva(tipo):
+    t = _normalizar_tipo_reserva_tienda(tipo)
+    if t == "torta":
+        return 48 * 60
+    if t == "pastel":
+        return 24 * 60
+    return 24 * 60
+
+
+def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, now_local=None):
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fecha_iso or "").strip()):
+        return False
+    hora = str(hora_inicio or "").strip()
+    if not _parse_hora_hhmm(hora):
+        return False
+    now_dt = now_local or datetime.now(ZoneInfo("America/Santiago"))
+    slot_dt = datetime.strptime(f"{fecha_iso} {hora}", "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("America/Santiago"))
+    minimo_dt = now_dt + timedelta(minutes=_minutos_anticipacion_reserva(tipo))
+    return slot_dt >= minimo_dt
+
+
 def _normalizar_telefono_cl(raw):
     dig = re.sub(r"\D+", "", str(raw or ""))
     if dig.startswith("56"):
@@ -3218,6 +3250,7 @@ def api_tienda_agenda_disponibilidad():
 
         fecha_desde = str(request.args.get("fecha_desde") or "").strip()
         fecha_hasta = str(request.args.get("fecha_hasta") or "").strip()
+        tipo_reserva = _normalizar_tipo_reserva_tienda(request.args.get("tipo"))
         hoy_dt = datetime.now(ZoneInfo("America/Santiago")).date()
         hoy_iso = hoy_dt.strftime("%Y-%m-%d")
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha_desde):
@@ -3228,10 +3261,33 @@ def api_tienda_agenda_disponibilidad():
         conn = get_db()
         cursor = conn.cursor()
         data = _calcular_disponibilidad_agenda_tienda(cursor, cfg, fecha_desde, fecha_hasta)
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
+        dias_filtrados = []
+        for dia in (data.get("dias") or []):
+            horas = []
+            for h in (dia.get("horas") or []):
+                cumple_regla = _cumple_anticipacion_reserva(
+                    dia.get("fecha"),
+                    h.get("hora_inicio"),
+                    tipo_reserva,
+                    now_local=now_local,
+                )
+                disponible = bool(h.get("disponible")) and bool(cumple_regla)
+                hh = dict(h)
+                hh["disponible"] = disponible
+                hh["sin_cupos"] = not disponible
+                if not disponible and not cumple_regla:
+                    hh["cupos_disponibles"] = 0
+                horas.append(hh)
+            d = dict(dia)
+            d["horas"] = horas
+            d["sin_cupos"] = all(bool(x.get("sin_cupos")) for x in horas) if horas else True
+            dias_filtrados.append(d)
         return jsonify(
             {
                 "success": True,
                 "enabled": True,
+                "tipo_reserva": tipo_reserva,
                 "cfg": {
                     "days_ahead": int(cfg["days_ahead"]),
                     "slot_minutes": int(cfg["slot_minutes"]),
@@ -3239,7 +3295,7 @@ def api_tienda_agenda_disponibilidad():
                     "hour_start": str(cfg["hour_start"]),
                     "hour_end": str(cfg["hour_end"]),
                 },
-                "dias": data.get("dias") or [],
+                "dias": dias_filtrados,
             }
         )
     except Exception as e:
@@ -3263,7 +3319,7 @@ def api_tienda_agenda_reservar():
         nombre = str(data.get("nombre") or "").strip()[:80]
         email = _normalizar_email(data.get("email"))
         telefono = _normalizar_telefono_cl(data.get("telefono"))
-        tipo_pedido = str(data.get("tipo") or "torta").strip()[:40] or "torta"
+        tipo_pedido = _normalizar_tipo_reserva_tienda(data.get("tipo"))
         detalle = str(data.get("detalle") or "").strip()[:400]
         entrega_tipo = str(data.get("entrega_tipo") or "retiro").strip().lower()
         if entrega_tipo not in {"retiro", "despacho"}:
@@ -3301,6 +3357,16 @@ def api_tienda_agenda_reservar():
         fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()
         if fecha_req < fecha_hoy:
             return jsonify({"success": False, "error": "No puedes reservar fechas pasadas"}), 400
+        if not _cumple_anticipacion_reserva(fecha, hora_inicio, tipo_pedido):
+            minutos = _minutos_anticipacion_reserva(tipo_pedido)
+            if tipo_pedido == "torta":
+                msg = "Las tortas requieren minimo 2 dias de anticipacion"
+            elif tipo_pedido == "pastel":
+                msg = "Los pasteles requieren minimo 24 horas de anticipacion"
+            else:
+                horas_min = int(max(1, minutos // 60))
+                msg = f"Este tipo de reserva requiere minimo {horas_min} horas de anticipacion"
+            return jsonify({"success": False, "error": msg}), 400
 
         conn = get_db()
         cursor = conn.cursor()
