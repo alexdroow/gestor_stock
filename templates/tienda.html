@@ -3259,7 +3259,7 @@
             }
             const { jsPDF } = jspdf;
             const doc = new jsPDF({ unit: "pt", format: "a4" });
-            if (typeof doc.setLineHeightFactor === "function") doc.setLineHeightFactor(1.25);
+            if (typeof doc.setLineHeightFactor === "function") doc.setLineHeightFactor(1.38);
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
             const margin = 34;
@@ -3285,15 +3285,15 @@
                 y = 30;
             };
             const drawSectionTitle = (title) => {
-                ensurePage(14);
+                ensurePage(18);
                 doc.setFont("helvetica", "bold");
-                doc.setFontSize(11);
+                doc.setFontSize(11.5);
                 doc.setTextColor(...colors.dark);
                 doc.text(String(title || ""), margin, y);
-                y += 2;
+                y += 4;
                 doc.setDrawColor(...colors.border);
                 doc.line(margin, y + 1, margin + contentWidth, y + 1);
-                y += 8;
+                y += 10;
             };
             const textBlockHeight = (lineCount = 1, fontSize = 12) => {
                 const lh = Number(doc.getLineHeightFactor ? doc.getLineHeightFactor() : 1.15) || 1.15;
@@ -3301,17 +3301,17 @@
             };
             const drawField = (label, value) => {
                 const wrapped = doc.splitTextToSize(safe(value), contentWidth);
-                ensurePage(18 + textBlockHeight(wrapped.length, 12));
+                ensurePage(22 + textBlockHeight(wrapped.length, 12));
                 doc.setFont("helvetica", "bold");
-                doc.setFontSize(9);
+                doc.setFontSize(9.5);
                 doc.setTextColor(...colors.muted);
                 doc.text(String(label || "").toUpperCase(), margin, y);
-                y += textBlockHeight(1, 9) + 1;
+                y += textBlockHeight(1, 9.5) + 3;
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(12);
                 doc.setTextColor(...colors.dark);
                 doc.text(wrapped, margin, y);
-                y += textBlockHeight(wrapped.length, 12) + 3;
+                y += textBlockHeight(wrapped.length, 12) + 7;
             };
             const drawLink = (label, url) => {
                 drawField(label, url);
@@ -3429,9 +3429,10 @@
             ];
             terminos.forEach((t, i) => {
                 const wrapped = doc.splitTextToSize(`${i + 1}. ${t}`, contentWidth - 4);
-                ensurePage(textBlockHeight(wrapped.length, 9.5) + 5);
+                ensurePage(textBlockHeight(wrapped.length, 10) + 8);
+                doc.setFontSize(10);
                 doc.text(wrapped, margin + 2, y);
-                y += textBlockHeight(wrapped.length, 9.5) + 2;
+                y += textBlockHeight(wrapped.length, 10) + 4;
             });
 
             ensurePage(15);
