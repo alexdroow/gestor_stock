@@ -178,9 +178,62 @@
             border-color: #94a3b8;
             transform: translateY(-1px);
         }
+        .toolbox-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .toolbox-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            display: grid;
+            gap: 8px;
+        }
+        .toolbox-card h3 {
+            margin: 0;
+            font-size: .9rem;
+        }
+        .list-box {
+            max-height: 180px;
+            overflow: auto;
+            border: 1px solid #dbe2ea;
+            border-radius: 8px;
+            padding: 8px;
+            background: #fff;
+            display: grid;
+            gap: 6px;
+        }
+        .list-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 7px;
+            display: grid;
+            gap: 5px;
+            font-size: .8rem;
+        }
+        .item-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .item-actions button {
+            padding: 6px 8px;
+            font-size: .75rem;
+        }
+        .compact-input {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 7px 8px;
+            font: inherit;
+            font-size: .82rem;
+        }
         @media (max-width: 1100px) {
             .grid { grid-template-columns: 1fr; }
             .fields { grid-template-columns: 1fr; }
+            .toolbox-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 768px) {
             .tienda-custom-main {
@@ -428,6 +481,48 @@
                     <button type="button" class="btn-outline" id="btn-recargar">Recargar desde servidor</button>
                 </div>
                 <div class="msg" id="msg"></div>
+
+                <h2>Automatizacion y Versionado</h2>
+                <div class="toolbox-grid">
+                    <article class="toolbox-card">
+                        <h3>Presets de diseño</h3>
+                        <div class="actions">
+                            <button type="button" class="btn-outline" data-quick-preset="minimal">Minimal</button>
+                            <button type="button" class="btn-outline" data-quick-preset="premium">Premium</button>
+                            <button type="button" class="btn-outline" data-quick-preset="temporada">Temporada</button>
+                        </div>
+                        <div style="display:flex;gap:6px;">
+                            <input id="preset-nombre" class="compact-input" type="text" placeholder="Nombre para duplicar preset actual">
+                            <button type="button" class="btn-secondary" id="btn-preset-duplicar">Duplicar</button>
+                        </div>
+                        <div class="list-box" id="lista-presets"></div>
+                    </article>
+
+                    <article class="toolbox-card">
+                        <h3>Programacion por fecha/hora/dia</h3>
+                        <input id="prog-nombre" class="compact-input" type="text" placeholder="Nombre campana (ej: Navidad)">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <input id="prog-fecha-inicio" class="compact-input" type="date">
+                            <input id="prog-fecha-fin" class="compact-input" type="date">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <input id="prog-hora-inicio" class="compact-input" type="time" placeholder="09:00">
+                            <input id="prog-hora-fin" class="compact-input" type="time" placeholder="19:00">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <input id="prog-dias" class="compact-input" type="text" placeholder="Dias 1-7 (ej: 1,2,3)">
+                            <input id="prog-prioridad" class="compact-input" type="number" value="10" min="0" max="999" placeholder="Prioridad">
+                        </div>
+                        <select id="prog-preset-id" class="compact-input"></select>
+                        <button type="button" class="btn-secondary" id="btn-prog-crear">Crear programacion</button>
+                        <div class="list-box" id="lista-programaciones"></div>
+                    </article>
+
+                    <article class="toolbox-card full">
+                        <h3>Historial y rollback</h3>
+                        <div class="list-box" id="lista-versiones"></div>
+                    </article>
+                </div>
             </section>
 
             <section class="panel">
@@ -465,6 +560,9 @@
 
 <script>
     const ENDPOINT = "/api/tienda/admin/personalizacion";
+    const PRESETS_ENDPOINT = "/api/tienda/admin/personalizacion/presets";
+    const PROGRAM_ENDPOINT = "/api/tienda/admin/personalizacion/programaciones";
+    const VERSIONES_ENDPOINT = "/api/tienda/admin/personalizacion/versiones";
     const msgEl = document.getElementById("msg");
     const fields = [
         "brand_text","search_placeholder","menu_title","cart_title","sec_ofertas_title","sec_destacados_title",
@@ -523,6 +621,7 @@
         offer_float_image_size: 46,
         custom_css: ""
     };
+    let PRESETS_CACHE = [];
 
     function setMsg(text, type) {
         msgEl.textContent = text || "";
@@ -637,6 +736,205 @@
         });
     }
 
+    function renderPresetsList(items) {
+        PRESETS_CACHE = Array.isArray(items) ? items : [];
+        const box = document.getElementById("lista-presets");
+        const select = document.getElementById("prog-preset-id");
+        if (select) {
+            const opts = PRESETS_CACHE.map((p) => `<option value="${Number(p.id || 0)}">${String(p.nombre || "")}</option>`).join("");
+            select.innerHTML = `<option value="">Selecciona preset para programar</option>${opts}`;
+        }
+        if (!box) return;
+        if (!PRESETS_CACHE.length) {
+            box.innerHTML = "<div class='list-item'>Sin presets disponibles.</div>";
+            return;
+        }
+        box.innerHTML = PRESETS_CACHE.map((p) => `
+            <div class="list-item">
+                <div><strong>${String(p.nombre || "")}</strong> ${p.built_in ? "<span style='color:#64748b;'>(base)</span>" : ""}</div>
+                <div class="item-actions">
+                    <button type="button" class="btn-outline" onclick="aplicarPreset(${Number(p.id || 0)})">Aplicar</button>
+                    ${p.built_in ? "" : `<button type="button" class="btn-outline" onclick="eliminarPreset(${Number(p.id || 0)})">Eliminar</button>`}
+                </div>
+            </div>
+        `).join("");
+    }
+
+    async function cargarPresets() {
+        try {
+            const res = await fetch(PRESETS_ENDPOINT, { headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar presets");
+            renderPresetsList(data.presets || []);
+        } catch (err) {
+            const box = document.getElementById("lista-presets");
+            if (box) box.innerHTML = `<div class='list-item'>${err.message || "Error cargando presets"}</div>`;
+        }
+    }
+
+    async function aplicarPreset(presetId) {
+        try {
+            const res = await fetch(`${PRESETS_ENDPOINT}/${Number(presetId || 0)}/aplicar`, { method: "POST", headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo aplicar preset");
+            fillForm(data.config || {});
+            syncColorPickersFromText();
+            setMsg("Preset aplicado correctamente.", "ok");
+        } catch (err) {
+            setMsg(err.message || "No se pudo aplicar preset", "err");
+        }
+    }
+    window.aplicarPreset = aplicarPreset;
+
+    async function eliminarPreset(presetId) {
+        if (!confirm("Eliminar este preset personalizado?")) return;
+        try {
+            const res = await fetch(`${PRESETS_ENDPOINT}/${Number(presetId || 0)}/eliminar`, { method: "POST", headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo eliminar preset");
+            await cargarPresets();
+            setMsg("Preset eliminado.", "ok");
+        } catch (err) {
+            setMsg(err.message || "No se pudo eliminar preset", "err");
+        }
+    }
+    window.eliminarPreset = eliminarPreset;
+
+    async function duplicarPresetActual() {
+        const nombre = String(document.getElementById("preset-nombre")?.value || "").trim();
+        if (!nombre) return setMsg("Escribe nombre para duplicar preset actual.", "err");
+        try {
+            const res = await fetch(PRESETS_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ nombre }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo duplicar preset");
+            document.getElementById("preset-nombre").value = "";
+            await cargarPresets();
+            setMsg("Preset duplicado y guardado.", "ok");
+        } catch (err) {
+            setMsg(err.message || "No se pudo duplicar preset", "err");
+        }
+    }
+
+    async function crearProgramacion() {
+        const payload = {
+            nombre: String(document.getElementById("prog-nombre")?.value || "").trim(),
+            preset_id: Number(document.getElementById("prog-preset-id")?.value || 0),
+            fecha_inicio: String(document.getElementById("prog-fecha-inicio")?.value || ""),
+            fecha_fin: String(document.getElementById("prog-fecha-fin")?.value || ""),
+            hora_inicio: String(document.getElementById("prog-hora-inicio")?.value || ""),
+            hora_fin: String(document.getElementById("prog-hora-fin")?.value || ""),
+            dias_semana: String(document.getElementById("prog-dias")?.value || ""),
+            prioridad: Number(document.getElementById("prog-prioridad")?.value || 0),
+            activo: true,
+        };
+        if (!payload.nombre) return setMsg("Nombre de campana requerido.", "err");
+        if (!payload.preset_id) return setMsg("Selecciona preset para programar.", "err");
+        try {
+            const res = await fetch(PROGRAM_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo crear programacion");
+            await cargarProgramaciones();
+            setMsg("Programacion creada.", "ok");
+        } catch (err) {
+            setMsg(err.message || "No se pudo crear programacion", "err");
+        }
+    }
+
+    async function cargarProgramaciones() {
+        try {
+            const res = await fetch(PROGRAM_ENDPOINT, { headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar programaciones");
+            const box = document.getElementById("lista-programaciones");
+            const items = Array.isArray(data.programaciones) ? data.programaciones : [];
+            if (!box) return;
+            if (!items.length) {
+                box.innerHTML = "<div class='list-item'>Sin programaciones activas.</div>";
+                return;
+            }
+            box.innerHTML = items.map((it) => `
+                <div class="list-item">
+                    <div><strong>${String(it.nombre || "")}</strong> (${String(it.preset_nombre || "-")})</div>
+                    <div>Fecha: ${String(it.fecha_inicio || "-")} a ${String(it.fecha_fin || "-")} | Hora: ${String(it.hora_inicio || "-")} - ${String(it.hora_fin || "-")}</div>
+                    <div>Dias: ${String(it.dias_semana || "todos")} | Prioridad: ${Number(it.prioridad || 0)}</div>
+                    <div class="item-actions">
+                        <button type="button" class="btn-outline" onclick="eliminarProgramacion(${Number(it.id || 0)})">Eliminar</button>
+                    </div>
+                </div>
+            `).join("");
+        } catch (err) {
+            const box = document.getElementById("lista-programaciones");
+            if (box) box.innerHTML = `<div class='list-item'>${err.message || "Error cargando programaciones"}</div>`;
+        }
+    }
+
+    async function eliminarProgramacion(id) {
+        if (!confirm("Eliminar esta programacion?")) return;
+        try {
+            const res = await fetch(`${PROGRAM_ENDPOINT}/${Number(id || 0)}/eliminar`, { method: "POST", headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo eliminar");
+            await cargarProgramaciones();
+            setMsg("Programacion eliminada.", "ok");
+        } catch (err) {
+            setMsg(err.message || "No se pudo eliminar programacion", "err");
+        }
+    }
+    window.eliminarProgramacion = eliminarProgramacion;
+
+    async function cargarVersiones() {
+        try {
+            const res = await fetch(VERSIONES_ENDPOINT, { headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar historial");
+            const box = document.getElementById("lista-versiones");
+            const items = Array.isArray(data.versiones) ? data.versiones : [];
+            if (!box) return;
+            if (!items.length) {
+                box.innerHTML = "<div class='list-item'>Sin versiones aun.</div>";
+                return;
+            }
+            box.innerHTML = items.map((v) => `
+                <div class="list-item">
+                    <div><strong>#${Number(v.id || 0)}</strong> · ${String(v.origen || "manual")} · ${String(v.creado_en || "")}</div>
+                    <div class="item-actions">
+                        <button type="button" class="btn-outline" onclick="rollbackVersion(${Number(v.id || 0)})">Rollback</button>
+                    </div>
+                </div>
+            `).join("");
+        } catch (err) {
+            const box = document.getElementById("lista-versiones");
+            if (box) box.innerHTML = `<div class='list-item'>${err.message || "Error cargando versiones"}</div>`;
+        }
+    }
+
+    async function rollbackVersion(versionId) {
+        if (!confirm(`Aplicar rollback a version #${Number(versionId || 0)}?`)) return;
+        try {
+            const res = await fetch(`${VERSIONES_ENDPOINT}/${Number(versionId || 0)}/rollback`, {
+                method: "POST",
+                headers: { Accept: "application/json" },
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo hacer rollback");
+            fillForm(data.config || {});
+            syncColorPickersFromText();
+            await cargarVersiones();
+            setMsg("Rollback aplicado.", "ok");
+        } catch (err) {
+            setMsg(err.message || "No se pudo aplicar rollback", "err");
+        }
+    }
+    window.rollbackVersion = rollbackVersion;
+
     async function cargar() {
         setMsg("Cargando configuracion...");
         try {
@@ -671,10 +969,24 @@
 
     document.getElementById("btn-guardar").addEventListener("click", guardar);
     document.getElementById("btn-recargar").addEventListener("click", cargar);
+    document.getElementById("btn-preset-duplicar")?.addEventListener("click", duplicarPresetActual);
+    document.getElementById("btn-prog-crear")?.addEventListener("click", crearProgramacion);
     document.getElementById("btn-restaurar").addEventListener("click", () => {
         fillForm(DEFAULTS);
         syncColorPickersFromText();
         setMsg("Valores base cargados en formulario. Presiona 'Guardar cambios' para aplicar.");
+    });
+    document.querySelectorAll("[data-quick-preset]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const slug = String(btn.getAttribute("data-quick-preset") || "");
+            const preset = PRESETS_CACHE.find((p) => String(p.slug || "") === slug);
+            if (!preset) {
+                setMsg("Preset no disponible. Recargando lista...", "err");
+                await cargarPresets();
+                return;
+            }
+            await aplicarPreset(Number(preset.id || 0));
+        });
     });
 
     for (const id of fields) {
@@ -686,6 +998,9 @@
 
     bindColorPickers();
     bindEmojiPalette();
+    cargarPresets();
+    cargarProgramaciones();
+    cargarVersiones();
     cargar();
 </script>
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>

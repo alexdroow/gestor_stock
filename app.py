@@ -1312,6 +1312,7 @@ def _obtener_tienda_personalizacion():
     conn = None
     try:
         conn = get_db()
+        _asegurar_presets_personalizacion(conn)
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -1331,7 +1332,8 @@ def _obtener_tienda_personalizacion():
             payload = json.loads(raw_json)
         except Exception:
             payload = {}
-        return _normalizar_tienda_personalizacion(payload)
+        base = _normalizar_tienda_personalizacion(payload)
+        return _aplicar_programacion_personalizacion(conn, base)
     finally:
         if conn:
             conn.close()
@@ -1345,7 +1347,15 @@ def _guardar_tienda_personalizacion(payload):
     conn = None
     try:
         conn = get_db()
+        _asegurar_presets_personalizacion(conn)
         cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO tienda_personalizacion_versiones (origen, config_json, creado_en)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            """,
+            ("manual", json.dumps(actual, ensure_ascii=False)),
+        )
         cursor.execute(
             """
             INSERT INTO tienda_personalizacion (id, config_json, actualizado_en)
@@ -1365,6 +1375,156 @@ def _guardar_tienda_personalizacion(payload):
     finally:
         if conn:
             conn.close()
+
+
+def _slug_simple(text):
+    slug = re.sub(r"[^a-z0-9]+", "-", str(text or "").strip().lower())
+    slug = slug.strip("-")
+    return slug[:60] or f"preset-{int(time.time())}"
+
+
+def _presets_built_in():
+    base = _default_tienda_personalizacion()
+    minimal = dict(base)
+    minimal.update({
+        "brand_text": "Sucree Store",
+        "hero_enabled": False,
+        "banner_enabled": False,
+        "color_bg": "#f8fafc",
+        "color_panel": "#ffffff",
+        "color_accent": "#2563eb",
+        "color_accent_dark": "#1d4ed8",
+        "offer_badge_text": "Oferta",
+        "offer_badge_icon": "🏷️",
+        "offer_float_icon": "✨",
+    })
+    premium = dict(base)
+    premium.update({
+        "brand_text": "Sucree Boutique",
+        "hero_enabled": True,
+        "hero_badge": "Coleccion exclusiva",
+        "hero_title": "Edicion Premium",
+        "hero_subtitle": "Postres de autor con retiro en tienda.",
+        "banner_enabled": True,
+        "banner_text": "Envios limitados hoy. Reserva temprano.",
+        "color_bg": "#0f172a",
+        "color_panel": "#111827",
+        "color_line": "#334155",
+        "color_text": "#f8fafc",
+        "color_muted": "#cbd5e1",
+        "color_accent": "#f59e0b",
+        "color_accent_dark": "#d97706",
+        "offer_badge_text": "Premium",
+        "offer_badge_icon": "💎",
+        "offer_float_icon": "🌟",
+        "offer_discount_chip_bg": "#b91c1c",
+    })
+    temporada = dict(base)
+    temporada.update({
+        "brand_text": "Sucree Temporada",
+        "hero_enabled": True,
+        "hero_badge": "Especial de temporada",
+        "hero_title": "Sabores de edicion limitada",
+        "hero_subtitle": "Aprovecha nuestras recetas por tiempo limitado.",
+        "banner_enabled": True,
+        "banner_text": "Campana activa: no te quedes sin tu favorito.",
+        "color_bg": "#fff7ed",
+        "color_panel": "#ffffff",
+        "color_line": "#fed7aa",
+        "color_accent": "#ea580c",
+        "color_accent_dark": "#c2410c",
+        "offer_badge_text": "Temporada",
+        "offer_badge_icon": "🎉",
+        "offer_float_icon": "🍓",
+        "offer_card_glow_color": "#f97316",
+    })
+    return [
+        {"slug": "minimal", "nombre": "Minimal", "config": minimal},
+        {"slug": "premium", "nombre": "Premium", "config": premium},
+        {"slug": "temporada", "nombre": "Temporada", "config": temporada},
+    ]
+
+
+def _asegurar_presets_personalizacion(conn):
+    cursor = conn.cursor()
+    for item in _presets_built_in():
+        cursor.execute(
+            """
+            INSERT INTO tienda_personalizacion_presets (nombre, slug, config_json, built_in, creado_en, actualizado_en)
+            VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(slug) DO UPDATE SET
+                nombre = excluded.nombre,
+                config_json = excluded.config_json,
+                built_in = 1,
+                actualizado_en = CURRENT_TIMESTAMP
+            """,
+            (item["nombre"], item["slug"], json.dumps(item["config"], ensure_ascii=False)),
+        )
+    conn.commit()
+
+
+def _serializar_preset_row(row):
+    item = dict(row)
+    try:
+        payload = json.loads(str(item.get("config_json") or "{}"))
+    except Exception:
+        payload = {}
+    return {
+        "id": int(item.get("id") or 0),
+        "nombre": str(item.get("nombre") or "").strip(),
+        "slug": str(item.get("slug") or "").strip(),
+        "built_in": bool(item.get("built_in")),
+        "config": _normalizar_tienda_personalizacion(payload),
+        "creado_en": item.get("creado_en"),
+        "actualizado_en": item.get("actualizado_en"),
+    }
+
+
+def _aplicar_programacion_personalizacion(conn, base_cfg):
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, nombre, config_json, fecha_inicio, fecha_fin, dias_semana, hora_inicio, hora_fin, prioridad
+            FROM tienda_personalizacion_programaciones
+            WHERE activo = 1
+            ORDER BY prioridad DESC, id DESC
+            """
+        )
+        rows = cursor.fetchall()
+    except Exception:
+        return base_cfg
+    if not rows:
+        return base_cfg
+
+    now_local = datetime.now(ZoneInfo("America/Santiago"))
+    now_date = now_local.date()
+    active_overrides = []
+    for row in rows:
+        item = dict(row)
+        f_ini = _parse_fecha_yyyy_mm_dd(item.get("fecha_inicio"))
+        f_fin = _parse_fecha_yyyy_mm_dd(item.get("fecha_fin"))
+        if f_ini and now_date < f_ini:
+            continue
+        if f_fin and now_date > f_fin:
+            continue
+        dias = _parse_dias_semana(item.get("dias_semana"))
+        if dias and now_local.isoweekday() not in dias:
+            continue
+        if not _franja_horaria_activa(item.get("hora_inicio"), item.get("hora_fin"), now_local):
+            continue
+        try:
+            cfg = json.loads(str(item.get("config_json") or "{}"))
+        except Exception:
+            cfg = {}
+        active_overrides.append(cfg)
+
+    if not active_overrides:
+        return base_cfg
+    merged = dict(base_cfg or {})
+    for override in active_overrides:
+        merged.update(dict(override or {}))
+    return _normalizar_tienda_personalizacion(merged)
 
 
 def _evaluar_estado_tienda(config):
@@ -1872,6 +2032,261 @@ def api_tienda_admin_personalizacion():
         return jsonify({"success": True, "config": config})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/admin/personalizacion/presets', methods=['GET', 'POST'])
+def api_tienda_admin_personalizacion_presets():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        _asegurar_presets_personalizacion(conn)
+        cursor = conn.cursor()
+        if request.method == "GET":
+            cursor.execute(
+                """
+                SELECT id, nombre, slug, config_json, built_in, creado_en, actualizado_en
+                FROM tienda_personalizacion_presets
+                ORDER BY built_in DESC, nombre COLLATE NOCASE ASC
+                """
+            )
+            return jsonify({"success": True, "presets": [_serializar_preset_row(r) for r in cursor.fetchall()]})
+
+        data = request.get_json(silent=True) or {}
+        nombre = str(data.get("nombre") or "").strip()[:80]
+        if not nombre:
+            return jsonify({"success": False, "error": "Nombre de preset requerido"}), 400
+        source_id = int(data.get("source_id") or 0)
+        source_cfg = _obtener_tienda_personalizacion()
+        if source_id > 0:
+            cursor.execute("SELECT config_json FROM tienda_personalizacion_presets WHERE id = ? LIMIT 1", (source_id,))
+            row = cursor.fetchone()
+            if row:
+                try:
+                    source_cfg = json.loads(str(row["config_json"] or "{}"))
+                except Exception:
+                    source_cfg = _obtener_tienda_personalizacion()
+        cfg = _normalizar_tienda_personalizacion(source_cfg)
+        slug = _slug_simple(nombre)
+        cursor.execute("SELECT COUNT(*) AS total FROM tienda_personalizacion_presets WHERE slug = ?", (slug,))
+        if int(cursor.fetchone()["total"] or 0) > 0:
+            slug = f"{slug}-{int(time.time())}"
+        cursor.execute(
+            """
+            INSERT INTO tienda_personalizacion_presets (nombre, slug, config_json, built_in, creado_en, actualizado_en)
+            VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (nombre, slug, json.dumps(cfg, ensure_ascii=False)),
+        )
+        conn.commit()
+        return jsonify({"success": True, "preset_id": int(cursor.lastrowid)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/personalizacion/presets/<int:preset_id>/aplicar', methods=['POST'])
+def api_tienda_admin_personalizacion_preset_aplicar(preset_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        _asegurar_presets_personalizacion(conn)
+        cursor = conn.cursor()
+        cursor.execute("SELECT config_json FROM tienda_personalizacion_presets WHERE id = ? LIMIT 1", (int(preset_id),))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Preset no encontrado"}), 404
+        try:
+            cfg = json.loads(str(row["config_json"] or "{}"))
+        except Exception:
+            cfg = {}
+        applied = _guardar_tienda_personalizacion(cfg)
+        crear_backup()
+        return jsonify({"success": True, "config": applied})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/personalizacion/presets/<int:preset_id>/eliminar', methods=['POST'])
+def api_tienda_admin_personalizacion_preset_eliminar(preset_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT built_in FROM tienda_personalizacion_presets WHERE id = ? LIMIT 1", (int(preset_id),))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Preset no encontrado"}), 404
+        if bool(row["built_in"]):
+            return jsonify({"success": False, "error": "No puedes eliminar presets base"}), 400
+        cursor.execute("DELETE FROM tienda_personalizacion_presets WHERE id = ?", (int(preset_id),))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/personalizacion/programaciones', methods=['GET', 'POST'])
+def api_tienda_admin_personalizacion_programaciones():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        _asegurar_presets_personalizacion(conn)
+        cursor = conn.cursor()
+        if request.method == "GET":
+            cursor.execute(
+                """
+                SELECT p.id, p.nombre, p.preset_id, p.fecha_inicio, p.fecha_fin, p.dias_semana, p.hora_inicio, p.hora_fin,
+                       p.prioridad, p.activo, p.creado_en, p.actualizado_en, pr.nombre AS preset_nombre
+                FROM tienda_personalizacion_programaciones p
+                LEFT JOIN tienda_personalizacion_presets pr ON pr.id = p.preset_id
+                ORDER BY p.activo DESC, p.prioridad DESC, p.id DESC
+                """
+            )
+            return jsonify({"success": True, "programaciones": [dict(r) for r in cursor.fetchall()]})
+
+        data = request.get_json(silent=True) or {}
+        nombre = str(data.get("nombre") or "").strip()[:90]
+        if not nombre:
+            return jsonify({"success": False, "error": "Nombre requerido"}), 400
+        preset_id = int(data.get("preset_id") or 0)
+        if preset_id <= 0:
+            return jsonify({"success": False, "error": "Selecciona un preset"}), 400
+        cursor.execute("SELECT config_json FROM tienda_personalizacion_presets WHERE id = ? LIMIT 1", (preset_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Preset no encontrado"}), 404
+        try:
+            cfg = _normalizar_tienda_personalizacion(json.loads(str(row["config_json"] or "{}")))
+        except Exception:
+            cfg = _default_tienda_personalizacion()
+        fecha_inicio = str(data.get("fecha_inicio") or "").strip()[:10] or None
+        fecha_fin = str(data.get("fecha_fin") or "").strip()[:10] or None
+        dias_semana = str(data.get("dias_semana") or "").strip()[:50]
+        hora_inicio = str(data.get("hora_inicio") or "").strip()[:5] or None
+        hora_fin = str(data.get("hora_fin") or "").strip()[:5] or None
+        try:
+            prioridad = int(data.get("prioridad") or 0)
+        except (TypeError, ValueError):
+            prioridad = 0
+        activo = 1 if bool(data.get("activo", True)) else 0
+        cursor.execute(
+            """
+            INSERT INTO tienda_personalizacion_programaciones (
+                nombre, preset_id, config_json, fecha_inicio, fecha_fin, dias_semana, hora_inicio, hora_fin, prioridad, activo, creado_en, actualizado_en
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                nombre,
+                preset_id,
+                json.dumps(cfg, ensure_ascii=False),
+                fecha_inicio,
+                fecha_fin,
+                dias_semana,
+                hora_inicio,
+                hora_fin,
+                prioridad,
+                activo,
+            ),
+        )
+        conn.commit()
+        return jsonify({"success": True, "programacion_id": int(cursor.lastrowid)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/personalizacion/programaciones/<int:programacion_id>/eliminar', methods=['POST'])
+def api_tienda_admin_personalizacion_programacion_eliminar(programacion_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tienda_personalizacion_programaciones WHERE id = ?", (int(programacion_id),))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/personalizacion/versiones', methods=['GET'])
+def api_tienda_admin_personalizacion_versiones():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, origen, creado_en
+            FROM tienda_personalizacion_versiones
+            ORDER BY id DESC
+            LIMIT 80
+            """
+        )
+        return jsonify({"success": True, "versiones": [dict(r) for r in cursor.fetchall()]})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/personalizacion/versiones/<int:version_id>/rollback', methods=['POST'])
+def api_tienda_admin_personalizacion_version_rollback(version_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT config_json FROM tienda_personalizacion_versiones WHERE id = ? LIMIT 1", (int(version_id),))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Version no encontrada"}), 404
+        try:
+            cfg = json.loads(str(row["config_json"] or "{}"))
+        except Exception:
+            cfg = {}
+        config = _guardar_tienda_personalizacion(cfg)
+        crear_backup()
+        return jsonify({"success": True, "config": config})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/tienda/estado', methods=['GET'])

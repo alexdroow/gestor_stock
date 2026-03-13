@@ -7465,6 +7465,61 @@ def migrar_db():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_personalizacion_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                slug TEXT UNIQUE,
+                config_json TEXT NOT NULL DEFAULT '{}',
+                built_in INTEGER NOT NULL DEFAULT 0,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_personalizacion_programaciones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                preset_id INTEGER,
+                config_json TEXT NOT NULL DEFAULT '{}',
+                fecha_inicio TEXT,
+                fecha_fin TEXT,
+                dias_semana TEXT DEFAULT '',
+                hora_inicio TEXT,
+                hora_fin TEXT,
+                prioridad INTEGER NOT NULL DEFAULT 0,
+                activo INTEGER NOT NULL DEFAULT 1,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(preset_id) REFERENCES tienda_personalizacion_presets(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_personalizacion_versiones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                origen TEXT NOT NULL DEFAULT 'manual',
+                config_json TEXT NOT NULL DEFAULT '{}',
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_pers_programacion_activo
+            ON tienda_personalizacion_programaciones(activo, prioridad, fecha_inicio, fecha_fin)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_pers_versiones_creado
+            ON tienda_personalizacion_versiones(creado_en DESC)
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS tienda_visitas (
                 session_id TEXT PRIMARY KEY,
                 primera_visita TEXT DEFAULT CURRENT_TIMESTAMP,
