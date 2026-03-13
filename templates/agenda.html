@@ -881,6 +881,17 @@
             display: flex;
             flex-direction: column;
         }
+
+        /* Modal principal de reservas: mas ancho y con acciones siempre visibles */
+        #modal-evento .modal {
+            width: min(96vw, 860px);
+            max-width: 860px;
+            max-height: 94vh;
+        }
+
+        #modal-evento .modal-body {
+            padding: 20px 24px 16px;
+        }
         
         .modal-header {
             padding: 20px 24px;
@@ -1095,6 +1106,22 @@
             gap: 12px;
             justify-content: flex-end;
         }
+
+        #modal-evento .modal-footer {
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            z-index: 2;
+            flex-wrap: wrap;
+            row-gap: 10px;
+        }
+
+        #modal-evento .modal-footer .btn {
+            flex: 1 1 120px;
+            min-width: 110px;
+            padding: 11px 12px;
+            text-align: center;
+        }
         
         .btn {
             padding: 10px 20px;
@@ -1160,6 +1187,11 @@
         body.dark-mode .modal {
             background: #1e293b;
             border-color: #334155;
+        }
+
+        body.dark-mode #modal-evento .modal-footer {
+            background: #1e293b;
+            border-top-color: #334155;
         }
         
         body.dark-mode .calendar-day-header,
@@ -1303,6 +1335,34 @@
         @media (max-width: 1220px) {
             .agenda-layout {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            #modal-evento .modal {
+                width: 96vw;
+                max-height: 96vh;
+                border-radius: 14px;
+            }
+
+            #modal-evento .modal-header {
+                padding: 14px 16px;
+            }
+
+            #modal-evento .modal-body {
+                padding: 14px 16px 12px;
+            }
+
+            #modal-evento .modal-footer {
+                padding: 12px 14px;
+            }
+
+            #modal-evento .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            #modal-evento .modal-footer .btn {
+                flex: 1 1 calc(50% - 8px);
             }
         }
         
