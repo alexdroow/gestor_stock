@@ -1153,25 +1153,40 @@ def _normalizar_tipo_reserva_tienda(raw):
     return ""
 
 
-def _minutos_anticipacion_reserva(tipo):
+def _topper_requiere_96h(topper_id=None, topper_nombre=None):
+    tid = str(topper_id or "").strip().lower()
+    tname = str(topper_nombre or "").strip().lower()
+    if not tid and not tname:
+        return False
+    texto = f"{tid} {tname}".strip()
+    if "sin-topper" in texto or "sin topper" in texto:
+        return False
+    if re.search(r"\bsin\b", texto) and "topper" in texto:
+        return False
+    return True
+
+
+def _minutos_anticipacion_reserva(tipo, topper_requiere_96h=False):
     t = _normalizar_tipo_reserva_tienda(tipo)
     if t == "torta":
+        if bool(topper_requiere_96h):
+            return 96 * 60
         return 48 * 60
     # Pastel: 24h.
     return 24 * 60
 
 
-def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None):
+def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None, topper_requiere_96h=False):
     tz = ZoneInfo("America/Santiago")
     now_dt = now_local or datetime.now(tz)
     t = _normalizar_tipo_reserva_tienda(tipo)
     # Regla horaria exacta por tipo:
-    # - torta: 48h
+    # - torta: 48h (96h si incluye topper distinto a "sin topper")
     # - pastel: 24h
-    return now_dt + timedelta(minutes=_minutos_anticipacion_reserva(t))
+    return now_dt + timedelta(minutes=_minutos_anticipacion_reserva(t, topper_requiere_96h=topper_requiere_96h))
 
 
-def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, cfg_agenda=None, now_local=None):
+def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, cfg_agenda=None, now_local=None, topper_requiere_96h=False):
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fecha_iso or "").strip()):
         return False
     hora = str(hora_inicio or "").strip()
@@ -1179,7 +1194,12 @@ def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, cfg_agenda=None, 
         return False
     now_dt = now_local or datetime.now(ZoneInfo("America/Santiago"))
     slot_dt = datetime.strptime(f"{fecha_iso} {hora}", "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("America/Santiago"))
-    minimo_dt = _min_datetime_anticipacion_reserva(tipo, cfg_agenda=cfg_agenda, now_local=now_dt)
+    minimo_dt = _min_datetime_anticipacion_reserva(
+        tipo,
+        cfg_agenda=cfg_agenda,
+        now_local=now_dt,
+        topper_requiere_96h=topper_requiere_96h,
+    )
     return slot_dt >= minimo_dt
 
 
@@ -3647,6 +3667,8 @@ def api_tienda_agenda_disponibilidad():
         fecha_desde = str(request.args.get("fecha_desde") or "").strip()
         fecha_hasta = str(request.args.get("fecha_hasta") or "").strip()
         tipo_reserva = _normalizar_tipo_reserva_tienda(request.args.get("tipo"))
+        topper_id = str(request.args.get("topper_id") or "").strip().lower()
+        topper_96h = tipo_reserva == "torta" and _topper_requiere_96h(topper_id=topper_id)
         if tipo_reserva not in {"torta", "pastel"}:
             return jsonify(
                 {
@@ -3684,6 +3706,7 @@ def api_tienda_agenda_disponibilidad():
                     tipo_reserva,
                     cfg_agenda=cfg,
                     now_local=now_local,
+                    topper_requiere_96h=topper_96h,
                 )
                 disponible = bool(h.get("disponible")) and bool(cumple_regla)
                 hh = dict(h)
@@ -3701,6 +3724,7 @@ def api_tienda_agenda_disponibilidad():
                 "success": True,
                 "enabled": True,
                 "tipo_reserva": tipo_reserva,
+                "topper_requiere_96h": bool(topper_96h),
                 "cfg": {
                     "days_ahead": int(cfg["days_ahead"]),
                     "slot_minutes": int(cfg["slot_minutes"]),
@@ -3785,10 +3809,21 @@ def api_tienda_agenda_reservar():
         fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()
         if fecha_req < fecha_hoy:
             return jsonify({"success": False, "error": "No puedes reservar fechas pasadas"}), 400
-        if not _cumple_anticipacion_reserva(fecha, hora_inicio, tipo_pedido, cfg_agenda=cfg):
-            minutos = _minutos_anticipacion_reserva(tipo_pedido)
+        topper_96h = False
+        if tipo_pedido == "torta" and catalogo_torta_resumen:
+            topper = catalogo_torta_resumen.get("topper") or {}
+            topper_96h = _topper_requiere_96h(topper_id=topper.get("id"), topper_nombre=topper.get("nombre"))
+
+        if not _cumple_anticipacion_reserva(
+            fecha,
+            hora_inicio,
+            tipo_pedido,
+            cfg_agenda=cfg,
+            topper_requiere_96h=topper_96h,
+        ):
+            minutos = _minutos_anticipacion_reserva(tipo_pedido, topper_requiere_96h=topper_96h)
             if tipo_pedido == "torta":
-                msg = "Las tortas requieren minimo 48 horas de anticipacion"
+                msg = "Las tortas con topper requieren minimo 96 horas de anticipacion" if topper_96h else "Las tortas requieren minimo 48 horas de anticipacion"
             elif tipo_pedido == "pastel":
                 msg = "Los pasteles requieren minimo 24 horas de anticipacion"
             else:

@@ -3018,6 +3018,9 @@
         function agendaCakeSelectTopper(topperId) {
             agendaCakeSelection.topper_id = String(topperId || "");
             _renderAgendaCakeBuilder();
+            agendaFechaActiva = "";
+            agendaHoraActiva = "";
+            cargarAgendaDisponibilidad(true);
         }
 
         async function _cargarCatalogoTortaAgenda() {
@@ -3216,7 +3219,13 @@
                     if (!silent) _agendaMsg("Selecciona Torta o Pastel para mostrar disponibilidad.", "err");
                     return;
                 }
-                const url = `/api/tienda/agenda/disponibilidad?tipo=${encodeURIComponent(agendaTipoActual)}`;
+                let url = `/api/tienda/agenda/disponibilidad?tipo=${encodeURIComponent(agendaTipoActual)}`;
+                if (agendaTipoActual === "torta") {
+                    const topperId = String(agendaCakeSelection?.topper_id || "").trim().toLowerCase();
+                    if (topperId) {
+                        url += `&topper_id=${encodeURIComponent(topperId)}`;
+                    }
+                }
                 const res = await fetch(url, { headers: { Accept: "application/json" } });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar disponibilidad");
