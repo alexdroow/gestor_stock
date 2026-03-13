@@ -1763,7 +1763,8 @@
         let productos = [];
         let categoriasDisponibles = [];
         let carrito = [];
-        let categoriaActiva = "TODOS";
+        const CAT_STORAGE_KEY = "tienda_categoria_activa";
+        let categoriaActiva = String(localStorage.getItem(CAT_STORAGE_KEY) || "TODOS");
         let cuponAplicado = { codigo: "", descuento_monto: 0 };
         let tiendaAbierta = true;
         let tiendaEstadoMensaje = "";
@@ -1968,6 +1969,7 @@
 
             if (!Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA") {
                 categoriaActiva = "TODOS";
+                localStorage.setItem(CAT_STORAGE_KEY, categoriaActiva);
             }
             if (secAgendaReservasEl) {
                 const showSection = Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA";
@@ -2555,7 +2557,8 @@
 
         async function _cargarCatalogoTortaAgenda() {
             try {
-                const res = await fetch("/api/tienda/catalogo-torta", { headers: { Accept: "application/json" } });
+                const url = `/api/tienda/catalogo-torta?t=${Date.now()}`;
+                const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar catalogo de tortas");
                 agendaCakeCatalog = data.catalogo || null;
@@ -2564,8 +2567,9 @@
                 if (agendaCakeCatalog && Array.isArray(agendaCakeCatalog.sizes) && !agendaCakeCatalog.sizes.length) {
                     _agendaMsg("Catalogo de tortas sin tamanos activos. Revisa /ventas/admin-catalogo-torta", "err");
                 }
-            } catch (_) {
+            } catch (err) {
                 agendaCakeCatalog = null;
+                _agendaMsg((err && err.message) ? err.message : "No se pudo cargar catalogo de tortas.", "err");
             }
         }
 
@@ -2596,7 +2600,7 @@
             if (!query) return _agendaMsg("Escribe una direccion para buscar en el mapa.", "err");
             try {
                 const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=cl&limit=1&q=${encodeURIComponent(query)}`;
-                const res = await fetch(url, { headers: { Accept: "application/json" } });
+                const res = await fetch(`${url}&t=${Date.now()}`, { headers: { Accept: "application/json" }, cache: "no-store" });
                 const data = await res.json();
                 if (!Array.isArray(data) || !data.length) throw new Error("No se encontro la direccion en el mapa.");
                 const first = data[0];
@@ -3211,7 +3215,9 @@
 
         function cambiarCategoria(cat) {
             categoriaActiva = cat;
+            localStorage.setItem(CAT_STORAGE_KEY, categoriaActiva);
             if (categoriaActiva === "AGENDA") {
+                _cargarCatalogoTortaAgenda();
                 cargarAgendaDisponibilidad(true);
             }
             renderCategoriasMenu();
