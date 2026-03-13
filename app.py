@@ -1560,6 +1560,36 @@ def _normalizar_url_personalizacion(raw):
     return ""
 
 
+def _escape_html_basico(texto):
+    return (
+        str(texto or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
+
+
+def _normalizar_html_liviano(raw, max_len=3000):
+    txt = str(raw or "").replace("\r\n", "\n").replace("\r", "\n")
+    txt = txt[: max(0, int(max_len or 0))]
+    esc = _escape_html_basico(txt)
+
+    whitelist = [
+        ("&lt;b&gt;", "<b>"), ("&lt;/b&gt;", "</b>"),
+        ("&lt;strong&gt;", "<strong>"), ("&lt;/strong&gt;", "</strong>"),
+        ("&lt;i&gt;", "<i>"), ("&lt;/i&gt;", "</i>"),
+        ("&lt;em&gt;", "<em>"), ("&lt;/em&gt;", "</em>"),
+        ("&lt;u&gt;", "<u>"), ("&lt;/u&gt;", "</u>"),
+        ("&lt;br&gt;", "<br>"), ("&lt;br/&gt;", "<br>"), ("&lt;br /&gt;", "<br>"),
+    ]
+    for src, dst in whitelist:
+        esc = esc.replace(src, dst)
+
+    return esc.replace("\n", "<br>")
+
+
 def _normalizar_tienda_personalizacion(payload):
     base = _default_tienda_personalizacion()
     data = dict(payload or {})
@@ -1621,7 +1651,10 @@ def _normalizar_tienda_personalizacion(payload):
     clean["agenda_type_torta_text"] = str(data.get("agenda_type_torta_text") or base["agenda_type_torta_text"]).strip()[:60] or base["agenda_type_torta_text"]
     clean["agenda_type_pastel_text"] = str(data.get("agenda_type_pastel_text") or base["agenda_type_pastel_text"]).strip()[:60] or base["agenda_type_pastel_text"]
     clean["agenda_section_title"] = str(data.get("agenda_section_title") or base["agenda_section_title"]).strip()[:90] or base["agenda_section_title"]
-    clean["agenda_section_subtitle"] = str(data.get("agenda_section_subtitle") or base["agenda_section_subtitle"]).strip()[:220] or base["agenda_section_subtitle"]
+    clean["agenda_section_subtitle"] = _normalizar_html_liviano(
+        data.get("agenda_section_subtitle") or base["agenda_section_subtitle"],
+        max_len=3000,
+    ) or base["agenda_section_subtitle"]
     clean["agenda_builder_title"] = str(data.get("agenda_builder_title") or base["agenda_builder_title"]).strip()[:80] or base["agenda_builder_title"]
     clean["agenda_summary_title"] = str(data.get("agenda_summary_title") or base["agenda_summary_title"]).strip()[:80] or base["agenda_summary_title"]
     clean["agenda_total_label"] = str(data.get("agenda_total_label") or base["agenda_total_label"]).strip()[:60] or base["agenda_total_label"]

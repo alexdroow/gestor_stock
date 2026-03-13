@@ -2018,6 +2018,21 @@
                 .replaceAll("'", "&#39;");
         }
 
+        function renderRichTextLite(raw) {
+            const src = String(raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+            let out = esc(src);
+            const allow = [
+                ["&lt;b&gt;", "<b>"], ["&lt;/b&gt;", "</b>"],
+                ["&lt;strong&gt;", "<strong>"], ["&lt;/strong&gt;", "</strong>"],
+                ["&lt;i&gt;", "<i>"], ["&lt;/i&gt;", "</i>"],
+                ["&lt;em&gt;", "<em>"], ["&lt;/em&gt;", "</em>"],
+                ["&lt;u&gt;", "<u>"], ["&lt;/u&gt;", "</u>"],
+                ["&lt;br&gt;", "<br>"], ["&lt;br/&gt;", "<br>"], ["&lt;br /&gt;", "<br>"],
+            ];
+            allow.forEach(([a, b]) => { out = out.replaceAll(a, b); });
+            return out.replaceAll("\n", "<br>");
+        }
+
         function aplicarPersonalizacionTienda(rawCfg) {
             tiendaUiCfg = { ...TIENDA_UI_DEFAULTS, ...(rawCfg || {}) };
             if (_catalogoTortaConDatos(tiendaUiCfg.catalogo_torta)) {
@@ -2041,7 +2056,7 @@
             if (agendaTipoTortaEl) agendaTipoTortaEl.textContent = String(tiendaUiCfg.agenda_type_torta_text || TIENDA_UI_DEFAULTS.agenda_type_torta_text);
             if (agendaTipoPastelEl) agendaTipoPastelEl.textContent = String(tiendaUiCfg.agenda_type_pastel_text || TIENDA_UI_DEFAULTS.agenda_type_pastel_text);
             if (agendaSectionTitleEl) agendaSectionTitleEl.textContent = String(tiendaUiCfg.agenda_section_title || TIENDA_UI_DEFAULTS.agenda_section_title);
-            if (agendaSectionSubtitleEl) agendaSectionSubtitleEl.textContent = String(tiendaUiCfg.agenda_section_subtitle || TIENDA_UI_DEFAULTS.agenda_section_subtitle);
+            if (agendaSectionSubtitleEl) agendaSectionSubtitleEl.innerHTML = renderRichTextLite(tiendaUiCfg.agenda_section_subtitle || TIENDA_UI_DEFAULTS.agenda_section_subtitle);
             if (agendaCakeBuilderTitleEl) agendaCakeBuilderTitleEl.textContent = String(tiendaUiCfg.agenda_builder_title || TIENDA_UI_DEFAULTS.agenda_builder_title);
             if (agendaCakeSummaryTitleEl) agendaCakeSummaryTitleEl.textContent = String(tiendaUiCfg.agenda_summary_title || TIENDA_UI_DEFAULTS.agenda_summary_title);
             if (agendaCakeTotalLabelEl) agendaCakeTotalLabelEl.textContent = String(tiendaUiCfg.agenda_total_label || TIENDA_UI_DEFAULTS.agenda_total_label);

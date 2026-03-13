@@ -178,6 +178,26 @@
             border-color: #94a3b8;
             transform: translateY(-1px);
         }
+        .rich-tools {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin: 6px 0 6px;
+        }
+        .rich-tools button {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            color: #0f172a;
+            font-weight: 800;
+            font-size: .78rem;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .rich-tools button:hover {
+            border-color: #94a3b8;
+            background: #f8fafc;
+        }
         .toolbox-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -495,7 +515,13 @@
                         <input id="agenda_section_title" type="text" maxlength="90" placeholder="Agenda tu pedido">
                     </label>
                     <label class="full">Subtitulo agenda
-                        <input id="agenda_section_subtitle" type="text" maxlength="220" placeholder="Selecciona dia y hora disponible para reservar...">
+                        <div class="rich-tools">
+                            <button type="button" data-rich-target="agenda_section_subtitle" data-rich-cmd="b"><b>B</b></button>
+                            <button type="button" data-rich-target="agenda_section_subtitle" data-rich-cmd="i"><i>I</i></button>
+                            <button type="button" data-rich-target="agenda_section_subtitle" data-rich-cmd="u"><u>U</u></button>
+                            <button type="button" data-rich-target="agenda_section_subtitle" data-rich-cmd="br">Salto</button>
+                        </div>
+                        <textarea id="agenda_section_subtitle" maxlength="3000" placeholder="Selecciona dia y hora disponible para reservar..."></textarea>
                     </label>
                     <label>Titulo constructor torta
                         <input id="agenda_builder_title" type="text" maxlength="80" placeholder="Arma tu torta">
@@ -811,6 +837,51 @@
         msgEl.className = `msg ${type || ""}`.trim();
     }
 
+    function richTextLite(raw) {
+        const src = String(raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        let out = src
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        const allow = [
+            ["&lt;b&gt;", "<b>"], ["&lt;/b&gt;", "</b>"],
+            ["&lt;strong&gt;", "<strong>"], ["&lt;/strong&gt;", "</strong>"],
+            ["&lt;i&gt;", "<i>"], ["&lt;/i&gt;", "</i>"],
+            ["&lt;em&gt;", "<em>"], ["&lt;/em&gt;", "</em>"],
+            ["&lt;u&gt;", "<u>"], ["&lt;/u&gt;", "</u>"],
+            ["&lt;br&gt;", "<br>"], ["&lt;br/&gt;", "<br>"], ["&lt;br /&gt;", "<br>"],
+        ];
+        allow.forEach(([a, b]) => { out = out.replaceAll(a, b); });
+        return out.replaceAll("\n", "<br>");
+    }
+
+    function applyRichCommand(targetId, cmd) {
+        const el = document.getElementById(targetId);
+        if (!el) return;
+        const start = Number(el.selectionStart || 0);
+        const end = Number(el.selectionEnd || 0);
+        const val = String(el.value || "");
+        const left = val.slice(0, start);
+        const sel = val.slice(start, end);
+        const right = val.slice(end);
+        const wrappers = {
+            b: ["<b>", "</b>"],
+            i: ["<i>", "</i>"],
+            u: ["<u>", "</u>"],
+            br: ["<br>", ""],
+        };
+        const wrap = wrappers[String(cmd || "").toLowerCase()];
+        if (!wrap) return;
+        const next = `${left}${wrap[0]}${sel}${wrap[1]}${right}`;
+        el.value = next;
+        const cursor = (left + wrap[0] + sel + wrap[1]).length;
+        el.focus();
+        try { el.setSelectionRange(cursor, cursor); } catch (_) {}
+        renderPreview();
+    }
+
     function getPayload() {
         const payload = {};
         for (const id of fields) {
@@ -886,7 +957,7 @@
         const agendaTitle = document.getElementById("pv-agenda-title");
         if (agendaTitle) agendaTitle.textContent = p.agenda_section_title || DEFAULTS.agenda_section_title;
         const agendaSubtitle = document.getElementById("pv-agenda-subtitle");
-        if (agendaSubtitle) agendaSubtitle.textContent = p.agenda_section_subtitle || DEFAULTS.agenda_section_subtitle;
+        if (agendaSubtitle) agendaSubtitle.innerHTML = richTextLite(p.agenda_section_subtitle || DEFAULTS.agenda_section_subtitle);
         const agendaOk = document.getElementById("pv-agenda-ok");
         if (agendaOk) {
             const cap = Math.max(1, Number(p.agenda_slot_capacity || DEFAULTS.agenda_slot_capacity || 1));
@@ -940,6 +1011,16 @@
                 if (!target) return;
                 target.value = emoji;
                 renderPreview();
+            });
+        });
+    }
+
+    function bindRichTools() {
+        document.querySelectorAll("[data-rich-target][data-rich-cmd]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const target = String(btn.getAttribute("data-rich-target") || "");
+                const cmd = String(btn.getAttribute("data-rich-cmd") || "");
+                applyRichCommand(target, cmd);
             });
         });
     }
@@ -1206,6 +1287,7 @@
 
     bindColorPickers();
     bindEmojiPalette();
+    bindRichTools();
     cargarPresets();
     cargarProgramaciones();
     cargarVersiones();
