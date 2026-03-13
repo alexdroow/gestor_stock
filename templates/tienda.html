@@ -350,6 +350,9 @@
             display: flex;
             gap: 6px;
             flex-wrap: wrap;
+            align-items: flex-start;
+            min-height: 34px;
+            overflow-x: auto;
         }
         .agenda-cake-pill {
             border: 1px solid #cbd5e1;
@@ -360,6 +363,9 @@
             font-size: .8rem;
             font-weight: 800;
             cursor: pointer;
+            display: inline-flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
         .agenda-cake-pill.active {
             border-color: var(--accent);
@@ -2631,14 +2637,22 @@
                     agendaCakeSelection.sabor_ids = [];
                 }
                 if (agendaCakeSizeCardsEl) {
-                    agendaCakeSizeCardsEl.innerHTML = sizesRender.length
-                        ? sizesRender.map((s) => {
+                    agendaCakeSizeCardsEl.innerHTML = "";
+                    if (!sizesRender.length) {
+                        agendaCakeSizeCardsEl.innerHTML = `<div class="agenda-cake-empty">Sin tamanos configurados.</div>`;
+                    } else {
+                        sizesRender.forEach((s) => {
                             const sid = String(s.id || "");
                             const active = sid === String(agendaCakeSelection.size_id || "") ? "active" : "";
                             const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(s.precio || 0))}` : ""}`;
-                            return `<button type="button" class="agenda-cake-pill ${active}" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;" onclick="agendaCakeSelectSize('${esc(sid)}')">${esc(label)}</button>`;
-                        }).join("")
-                        : `<div class="agenda-cake-empty">Sin tamanos configurados.</div>`;
+                            const btn = document.createElement("button");
+                            btn.type = "button";
+                            btn.className = `agenda-cake-pill ${active}`.trim();
+                            btn.textContent = label;
+                            btn.addEventListener("click", () => agendaCakeSelectSize(sid));
+                            agendaCakeSizeCardsEl.appendChild(btn);
+                        });
+                    }
                 }
                 const sizeSelected = _catalogFind("sizes", agendaCakeSelection.size_id);
                 const maxSabores = Math.max(1, Number(sizeSelected?.max_sabores || 1));
@@ -2684,24 +2698,44 @@
 
                 if (agendaCakeTopperCardsEl) {
                     const toppers = _catalogList("toppers");
-                    agendaCakeTopperCardsEl.innerHTML = [
-                        `<button type="button" class="agenda-cake-pill ${!agendaCakeSelection.topper_id ? "active" : ""}" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;" onclick="agendaCakeSelectTopper('')">Sin topper</button>`,
-                        ...toppers.map((t) => {
-                            const tid = String(t.id || "");
-                            const active = tid === String(agendaCakeSelection.topper_id || "") ? "active" : "";
-                            const label = `${String(t.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(t.precio || 0))}` : ""}`;
-                            return `<button type="button" class="agenda-cake-pill ${active}" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;" onclick="agendaCakeSelectTopper('${esc(tid)}')">${esc(label)}</button>`;
-                        }),
-                    ].join("");
+                    agendaCakeTopperCardsEl.innerHTML = "";
+                    const sinTopperBtn = document.createElement("button");
+                    sinTopperBtn.type = "button";
+                    sinTopperBtn.className = `agenda-cake-pill ${!agendaCakeSelection.topper_id ? "active" : ""}`.trim();
+                    sinTopperBtn.textContent = "Sin topper";
+                    sinTopperBtn.addEventListener("click", () => agendaCakeSelectTopper(""));
+                    agendaCakeTopperCardsEl.appendChild(sinTopperBtn);
+                    toppers.forEach((t) => {
+                        const tid = String(t.id || "");
+                        const active = tid === String(agendaCakeSelection.topper_id || "") ? "active" : "";
+                        const label = `${String(t.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(t.precio || 0))}` : ""}`;
+                        const btn = document.createElement("button");
+                        btn.type = "button";
+                        btn.className = `agenda-cake-pill ${active}`.trim();
+                        btn.textContent = label;
+                        btn.addEventListener("click", () => agendaCakeSelectTopper(tid));
+                        agendaCakeTopperCardsEl.appendChild(btn);
+                    });
                 }
                 _renderAgendaCakeFiles();
                 _renderAgendaCakeSummary();
             } catch (err) {
                 if (agendaCakeSizeCardsEl) {
                     const sizesFallback = _catalogList("sizes");
-                    agendaCakeSizeCardsEl.innerHTML = sizesFallback.length
-                        ? sizesFallback.map((s) => `<button type="button" class="agenda-cake-pill" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;" onclick="agendaCakeSelectSize('${esc(String(s.id || ""))}')">${esc(String(s.nombre || "Tamano"))}</button>`).join("")
-                        : `<div class="agenda-cake-empty">Error render tamanos.</div>`;
+                    agendaCakeSizeCardsEl.innerHTML = "";
+                    if (!sizesFallback.length) {
+                        agendaCakeSizeCardsEl.innerHTML = `<div class="agenda-cake-empty">Error render tamanos.</div>`;
+                    } else {
+                        sizesFallback.forEach((s) => {
+                            const sid = String(s.id || "");
+                            const btn = document.createElement("button");
+                            btn.type = "button";
+                            btn.className = "agenda-cake-pill";
+                            btn.textContent = String(s.nombre || "Tamano");
+                            btn.addEventListener("click", () => agendaCakeSelectSize(sid));
+                            agendaCakeSizeCardsEl.appendChild(btn);
+                        });
+                    }
                 }
                 _agendaMsg(`Error render catalogo torta: ${String(err?.message || err || "desconocido")}`, "err");
             }
