@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personalizacion Tienda</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --line: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+            --accent: #ea580c;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
+        .layout { display: flex; min-height: 100vh; }
+        .main { flex: 1; padding: 20px; }
+        .top {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .top h1 { margin: 0; font-size: 1.2rem; }
+        .top-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .top-links a {
+            text-decoration: none;
+            color: #334155;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 7px 10px;
+            background: #fff;
+            font-weight: 700;
+        }
+        .grid {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1.2fr .8fr;
+            gap: 12px;
+            align-items: start;
+        }
+        .panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 12px;
+            display: grid;
+            gap: 10px;
+        }
+        .panel h2 {
+            margin: 0;
+            font-size: 1rem;
+        }
+        .fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        label { display: grid; gap: 4px; font-size: .85rem; color: #334155; font-weight: 700; }
+        input[type="text"], input[type="url"], textarea, select {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 9px;
+            font: inherit;
+        }
+        textarea { min-height: 84px; resize: vertical; }
+        .full { grid-column: 1 / -1; }
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: #f8fafc;
+        }
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        button {
+            border: 0;
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-outline { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+        .msg { font-size: .9rem; color: #475569; min-height: 20px; }
+        .msg.ok { color: #166534; }
+        .msg.err { color: #b91c1c; }
+        .preview {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .preview-top {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .preview-brand { font-weight: 900; }
+        .preview-search { font-size: .8rem; color: #64748b; }
+        .preview-body { padding: 12px; display: grid; gap: 9px; }
+        .preview-banner {
+            border-radius: 10px;
+            padding: 10px;
+            font-size: .86rem;
+            font-weight: 700;
+        }
+        .preview-hero {
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 10px;
+            display: grid;
+            gap: 4px;
+        }
+        .preview-hero .t { font-weight: 900; }
+        .preview-sec { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; }
+        .preview-sec .h { font-weight: 800; margin-bottom: 5px; }
+        @media (max-width: 1100px) {
+            .grid { grid-template-columns: 1fr; }
+            .fields { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+<div class="layout">
+    {% include "_sidebar.html" %}
+    <main class="main">
+        <div class="top">
+            <h1>Personalizacion de Tienda</h1>
+            <div class="top-links">
+                <a href="/ventas/admin-catalogo">Catalogo tienda</a>
+                <a href="/ventas/cupones">Cupones</a>
+                <a href="/ventas">Ventas</a>
+                <a href="/tienda" target="_blank" rel="noopener">Abrir tienda</a>
+            </div>
+        </div>
+
+        <div class="grid">
+            <section class="panel">
+                <h2>Textos principales</h2>
+                <div class="fields">
+                    <label>Marca / titulo superior
+                        <input id="brand_text" type="text" maxlength="90">
+                    </label>
+                    <label>Placeholder busqueda
+                        <input id="search_placeholder" type="text" maxlength="120">
+                    </label>
+                    <label>Titulo menu lateral
+                        <input id="menu_title" type="text" maxlength="80">
+                    </label>
+                    <label>Titulo carrito
+                        <input id="cart_title" type="text" maxlength="80">
+                    </label>
+                    <label>Titulo seccion ofertas
+                        <input id="sec_ofertas_title" type="text" maxlength="80">
+                    </label>
+                    <label>Titulo seccion destacados
+                        <input id="sec_destacados_title" type="text" maxlength="80">
+                    </label>
+                    <label class="full">Texto carrito vacio
+                        <input id="empty_cart_text" type="text" maxlength="140">
+                    </label>
+                </div>
+
+                <h2>WhatsApp y botones</h2>
+                <div class="fields">
+                    <label class="toggle full"><input id="show_whatsapp_button" type="checkbox"> Mostrar boton flotante WhatsApp</label>
+                    <label>URL WhatsApp
+                        <input id="whatsapp_url" type="url" placeholder="https://wa.me/...">
+                    </label>
+                    <label>Titulo tooltip WhatsApp
+                        <input id="whatsapp_title" type="text" maxlength="90">
+                    </label>
+                    <label class="full">URL icono WhatsApp (opcional, http(s) o /static/...)
+                        <input id="whatsapp_icon_url" type="url">
+                    </label>
+                </div>
+
+                <h2>Hero y banner</h2>
+                <div class="fields">
+                    <label class="toggle full"><input id="hero_enabled" type="checkbox"> Activar hero principal</label>
+                    <label>Etiqueta hero
+                        <input id="hero_badge" type="text" maxlength="60">
+                    </label>
+                    <label>Titulo hero
+                        <input id="hero_title" type="text" maxlength="120">
+                    </label>
+                    <label class="full">Subtitulo hero
+                        <input id="hero_subtitle" type="text" maxlength="260">
+                    </label>
+                    <label>Texto boton hero
+                        <input id="hero_cta_text" type="text" maxlength="80">
+                    </label>
+                    <label>URL boton hero
+                        <input id="hero_cta_url" type="url">
+                    </label>
+                    <label class="full">URL imagen hero
+                        <input id="hero_image_url" type="url">
+                    </label>
+                    <label class="toggle full"><input id="banner_enabled" type="checkbox"> Activar franja de anuncio</label>
+                    <label class="full">Texto franja anuncio
+                        <input id="banner_text" type="text" maxlength="220">
+                    </label>
+                    <label>Color fondo franja
+                        <input id="banner_bg" type="text" placeholder="#f0fdf4">
+                    </label>
+                    <label>Color texto franja
+                        <input id="banner_text_color" type="text" placeholder="#166534">
+                    </label>
+                </div>
+
+                <h2>Colores y CSS</h2>
+                <div class="fields">
+                    <label>Color fondo sitio
+                        <input id="color_bg" type="text" placeholder="#f5f5f5">
+                    </label>
+                    <label>Color paneles
+                        <input id="color_panel" type="text" placeholder="#ffffff">
+                    </label>
+                    <label>Color lineas
+                        <input id="color_line" type="text" placeholder="#e5e7eb">
+                    </label>
+                    <label>Color texto
+                        <input id="color_text" type="text" placeholder="#111827">
+                    </label>
+                    <label>Color texto secundario
+                        <input id="color_muted" type="text" placeholder="#6b7280">
+                    </label>
+                    <label>Color acento
+                        <input id="color_accent" type="text" placeholder="#f45d08">
+                    </label>
+                    <label>Color acento hover
+                        <input id="color_accent_dark" type="text" placeholder="#cc4a03">
+                    </label>
+                    <label class="full">CSS personalizado (opcional)
+                        <textarea id="custom_css" placeholder=".topbar { border-radius: 0; }"></textarea>
+                    </label>
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="btn-primary" id="btn-guardar">Guardar cambios</button>
+                    <button type="button" class="btn-secondary" id="btn-restaurar">Restaurar valores base</button>
+                    <button type="button" class="btn-outline" id="btn-recargar">Recargar desde servidor</button>
+                </div>
+                <div class="msg" id="msg"></div>
+            </section>
+
+            <section class="panel">
+                <h2>Vista previa rapida</h2>
+                <div class="preview" id="preview">
+                    <div class="preview-top">
+                        <div class="preview-brand" id="pv-brand">Tienda en linea</div>
+                        <div class="preview-search" id="pv-search">Buscar productos...</div>
+                    </div>
+                    <div class="preview-body">
+                        <div class="preview-banner" id="pv-banner" style="display:none;"></div>
+                        <div class="preview-hero" id="pv-hero" style="display:none;">
+                            <div style="font-size:.75rem;color:#64748b;" id="pv-hero-badge"></div>
+                            <div class="t" id="pv-hero-title"></div>
+                            <div style="font-size:.85rem;color:#334155;" id="pv-hero-subtitle"></div>
+                        </div>
+                        <div class="preview-sec">
+                            <div class="h" id="pv-ofertas">Ofertas</div>
+                            <div style="font-size:.82rem;color:#64748b;">Productos con descuento y destacados.</div>
+                        </div>
+                        <div class="preview-sec">
+                            <div class="h" id="pv-cart">Tu compra</div>
+                            <div style="font-size:.82rem;color:#64748b;" id="pv-empty">El carrito esta vacio.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<script>
+    const ENDPOINT = "/api/tienda/admin/personalizacion";
+    const msgEl = document.getElementById("msg");
+    const fields = [
+        "brand_text","search_placeholder","menu_title","cart_title","sec_ofertas_title","sec_destacados_title",
+        "empty_cart_text","whatsapp_url","whatsapp_title","whatsapp_icon_url","show_whatsapp_button",
+        "hero_enabled","hero_badge","hero_title","hero_subtitle","hero_cta_text","hero_cta_url","hero_image_url",
+        "banner_enabled","banner_text","banner_bg","banner_text_color",
+        "color_bg","color_panel","color_line","color_text","color_muted","color_accent","color_accent_dark","custom_css"
+    ];
+
+    const DEFAULTS = {
+        brand_text: "Tienda en linea",
+        search_placeholder: "Buscar productos...",
+        menu_title: "Menu",
+        cart_title: "Tu compra",
+        sec_ofertas_title: "Ofertas",
+        sec_destacados_title: "Articulos destacados",
+        empty_cart_text: "El carrito esta vacio.",
+        whatsapp_url: "https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda.",
+        whatsapp_title: "Escribenos por WhatsApp",
+        whatsapp_icon_url: "/static/whatsapp_icon.png",
+        show_whatsapp_button: true,
+        hero_enabled: false,
+        hero_badge: "Tienda online",
+        hero_title: "Pasteleria Sucree",
+        hero_subtitle: "Haz tu pedido online y revisa tu estado en vivo.",
+        hero_cta_text: "Pedir por WhatsApp",
+        hero_cta_url: "",
+        hero_image_url: "",
+        banner_enabled: false,
+        banner_text: "",
+        banner_bg: "#f0fdf4",
+        banner_text_color: "#166534",
+        color_bg: "#f5f5f5",
+        color_panel: "#ffffff",
+        color_line: "#e5e7eb",
+        color_text: "#111827",
+        color_muted: "#6b7280",
+        color_accent: "#f45d08",
+        color_accent_dark: "#cc4a03",
+        custom_css: ""
+    };
+
+    function setMsg(text, type) {
+        msgEl.textContent = text || "";
+        msgEl.className = `msg ${type || ""}`.trim();
+    }
+
+    function getPayload() {
+        const payload = {};
+        for (const id of fields) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            payload[id] = el.type === "checkbox" ? Boolean(el.checked) : String(el.value || "");
+        }
+        return payload;
+    }
+
+    function fillForm(data) {
+        const cfg = { ...DEFAULTS, ...(data || {}) };
+        for (const id of fields) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            if (el.type === "checkbox") {
+                el.checked = Boolean(cfg[id]);
+            } else {
+                el.value = String(cfg[id] ?? "");
+            }
+        }
+        renderPreview();
+    }
+
+    function renderPreview() {
+        const p = getPayload();
+        document.getElementById("pv-brand").textContent = p.brand_text || DEFAULTS.brand_text;
+        document.getElementById("pv-search").textContent = p.search_placeholder || DEFAULTS.search_placeholder;
+        document.getElementById("pv-ofertas").textContent = p.sec_ofertas_title || DEFAULTS.sec_ofertas_title;
+        document.getElementById("pv-cart").textContent = p.cart_title || DEFAULTS.cart_title;
+        document.getElementById("pv-empty").textContent = p.empty_cart_text || DEFAULTS.empty_cart_text;
+
+        const prev = document.getElementById("preview");
+        prev.style.background = p.color_panel || DEFAULTS.color_panel;
+        prev.style.borderColor = p.color_line || DEFAULTS.color_line;
+        prev.style.color = p.color_text || DEFAULTS.color_text;
+
+        const banner = document.getElementById("pv-banner");
+        banner.style.display = p.banner_enabled && p.banner_text ? "" : "none";
+        banner.textContent = p.banner_text || "";
+        banner.style.background = p.banner_bg || DEFAULTS.banner_bg;
+        banner.style.color = p.banner_text_color || DEFAULTS.banner_text_color;
+
+        const hero = document.getElementById("pv-hero");
+        hero.style.display = p.hero_enabled ? "" : "none";
+        document.getElementById("pv-hero-badge").textContent = p.hero_badge || "";
+        document.getElementById("pv-hero-title").textContent = p.hero_title || "";
+        document.getElementById("pv-hero-subtitle").textContent = p.hero_subtitle || "";
+    }
+
+    async function cargar() {
+        setMsg("Cargando configuracion...");
+        try {
+            const res = await fetch(ENDPOINT, { headers: { Accept: "application/json" } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar configuracion");
+            fillForm(data.config || {});
+            setMsg("Configuracion cargada.", "ok");
+        } catch (err) {
+            setMsg(err.message || "Error cargando configuracion", "err");
+        }
+    }
+
+    async function guardar() {
+        setMsg("Guardando cambios...");
+        try {
+            const res = await fetch(ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify(getPayload()),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
+            fillForm(data.config || {});
+            setMsg("Personalizacion guardada correctamente.", "ok");
+        } catch (err) {
+            setMsg(err.message || "Error guardando", "err");
+        }
+    }
+
+    document.getElementById("btn-guardar").addEventListener("click", guardar);
+    document.getElementById("btn-recargar").addEventListener("click", cargar);
+    document.getElementById("btn-restaurar").addEventListener("click", () => {
+        fillForm(DEFAULTS);
+        setMsg("Valores base cargados en formulario. Presiona 'Guardar cambios' para aplicar.");
+    });
+
+    for (const id of fields) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.addEventListener("input", renderPreview);
+        el.addEventListener("change", renderPreview);
+    }
+
+    cargar();
+</script>
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>

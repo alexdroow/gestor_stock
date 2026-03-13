@@ -7443,6 +7443,28 @@ def migrar_db():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_personalizacion (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                config_json TEXT NOT NULL DEFAULT '{}',
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO tienda_personalizacion (id, config_json, actualizado_en)
+            VALUES (1, '{}', CURRENT_TIMESTAMP)
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_personalizacion
+            SET config_json = COALESCE(NULLIF(TRIM(config_json), ''), '{}')
+            WHERE id = 1
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS tienda_visitas (
                 session_id TEXT PRIMARY KEY,
                 primera_visita TEXT DEFAULT CURRENT_TIMESTAMP,

@@ -140,6 +140,65 @@
             background: #fff1f2;
             color: #991b1b;
         }
+        .tienda-custom-banner {
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: .92rem;
+            font-weight: 700;
+        }
+        .tienda-hero {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel);
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1.1fr .9fr;
+            min-height: 180px;
+        }
+        .tienda-hero-copy {
+            padding: 16px;
+            display: grid;
+            gap: 8px;
+            align-content: center;
+        }
+        .tienda-hero-badge {
+            width: fit-content;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: .72rem;
+            font-weight: 800;
+            background: var(--chip);
+            color: #1e293b;
+        }
+        .tienda-hero-title {
+            margin: 0;
+            font-size: 1.44rem;
+            line-height: 1.1;
+        }
+        .tienda-hero-subtitle {
+            color: var(--muted);
+            font-size: .95rem;
+        }
+        .tienda-hero-cta {
+            width: fit-content;
+            text-decoration: none;
+            background: var(--accent);
+            color: #fff;
+            padding: 8px 11px;
+            border-radius: 10px;
+            font-weight: 800;
+        }
+        .tienda-hero-media {
+            min-height: 100%;
+            background: #fff7ed;
+            overflow: hidden;
+        }
+        .tienda-hero-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
         .scroller {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
@@ -855,6 +914,8 @@
             .mobile-cat-strip { display: flex; }
             .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
             .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+            .tienda-hero { grid-template-columns: 1fr; }
+            .tienda-hero-media { min-height: 150px; }
             .item-name { font-size: .98rem; min-height: 32px; }
             .item-desc { font-size: .79rem; min-height: 22px; }
             .item-body { padding: 8px 8px 10px; }
@@ -870,30 +931,42 @@
             }
         }
     </style>
+    <style id="tienda-custom-css"></style>
 </head>
 <body>
     <header class="topbar">
         <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()">Menu</button>
-        <div class="brand">Tienda en linea</div>
+        <div class="brand" id="brand-text">Tienda en linea</div>
         <div class="search">
             <input id="search-input" type="search" placeholder="Buscar productos...">
         </div>
         <button type="button" class="menu-quick-btn" id="btn-cuenta">Mi cuenta</button>
-        <button type="button" class="menu-quick-btn" id="btn-menu-quick">Categorias</button>
     </header>
 
     <main class="layout">
         <aside class="left-nav">
-            <h3>Menu</h3>
+            <h3 id="menu-title">Menu</h3>
             <div class="cat-list" id="cat-list"></div>
         </aside>
 
         <section class="content">
             <div class="tienda-estado-banner" id="tienda-estado-banner">Cargando estado de tienda...</div>
+            <div class="tienda-custom-banner" id="tienda-custom-banner" style="display:none;"></div>
+            <div class="tienda-hero" id="tienda-hero" style="display:none;">
+                <div class="tienda-hero-copy">
+                    <div class="tienda-hero-badge" id="tienda-hero-badge"></div>
+                    <h2 class="tienda-hero-title" id="tienda-hero-title"></h2>
+                    <div class="tienda-hero-subtitle" id="tienda-hero-subtitle"></div>
+                    <a class="tienda-hero-cta" id="tienda-hero-cta" href="#" target="_blank" rel="noopener">Ver mas</a>
+                </div>
+                <div class="tienda-hero-media" id="tienda-hero-media">
+                    <img id="tienda-hero-image" src="" alt="Banner tienda">
+                </div>
+            </div>
             <div class="mobile-cat-strip" id="mobile-cat-strip"></div>
             <div class="section" id="sec-ofertas">
                 <div class="ofertas-head">
-                    <h2>Ofertas</h2>
+                    <h2 id="sec-ofertas-title">Ofertas</h2>
                     <div class="ofertas-nav">
                         <button type="button" class="ofertas-nav-btn" id="ofertas-prev" aria-label="Ver ofertas anteriores">&#8249;</button>
                         <button type="button" class="ofertas-nav-btn" id="ofertas-next" aria-label="Ver más ofertas">&#8250;</button>
@@ -903,7 +976,7 @@
             </div>
 
             <div class="section" id="sec-destacados">
-                <h2>Articulos destacados</h2>
+                <h2 id="sec-destacados-title">Articulos destacados</h2>
                 <div class="scroller" id="destacados-list"></div>
             </div>
 
@@ -911,7 +984,7 @@
         </section>
 
         <aside class="cart-panel">
-            <h3>Tu compra</h3>
+            <h3 id="cart-title">Tu compra</h3>
             <div class="cart-list" id="cart-list"></div>
             <div class="cart-meta">
                 <label for="codigo-descuento">Codigo de descuento</label>
@@ -947,15 +1020,15 @@
     </main>
 
     <div class="mobile-overlay" id="mobile-overlay"></div>
-    <a class="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
-        <img src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
+    <a class="wa-fab" id="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
+        <img id="wa-fab-icon" src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
     </a>
     <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirMenuMobile()">Menu</button>
     <button type="button" class="mobile-cart-fab" id="mobile-cart-fab" onclick="abrirCarritoMobile()">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
     <div class="mobile-menu-modal" id="mobile-menu-modal">
         <div class="mobile-menu-panel">
             <div class="mobile-cart-head">
-                <strong>Menu de categorias</strong>
+                <strong id="mobile-menu-title">Menu de categorias</strong>
                 <button type="button" class="mobile-cart-close" id="mobile-menu-close">Cerrar</button>
             </div>
             <div class="mobile-menu-list" id="mobile-menu-list"></div>
@@ -1068,7 +1141,24 @@
         const totalEl = document.getElementById("total");
         const mobileTotalEl = document.getElementById("mobile-total");
         const msgEl = document.getElementById("msg");
+        const brandTextEl = document.getElementById("brand-text");
         const searchInputEl = document.getElementById("search-input");
+        const menuTitleEl = document.getElementById("menu-title");
+        const secOfertasTitleEl = document.getElementById("sec-ofertas-title");
+        const secDestacadosTitleEl = document.getElementById("sec-destacados-title");
+        const cartTitleEl = document.getElementById("cart-title");
+        const mobileMenuTitleEl = document.getElementById("mobile-menu-title");
+        const tiendaCustomBannerEl = document.getElementById("tienda-custom-banner");
+        const tiendaHeroEl = document.getElementById("tienda-hero");
+        const tiendaHeroBadgeEl = document.getElementById("tienda-hero-badge");
+        const tiendaHeroTitleEl = document.getElementById("tienda-hero-title");
+        const tiendaHeroSubtitleEl = document.getElementById("tienda-hero-subtitle");
+        const tiendaHeroCtaEl = document.getElementById("tienda-hero-cta");
+        const tiendaHeroMediaEl = document.getElementById("tienda-hero-media");
+        const tiendaHeroImageEl = document.getElementById("tienda-hero-image");
+        const waFabEl = document.getElementById("wa-fab");
+        const waFabIconEl = document.getElementById("wa-fab-icon");
+        const tiendaCustomCssEl = document.getElementById("tienda-custom-css");
         const codigoDescuentoEl = document.getElementById("codigo-descuento");
         const mobileCodigoDescuentoEl = document.getElementById("mobile-codigo-descuento");
         const btnAplicarCuponEl = document.getElementById("btn-aplicar-cupon");
@@ -1091,7 +1181,6 @@
         const leftNavEl = document.querySelector(".left-nav");
         const cartPanelEl = document.querySelector(".cart-panel");
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
-        const btnMenuQuickEl = document.getElementById("btn-menu-quick");
         const mobileMenuFabEl = document.getElementById("mobile-menu-fab");
         const mobileOverlayEl = document.getElementById("mobile-overlay");
         const mobileCartFabEl = document.getElementById("mobile-cart-fab");
@@ -1122,6 +1211,8 @@
         let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
         let historialComprasCliente = [];
+        let carritoVacioTexto = "El carrito esta vacio.";
+        let tiendaUiCfg = {};
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -1137,6 +1228,39 @@
         if (_forceMobileParam || _uaMobile) {
             document.body.classList.add("mobile-ui");
         }
+        const TIENDA_UI_DEFAULTS = {
+            brand_text: "Tienda en linea",
+            search_placeholder: "Buscar productos...",
+            menu_title: "Menu",
+            sec_ofertas_title: "Ofertas",
+            sec_destacados_title: "Articulos destacados",
+            cart_title: "Tu compra",
+            empty_cart_text: "El carrito esta vacio.",
+            whatsapp_url: "https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda.",
+            whatsapp_title: "Escribenos por WhatsApp",
+            whatsapp_icon_url: "{{ url_for('static', filename='whatsapp_icon.png') }}",
+            show_whatsapp_button: true,
+            hero_enabled: false,
+            hero_badge: "Tienda online",
+            hero_title: "Pasteleria Sucree",
+            hero_subtitle: "Haz tu pedido online y revisa tu estado en vivo.",
+            hero_cta_text: "Pedir por WhatsApp",
+            hero_cta_url: "",
+            hero_image_url: "",
+            banner_enabled: false,
+            banner_text: "",
+            banner_bg: "#f0fdf4",
+            banner_text_color: "#166534",
+            color_bg: "#f5f5f5",
+            color_panel: "#ffffff",
+            color_line: "#e5e7eb",
+            color_text: "#111827",
+            color_muted: "#6b7280",
+            color_accent: "#f45d08",
+            color_accent_dark: "#cc4a03",
+            custom_css: "",
+        };
+        const TIENDA_UI_INITIAL = {{ (tienda_personalizacion or {}) | tojson }};
 
         function esc(text) {
             return String(text || "")
@@ -1145,6 +1269,68 @@
                 .replaceAll(">", "&gt;")
                 .replaceAll('"', "&quot;")
                 .replaceAll("'", "&#39;");
+        }
+
+        function aplicarPersonalizacionTienda(rawCfg) {
+            tiendaUiCfg = { ...TIENDA_UI_DEFAULTS, ...(rawCfg || {}) };
+            carritoVacioTexto = String(tiendaUiCfg.empty_cart_text || TIENDA_UI_DEFAULTS.empty_cart_text);
+            if (brandTextEl) brandTextEl.textContent = String(tiendaUiCfg.brand_text || TIENDA_UI_DEFAULTS.brand_text);
+            if (searchInputEl) searchInputEl.placeholder = String(tiendaUiCfg.search_placeholder || TIENDA_UI_DEFAULTS.search_placeholder);
+            if (menuTitleEl) menuTitleEl.textContent = String(tiendaUiCfg.menu_title || TIENDA_UI_DEFAULTS.menu_title);
+            if (mobileMenuTitleEl) mobileMenuTitleEl.textContent = `${String(tiendaUiCfg.menu_title || TIENDA_UI_DEFAULTS.menu_title)} de categorias`;
+            if (secOfertasTitleEl) secOfertasTitleEl.textContent = String(tiendaUiCfg.sec_ofertas_title || TIENDA_UI_DEFAULTS.sec_ofertas_title);
+            if (secDestacadosTitleEl) secDestacadosTitleEl.textContent = String(tiendaUiCfg.sec_destacados_title || TIENDA_UI_DEFAULTS.sec_destacados_title);
+            if (cartTitleEl) cartTitleEl.textContent = String(tiendaUiCfg.cart_title || TIENDA_UI_DEFAULTS.cart_title);
+
+            if (waFabEl) {
+                const visible = Boolean(tiendaUiCfg.show_whatsapp_button);
+                waFabEl.style.display = visible ? "" : "none";
+                waFabEl.href = String(tiendaUiCfg.whatsapp_url || TIENDA_UI_DEFAULTS.whatsapp_url);
+                const waTitle = String(tiendaUiCfg.whatsapp_title || TIENDA_UI_DEFAULTS.whatsapp_title);
+                waFabEl.title = waTitle;
+                waFabEl.setAttribute("aria-label", waTitle);
+            }
+            if (waFabIconEl) {
+                waFabIconEl.src = String(tiendaUiCfg.whatsapp_icon_url || TIENDA_UI_DEFAULTS.whatsapp_icon_url);
+            }
+
+            if (tiendaCustomBannerEl) {
+                const on = Boolean(tiendaUiCfg.banner_enabled) && String(tiendaUiCfg.banner_text || "").trim();
+                tiendaCustomBannerEl.style.display = on ? "" : "none";
+                tiendaCustomBannerEl.textContent = String(tiendaUiCfg.banner_text || "");
+                tiendaCustomBannerEl.style.background = String(tiendaUiCfg.banner_bg || TIENDA_UI_DEFAULTS.banner_bg);
+                tiendaCustomBannerEl.style.color = String(tiendaUiCfg.banner_text_color || TIENDA_UI_DEFAULTS.banner_text_color);
+            }
+
+            if (tiendaHeroEl) {
+                const on = Boolean(tiendaUiCfg.hero_enabled);
+                tiendaHeroEl.style.display = on ? "grid" : "none";
+            }
+            if (tiendaHeroBadgeEl) tiendaHeroBadgeEl.textContent = String(tiendaUiCfg.hero_badge || "");
+            if (tiendaHeroTitleEl) tiendaHeroTitleEl.textContent = String(tiendaUiCfg.hero_title || "");
+            if (tiendaHeroSubtitleEl) tiendaHeroSubtitleEl.textContent = String(tiendaUiCfg.hero_subtitle || "");
+            if (tiendaHeroCtaEl) {
+                const txt = String(tiendaUiCfg.hero_cta_text || "").trim();
+                const url = String(tiendaUiCfg.hero_cta_url || "").trim();
+                tiendaHeroCtaEl.textContent = txt || "Ver mas";
+                tiendaHeroCtaEl.style.display = txt && url ? "" : "none";
+                tiendaHeroCtaEl.href = url || "#";
+            }
+            if (tiendaHeroImageEl && tiendaHeroMediaEl) {
+                const img = String(tiendaUiCfg.hero_image_url || "").trim();
+                tiendaHeroMediaEl.style.display = img ? "" : "none";
+                if (img) tiendaHeroImageEl.src = img;
+            }
+
+            const root = document.documentElement;
+            root.style.setProperty("--bg", String(tiendaUiCfg.color_bg || TIENDA_UI_DEFAULTS.color_bg));
+            root.style.setProperty("--panel", String(tiendaUiCfg.color_panel || TIENDA_UI_DEFAULTS.color_panel));
+            root.style.setProperty("--line", String(tiendaUiCfg.color_line || TIENDA_UI_DEFAULTS.color_line));
+            root.style.setProperty("--text", String(tiendaUiCfg.color_text || TIENDA_UI_DEFAULTS.color_text));
+            root.style.setProperty("--muted", String(tiendaUiCfg.color_muted || TIENDA_UI_DEFAULTS.color_muted));
+            root.style.setProperty("--accent", String(tiendaUiCfg.color_accent || TIENDA_UI_DEFAULTS.color_accent));
+            root.style.setProperty("--accent-dark", String(tiendaUiCfg.color_accent_dark || TIENDA_UI_DEFAULTS.color_accent_dark));
+            if (tiendaCustomCssEl) tiendaCustomCssEl.textContent = String(tiendaUiCfg.custom_css || "");
         }
 
         function normalizarEmailCliente(raw) {
@@ -1487,8 +1673,8 @@
 
         function renderCart() {
             if (!carrito.length) {
-                cartListEl.innerHTML = "<div>El carrito esta vacio.</div>";
-                if (mobileCartListEl) mobileCartListEl.innerHTML = "<div>El carrito esta vacio.</div>";
+                cartListEl.innerHTML = `<div>${esc(carritoVacioTexto)}</div>`;
+                if (mobileCartListEl) mobileCartListEl.innerHTML = `<div>${esc(carritoVacioTexto)}</div>`;
                 subtotalMontoEl.textContent = money.format(0);
                 if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(0);
                 descuentoMontoEl.textContent = `-${money.format(0)}`;
@@ -1634,6 +1820,7 @@
                 categoriasDisponibles = Array.isArray(data.categorias)
                     ? data.categorias.filter((c) => Boolean(c.activa_en_tienda))
                     : [];
+                aplicarPersonalizacionTienda(data.personalizacion || tiendaUiCfg || TIENDA_UI_INITIAL);
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                 renderCategoriasMenu();
@@ -2248,7 +2435,6 @@
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
-        if (btnMenuQuickEl) btnMenuQuickEl.addEventListener("click", abrirMenuMobile);
         if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirMenuMobile);
         if (ofertasPrevBtnEl) ofertasPrevBtnEl.addEventListener("click", () => scrollOfertas(-1));
         if (ofertasNextBtnEl) ofertasNextBtnEl.addEventListener("click", () => scrollOfertas(1));
@@ -2281,6 +2467,7 @@
             mobileCodigoDescuentoEl.addEventListener("input", () => { codigoDescuentoEl.value = mobileCodigoDescuentoEl.value; });
         }
 
+        aplicarPersonalizacionTienda(TIENDA_UI_INITIAL);
         clienteRegistrado = cargarClienteLocal();
         ultimoComprobantePedido = cargarUltimoPedidoLocal();
         renderEstadoCuenta();

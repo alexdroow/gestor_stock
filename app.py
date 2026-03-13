@@ -792,7 +792,11 @@ def admin_logout():
 
 @app.route('/tienda')
 def tienda_publica():
-    return render_template('tienda.html')
+    try:
+        personalizacion = _obtener_tienda_personalizacion()
+    except Exception:
+        personalizacion = _default_tienda_personalizacion()
+    return render_template('tienda.html', tienda_personalizacion=personalizacion)
 
 
 def _parse_fecha_yyyy_mm_dd(valor):
@@ -1178,6 +1182,161 @@ def _obtener_tienda_config():
             conn.close()
 
 
+def _default_tienda_personalizacion():
+    return {
+        "brand_text": "Tienda en linea",
+        "search_placeholder": "Buscar productos...",
+        "menu_title": "Menu",
+        "sec_ofertas_title": "Ofertas",
+        "sec_destacados_title": "Articulos destacados",
+        "cart_title": "Tu compra",
+        "empty_cart_text": "El carrito esta vacio.",
+        "whatsapp_url": "https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda.",
+        "whatsapp_title": "Escribenos por WhatsApp",
+        "whatsapp_icon_url": "/static/whatsapp_icon.png",
+        "show_whatsapp_button": True,
+        "hero_enabled": False,
+        "hero_badge": "Tienda online",
+        "hero_title": "Pasteleria Sucree",
+        "hero_subtitle": "Haz tu pedido online y revisa tu estado en vivo.",
+        "hero_cta_text": "Pedir por WhatsApp",
+        "hero_cta_url": "",
+        "hero_image_url": "",
+        "banner_enabled": False,
+        "banner_text": "",
+        "banner_bg": "#f0fdf4",
+        "banner_text_color": "#166534",
+        "color_bg": "#f5f5f5",
+        "color_panel": "#ffffff",
+        "color_line": "#e5e7eb",
+        "color_text": "#111827",
+        "color_muted": "#6b7280",
+        "color_accent": "#f45d08",
+        "color_accent_dark": "#cc4a03",
+        "custom_css": "",
+    }
+
+
+def _normalizar_color_hex(raw, default):
+    color = str(raw or "").strip().lower()
+    if re.match(r"^#[0-9a-f]{6}$", color):
+        return color
+    if re.match(r"^#[0-9a-f]{3}$", color):
+        return color
+    return default
+
+
+def _normalizar_url_personalizacion(raw):
+    url = str(raw or "").strip()
+    if not url:
+        return ""
+    if url.startswith("/static/"):
+        return url
+    if re.match(r"^https?://", url, re.IGNORECASE):
+        return url
+    return ""
+
+
+def _normalizar_tienda_personalizacion(payload):
+    base = _default_tienda_personalizacion()
+    data = dict(payload or {})
+    clean = dict(base)
+    clean["brand_text"] = str(data.get("brand_text") or base["brand_text"]).strip()[:90] or base["brand_text"]
+    clean["search_placeholder"] = str(data.get("search_placeholder") or base["search_placeholder"]).strip()[:120] or base["search_placeholder"]
+    clean["menu_title"] = str(data.get("menu_title") or base["menu_title"]).strip()[:80] or base["menu_title"]
+    clean["sec_ofertas_title"] = str(data.get("sec_ofertas_title") or base["sec_ofertas_title"]).strip()[:80] or base["sec_ofertas_title"]
+    clean["sec_destacados_title"] = str(data.get("sec_destacados_title") or base["sec_destacados_title"]).strip()[:80] or base["sec_destacados_title"]
+    clean["cart_title"] = str(data.get("cart_title") or base["cart_title"]).strip()[:80] or base["cart_title"]
+    clean["empty_cart_text"] = str(data.get("empty_cart_text") or base["empty_cart_text"]).strip()[:140] or base["empty_cart_text"]
+
+    clean["whatsapp_url"] = _normalizar_url_personalizacion(data.get("whatsapp_url")) or base["whatsapp_url"]
+    clean["whatsapp_title"] = str(data.get("whatsapp_title") or base["whatsapp_title"]).strip()[:90] or base["whatsapp_title"]
+    clean["whatsapp_icon_url"] = _normalizar_url_personalizacion(data.get("whatsapp_icon_url")) or base["whatsapp_icon_url"]
+    clean["show_whatsapp_button"] = bool(data.get("show_whatsapp_button", base["show_whatsapp_button"]))
+
+    clean["hero_enabled"] = bool(data.get("hero_enabled", base["hero_enabled"]))
+    clean["hero_badge"] = str(data.get("hero_badge") or "").strip()[:60]
+    clean["hero_title"] = str(data.get("hero_title") or "").strip()[:120]
+    clean["hero_subtitle"] = str(data.get("hero_subtitle") or "").strip()[:260]
+    clean["hero_cta_text"] = str(data.get("hero_cta_text") or "").strip()[:80]
+    clean["hero_cta_url"] = _normalizar_url_personalizacion(data.get("hero_cta_url"))
+    clean["hero_image_url"] = _normalizar_url_personalizacion(data.get("hero_image_url"))
+
+    clean["banner_enabled"] = bool(data.get("banner_enabled", base["banner_enabled"]))
+    clean["banner_text"] = str(data.get("banner_text") or "").strip()[:220]
+    clean["banner_bg"] = _normalizar_color_hex(data.get("banner_bg"), base["banner_bg"])
+    clean["banner_text_color"] = _normalizar_color_hex(data.get("banner_text_color"), base["banner_text_color"])
+
+    clean["color_bg"] = _normalizar_color_hex(data.get("color_bg"), base["color_bg"])
+    clean["color_panel"] = _normalizar_color_hex(data.get("color_panel"), base["color_panel"])
+    clean["color_line"] = _normalizar_color_hex(data.get("color_line"), base["color_line"])
+    clean["color_text"] = _normalizar_color_hex(data.get("color_text"), base["color_text"])
+    clean["color_muted"] = _normalizar_color_hex(data.get("color_muted"), base["color_muted"])
+    clean["color_accent"] = _normalizar_color_hex(data.get("color_accent"), base["color_accent"])
+    clean["color_accent_dark"] = _normalizar_color_hex(data.get("color_accent_dark"), base["color_accent_dark"])
+    clean["custom_css"] = str(data.get("custom_css") or "").strip()[:5000]
+    return clean
+
+
+def _obtener_tienda_personalizacion():
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT config_json
+            FROM tienda_personalizacion
+            WHERE id = 1
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        if not row:
+            return _default_tienda_personalizacion()
+        raw_json = str(row["config_json"] or "").strip()
+        if not raw_json:
+            return _default_tienda_personalizacion()
+        try:
+            payload = json.loads(raw_json)
+        except Exception:
+            payload = {}
+        return _normalizar_tienda_personalizacion(payload)
+    finally:
+        if conn:
+            conn.close()
+
+
+def _guardar_tienda_personalizacion(payload):
+    actual = _obtener_tienda_personalizacion()
+    merged = dict(actual)
+    merged.update(dict(payload or {}))
+    config = _normalizar_tienda_personalizacion(merged)
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO tienda_personalizacion (id, config_json, actualizado_en)
+            VALUES (1, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                config_json = excluded.config_json,
+                actualizado_en = CURRENT_TIMESTAMP
+            """,
+            (json.dumps(config, ensure_ascii=False),),
+        )
+        conn.commit()
+        return config
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
 def _evaluar_estado_tienda(config):
     cfg = dict(config or {})
     modo = str(cfg.get("modo_manual") or "auto").strip().lower()
@@ -1447,6 +1606,7 @@ def api_tienda_productos():
                 "tienda_abierta": bool(estado.get("abierta")),
                 "estado_tienda": estado,
                 "mensaje_post_pedido": str(config.get("mensaje_post_pedido") or "").strip(),
+                "personalizacion": _obtener_tienda_personalizacion(),
             }
         )
     except Exception as e:
@@ -1659,9 +1819,29 @@ def ventas_admin_catalogo():
     return render_template('tienda_admin.html')
 
 
+@app.route('/ventas/admin-personalizacion')
+def ventas_admin_personalizacion():
+    return render_template('tienda_personalizacion_admin.html')
+
+
 @app.route('/ventas/cupones')
 def ventas_admin_cupones():
     return render_template('cupones_admin.html')
+
+
+@app.route('/api/tienda/admin/personalizacion', methods=['GET', 'POST'])
+def api_tienda_admin_personalizacion():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        if request.method == "GET":
+            return jsonify({"success": True, "config": _obtener_tienda_personalizacion()})
+        data = request.get_json(silent=True) or {}
+        config = _guardar_tienda_personalizacion(data)
+        crear_backup()
+        return jsonify({"success": True, "config": config})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/tienda/estado', methods=['GET'])
