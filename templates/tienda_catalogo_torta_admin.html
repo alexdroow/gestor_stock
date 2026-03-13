@@ -222,6 +222,14 @@ function activeCount(arr) {
     return (Array.isArray(arr) ? arr : []).filter((x) => Boolean(x.activo)).length;
 }
 
+function renderSummary() {
+    document.getElementById("sum-sizes").textContent = String(activeCount(state.sizes));
+    document.getElementById("sum-flavors").textContent = String(activeCount(state.sabores));
+    document.getElementById("sum-extras").textContent = String(activeCount(state.extras));
+    document.getElementById("sum-toppers").textContent = String(activeCount(state.toppers));
+    document.getElementById("sum-prices").textContent = state.show_prices ? "Si" : "No";
+}
+
 function rowHtmlSize(item, idx) {
     return `
         <div class="row" data-idx="${idx}">
@@ -280,11 +288,7 @@ function render() {
     bindListInputs("sabores");
     bindListInputs("extras");
     bindListInputs("toppers");
-    document.getElementById("sum-sizes").textContent = String(activeCount(state.sizes));
-    document.getElementById("sum-flavors").textContent = String(activeCount(state.sabores));
-    document.getElementById("sum-extras").textContent = String(activeCount(state.extras));
-    document.getElementById("sum-toppers").textContent = String(activeCount(state.toppers));
-    document.getElementById("sum-prices").textContent = state.show_prices ? "Si" : "No";
+    renderSummary();
 }
 
 function bindListInputs(key) {
@@ -301,7 +305,7 @@ function bindListInputs(key) {
                 else if (field === "precio" || field === "max_sabores" || field === "max_cantidad") state[key][idx][field] = n(inp.value, 0);
                 else state[key][idx][field] = String(inp.value || "");
                 if (field === "nombre") state[key][idx].id = slug(inp.value);
-                render();
+                renderSummary();
             });
         });
     });
@@ -365,9 +369,9 @@ async function save() {
 }
 
 document.getElementById("enabled").addEventListener("change", () => { state.enabled = Boolean(document.getElementById("enabled").checked); render(); });
-document.getElementById("show_prices").addEventListener("change", () => { state.show_prices = Boolean(document.getElementById("show_prices").checked); render(); });
-document.getElementById("max_extra_items").addEventListener("input", () => { state.max_extra_items = n(document.getElementById("max_extra_items").value, 8); render(); });
-document.getElementById("max_reference_images").addEventListener("input", () => { state.max_reference_images = n(document.getElementById("max_reference_images").value, 3); render(); });
+document.getElementById("show_prices").addEventListener("change", () => { state.show_prices = Boolean(document.getElementById("show_prices").checked); renderSummary(); });
+document.getElementById("max_extra_items").addEventListener("input", () => { state.max_extra_items = n(document.getElementById("max_extra_items").value, 8); });
+document.getElementById("max_reference_images").addEventListener("input", () => { state.max_reference_images = n(document.getElementById("max_reference_images").value, 3); });
 document.getElementById("add-size").addEventListener("click", () => { state.sizes.push(newItem({ nombre: "Nuevo tamano", precio: 0, max_sabores: 3, activo: true })); render(); });
 document.getElementById("add-flavor").addEventListener("click", () => { state.sabores.push(newItem({ nombre: "Nuevo sabor", precio: 0, activo: true })); render(); });
 document.getElementById("add-extra").addEventListener("click", () => { state.extras.push(newItem({ nombre: "Nuevo extra", precio: 0, max_cantidad: 1, activo: true })); render(); });
