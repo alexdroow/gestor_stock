@@ -98,6 +98,22 @@
             margin: 0 0 10px;
             font-size: 0.98rem;
         }
+        .agenda-quick-btn {
+            width: 100%;
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+            border-radius: 10px;
+            padding: 9px 10px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+        .agenda-quick-btn.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(244, 93, 8, .15);
+        }
         .cat-list {
             display: grid;
             gap: 6px;
@@ -1170,6 +1186,7 @@
 
     <main class="layout">
         <aside class="left-nav">
+            <button type="button" id="agenda-quick-btn" class="agenda-quick-btn" style="display:none;">Agendar pedido</button>
             <h3 id="menu-title">Menu</h3>
             <div class="cat-list" id="cat-list"></div>
         </aside>
@@ -1428,6 +1445,7 @@
         const menuTitleEl = document.getElementById("menu-title");
         const secOfertasTitleEl = document.getElementById("sec-ofertas-title");
         const secDestacadosTitleEl = document.getElementById("sec-destacados-title");
+        const agendaQuickBtnEl = document.getElementById("agenda-quick-btn");
         const cartTitleEl = document.getElementById("cart-title");
         const mobileMenuTitleEl = document.getElementById("mobile-menu-title");
         const tiendaCustomBannerEl = document.getElementById("tienda-custom-banner");
@@ -1628,6 +1646,12 @@
             if (secOfertasTitleEl) secOfertasTitleEl.textContent = String(tiendaUiCfg.sec_ofertas_title || TIENDA_UI_DEFAULTS.sec_ofertas_title);
             if (secDestacadosTitleEl) secDestacadosTitleEl.textContent = String(tiendaUiCfg.sec_destacados_title || TIENDA_UI_DEFAULTS.sec_destacados_title);
             if (cartTitleEl) cartTitleEl.textContent = String(tiendaUiCfg.cart_title || TIENDA_UI_DEFAULTS.cart_title);
+            if (agendaQuickBtnEl) {
+                const show = Boolean(tiendaUiCfg.agenda_enabled);
+                agendaQuickBtnEl.style.display = show ? "" : "none";
+                agendaQuickBtnEl.textContent = String(tiendaUiCfg.agenda_menu_label || TIENDA_UI_DEFAULTS.agenda_menu_label);
+                agendaQuickBtnEl.classList.toggle("active", categoriaActiva === "AGENDA");
+            }
             if (agendaSectionTitleEl) agendaSectionTitleEl.textContent = String(tiendaUiCfg.agenda_section_title || TIENDA_UI_DEFAULTS.agenda_section_title);
             if (agendaSectionSubtitleEl) agendaSectionSubtitleEl.textContent = String(tiendaUiCfg.agenda_section_subtitle || TIENDA_UI_DEFAULTS.agenda_section_subtitle);
             if (agendaBtnReservarEl) agendaBtnReservarEl.textContent = String(tiendaUiCfg.agenda_form_button_text || TIENDA_UI_DEFAULTS.agenda_form_button_text);
@@ -1948,7 +1972,6 @@
 
         function renderCategoriasMenu() {
             const cats = new Set(["TODOS", "DESTACADOS", "OFERTAS"]);
-            if (Boolean(tiendaUiCfg.agenda_enabled)) cats.add("AGENDA");
             if (Array.isArray(categoriasDisponibles) && categoriasDisponibles.length) {
                 categoriasDisponibles.forEach((c) => {
                     const nombre = String(c.nombre || "").trim();
@@ -1963,11 +1986,9 @@
                     ? "Todos"
                     : c === "DESTACADOS"
                         ? "Articulos destacados"
-                        : c === "OFERTAS"
-                            ? "Ofertas"
-                            : c === "AGENDA"
-                                ? String(tiendaUiCfg.agenda_menu_label || "Agendar pedido")
-                                : c;
+                    : c === "OFERTAS"
+                        ? "Ofertas"
+                        : c;
                 const active = c === categoriaActiva ? "active" : "";
                 return `<button type="button" class="cat-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
             }).join("");
@@ -1977,11 +1998,9 @@
                         ? "Todos"
                         : c === "DESTACADOS"
                             ? "Destacados"
-                            : c === "OFERTAS"
-                                ? "Ofertas"
-                                : c === "AGENDA"
-                                    ? String(tiendaUiCfg.agenda_menu_label || "Agenda")
-                                    : c;
+                        : c === "OFERTAS"
+                            ? "Ofertas"
+                            : c;
                     const active = c === categoriaActiva ? "active" : "";
                     return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
                 }).join("");
@@ -1992,11 +2011,9 @@
                         ? "Todos"
                         : c === "DESTACADOS"
                             ? "Articulos destacados"
-                            : c === "OFERTAS"
-                                ? "Ofertas"
-                                : c === "AGENDA"
-                                    ? String(tiendaUiCfg.agenda_menu_label || "Agendar pedido")
-                                    : c;
+                        : c === "OFERTAS"
+                            ? "Ofertas"
+                            : c;
                     const active = c === categoriaActiva ? "active" : "";
                     return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}');cerrarPanelesMobile();">${esc(label)}</button>`;
                 }).join("");
@@ -2414,9 +2431,11 @@
 
         function renderSecciones() {
             const agendaMode = categoriaActiva === "AGENDA";
+            if (agendaQuickBtnEl) agendaQuickBtnEl.classList.toggle("active", agendaMode);
             if (secOfertasEl) secOfertasEl.style.display = agendaMode ? "none" : "";
             if (secDestacadosEl) secDestacadosEl.style.display = agendaMode ? "none" : "";
             if (categoriasWrapEl) categoriasWrapEl.style.display = agendaMode ? "none" : "";
+            if (cartPanelEl) cartPanelEl.style.display = agendaMode ? "none" : "";
             if (secAgendaReservasEl) {
                 secAgendaReservasEl.style.display = agendaMode && Boolean(tiendaUiCfg.agenda_enabled) ? "" : "none";
             }
@@ -3234,6 +3253,7 @@
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
         if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirMenuMobile);
+        agendaQuickBtnEl?.addEventListener("click", () => cambiarCategoria("AGENDA"));
         if (ofertasPrevBtnEl) ofertasPrevBtnEl.addEventListener("click", () => scrollOfertas(-1));
         if (ofertasNextBtnEl) ofertasNextBtnEl.addEventListener("click", () => scrollOfertas(1));
         if (mobileCartFabEl) mobileCartFabEl.addEventListener("click", abrirCarritoMobile);
