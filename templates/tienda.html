@@ -2470,7 +2470,10 @@
                 }).join("");
             }
 
-            const sizes = _catalogList("sizes").filter((s) => String(s.categoria_id || "") === String(agendaCakeCategoriaActiva || ""));
+            const sizesAll = _catalogList("sizes");
+            const sizes = categorias.length
+                ? sizesAll.filter((s) => String(s.categoria_id || "") === String(agendaCakeCategoriaActiva || ""))
+                : sizesAll;
             if (agendaCakeSelection.size_id && !sizes.some((s) => String(s.id || "") === String(agendaCakeSelection.size_id || ""))) {
                 agendaCakeSelection.size_id = "";
                 agendaCakeSelection.sabor_ids = [];

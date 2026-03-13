@@ -1743,14 +1743,39 @@ def _normalizar_catalogo_torta_cfg(raw):
 def _catalogo_torta_publico(cfg):
     cat = _normalizar_catalogo_torta_cfg(cfg)
     categorias_activas = [x for x in (cat.get("categorias") or []) if bool(x.get("activo"))]
+    sizes_activas = [x for x in (cat.get("sizes") or []) if bool(x.get("activo"))]
+    if not categorias_activas:
+        ids_detectadas = []
+        seen = set()
+        for s in sizes_activas:
+            cid = str(s.get("categoria_id") or "").strip()
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            ids_detectadas.append(cid)
+        if ids_detectadas:
+            categorias_activas = [
+                {"id": cid, "nombre": str(cid).replace("-", " ").title(), "activo": True}
+                for cid in ids_detectadas
+            ]
+        else:
+            categorias_activas = [{"id": "general", "nombre": "General", "activo": True}]
     cat_ids = {str(x.get("id") or "") for x in categorias_activas}
+    sizes_publicas = []
+    default_cat = str((categorias_activas[0] or {}).get("id") or "general")
+    for s in sizes_activas:
+        row = dict(s)
+        if not str(row.get("categoria_id") or "").strip():
+            row["categoria_id"] = default_cat
+        if str(row.get("categoria_id") or "") in cat_ids:
+            sizes_publicas.append(row)
     return {
         "enabled": bool(cat.get("enabled")),
         "show_prices": bool(cat.get("show_prices")),
         "max_extra_items": int(cat.get("max_extra_items") or 8),
         "max_reference_images": int(cat.get("max_reference_images") or 3),
         "categorias": categorias_activas,
-        "sizes": [x for x in (cat.get("sizes") or []) if bool(x.get("activo")) and str(x.get("categoria_id") or "") in cat_ids],
+        "sizes": sizes_publicas,
         "sabores": [x for x in (cat.get("sabores") or []) if bool(x.get("activo"))],
         "extras": [x for x in (cat.get("extras") or []) if bool(x.get("activo"))],
         "toppers": [x for x in (cat.get("toppers") or []) if bool(x.get("activo"))],
