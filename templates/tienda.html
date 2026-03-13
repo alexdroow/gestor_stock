@@ -3259,6 +3259,7 @@
             }
             const { jsPDF } = jspdf;
             const doc = new jsPDF({ unit: "pt", format: "a4" });
+            if (typeof doc.setLineHeightFactor === "function") doc.setLineHeightFactor(1.25);
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
             const margin = 34;
@@ -3348,41 +3349,45 @@
                 detallePedido = linesCat.join("\n");
             }
 
+            const headerTop = y;
+            const headerHeight = 58;
             doc.setFillColor(...colors.primary);
-            doc.rect(margin, y, contentWidth, 34, "F");
+            doc.rect(margin, headerTop, contentWidth, headerHeight, "F");
             doc.setTextColor(255, 255, 255);
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(19);
-            doc.text("Sucree Pasteleria", margin + 4, y + 11);
+            doc.setFontSize(20);
+            doc.text("Sucree Pasteleria", margin + 8, headerTop + 20);
             doc.setFont("helvetica", "normal");
-            doc.setFontSize(11);
-            doc.text("Comprobante de Pedido", margin + 4, y + 18);
+            doc.setFontSize(12);
+            doc.text("Comprobante de Pedido", margin + 8, headerTop + 34);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(12);
-            doc.text(`Reserva tienda - ${_labelTipoReserva(payload.tipo)}`, margin + 4, y + 25);
+            doc.text(`Reserva tienda - ${_labelTipoReserva(payload.tipo)}`, margin + 8, headerTop + 47);
             doc.setFont("helvetica", "normal");
-            doc.setFontSize(9);
-            doc.text(`Generado: ${new Date().toLocaleString("es-CL")}`, margin + 4, y + 31);
-            doc.text(String(_labelTipoReserva(payload.tipo)).toUpperCase(), margin + contentWidth - 4, y + 10, { align: "right" });
-            y += 40;
+            doc.setFontSize(9.5);
+            doc.text(`Generado: ${new Date().toLocaleString("es-CL")}`, margin + 8, headerTop + 56);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text(String(_labelTipoReserva(payload.tipo)).toUpperCase(), margin + contentWidth - 8, headerTop + 20, { align: "right" });
+            y += headerHeight + 10;
 
-            ensurePage(22);
+            ensurePage(36);
             doc.setFillColor(...colors.card);
             doc.setDrawColor(...colors.border);
-            doc.rect(margin, y, contentWidth, 17, "FD");
+            doc.rect(margin, y, contentWidth, 30, "FD");
             doc.setFont("helvetica", "bold");
             doc.setTextColor(...colors.dark);
-            doc.setFontSize(10);
-            doc.text(`Entrega: ${safe(fechaTxt)} ${safe(payload.hora_inicio, "")}`.trim(), margin + 4, y + 7);
+            doc.setFontSize(10.5);
+            doc.text(`Entrega: ${safe(fechaTxt)} ${safe(payload.hora_inicio, "")}`.trim(), margin + 8, y + 12);
             doc.setFont("helvetica", "normal");
-            doc.setFontSize(9);
+            doc.setFontSize(9.5);
             doc.setTextColor(...colors.muted);
-            doc.text(`Modalidad: ${entregaTxt}`, margin + 4, y + 13);
+            doc.text(`Modalidad: ${entregaTxt}`, margin + 8, y + 24);
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(10);
+            doc.setFontSize(11);
             doc.setTextColor(...colors.dark);
-            doc.text(`Orden ${reservaLabel}`, margin + contentWidth - 4, y + 10, { align: "right" });
-            y += 23;
+            doc.text(`Orden ${reservaLabel}`, margin + contentWidth - 8, y + 16, { align: "right" });
+            y += 38;
 
             drawSectionTitle("Datos del Cliente");
             drawField("Cliente", payload.nombre);
@@ -3404,15 +3409,15 @@
             drawField("Ingredientes / Detalles", detallePedido);
 
             drawSectionTitle("Terminos y Condiciones");
-            ensurePage(20);
+            ensurePage(26);
             doc.setFillColor(...colors.warnBg);
             doc.setDrawColor(...colors.warnBorder);
-            doc.rect(margin, y, contentWidth, 8, "FD");
+            doc.rect(margin, y, contentWidth, 14, "FD");
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(9.5);
+            doc.setFontSize(9);
             doc.setTextColor(...colors.warnText);
-            doc.text("Aplicable a todos los pedidos confirmados mediante abono.", margin + 4, y + 5.5);
-            y += 11;
+            doc.text("Aplicable a todos los pedidos confirmados mediante abono.", margin + 6, y + 9.5);
+            y += 18;
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9.5);
             doc.setTextColor(...colors.dark);
