@@ -1413,9 +1413,13 @@ def _default_tienda_personalizacion():
         "show_prices": True,
         "max_extra_items": 8,
         "max_reference_images": 3,
+        "categorias": [
+            {"id": "bizcocho", "nombre": "Tortas Bizcocho", "activo": True},
+            {"id": "panqueque", "nombre": "Tortas Panqueque", "activo": True},
+        ],
         "sizes": [
-            {"id": "torta-15-bizcocho", "nombre": "15 personas (Bizcocho)", "precio": 25990, "max_sabores": 3, "activo": True},
-            {"id": "torta-20-bizcocho", "nombre": "20 personas (Bizcocho)", "precio": 31990, "max_sabores": 3, "activo": True},
+            {"id": "torta-15-bizcocho", "categoria_id": "bizcocho", "nombre": "15 personas (Bizcocho)", "precio": 25990, "max_sabores": 3, "activo": True},
+            {"id": "torta-20-bizcocho", "categoria_id": "bizcocho", "nombre": "20 personas (Bizcocho)", "precio": 31990, "max_sabores": 3, "activo": True},
         ],
         "sabores": [
             {"id": "manjar", "nombre": "Manjar", "precio": 0, "activo": True},
@@ -1626,6 +1630,7 @@ def _normalizar_catalogo_torta_item(item, defaults, allow_max_sabores=False, all
         precio = float(defaults.get("precio") or 0)
     row["precio"] = max(0, round(precio, 2))
     row["activo"] = bool(src.get("activo", defaults.get("activo", True)))
+    row["categoria_id"] = re.sub(r"[^a-z0-9\-]+", "-", str(src.get("categoria_id") or defaults.get("categoria_id") or "").strip().lower()).strip("-")[:60]
     if allow_max_sabores:
         try:
             max_sabores = int(src.get("max_sabores") if src.get("max_sabores") is not None else defaults.get("max_sabores") or 3)
@@ -1647,6 +1652,7 @@ def _normalizar_catalogo_torta_cfg(raw):
     out = {
         "enabled": bool(data.get("enabled", base.get("enabled", True))),
         "show_prices": bool(data.get("show_prices", base.get("show_prices", True))),
+        "categorias": [],
         "sizes": [],
         "sabores": [],
         "extras": [],
@@ -1663,17 +1669,31 @@ def _normalizar_catalogo_torta_cfg(raw):
         max_reference_images = int(base.get("max_reference_images") or 3)
     out["max_reference_images"] = max(0, min(10, max_reference_images))
 
+    cats_in = data.get("categorias")
+    if not isinstance(cats_in, list):
+        cats_in = list(base.get("categorias") or [])
+    for item in cats_in[:20]:
+        cat = dict(item or {})
+        cid = re.sub(r"[^a-z0-9\-]+", "-", str(cat.get("id") or "").strip().lower()).strip("-")[:60] or _slug_simple(cat.get("nombre") or "categoria")
+        nombre = str(cat.get("nombre") or "").strip()[:80] or "Categoria"
+        out["categorias"].append({"id": cid, "nombre": nombre, "activo": bool(cat.get("activo", True))})
+    if not out["categorias"]:
+        out["categorias"] = list(base.get("categorias") or [{"id": "general", "nombre": "General", "activo": True}])
+
+    categorias_validas = {str(c.get("id") or "") for c in out["categorias"]}
+
     sizes_in = data.get("sizes")
     if not isinstance(sizes_in, list):
         sizes_in = list(base.get("sizes") or [])
     for item in sizes_in[:25]:
-        out["sizes"].append(
-            _normalizar_catalogo_torta_item(
-                item,
-                {"id": "size", "nombre": "Tamano", "precio": 0, "max_sabores": 3, "activo": True},
-                allow_max_sabores=True,
-            )
+        norm = _normalizar_catalogo_torta_item(
+            item,
+            {"id": "size", "categoria_id": next(iter(categorias_validas), "general"), "nombre": "Tamano", "precio": 0, "max_sabores": 3, "activo": True},
+            allow_max_sabores=True,
         )
+        if not norm.get("categoria_id") or norm.get("categoria_id") not in categorias_validas:
+            norm["categoria_id"] = next(iter(categorias_validas), "general")
+        out["sizes"].append(norm)
 
     sabores_in = data.get("sabores")
     if not isinstance(sabores_in, list):
@@ -1722,12 +1742,15 @@ def _normalizar_catalogo_torta_cfg(raw):
 
 def _catalogo_torta_publico(cfg):
     cat = _normalizar_catalogo_torta_cfg(cfg)
+    categorias_activas = [x for x in (cat.get("categorias") or []) if bool(x.get("activo"))]
+    cat_ids = {str(x.get("id") or "") for x in categorias_activas}
     return {
         "enabled": bool(cat.get("enabled")),
         "show_prices": bool(cat.get("show_prices")),
         "max_extra_items": int(cat.get("max_extra_items") or 8),
         "max_reference_images": int(cat.get("max_reference_images") or 3),
-        "sizes": [x for x in (cat.get("sizes") or []) if bool(x.get("activo"))],
+        "categorias": categorias_activas,
+        "sizes": [x for x in (cat.get("sizes") or []) if bool(x.get("activo")) and str(x.get("categoria_id") or "") in cat_ids],
         "sabores": [x for x in (cat.get("sabores") or []) if bool(x.get("activo"))],
         "extras": [x for x in (cat.get("extras") or []) if bool(x.get("activo"))],
         "toppers": [x for x in (cat.get("toppers") or []) if bool(x.get("activo"))],

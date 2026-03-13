@@ -63,7 +63,7 @@
         .section h2 { margin: 0; font-size: .95rem; }
         .row {
             display: grid;
-            grid-template-columns: 1.2fr .6fr .4fr .4fr auto;
+            grid-template-columns: 1.2fr .6fr .8fr .4fr .4fr auto;
             gap: 8px;
             align-items: end;
         }
@@ -138,6 +138,15 @@
 
                 <div class="section">
                     <div class="actions">
+                        <h2 style="margin:0;flex:1;">Categorias de torta</h2>
+                        <button class="btn btn-out" type="button" id="add-category">Agregar categoria</button>
+                    </div>
+                    <div class="list" id="list-categories"></div>
+                    <div class="muted">Ejemplo: Tortas Bizcocho, Tortas Panqueque.</div>
+                </div>
+
+                <div class="section">
+                    <div class="actions">
                         <h2 style="margin:0;flex:1;">Tamanos base</h2>
                         <button class="btn btn-out" type="button" id="add-size">Agregar tamano</button>
                     </div>
@@ -198,6 +207,7 @@ let state = {
     show_prices: true,
     max_extra_items: 8,
     max_reference_images: 3,
+    categorias: [],
     sizes: [],
     sabores: [],
     extras: [],
@@ -231,13 +241,27 @@ function renderSummary() {
 }
 
 function rowHtmlSize(item, idx) {
+    const catRows = Array.isArray(state.categorias) ? state.categorias : [];
+    const catOptions = catRows.map((c) => `<option value="${esc(c.id || "")}">${esc(c.nombre || c.id || "")}</option>`).join("");
     return `
         <div class="row" data-idx="${idx}">
             <label>Nombre<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
             <label>Precio<input data-k="precio" type="number" min="0" step="1" value="${n(item.precio)}"></label>
+            <label>Categoria
+                <select data-k="categoria_id">${catOptions}</select>
+            </label>
             <label>Max sabores<input data-k="max_sabores" type="number" min="1" max="8" step="1" value="${Math.max(1, n(item.max_sabores, 3))}"></label>
             <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activo</label>
             <button class="btn btn-del" type="button" onclick="removeRow('sizes', ${idx})">X</button>
+        </div>
+    `;
+}
+function rowHtmlCategory(item, idx) {
+    return `
+        <div class="row" data-idx="${idx}" style="grid-template-columns:1fr .4fr auto;">
+            <label>Nombre categoria<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
+            <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activa</label>
+            <button class="btn btn-del" type="button" onclick="removeRow('categorias', ${idx})">X</button>
         </div>
     `;
 }
@@ -280,10 +304,12 @@ function render() {
     document.getElementById("show_prices").checked = Boolean(state.show_prices);
     document.getElementById("max_extra_items").value = Math.max(1, n(state.max_extra_items, 8));
     document.getElementById("max_reference_images").value = Math.max(0, n(state.max_reference_images, 3));
+    document.getElementById("list-categories").innerHTML = state.categorias.map((x, i) => rowHtmlCategory(x, i)).join("");
     document.getElementById("list-sizes").innerHTML = state.sizes.map((x, i) => rowHtmlSize(x, i)).join("");
     document.getElementById("list-flavors").innerHTML = state.sabores.map((x, i) => rowHtmlFlavor(x, i)).join("");
     document.getElementById("list-extras").innerHTML = state.extras.map((x, i) => rowHtmlExtra(x, i)).join("");
     document.getElementById("list-toppers").innerHTML = state.toppers.map((x, i) => rowHtmlTopper(x, i)).join("");
+    bindListInputs("categorias");
     bindListInputs("sizes");
     bindListInputs("sabores");
     bindListInputs("extras");
@@ -305,9 +331,14 @@ function bindListInputs(key) {
                 else if (field === "precio" || field === "max_sabores" || field === "max_cantidad") state[key][idx][field] = n(inp.value, 0);
                 else state[key][idx][field] = String(inp.value || "");
                 if (field === "nombre") state[key][idx].id = slug(inp.value);
+                if (field === "categoria_id") state[key][idx].categoria_id = String(inp.value || "");
                 renderSummary();
             });
         });
+        if (key === "sizes") {
+            const catSel = row.querySelector('select[data-k="categoria_id"]');
+            if (catSel) catSel.value = String(state[key][idx].categoria_id || "");
+        }
     });
 }
 
@@ -341,7 +372,8 @@ function payload() {
         show_prices: Boolean(document.getElementById("show_prices").checked),
         max_extra_items: Math.max(1, Math.min(20, n(document.getElementById("max_extra_items").value, 8))),
         max_reference_images: Math.max(0, Math.min(10, n(document.getElementById("max_reference_images").value, 3))),
-        sizes: state.sizes.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_sabores: Math.max(1, Math.min(8, n(x.max_sabores, 3))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+        categorias: state.categorias.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+        sizes: state.sizes.map((x) => ({ id: slug(x.id || x.nombre), categoria_id: slug(x.categoria_id || ""), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_sabores: Math.max(1, Math.min(8, n(x.max_sabores, 3))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
         sabores: state.sabores.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), activo: Boolean(x.activo) })).filter((x) => x.nombre),
         extras: state.extras.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_cantidad: Math.max(1, Math.min(20, n(x.max_cantidad, 1))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
         toppers: state.toppers.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), activo: Boolean(x.activo) })).filter((x) => x.nombre),
@@ -351,6 +383,7 @@ function payload() {
 async function save() {
     try {
         const body = payload();
+        if (!body.categorias.length) throw new Error("Debes agregar al menos una categoria");
         if (!body.sizes.length) throw new Error("Debes agregar al menos un tamano");
         if (!body.sabores.length) throw new Error("Debes agregar al menos un sabor");
         const res = await fetch(ENDPOINT, {
@@ -372,7 +405,12 @@ document.getElementById("enabled").addEventListener("change", () => { state.enab
 document.getElementById("show_prices").addEventListener("change", () => { state.show_prices = Boolean(document.getElementById("show_prices").checked); renderSummary(); });
 document.getElementById("max_extra_items").addEventListener("input", () => { state.max_extra_items = n(document.getElementById("max_extra_items").value, 8); });
 document.getElementById("max_reference_images").addEventListener("input", () => { state.max_reference_images = n(document.getElementById("max_reference_images").value, 3); });
-document.getElementById("add-size").addEventListener("click", () => { state.sizes.push(newItem({ nombre: "Nuevo tamano", precio: 0, max_sabores: 3, activo: true })); render(); });
+document.getElementById("add-category").addEventListener("click", () => { state.categorias.push(newItem({ nombre: "Nueva categoria", activo: true })); render(); });
+document.getElementById("add-size").addEventListener("click", () => {
+    const firstCat = (state.categorias && state.categorias[0]) ? String(state.categorias[0].id || "") : "";
+    state.sizes.push(newItem({ nombre: "Nuevo tamano", categoria_id: firstCat, precio: 0, max_sabores: 3, activo: true }));
+    render();
+});
 document.getElementById("add-flavor").addEventListener("click", () => { state.sabores.push(newItem({ nombre: "Nuevo sabor", precio: 0, activo: true })); render(); });
 document.getElementById("add-extra").addEventListener("click", () => { state.extras.push(newItem({ nombre: "Nuevo extra", precio: 0, max_cantidad: 1, activo: true })); render(); });
 document.getElementById("add-topper").addEventListener("click", () => { state.toppers.push(newItem({ nombre: "Nuevo topper", precio: 0, activo: true })); render(); });
