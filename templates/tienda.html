@@ -3294,19 +3294,23 @@
                 doc.line(margin, y + 1, margin + contentWidth, y + 1);
                 y += 8;
             };
+            const textBlockHeight = (lineCount = 1, fontSize = 12) => {
+                const lh = Number(doc.getLineHeightFactor ? doc.getLineHeightFactor() : 1.15) || 1.15;
+                return Math.max(1, lineCount) * fontSize * lh;
+            };
             const drawField = (label, value) => {
                 const wrapped = doc.splitTextToSize(safe(value), contentWidth);
-                ensurePage(10 + (wrapped.length * 4.8));
+                ensurePage(18 + textBlockHeight(wrapped.length, 12));
                 doc.setFont("helvetica", "bold");
                 doc.setFontSize(9);
                 doc.setTextColor(...colors.muted);
                 doc.text(String(label || "").toUpperCase(), margin, y);
-                y += 5;
+                y += textBlockHeight(1, 9) + 1;
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(12);
                 doc.setTextColor(...colors.dark);
                 doc.text(wrapped, margin, y);
-                y += (wrapped.length * 5.2) + 2;
+                y += textBlockHeight(wrapped.length, 12) + 3;
             };
             const drawLink = (label, url) => {
                 drawField(label, url);
@@ -3420,9 +3424,9 @@
             ];
             terminos.forEach((t, i) => {
                 const wrapped = doc.splitTextToSize(`${i + 1}. ${t}`, contentWidth - 4);
-                ensurePage((wrapped.length * 4.6) + 4);
+                ensurePage(textBlockHeight(wrapped.length, 9.5) + 5);
                 doc.text(wrapped, margin + 2, y);
-                y += (wrapped.length * 4.6) + 2;
+                y += textBlockHeight(wrapped.length, 9.5) + 2;
             });
 
             ensurePage(15);
