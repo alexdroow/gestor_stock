@@ -74,6 +74,21 @@
             padding: 8px 9px;
             font: inherit;
         }
+        .color-field {
+            display: grid;
+            grid-template-columns: 1fr 44px;
+            gap: 6px;
+            align-items: center;
+        }
+        .color-field input[type="color"] {
+            width: 44px;
+            height: 38px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 0;
+            background: #fff;
+            cursor: pointer;
+        }
         textarea { min-height: 84px; resize: vertical; }
         .full { grid-column: 1 / -1; }
         .toggle {
@@ -228,38 +243,127 @@
                         <input id="banner_text" type="text" maxlength="220">
                     </label>
                     <label>Color fondo franja
-                        <input id="banner_bg" type="text" placeholder="#f0fdf4">
+                        <div class="color-field">
+                            <input id="banner_bg" type="text" placeholder="#f0fdf4">
+                            <input type="color" data-color-target="banner_bg" value="#f0fdf4">
+                        </div>
                     </label>
                     <label>Color texto franja
-                        <input id="banner_text_color" type="text" placeholder="#166534">
+                        <div class="color-field">
+                            <input id="banner_text_color" type="text" placeholder="#166534">
+                            <input type="color" data-color-target="banner_text_color" value="#166534">
+                        </div>
                     </label>
                 </div>
 
                 <h2>Colores y CSS</h2>
                 <div class="fields">
                     <label>Color fondo sitio
-                        <input id="color_bg" type="text" placeholder="#f5f5f5">
+                        <div class="color-field">
+                            <input id="color_bg" type="text" placeholder="#f5f5f5">
+                            <input type="color" data-color-target="color_bg" value="#f5f5f5">
+                        </div>
                     </label>
                     <label>Color paneles
-                        <input id="color_panel" type="text" placeholder="#ffffff">
+                        <div class="color-field">
+                            <input id="color_panel" type="text" placeholder="#ffffff">
+                            <input type="color" data-color-target="color_panel" value="#ffffff">
+                        </div>
                     </label>
                     <label>Color lineas
-                        <input id="color_line" type="text" placeholder="#e5e7eb">
+                        <div class="color-field">
+                            <input id="color_line" type="text" placeholder="#e5e7eb">
+                            <input type="color" data-color-target="color_line" value="#e5e7eb">
+                        </div>
                     </label>
                     <label>Color texto
-                        <input id="color_text" type="text" placeholder="#111827">
+                        <div class="color-field">
+                            <input id="color_text" type="text" placeholder="#111827">
+                            <input type="color" data-color-target="color_text" value="#111827">
+                        </div>
                     </label>
                     <label>Color texto secundario
-                        <input id="color_muted" type="text" placeholder="#6b7280">
+                        <div class="color-field">
+                            <input id="color_muted" type="text" placeholder="#6b7280">
+                            <input type="color" data-color-target="color_muted" value="#6b7280">
+                        </div>
                     </label>
                     <label>Color acento
-                        <input id="color_accent" type="text" placeholder="#f45d08">
+                        <div class="color-field">
+                            <input id="color_accent" type="text" placeholder="#f45d08">
+                            <input type="color" data-color-target="color_accent" value="#f45d08">
+                        </div>
                     </label>
                     <label>Color acento hover
-                        <input id="color_accent_dark" type="text" placeholder="#cc4a03">
+                        <div class="color-field">
+                            <input id="color_accent_dark" type="text" placeholder="#cc4a03">
+                            <input type="color" data-color-target="color_accent_dark" value="#cc4a03">
+                        </div>
+                    </label>
+                    <label>Borde tarjeta oferta
+                        <div class="color-field">
+                            <input id="offer_card_border_color" type="text" placeholder="#fdba74">
+                            <input type="color" data-color-target="offer_card_border_color" value="#fdba74">
+                        </div>
+                    </label>
+                    <label>Brillo tarjeta oferta
+                        <div class="color-field">
+                            <input id="offer_card_glow_color" type="text" placeholder="#fb923c">
+                            <input type="color" data-color-target="offer_card_glow_color" value="#fb923c">
+                        </div>
+                    </label>
+                    <label>Color precio oferta
+                        <div class="color-field">
+                            <input id="offer_price_color" type="text" placeholder="#9a3412">
+                            <input type="color" data-color-target="offer_price_color" value="#9a3412">
+                        </div>
+                    </label>
+                    <label>Chip descuento (fondo)
+                        <div class="color-field">
+                            <input id="offer_discount_chip_bg" type="text" placeholder="#ef4444">
+                            <input type="color" data-color-target="offer_discount_chip_bg" value="#ef4444">
+                        </div>
+                    </label>
+                    <label>Chip descuento (texto)
+                        <div class="color-field">
+                            <input id="offer_discount_chip_text" type="text" placeholder="#ffffff">
+                            <input type="color" data-color-target="offer_discount_chip_text" value="#ffffff">
+                        </div>
+                    </label>
+                    <label>Badge oferta (fondo)
+                        <div class="color-field">
+                            <input id="offer_badge_bg" type="text" placeholder="#f97316">
+                            <input type="color" data-color-target="offer_badge_bg" value="#f97316">
+                        </div>
+                    </label>
+                    <label>Badge oferta (texto)
+                        <div class="color-field">
+                            <input id="offer_badge_text_color" type="text" placeholder="#ffffff">
+                            <input type="color" data-color-target="offer_badge_text_color" value="#ffffff">
+                        </div>
                     </label>
                     <label class="full">CSS personalizado (opcional)
                         <textarea id="custom_css" placeholder=".topbar { border-radius: 0; }"></textarea>
+                    </label>
+                </div>
+
+                <h2>Viñeta y flotantes de oferta</h2>
+                <div class="fields">
+                    <label class="toggle full"><input id="offer_badge_enabled" type="checkbox"> Mostrar viñeta de oferta en tarjetas</label>
+                    <label>Texto viñeta oferta
+                        <input id="offer_badge_text" type="text" maxlength="28" placeholder="Oferta">
+                    </label>
+                    <label>Icono viñeta oferta
+                        <input id="offer_badge_icon" type="text" maxlength="8" placeholder="🔥">
+                    </label>
+                    <label>Icono flotante oferta
+                        <input id="offer_float_icon" type="text" maxlength="8" placeholder="✨">
+                    </label>
+                    <label>Tamaño flotante (24-120)
+                        <input id="offer_float_image_size" type="text" maxlength="3" placeholder="46">
+                    </label>
+                    <label class="full">URL imagen flotante de oferta (si se define, reemplaza icono flotante)
+                        <input id="offer_float_image_url" type="url" placeholder="https://.../sticker.png">
                     </label>
                 </div>
 
@@ -287,7 +391,11 @@
                         </div>
                         <div class="preview-sec">
                             <div class="h" id="pv-ofertas">Ofertas</div>
-                            <div style="font-size:.82rem;color:#64748b;">Productos con descuento y destacados.</div>
+                            <div style="font-size:.82rem;color:#64748b;margin-bottom:6px;">Productos con descuento y destacados.</div>
+                            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                <span id="pv-offer-badge" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:.7rem;font-weight:800;">🔥 Oferta</span>
+                                <span id="pv-discount-chip" style="display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;font-size:.7rem;font-weight:800;">-20%</span>
+                            </div>
                         </div>
                         <div class="preview-sec">
                             <div class="h" id="pv-cart">Tu compra</div>
@@ -308,7 +416,11 @@
         "empty_cart_text","whatsapp_url","whatsapp_title","whatsapp_icon_url","show_whatsapp_button",
         "hero_enabled","hero_badge","hero_title","hero_subtitle","hero_cta_text","hero_cta_url","hero_image_url",
         "banner_enabled","banner_text","banner_bg","banner_text_color",
-        "color_bg","color_panel","color_line","color_text","color_muted","color_accent","color_accent_dark","custom_css"
+        "color_bg","color_panel","color_line","color_text","color_muted","color_accent","color_accent_dark",
+        "offer_card_border_color","offer_card_glow_color","offer_price_color","offer_discount_chip_bg","offer_discount_chip_text",
+        "offer_badge_enabled","offer_badge_text","offer_badge_icon","offer_badge_bg","offer_badge_text_color",
+        "offer_float_icon","offer_float_image_url","offer_float_image_size",
+        "custom_css"
     ];
 
     const DEFAULTS = {
@@ -341,6 +453,19 @@
         color_muted: "#6b7280",
         color_accent: "#f45d08",
         color_accent_dark: "#cc4a03",
+        offer_card_border_color: "#fdba74",
+        offer_card_glow_color: "#fb923c",
+        offer_price_color: "#9a3412",
+        offer_discount_chip_bg: "#ef4444",
+        offer_discount_chip_text: "#ffffff",
+        offer_badge_enabled: true,
+        offer_badge_text: "Oferta",
+        offer_badge_icon: "🔥",
+        offer_badge_bg: "#f97316",
+        offer_badge_text_color: "#ffffff",
+        offer_float_icon: "✨",
+        offer_float_image_url: "",
+        offer_float_image_size: 46,
         custom_css: ""
     };
 
@@ -386,6 +511,22 @@
         prev.style.borderColor = p.color_line || DEFAULTS.color_line;
         prev.style.color = p.color_text || DEFAULTS.color_text;
 
+        const offerBadge = document.getElementById("pv-offer-badge");
+        if (offerBadge) {
+            const show = Boolean(p.offer_badge_enabled);
+            offerBadge.style.display = show ? "inline-flex" : "none";
+            const badgeIcon = String(p.offer_badge_icon || "").trim();
+            const badgeText = String(p.offer_badge_text || "Oferta").trim();
+            offerBadge.textContent = `${badgeIcon ? `${badgeIcon} ` : ""}${badgeText}`;
+            offerBadge.style.background = p.offer_badge_bg || DEFAULTS.offer_badge_bg;
+            offerBadge.style.color = p.offer_badge_text_color || DEFAULTS.offer_badge_text_color;
+        }
+        const chip = document.getElementById("pv-discount-chip");
+        if (chip) {
+            chip.style.background = p.offer_discount_chip_bg || DEFAULTS.offer_discount_chip_bg;
+            chip.style.color = p.offer_discount_chip_text || DEFAULTS.offer_discount_chip_text;
+        }
+
         const banner = document.getElementById("pv-banner");
         banner.style.display = p.banner_enabled && p.banner_text ? "" : "none";
         banner.textContent = p.banner_text || "";
@@ -399,6 +540,35 @@
         document.getElementById("pv-hero-subtitle").textContent = p.hero_subtitle || "";
     }
 
+    function syncColorPickersFromText() {
+        document.querySelectorAll("input[data-color-target]").forEach((picker) => {
+            const targetId = String(picker.getAttribute("data-color-target") || "");
+            const txt = document.getElementById(targetId);
+            if (!txt) return;
+            const raw = String(txt.value || "").trim();
+            const ok = /^#([0-9a-fA-F]{6})$/.test(raw);
+            if (ok) picker.value = raw;
+        });
+    }
+
+    function bindColorPickers() {
+        document.querySelectorAll("input[data-color-target]").forEach((picker) => {
+            const targetId = String(picker.getAttribute("data-color-target") || "");
+            const txt = document.getElementById(targetId);
+            if (!txt) return;
+            picker.addEventListener("input", () => {
+                txt.value = picker.value;
+                renderPreview();
+            });
+            txt.addEventListener("input", () => {
+                const raw = String(txt.value || "").trim();
+                if (/^#([0-9a-fA-F]{6})$/.test(raw)) {
+                    picker.value = raw;
+                }
+            });
+        });
+    }
+
     async function cargar() {
         setMsg("Cargando configuracion...");
         try {
@@ -406,6 +576,7 @@
             const data = await res.json();
             if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar configuracion");
             fillForm(data.config || {});
+            syncColorPickersFromText();
             setMsg("Configuracion cargada.", "ok");
         } catch (err) {
             setMsg(err.message || "Error cargando configuracion", "err");
@@ -423,6 +594,7 @@
             const data = await res.json();
             if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
             fillForm(data.config || {});
+            syncColorPickersFromText();
             setMsg("Personalizacion guardada correctamente.", "ok");
         } catch (err) {
             setMsg(err.message || "Error guardando", "err");
@@ -433,6 +605,7 @@
     document.getElementById("btn-recargar").addEventListener("click", cargar);
     document.getElementById("btn-restaurar").addEventListener("click", () => {
         fillForm(DEFAULTS);
+        syncColorPickersFromText();
         setMsg("Valores base cargados en formulario. Presiona 'Guardar cambios' para aplicar.");
     });
 
@@ -443,6 +616,7 @@
         el.addEventListener("change", renderPreview);
     }
 
+    bindColorPickers();
     cargar();
 </script>
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>

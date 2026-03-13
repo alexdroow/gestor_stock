@@ -1213,6 +1213,19 @@ def _default_tienda_personalizacion():
         "color_muted": "#6b7280",
         "color_accent": "#f45d08",
         "color_accent_dark": "#cc4a03",
+        "offer_card_border_color": "#fdba74",
+        "offer_card_glow_color": "#fb923c",
+        "offer_price_color": "#9a3412",
+        "offer_discount_chip_bg": "#ef4444",
+        "offer_discount_chip_text": "#ffffff",
+        "offer_badge_enabled": True,
+        "offer_badge_text": "Oferta",
+        "offer_badge_icon": "🔥",
+        "offer_badge_bg": "#f97316",
+        "offer_badge_text_color": "#ffffff",
+        "offer_float_icon": "✨",
+        "offer_float_image_url": "",
+        "offer_float_image_size": 46,
         "custom_css": "",
     }
 
@@ -1274,6 +1287,23 @@ def _normalizar_tienda_personalizacion(payload):
     clean["color_muted"] = _normalizar_color_hex(data.get("color_muted"), base["color_muted"])
     clean["color_accent"] = _normalizar_color_hex(data.get("color_accent"), base["color_accent"])
     clean["color_accent_dark"] = _normalizar_color_hex(data.get("color_accent_dark"), base["color_accent_dark"])
+    clean["offer_card_border_color"] = _normalizar_color_hex(data.get("offer_card_border_color"), base["offer_card_border_color"])
+    clean["offer_card_glow_color"] = _normalizar_color_hex(data.get("offer_card_glow_color"), base["offer_card_glow_color"])
+    clean["offer_price_color"] = _normalizar_color_hex(data.get("offer_price_color"), base["offer_price_color"])
+    clean["offer_discount_chip_bg"] = _normalizar_color_hex(data.get("offer_discount_chip_bg"), base["offer_discount_chip_bg"])
+    clean["offer_discount_chip_text"] = _normalizar_color_hex(data.get("offer_discount_chip_text"), base["offer_discount_chip_text"])
+    clean["offer_badge_enabled"] = bool(data.get("offer_badge_enabled", base["offer_badge_enabled"]))
+    clean["offer_badge_text"] = str(data.get("offer_badge_text") or "").strip()[:28]
+    clean["offer_badge_icon"] = str(data.get("offer_badge_icon") or "").strip()[:8]
+    clean["offer_badge_bg"] = _normalizar_color_hex(data.get("offer_badge_bg"), base["offer_badge_bg"])
+    clean["offer_badge_text_color"] = _normalizar_color_hex(data.get("offer_badge_text_color"), base["offer_badge_text_color"])
+    clean["offer_float_icon"] = str(data.get("offer_float_icon") or "").strip()[:8]
+    clean["offer_float_image_url"] = _normalizar_url_personalizacion(data.get("offer_float_image_url"))
+    try:
+        offer_float_image_size = int(data.get("offer_float_image_size") or base["offer_float_image_size"])
+    except (TypeError, ValueError):
+        offer_float_image_size = int(base["offer_float_image_size"])
+    clean["offer_float_image_size"] = max(24, min(120, offer_float_image_size))
     clean["custom_css"] = str(data.get("custom_css") or "").strip()[:5000]
     return clean
 

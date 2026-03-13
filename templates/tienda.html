@@ -260,8 +260,8 @@
             position: relative;
         }
         .item-card.oferta {
-            border: 1px solid #fdba74;
-            box-shadow: 0 0 0 1px rgba(251, 146, 60, .35), 0 14px 26px rgba(251, 146, 60, .26);
+            border: 1px solid var(--offer-border, #fdba74);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--offer-glow, #fb923c) 35%, transparent), 0 14px 26px color-mix(in srgb, var(--offer-glow, #fb923c) 26%, transparent);
         }
         .item-card.oferta::before {
             content: "";
@@ -269,8 +269,8 @@
             inset: -1px;
             border-radius: 12px;
             pointer-events: none;
-            border: 1px solid rgba(249, 115, 22, .7);
-            box-shadow: 0 0 22px rgba(251, 146, 60, .45);
+            border: 1px solid color-mix(in srgb, var(--offer-glow, #fb923c) 75%, transparent);
+            box-shadow: 0 0 22px color-mix(in srgb, var(--offer-glow, #fb923c) 45%, transparent);
         }
         .fav-tag {
             position: absolute;
@@ -332,7 +332,7 @@
         }
         .item-card.oferta .price-final {
             font-size: 1.34rem;
-            color: #9a3412;
+            color: var(--offer-price, #9a3412);
         }
         .price-old {
             color: #9ca3af;
@@ -342,10 +342,58 @@
         .discount-chip {
             font-size: 0.74rem;
             font-weight: 800;
-            color: #fff;
-            background: #ef4444;
+            color: var(--discount-chip-text, #fff);
+            background: var(--discount-chip-bg, #ef4444);
             border-radius: 999px;
             padding: 2px 6px;
+        }
+        .offer-custom-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 3;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: .72rem;
+            font-weight: 900;
+            border-radius: 999px;
+            padding: 4px 8px;
+            background: var(--offer-badge-bg, #f97316);
+            color: var(--offer-badge-text, #ffffff);
+            box-shadow: 0 4px 10px rgba(2, 6, 23, .22);
+            max-width: 75%;
+        }
+        .offer-custom-badge .txt {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .offer-float {
+            position: absolute;
+            right: 10px;
+            bottom: 48px;
+            z-index: 2;
+            width: var(--offer-float-size, 46px);
+            height: var(--offer-float-size, 46px);
+            display: grid;
+            place-items: center;
+            pointer-events: none;
+            animation: offerFloat 2.8s ease-in-out infinite;
+        }
+        .offer-float.icon {
+            font-size: calc(var(--offer-float-size, 46px) * .62);
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,.23));
+        }
+        .offer-float.image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,.23));
+        }
+        @keyframes offerFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
         }
         .agotado-chip {
             font-size: 0.72rem;
@@ -1258,6 +1306,19 @@
             color_muted: "#6b7280",
             color_accent: "#f45d08",
             color_accent_dark: "#cc4a03",
+            offer_card_border_color: "#fdba74",
+            offer_card_glow_color: "#fb923c",
+            offer_price_color: "#9a3412",
+            offer_discount_chip_bg: "#ef4444",
+            offer_discount_chip_text: "#ffffff",
+            offer_badge_enabled: true,
+            offer_badge_text: "Oferta",
+            offer_badge_icon: "🔥",
+            offer_badge_bg: "#f97316",
+            offer_badge_text_color: "#ffffff",
+            offer_float_icon: "✨",
+            offer_float_image_url: "",
+            offer_float_image_size: 46,
             custom_css: "",
         };
         const TIENDA_UI_INITIAL = {{ (tienda_personalizacion or {}) | tojson }};
@@ -1330,6 +1391,15 @@
             root.style.setProperty("--muted", String(tiendaUiCfg.color_muted || TIENDA_UI_DEFAULTS.color_muted));
             root.style.setProperty("--accent", String(tiendaUiCfg.color_accent || TIENDA_UI_DEFAULTS.color_accent));
             root.style.setProperty("--accent-dark", String(tiendaUiCfg.color_accent_dark || TIENDA_UI_DEFAULTS.color_accent_dark));
+            root.style.setProperty("--offer-border", String(tiendaUiCfg.offer_card_border_color || TIENDA_UI_DEFAULTS.offer_card_border_color));
+            root.style.setProperty("--offer-glow", String(tiendaUiCfg.offer_card_glow_color || TIENDA_UI_DEFAULTS.offer_card_glow_color));
+            root.style.setProperty("--offer-price", String(tiendaUiCfg.offer_price_color || TIENDA_UI_DEFAULTS.offer_price_color));
+            root.style.setProperty("--discount-chip-bg", String(tiendaUiCfg.offer_discount_chip_bg || TIENDA_UI_DEFAULTS.offer_discount_chip_bg));
+            root.style.setProperty("--discount-chip-text", String(tiendaUiCfg.offer_discount_chip_text || TIENDA_UI_DEFAULTS.offer_discount_chip_text));
+            root.style.setProperty("--offer-badge-bg", String(tiendaUiCfg.offer_badge_bg || TIENDA_UI_DEFAULTS.offer_badge_bg));
+            root.style.setProperty("--offer-badge-text", String(tiendaUiCfg.offer_badge_text_color || TIENDA_UI_DEFAULTS.offer_badge_text_color));
+            const floatSizeNum = Math.max(24, Math.min(120, Number(tiendaUiCfg.offer_float_image_size || TIENDA_UI_DEFAULTS.offer_float_image_size) || 46));
+            root.style.setProperty("--offer-float-size", `${floatSizeNum}px`);
             if (tiendaCustomCssEl) tiendaCustomCssEl.textContent = String(tiendaUiCfg.custom_css || "");
         }
 
@@ -1538,9 +1608,16 @@
             const stock = Math.max(0, Number(p.max_compra || 0));
             const agotado = stock <= 0;
             const esOferta = hasDiscount;
+            const badgeOn = esOferta && Boolean(tiendaUiCfg.offer_badge_enabled);
+            const badgeText = String(tiendaUiCfg.offer_badge_text || "").trim() || "Oferta";
+            const badgeIcon = String(tiendaUiCfg.offer_badge_icon || "").trim();
+            const floatImg = String(tiendaUiCfg.offer_float_image_url || "").trim();
+            const floatIcon = String(tiendaUiCfg.offer_float_icon || "").trim();
             return `
                 <article class="item-card ${esOferta ? "oferta" : ""}">
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
+                    ${badgeOn ? `<span class="offer-custom-badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
+                    ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
                     <div class="item-photo">${fotoHtml(p)}</div>
                     <div class="item-body">
                         <div class="item-name">${esc(p.nombre)}</div>
