@@ -146,6 +146,68 @@
             align-items: center;
             margin-bottom: 24px;
         }
+        .reserva-top-alert {
+            display: none;
+            margin: -8px 0 14px;
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-weight: 700;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .reserva-top-alert.active {
+            display: flex;
+        }
+        .reserva-top-alert .actions {
+            display: inline-flex;
+            gap: 8px;
+        }
+        .reserva-popup {
+            position: fixed;
+            top: 18px;
+            right: 20px;
+            z-index: 1000;
+            max-width: min(420px, 92vw);
+            background: #0f172a;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.15);
+            border-radius: 12px;
+            box-shadow: 0 18px 40px rgba(15,23,42,.35);
+            padding: 12px;
+            display: none;
+        }
+        .reserva-popup.active {
+            display: block;
+        }
+        .reserva-popup .title {
+            font-size: 15px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .reserva-popup .meta {
+            font-size: 13px;
+            color: #cbd5e1;
+            margin-bottom: 10px;
+        }
+        .reserva-popup .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-whatsapp {
+            background: #22c55e;
+            color: #fff;
+            border: none;
+        }
+        .btn-whatsapp:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
         
         .page-title {
             font-size: 32px;
@@ -1316,6 +1378,12 @@
                 <button onclick="abrirConfig()" class="btn-icon" title="Configuración">&#9998;</button>
             </div>
             
+            <div class="reserva-top-alert" id="reserva-top-alert">
+                <span id="reserva-top-alert-text">Hay nuevas reservas por confirmar.</span>
+                <span class="actions">
+                    <button type="button" class="btn btn-secondary" onclick="irANuevaReserva()">Ver reserva</button>
+                </span>
+            </div>
             <div class="agenda-layout">
                 <div class="agenda-main-column">
                     <!-- Calendario -->
@@ -1432,6 +1500,14 @@
     <div class="loading-overlay" id="loading">
         <div class="spinner"></div>
         <div>Cargando...</div>
+    </div>
+    <div class="reserva-popup" id="reserva-popup">
+        <div class="title">&#128276; Nueva reserva desde tienda</div>
+        <div class="meta" id="reserva-popup-meta">Llego una reserva nueva y debes confirmarla.</div>
+        <div class="actions">
+            <button type="button" class="btn btn-primary" onclick="irANuevaReserva()">Abrir reserva</button>
+            <button type="button" class="btn btn-secondary" onclick="cerrarReservaPopup()">Cerrar</button>
+        </div>
     </div>
 
     <!-- Modal Evento -->
@@ -1560,6 +1636,7 @@
             <div class="modal-footer">
                 <button onclick="eliminarEvento()" class="btn btn-danger" id="btn-eliminar" style="display: none;">Eliminar</button>
                 <button onclick="cerrarModal()" class="btn btn-secondary">Cancelar</button>
+                <button onclick="contactarClienteWhatsAppEvento()" class="btn btn-whatsapp" id="btn-whatsapp-cliente" style="display: none;">WhatsApp cliente</button>
                 <button onclick="generarPDF()" class="btn btn-pdf" id="btn-pdf" style="display: none;">&#128196; PDF</button>
                 <button onclick="guardarEvento()" class="btn btn-success">Guardar</button>
             </div>
@@ -1709,6 +1786,9 @@
             zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
         const AGENDA_DAY_HOURS_OPEN_KEY = 'agenda_day_hours_open_v1';
+        const RESERVAS_TIENDA_SEEN_KEY = 'agenda_reservas_tienda_seen_v1';
+        let reservasTiendaSeen = new Set();
+        let reservasTiendaBootstrapped = false;
 
         function setDayHoursPanelOpen(isOpen, persist = true) {
             const panel = document.getElementById('day-hours-panel');
@@ -1939,6 +2019,7 @@
             applyDarkModePreference();
             inicializarBusquedaDireccion();
             cargarEstadoDayHoursPanel();
+            cargarReservasTiendaSeen();
             fechaSeleccionada = formatearFecha(new Date());
             cargarConfig();
             cargarEventos({ silent: true }); // Evita parpadeo al entrar a Agenda
@@ -1946,6 +2027,12 @@
              
             // Actualizar cada minuto
             setInterval(verificarNotificaciones, 60000);
+            setInterval(() => cargarEventos({ silent: true, fromPolling: true }), 15000);
+
+            const telefonoInput = document.getElementById('evento-telefono');
+            if (telefonoInput) {
+                telefonoInput.addEventListener('input', actualizarBotonWhatsAppCliente);
+            }
         });
 
         window.addEventListener('storage', (event) => {
@@ -1979,13 +2066,19 @@
                     renderizarProximos();
                     renderizarBloqueosActivos();
                     verificarNotificaciones();
+                    actualizarAlertaReservasPendientes();
+                    detectarNuevasReservasTienda(Boolean(options && options.fromPolling));
                 } else {
                     console.error('Error cargando eventos:', data.error);
-                    alert('Error al cargar eventos: ' + data.error);
+                    if (!options || options.silent !== true) {
+                        alert('Error al cargar eventos: ' + data.error);
+                    }
                 }
             } catch (error) {
                 console.error('Error de conexión:', error);
-                alert('Error de conexión al cargar eventos');
+                if (!options || options.silent !== true) {
+                    alert('Error de conexión al cargar eventos');
+                }
             } finally {
                 if (showLoading) mostrarLoading(false);
             }
@@ -2429,6 +2522,180 @@
             });
         }
 
+        function esReservaTiendaPendiente(evento) {
+            if (!evento) return false;
+            const estado = String(evento.estado || '').trim().toLowerCase();
+            if (estado !== 'pendiente') return false;
+            const tipo = String(evento.tipo || '').trim().toLowerCase();
+            if (tipo === 'bloqueo') return false;
+            const motivo = String(evento.motivo || '').toLowerCase();
+            const ingredientes = String(evento.ingredientes || '').toLowerCase();
+            const titulo = String(evento.titulo || '').toLowerCase();
+            return (
+                motivo.includes('reserva cliente tienda online') ||
+                ingredientes.includes('reserva desde tienda online') ||
+                titulo.includes('reserva tienda')
+            );
+        }
+
+        function obtenerReservasTiendaPendientesOrdenadas() {
+            return eventos
+                .filter(esReservaTiendaPendiente)
+                .slice()
+                .sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+        }
+
+        function cargarReservasTiendaSeen() {
+            try {
+                const raw = localStorage.getItem(RESERVAS_TIENDA_SEEN_KEY);
+                if (!raw) return;
+                const ids = JSON.parse(raw);
+                if (!Array.isArray(ids)) return;
+                reservasTiendaSeen = new Set(
+                    ids
+                        .map(v => Number(v || 0))
+                        .filter(v => Number.isFinite(v) && v > 0)
+                );
+            } catch (error) {
+                reservasTiendaSeen = new Set();
+            }
+        }
+
+        function guardarReservasTiendaSeen() {
+            try {
+                localStorage.setItem(
+                    RESERVAS_TIENDA_SEEN_KEY,
+                    JSON.stringify(Array.from(reservasTiendaSeen))
+                );
+            } catch (error) {
+                // Ignora errores de almacenamiento del navegador.
+            }
+        }
+
+        function actualizarAlertaReservasPendientes() {
+            const alertEl = document.getElementById('reserva-top-alert');
+            const textEl = document.getElementById('reserva-top-alert-text');
+            if (!alertEl || !textEl) return;
+            const pendientes = obtenerReservasTiendaPendientesOrdenadas();
+            if (!pendientes.length) {
+                alertEl.classList.remove('active');
+                textEl.textContent = 'No hay reservas nuevas por confirmar.';
+                return;
+            }
+            const plural = pendientes.length === 1 ? 'reserva nueva' : 'reservas nuevas';
+            textEl.textContent = `Tienes ${pendientes.length} ${plural} por confirmar en Agenda.`;
+            alertEl.classList.add('active');
+        }
+
+        function mostrarReservaPopup(evento, nuevasCount = 1) {
+            const popup = document.getElementById('reserva-popup');
+            const meta = document.getElementById('reserva-popup-meta');
+            if (!popup || !meta) return;
+            if (evento) {
+                const cliente = String(evento.cliente || 'Cliente sin nombre').trim();
+                const fecha = String(evento.fecha || '-').trim();
+                const hora = String(evento.hora_inicio || evento.hora_entrega || '').trim();
+                const extra = nuevasCount > 1 ? ` (+${nuevasCount - 1} nuevas)` : '';
+                meta.textContent = `${cliente} - ${fecha}${hora ? ' ' + hora : ''}${extra}. Debes confirmar la reserva.`;
+            } else {
+                meta.textContent = 'Llego una reserva nueva y debes confirmarla.';
+            }
+            popup.classList.add('active');
+        }
+
+        function cerrarReservaPopup() {
+            const popup = document.getElementById('reserva-popup');
+            if (!popup) return;
+            popup.classList.remove('active');
+        }
+
+        function detectarNuevasReservasTienda(desdePolling) {
+            const pendientes = obtenerReservasTiendaPendientesOrdenadas();
+
+            if (!reservasTiendaBootstrapped) {
+                pendientes.forEach(e => {
+                    const id = Number(e.id || 0);
+                    if (id > 0) reservasTiendaSeen.add(id);
+                });
+                guardarReservasTiendaSeen();
+                reservasTiendaBootstrapped = true;
+                return;
+            }
+
+            const nuevos = pendientes.filter(e => {
+                const id = Number(e.id || 0);
+                return id > 0 && !reservasTiendaSeen.has(id);
+            });
+
+            if (!nuevos.length) return;
+            nuevos.forEach(e => reservasTiendaSeen.add(Number(e.id || 0)));
+            guardarReservasTiendaSeen();
+            if (desdePolling) {
+                mostrarReservaPopup(nuevos[0], nuevos.length);
+            }
+        }
+
+        function irANuevaReserva() {
+            const pendientes = obtenerReservasTiendaPendientesOrdenadas();
+            if (!pendientes.length) {
+                cerrarReservaPopup();
+                return;
+            }
+            cerrarReservaPopup();
+            editarEvento(Number(pendientes[0].id || 0));
+        }
+
+        function normalizarTelefonoWhatsApp(raw) {
+            let digits = String(raw || '').replace(/\D+/g, '');
+            if (!digits) return '';
+            if (digits.startsWith('00')) digits = digits.slice(2);
+            if (digits.startsWith('0')) digits = digits.replace(/^0+/, '');
+            if (digits.startsWith('56') && digits.length >= 10) return digits;
+            if (digits.length === 9 && digits.startsWith('9')) return `56${digits}`;
+            if (digits.length >= 10) return digits;
+            return '';
+        }
+
+        function actualizarBotonWhatsAppCliente() {
+            const btn = document.getElementById('btn-whatsapp-cliente');
+            const tipoEl = document.getElementById('evento-tipo');
+            const telefonoEl = document.getElementById('evento-telefono');
+            if (!btn || !tipoEl || !telefonoEl) return;
+            const tipo = String(tipoEl.value || '').trim().toLowerCase();
+            if (tipo === 'bloqueo') {
+                btn.style.display = 'none';
+                btn.disabled = true;
+                btn.title = '';
+                return;
+            }
+            const phone = normalizarTelefonoWhatsApp(telefonoEl.value);
+            btn.style.display = 'inline-block';
+            btn.disabled = !phone;
+            btn.title = phone ? 'Contactar cliente por WhatsApp' : 'Ingresa un telefono valido para habilitar WhatsApp';
+        }
+
+        function contactarClienteWhatsAppEvento() {
+            const tipo = String((document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
+            if (tipo === 'bloqueo') return;
+            const cliente = (document.getElementById('evento-cliente').value || 'cliente').trim();
+            const telefono = normalizarTelefonoWhatsApp(document.getElementById('evento-telefono').value);
+            if (!telefono) {
+                alert('Ingresa un telefono valido para contactar por WhatsApp.');
+                return;
+            }
+            const fecha = (document.getElementById('evento-fecha').value || '').trim();
+            const hora = (document.getElementById('evento-entrega').value || document.getElementById('evento-hora-inicio').value || '').trim();
+            const titulo = (document.getElementById('evento-titulo').value || 'tu reserva').trim();
+            const mensaje = [
+                `Hola ${cliente}, te escribimos de Sucree Pasteleria.`,
+                `Estamos revisando tu reserva: ${titulo}.`,
+                `Fecha: ${fecha}${hora ? ' a las ' + hora : ''}.`,
+                'Te contactamos para coordinar los detalles finales.'
+            ].join(' ');
+            const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
         function limpiarMapaEstado(mensaje = 'Escribe una dirección para ver el mapa.', tipo = '') {
             const statusEl = document.getElementById('mapa-status');
             const iframe = document.getElementById('mapa-iframe');
@@ -2845,6 +3112,7 @@
         // MODALES
         function abrirModal() {
             document.getElementById('modal-evento').classList.add('active');
+            actualizarBotonWhatsAppCliente();
         }
         
         function cerrarModal() {
@@ -2856,6 +3124,7 @@
             const mapaWrap = document.getElementById('mapa-preview');
             if (mapaWrap) mapaWrap.style.display = 'none';
             limpiarMapaEstado();
+            actualizarBotonWhatsAppCliente();
         }
         
         function abrirConfig() {
@@ -2902,6 +3171,7 @@
             cambiarTipo();
             toggleEnvio();
             actualizarVisibilidadBotonPdf();
+            actualizarBotonWhatsAppCliente();
             abrirModal();
         }
         
@@ -2935,6 +3205,7 @@
             cambiarTipo();
             toggleEnvio();
             actualizarVisibilidadBotonPdf();
+            actualizarBotonWhatsAppCliente();
             abrirModal();
         }
         
@@ -2958,6 +3229,7 @@
                 toggleEnvio();
             }
             actualizarVisibilidadBotonPdf();
+            actualizarBotonWhatsAppCliente();
         }
         
         function toggleEnvio() {
@@ -3450,5 +3722,6 @@
 </body>
 </html>               
                 
+
 
 
