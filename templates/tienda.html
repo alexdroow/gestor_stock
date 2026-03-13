@@ -15,6 +15,11 @@
             --accent: #f45d08;
             --accent-dark: #cc4a03;
             --chip: #eef2ff;
+            --agenda-card-bg: #f8fafc;
+            --agenda-card-border: #cbd5e1;
+            --agenda-slot-available-bg: #ecfeff;
+            --agenda-slot-unavailable-bg: #e5e7eb;
+            --agenda-slot-unavailable-text: #64748b;
         }
         * { box-sizing: border-box; }
         body {
@@ -126,6 +131,113 @@
             margin: 0 0 10px;
             font-size: 1.2rem;
         }
+        .agenda-section {
+            background: var(--agenda-card-bg);
+            border-color: var(--agenda-card-border);
+            display: grid;
+            gap: 12px;
+        }
+        .agenda-subtitle {
+            color: var(--muted);
+            font-size: .92rem;
+            margin-top: -2px;
+        }
+        .agenda-days {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+            gap: 8px;
+        }
+        .agenda-day-btn {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: #fff;
+            color: #1f2937;
+            padding: 9px 10px;
+            text-align: left;
+            display: grid;
+            gap: 3px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .agenda-day-btn small {
+            font-size: .74rem;
+            color: var(--muted);
+        }
+        .agenda-day-btn.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(244, 93, 8, .16);
+        }
+        .agenda-day-btn.sin-cupo {
+            background: var(--agenda-slot-unavailable-bg);
+            color: var(--agenda-slot-unavailable-text);
+            border-color: #cbd5e1;
+        }
+        .agenda-hours {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 8px;
+        }
+        .agenda-hour-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: var(--agenda-slot-available-bg);
+            color: #0f172a;
+            padding: 8px 9px;
+            cursor: pointer;
+            font-weight: 700;
+            text-align: left;
+            display: grid;
+            gap: 2px;
+        }
+        .agenda-hour-btn small {
+            color: #0f766e;
+            font-size: .72rem;
+            font-weight: 700;
+        }
+        .agenda-hour-btn.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(244, 93, 8, .16);
+        }
+        .agenda-hour-btn.sin-cupo {
+            background: var(--agenda-slot-unavailable-bg);
+            color: var(--agenda-slot-unavailable-text);
+            border-color: #cbd5e1;
+            cursor: not-allowed;
+        }
+        .agenda-hour-btn.sin-cupo small {
+            color: var(--agenda-slot-unavailable-text);
+        }
+        .agenda-form {
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 10px;
+            display: grid;
+            gap: 9px;
+            background: #fff;
+        }
+        .agenda-form .grid2 {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .agenda-form input, .agenda-form select, .agenda-form textarea {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 9px;
+            font: inherit;
+        }
+        .agenda-form textarea {
+            min-height: 72px;
+            resize: vertical;
+        }
+        .agenda-status {
+            font-size: .86rem;
+            color: var(--muted);
+            min-height: 18px;
+        }
+        .agenda-status.err { color: #b91c1c; }
+        .agenda-status.ok { color: #166534; }
         .tienda-estado-banner {
             border: 1px solid #86efac;
             border-radius: 12px;
@@ -969,6 +1081,7 @@
             .item-body { padding: 8px 8px 10px; }
             .quick-add { width: 31px; height: 31px; font-size: 1.08rem; }
             .ofertas-track .item-card { flex: 0 0 min(240px, 78vw); width: min(240px, 78vw); }
+            .agenda-form .grid2 { grid-template-columns: 1fr; }
             .mobile-cart-fab {
                 display: inline-flex;
                 align-items: center;
@@ -1026,6 +1139,34 @@
             <div class="section" id="sec-destacados">
                 <h2 id="sec-destacados-title">Articulos destacados</h2>
                 <div class="scroller" id="destacados-list"></div>
+            </div>
+
+            <div class="section agenda-section" id="sec-agenda-reservas" style="display:none;">
+                <h2 id="agenda-section-title">Agenda tu pedido</h2>
+                <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
+                <div class="agenda-days" id="agenda-days-list"></div>
+                <div class="agenda-hours" id="agenda-hours-list"></div>
+                <form class="agenda-form" id="agenda-reserva-form">
+                    <div class="grid2">
+                        <input id="agenda-nombre" type="text" maxlength="80" placeholder="Nombre completo">
+                        <input id="agenda-email" type="email" maxlength="120" placeholder="Correo electronico">
+                    </div>
+                    <div class="grid2">
+                        <div class="phone-wrap">
+                            <span class="phone-prefix">+569</span>
+                            <input id="agenda-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
+                        </div>
+                        <select id="agenda-tipo">
+                            <option value="torta">Torta</option>
+                            <option value="pastel">Pastel</option>
+                            <option value="postre">Postre</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                    <textarea id="agenda-detalle" maxlength="400" placeholder="Detalle rapido del pedido (opcional)"></textarea>
+                    <button class="checkout-btn" id="agenda-btn-reservar" type="button">Reservar horario</button>
+                    <div class="agenda-status" id="agenda-status-msg"></div>
+                </form>
             </div>
 
             <div id="categorias-wrap"></div>
@@ -1245,6 +1386,20 @@
         const pedidoActivoVerEl = document.getElementById("pedido-activo-ver");
         const ofertasPrevBtnEl = document.getElementById("ofertas-prev");
         const ofertasNextBtnEl = document.getElementById("ofertas-next");
+        const secOfertasEl = document.getElementById("sec-ofertas");
+        const secDestacadosEl = document.getElementById("sec-destacados");
+        const secAgendaReservasEl = document.getElementById("sec-agenda-reservas");
+        const agendaSectionTitleEl = document.getElementById("agenda-section-title");
+        const agendaSectionSubtitleEl = document.getElementById("agenda-section-subtitle");
+        const agendaDaysListEl = document.getElementById("agenda-days-list");
+        const agendaHoursListEl = document.getElementById("agenda-hours-list");
+        const agendaNombreEl = document.getElementById("agenda-nombre");
+        const agendaEmailEl = document.getElementById("agenda-email");
+        const agendaTelefonoEl = document.getElementById("agenda-telefono");
+        const agendaTipoEl = document.getElementById("agenda-tipo");
+        const agendaDetalleEl = document.getElementById("agenda-detalle");
+        const agendaStatusMsgEl = document.getElementById("agenda-status-msg");
+        const agendaBtnReservarEl = document.getElementById("agenda-btn-reservar");
 
         let productos = [];
         let categoriasDisponibles = [];
@@ -1261,6 +1416,10 @@
         let historialComprasCliente = [];
         let carritoVacioTexto = "El carrito esta vacio.";
         let tiendaUiCfg = {};
+        let agendaDias = [];
+        let agendaFechaActiva = "";
+        let agendaHoraActiva = "";
+        let agendaPollTimer = null;
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -1319,6 +1478,21 @@
             offer_float_icon: "✨",
             offer_float_image_url: "",
             offer_float_image_size: 46,
+            agenda_enabled: true,
+            agenda_menu_label: "Agendar pedido",
+            agenda_section_title: "Agenda tu pedido",
+            agenda_section_subtitle: "Selecciona dia y hora disponible para reservar tu torta o pastel.",
+            agenda_days_ahead: 14,
+            agenda_hour_start: "09:00",
+            agenda_hour_end: "19:00",
+            agenda_slot_minutes: 60,
+            agenda_slot_capacity: 1,
+            agenda_form_button_text: "Reservar horario",
+            agenda_card_bg: "#f8fafc",
+            agenda_card_border: "#cbd5e1",
+            agenda_slot_available_bg: "#ecfeff",
+            agenda_slot_unavailable_bg: "#e5e7eb",
+            agenda_slot_unavailable_text: "#64748b",
             custom_css: "",
         };
         const TIENDA_UI_INITIAL = {{ (tienda_personalizacion or {}) | tojson }};
@@ -1342,6 +1516,9 @@
             if (secOfertasTitleEl) secOfertasTitleEl.textContent = String(tiendaUiCfg.sec_ofertas_title || TIENDA_UI_DEFAULTS.sec_ofertas_title);
             if (secDestacadosTitleEl) secDestacadosTitleEl.textContent = String(tiendaUiCfg.sec_destacados_title || TIENDA_UI_DEFAULTS.sec_destacados_title);
             if (cartTitleEl) cartTitleEl.textContent = String(tiendaUiCfg.cart_title || TIENDA_UI_DEFAULTS.cart_title);
+            if (agendaSectionTitleEl) agendaSectionTitleEl.textContent = String(tiendaUiCfg.agenda_section_title || TIENDA_UI_DEFAULTS.agenda_section_title);
+            if (agendaSectionSubtitleEl) agendaSectionSubtitleEl.textContent = String(tiendaUiCfg.agenda_section_subtitle || TIENDA_UI_DEFAULTS.agenda_section_subtitle);
+            if (agendaBtnReservarEl) agendaBtnReservarEl.textContent = String(tiendaUiCfg.agenda_form_button_text || TIENDA_UI_DEFAULTS.agenda_form_button_text);
 
             if (waFabEl) {
                 const visible = Boolean(tiendaUiCfg.show_whatsapp_button);
@@ -1400,7 +1577,25 @@
             root.style.setProperty("--offer-badge-text", String(tiendaUiCfg.offer_badge_text_color || TIENDA_UI_DEFAULTS.offer_badge_text_color));
             const floatSizeNum = Math.max(24, Math.min(120, Number(tiendaUiCfg.offer_float_image_size || TIENDA_UI_DEFAULTS.offer_float_image_size) || 46));
             root.style.setProperty("--offer-float-size", `${floatSizeNum}px`);
+            root.style.setProperty("--agenda-card-bg", String(tiendaUiCfg.agenda_card_bg || TIENDA_UI_DEFAULTS.agenda_card_bg));
+            root.style.setProperty("--agenda-card-border", String(tiendaUiCfg.agenda_card_border || TIENDA_UI_DEFAULTS.agenda_card_border));
+            root.style.setProperty("--agenda-slot-available-bg", String(tiendaUiCfg.agenda_slot_available_bg || TIENDA_UI_DEFAULTS.agenda_slot_available_bg));
+            root.style.setProperty("--agenda-slot-unavailable-bg", String(tiendaUiCfg.agenda_slot_unavailable_bg || TIENDA_UI_DEFAULTS.agenda_slot_unavailable_bg));
+            root.style.setProperty("--agenda-slot-unavailable-text", String(tiendaUiCfg.agenda_slot_unavailable_text || TIENDA_UI_DEFAULTS.agenda_slot_unavailable_text));
             if (tiendaCustomCssEl) tiendaCustomCssEl.textContent = String(tiendaUiCfg.custom_css || "");
+
+            if (!Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA") {
+                categoriaActiva = "TODOS";
+            }
+            if (secAgendaReservasEl) {
+                const showSection = Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA";
+                secAgendaReservasEl.style.display = showSection ? "" : "none";
+            }
+            if (Boolean(tiendaUiCfg.agenda_enabled)) {
+                _startAgendaPoll();
+            } else {
+                _stopAgendaPoll();
+            }
         }
 
         function normalizarEmailCliente(raw) {
@@ -1526,6 +1721,9 @@
                     cuentaEstadoEl.textContent = "Registra tu correo y telefono para comprar mas rapido.";
                 }
             }
+            if (agendaNombreEl && clienteRegistrado) agendaNombreEl.value = String(clienteRegistrado.nombre || "");
+            if (agendaEmailEl && clienteRegistrado) agendaEmailEl.value = String(clienteRegistrado.email || "");
+            if (agendaTelefonoEl && clienteRegistrado) agendaTelefonoEl.value = String(clienteRegistrado.telefono_digitos || normalizarTelefono8(clienteRegistrado.telefono || ""));
         }
 
         function msg(text, isErr = false) {
@@ -1570,6 +1768,7 @@
             if (categoriaActiva === "TODOS") return true;
             if (categoriaActiva === "OFERTAS") return n(p.descuento_tienda_pct) > 0;
             if (categoriaActiva === "DESTACADOS") return Boolean(p.destacado_tienda);
+            if (categoriaActiva === "AGENDA") return false;
             return nombreCategoria(p) === categoriaActiva;
         }
 
@@ -1637,6 +1836,7 @@
 
         function renderCategoriasMenu() {
             const cats = new Set(["TODOS", "DESTACADOS", "OFERTAS"]);
+            if (Boolean(tiendaUiCfg.agenda_enabled)) cats.add("AGENDA");
             if (Array.isArray(categoriasDisponibles) && categoriasDisponibles.length) {
                 categoriasDisponibles.forEach((c) => {
                     const nombre = String(c.nombre || "").trim();
@@ -1647,20 +1847,44 @@
             }
             const all = Array.from(cats);
             catListEl.innerHTML = all.map((c) => {
-                const label = c === "TODOS" ? "Todos" : c === "DESTACADOS" ? "Articulos destacados" : c === "OFERTAS" ? "Ofertas" : c;
+                const label = c === "TODOS"
+                    ? "Todos"
+                    : c === "DESTACADOS"
+                        ? "Articulos destacados"
+                        : c === "OFERTAS"
+                            ? "Ofertas"
+                            : c === "AGENDA"
+                                ? String(tiendaUiCfg.agenda_menu_label || "Agendar pedido")
+                                : c;
                 const active = c === categoriaActiva ? "active" : "";
                 return `<button type="button" class="cat-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
             }).join("");
             if (mobileCatStripEl) {
                 mobileCatStripEl.innerHTML = all.map((c) => {
-                    const label = c === "TODOS" ? "Todos" : c === "DESTACADOS" ? "Destacados" : c === "OFERTAS" ? "Ofertas" : c;
+                    const label = c === "TODOS"
+                        ? "Todos"
+                        : c === "DESTACADOS"
+                            ? "Destacados"
+                            : c === "OFERTAS"
+                                ? "Ofertas"
+                                : c === "AGENDA"
+                                    ? String(tiendaUiCfg.agenda_menu_label || "Agenda")
+                                    : c;
                     const active = c === categoriaActiva ? "active" : "";
                     return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
                 }).join("");
             }
             if (mobileMenuListEl) {
                 mobileMenuListEl.innerHTML = all.map((c) => {
-                    const label = c === "TODOS" ? "Todos" : c === "DESTACADOS" ? "Articulos destacados" : c === "OFERTAS" ? "Ofertas" : c;
+                    const label = c === "TODOS"
+                        ? "Todos"
+                        : c === "DESTACADOS"
+                            ? "Articulos destacados"
+                            : c === "OFERTAS"
+                                ? "Ofertas"
+                                : c === "AGENDA"
+                                    ? String(tiendaUiCfg.agenda_menu_label || "Agendar pedido")
+                                    : c;
                     const active = c === categoriaActiva ? "active" : "";
                     return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}');cerrarPanelesMobile();">${esc(label)}</button>`;
                 }).join("");
@@ -1710,7 +1934,170 @@
             } catch (_) {}
         }
 
+        function _agendaMsg(text, type = "") {
+            if (!agendaStatusMsgEl) return;
+            agendaStatusMsgEl.textContent = String(text || "");
+            agendaStatusMsgEl.className = `agenda-status ${type || ""}`.trim();
+        }
+
+        function _normalizarAgendaTelefono(raw) {
+            const d = normalizarTelefono8(raw);
+            return d ? `+569${d}` : "";
+        }
+
+        function _agendaDiaActual() {
+            return (agendaDias || []).find((d) => String(d.fecha || "") === String(agendaFechaActiva || "")) || null;
+        }
+
+        function _renderAgendaDiaHora() {
+            if (!secAgendaReservasEl || !Boolean(tiendaUiCfg.agenda_enabled)) return;
+            const dias = Array.isArray(agendaDias) ? agendaDias : [];
+            if (!agendaDaysListEl || !agendaHoursListEl) return;
+
+            if (!dias.length) {
+                agendaDaysListEl.innerHTML = `<div style="color:#64748b;">No hay disponibilidad cargada.</div>`;
+                agendaHoursListEl.innerHTML = "";
+                return;
+            }
+
+            if (!agendaFechaActiva || !dias.some((d) => String(d.fecha || "") === agendaFechaActiva)) {
+                const firstAvailable = dias.find((d) => !Boolean(d.sin_cupos));
+                agendaFechaActiva = String((firstAvailable || dias[0] || {}).fecha || "");
+            }
+            const diaActivo = _agendaDiaActual();
+            const horas = Array.isArray(diaActivo?.horas) ? diaActivo.horas : [];
+            if (!agendaHoraActiva || !horas.some((h) => String(h.hora_inicio || "") === agendaHoraActiva && Boolean(h.disponible))) {
+                const firstHour = horas.find((h) => Boolean(h.disponible));
+                agendaHoraActiva = String(firstHour?.hora_inicio || "");
+            }
+
+            agendaDaysListEl.innerHTML = dias.map((d) => {
+                const fecha = String(d.fecha || "");
+                const active = fecha === agendaFechaActiva ? "active" : "";
+                const sinCupo = Boolean(d.sin_cupos) ? "sin-cupo" : "";
+                const badge = Boolean(d.sin_cupos) ? "Sin cupos" : "Con cupo";
+                return `
+                    <button type="button" class="agenda-day-btn ${active} ${sinCupo}" onclick="seleccionarAgendaDia('${esc(fecha)}')">
+                        <span>${esc(String(d.label || fecha))}</span>
+                        <small>${esc(badge)}</small>
+                    </button>
+                `;
+            }).join("");
+
+            if (!diaActivo) {
+                agendaHoursListEl.innerHTML = "";
+                return;
+            }
+            agendaHoursListEl.innerHTML = horas.map((h) => {
+                const hora = String(h.hora_inicio || "");
+                const active = hora === agendaHoraActiva ? "active" : "";
+                const sinCupo = Boolean(h.sin_cupos) ? "sin-cupo" : "";
+                const meta = Boolean(h.disponible)
+                    ? `${Number(h.cupos_disponibles || 0)} cupo(s)`
+                    : "Sin cupos";
+                return `
+                    <button type="button" class="agenda-hour-btn ${active} ${sinCupo}" onclick="seleccionarAgendaHora('${esc(hora)}')" ${Boolean(h.disponible) ? "" : "disabled"}>
+                        <span>${esc(String(h.label || hora))}</span>
+                        <small>${esc(meta)}</small>
+                    </button>
+                `;
+            }).join("");
+        }
+
+        async function cargarAgendaDisponibilidad(silent = false) {
+            if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
+            if (!silent) _agendaMsg("Cargando disponibilidad...");
+            try {
+                const res = await fetch("/api/tienda/agenda/disponibilidad", { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar disponibilidad");
+                agendaDias = Array.isArray(data.dias) ? data.dias : [];
+                _renderAgendaDiaHora();
+                if (!silent) _agendaMsg("Disponibilidad actualizada.", "ok");
+            } catch (e) {
+                if (!silent) _agendaMsg(e.message || "Error al cargar disponibilidad", "err");
+            }
+        }
+
+        async function reservarAgendaDesdeTienda() {
+            if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
+            const dia = _agendaDiaActual();
+            if (!dia || !agendaFechaActiva) return _agendaMsg("Selecciona un dia de agenda.", "err");
+            if (!agendaHoraActiva) return _agendaMsg("Selecciona una hora disponible.", "err");
+
+            const nombre = String(agendaNombreEl?.value || clienteRegistrado?.nombre || "").trim();
+            const email = normalizarEmailCliente(String(agendaEmailEl?.value || clienteRegistrado?.email || "").trim());
+            const telefono = _normalizarAgendaTelefono(String(agendaTelefonoEl?.value || clienteRegistrado?.telefono || "").trim());
+            const tipo = String(agendaTipoEl?.value || "torta").trim();
+            const detalle = String(agendaDetalleEl?.value || "").trim();
+            if (nombre.length < 2) return _agendaMsg("Ingresa un nombre valido.", "err");
+            if (!email) return _agendaMsg("Ingresa un correo valido.", "err");
+            if (!telefono) return _agendaMsg("Telefono invalido, usa 8 digitos.", "err");
+
+            _agendaMsg("Reservando horario...");
+            try {
+                const res = await fetch("/api/tienda/agenda/reservar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        fecha: agendaFechaActiva,
+                        hora_inicio: agendaHoraActiva,
+                        nombre,
+                        email,
+                        telefono,
+                        tipo,
+                        detalle,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo reservar");
+                if (agendaDetalleEl) agendaDetalleEl.value = "";
+                _agendaMsg("Reserva realizada correctamente.", "ok");
+                await cargarAgendaDisponibilidad(true);
+                _renderAgendaDiaHora();
+            } catch (e) {
+                _agendaMsg(e.message || "No se pudo reservar", "err");
+                await cargarAgendaDisponibilidad(true);
+            }
+        }
+
+        function seleccionarAgendaDia(fecha) {
+            agendaFechaActiva = String(fecha || "");
+            agendaHoraActiva = "";
+            _renderAgendaDiaHora();
+        }
+
+        function seleccionarAgendaHora(hora) {
+            agendaHoraActiva = String(hora || "");
+            _renderAgendaDiaHora();
+        }
+
+        function _startAgendaPoll() {
+            if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
+            if (agendaPollTimer) return;
+            cargarAgendaDisponibilidad(true);
+            agendaPollTimer = setInterval(() => cargarAgendaDisponibilidad(true), 5000);
+        }
+
+        function _stopAgendaPoll() {
+            if (agendaPollTimer) {
+                clearInterval(agendaPollTimer);
+                agendaPollTimer = null;
+            }
+        }
+
         function renderSecciones() {
+            const agendaMode = categoriaActiva === "AGENDA";
+            if (secOfertasEl) secOfertasEl.style.display = agendaMode ? "none" : "";
+            if (secDestacadosEl) secDestacadosEl.style.display = agendaMode ? "none" : "";
+            if (categoriasWrapEl) categoriasWrapEl.style.display = agendaMode ? "none" : "";
+            if (secAgendaReservasEl) {
+                secAgendaReservasEl.style.display = agendaMode && Boolean(tiendaUiCfg.agenda_enabled) ? "" : "none";
+            }
+            if (agendaMode) {
+                _renderAgendaDiaHora();
+                return;
+            }
             const visibles = productos.filter((p) => productoFiltrado(p));
 
             const destacados = visibles
@@ -1883,6 +2270,9 @@
 
         function cambiarCategoria(cat) {
             categoriaActiva = cat;
+            if (categoriaActiva === "AGENDA") {
+                cargarAgendaDisponibilidad(true);
+            }
             renderCategoriasMenu();
             renderSecciones();
         }
@@ -2436,6 +2826,8 @@
         window.abrirMenuMobile = abrirMenuMobile;
         window.abrirCarritoMobile = abrirCarritoMobile;
         window.repetirCompraVenta = repetirCompraVenta;
+        window.seleccionarAgendaDia = seleccionarAgendaDia;
+        window.seleccionarAgendaHora = seleccionarAgendaHora;
         window.descargarComprobanteUltimoPedido = () => {
             const p = ultimoComprobantePedido;
             if (!p) return msg("No hay comprobante disponible.", true);
@@ -2539,6 +2931,13 @@
                 cuentaTelefonoEl.value = onlyDigits;
             });
         }
+        if (agendaTelefonoEl) {
+            agendaTelefonoEl.addEventListener("input", () => {
+                const onlyDigits = String(agendaTelefonoEl.value || "").replace(/\D+/g, "").slice(0, 8);
+                agendaTelefonoEl.value = onlyDigits;
+            });
+        }
+        agendaBtnReservarEl?.addEventListener("click", reservarAgendaDesdeTienda);
         if (codigoDescuentoEl && mobileCodigoDescuentoEl) {
             codigoDescuentoEl.addEventListener("input", () => { mobileCodigoDescuentoEl.value = codigoDescuentoEl.value; });
             mobileCodigoDescuentoEl.addEventListener("input", () => { codigoDescuentoEl.value = mobileCodigoDescuentoEl.value; });
@@ -2551,6 +2950,7 @@
         if (clienteRegistrado) cargarHistorialCliente();
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
+        _startAgendaPoll();
         renderCart();
         cargarProductos();
         _trackTienda("view");

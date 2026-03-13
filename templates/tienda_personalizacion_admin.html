@@ -475,6 +475,73 @@
                     </label>
                 </div>
 
+                <h2>Agenda de reservas en tienda</h2>
+                <div class="fields">
+                    <label class="toggle full"><input id="agenda_enabled" type="checkbox"> Mostrar seccion "Agendar pedido" en menu de tienda</label>
+                    <label>Texto menu agenda
+                        <input id="agenda_menu_label" type="text" maxlength="60" placeholder="Agendar pedido">
+                    </label>
+                    <label>Titulo seccion agenda
+                        <input id="agenda_section_title" type="text" maxlength="90" placeholder="Agenda tu pedido">
+                    </label>
+                    <label class="full">Subtitulo agenda
+                        <input id="agenda_section_subtitle" type="text" maxlength="220" placeholder="Selecciona dia y hora disponible para reservar...">
+                    </label>
+                    <label>Texto boton reserva
+                        <input id="agenda_form_button_text" type="text" maxlength="50" placeholder="Reservar horario">
+                    </label>
+                    <label>Dias a mostrar (3-60)
+                        <input id="agenda_days_ahead" type="number" min="3" max="60" step="1">
+                    </label>
+                    <label>Hora inicio (HH:MM)
+                        <input id="agenda_hour_start" type="time">
+                    </label>
+                    <label>Hora fin (HH:MM)
+                        <input id="agenda_hour_end" type="time">
+                    </label>
+                    <label>Duracion slot (min)
+                        <select id="agenda_slot_minutes">
+                            <option value="30">30</option>
+                            <option value="60">60</option>
+                            <option value="90">90</option>
+                            <option value="120">120</option>
+                        </select>
+                    </label>
+                    <label>Cupo por slot (1-20)
+                        <input id="agenda_slot_capacity" type="number" min="1" max="20" step="1">
+                    </label>
+                    <label>Fondo seccion agenda
+                        <div class="color-field">
+                            <input id="agenda_card_bg" type="text" placeholder="#f8fafc">
+                            <input type="color" data-color-target="agenda_card_bg" value="#f8fafc">
+                        </div>
+                    </label>
+                    <label>Borde seccion agenda
+                        <div class="color-field">
+                            <input id="agenda_card_border" type="text" placeholder="#cbd5e1">
+                            <input type="color" data-color-target="agenda_card_border" value="#cbd5e1">
+                        </div>
+                    </label>
+                    <label>Fondo horario disponible
+                        <div class="color-field">
+                            <input id="agenda_slot_available_bg" type="text" placeholder="#ecfeff">
+                            <input type="color" data-color-target="agenda_slot_available_bg" value="#ecfeff">
+                        </div>
+                    </label>
+                    <label>Fondo horario sin cupos
+                        <div class="color-field">
+                            <input id="agenda_slot_unavailable_bg" type="text" placeholder="#e5e7eb">
+                            <input type="color" data-color-target="agenda_slot_unavailable_bg" value="#e5e7eb">
+                        </div>
+                    </label>
+                    <label>Texto horario sin cupos
+                        <div class="color-field">
+                            <input id="agenda_slot_unavailable_text" type="text" placeholder="#64748b">
+                            <input type="color" data-color-target="agenda_slot_unavailable_text" value="#64748b">
+                        </div>
+                    </label>
+                </div>
+
                 <div class="actions">
                     <button type="button" class="btn-primary" id="btn-guardar">Guardar cambios</button>
                     <button type="button" class="btn-secondary" id="btn-restaurar">Restaurar valores base</button>
@@ -551,6 +618,14 @@
                             <div class="h" id="pv-cart">Tu compra</div>
                             <div style="font-size:.82rem;color:#64748b;" id="pv-empty">El carrito esta vacio.</div>
                         </div>
+                        <div class="preview-sec" id="pv-agenda-wrap" style="display:none;">
+                            <div class="h" id="pv-agenda-title">Agenda tu pedido</div>
+                            <div style="font-size:.8rem;color:#64748b;" id="pv-agenda-subtitle">Selecciona dia y hora disponible.</div>
+                            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+                                <span id="pv-agenda-ok" style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:.72rem;font-weight:800;">10:00 (1 cupo)</span>
+                                <span id="pv-agenda-off" style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:.72rem;font-weight:800;">11:00 sin cupos</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -573,6 +648,9 @@
         "offer_card_border_color","offer_card_glow_color","offer_price_color","offer_discount_chip_bg","offer_discount_chip_text",
         "offer_badge_enabled","offer_badge_text","offer_badge_icon","offer_badge_bg","offer_badge_text_color",
         "offer_float_icon","offer_float_image_url","offer_float_image_size",
+        "agenda_enabled","agenda_menu_label","agenda_section_title","agenda_section_subtitle","agenda_form_button_text",
+        "agenda_days_ahead","agenda_hour_start","agenda_hour_end","agenda_slot_minutes","agenda_slot_capacity",
+        "agenda_card_bg","agenda_card_border","agenda_slot_available_bg","agenda_slot_unavailable_bg","agenda_slot_unavailable_text",
         "custom_css"
     ];
 
@@ -619,6 +697,21 @@
         offer_float_icon: "✨",
         offer_float_image_url: "",
         offer_float_image_size: 46,
+        agenda_enabled: true,
+        agenda_menu_label: "Agendar pedido",
+        agenda_section_title: "Agenda tu pedido",
+        agenda_section_subtitle: "Selecciona dia y hora disponible para reservar tu torta o pastel.",
+        agenda_form_button_text: "Reservar horario",
+        agenda_days_ahead: 14,
+        agenda_hour_start: "09:00",
+        agenda_hour_end: "19:00",
+        agenda_slot_minutes: 60,
+        agenda_slot_capacity: 1,
+        agenda_card_bg: "#f8fafc",
+        agenda_card_border: "#cbd5e1",
+        agenda_slot_available_bg: "#ecfeff",
+        agenda_slot_unavailable_bg: "#e5e7eb",
+        agenda_slot_unavailable_text: "#64748b",
         custom_css: ""
     };
     let PRESETS_CACHE = [];
@@ -692,6 +785,31 @@
         document.getElementById("pv-hero-badge").textContent = p.hero_badge || "";
         document.getElementById("pv-hero-title").textContent = p.hero_title || "";
         document.getElementById("pv-hero-subtitle").textContent = p.hero_subtitle || "";
+
+        const agendaWrap = document.getElementById("pv-agenda-wrap");
+        if (agendaWrap) {
+            const showAgenda = Boolean(p.agenda_enabled);
+            agendaWrap.style.display = showAgenda ? "" : "none";
+            agendaWrap.style.background = p.agenda_card_bg || DEFAULTS.agenda_card_bg;
+            agendaWrap.style.borderColor = p.agenda_card_border || DEFAULTS.agenda_card_border;
+        }
+        const agendaTitle = document.getElementById("pv-agenda-title");
+        if (agendaTitle) agendaTitle.textContent = p.agenda_section_title || DEFAULTS.agenda_section_title;
+        const agendaSubtitle = document.getElementById("pv-agenda-subtitle");
+        if (agendaSubtitle) agendaSubtitle.textContent = p.agenda_section_subtitle || DEFAULTS.agenda_section_subtitle;
+        const agendaOk = document.getElementById("pv-agenda-ok");
+        if (agendaOk) {
+            const cap = Math.max(1, Number(p.agenda_slot_capacity || DEFAULTS.agenda_slot_capacity || 1));
+            agendaOk.textContent = `10:00 (${cap} cupo${cap === 1 ? "" : "s"})`;
+            agendaOk.style.background = p.agenda_slot_available_bg || DEFAULTS.agenda_slot_available_bg;
+            agendaOk.style.color = "#0f172a";
+        }
+        const agendaOff = document.getElementById("pv-agenda-off");
+        if (agendaOff) {
+            agendaOff.textContent = "11:00 sin cupos";
+            agendaOff.style.background = p.agenda_slot_unavailable_bg || DEFAULTS.agenda_slot_unavailable_bg;
+            agendaOff.style.color = p.agenda_slot_unavailable_text || DEFAULTS.agenda_slot_unavailable_text;
+        }
     }
 
     function syncColorPickersFromText() {

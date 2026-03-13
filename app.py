@@ -958,6 +958,195 @@ def _pedido_estado_label(estado):
     return labels.get(est, "Recibido")
 
 
+def _clamp_int(value, default=0, min_value=0, max_value=9999):
+    try:
+        out = int(value)
+    except (TypeError, ValueError):
+        out = int(default)
+    if out < min_value:
+        out = min_value
+    if out > max_value:
+        out = max_value
+    return out
+
+
+def _hora_hhmm_o_default(raw, default):
+    hora = str(raw or "").strip()
+    if _parse_hora_hhmm(hora):
+        return hora
+    return default
+
+
+def _hhmm_a_minutos(hora):
+    parsed = _parse_hora_hhmm(hora)
+    if not parsed:
+        return None
+    hh, mm = parsed
+    return (int(hh) * 60) + int(mm)
+
+
+def _minutos_a_hhmm(total_minutos):
+    total = int(total_minutos or 0)
+    h = max(0, min(23, total // 60))
+    m = max(0, min(59, total % 60))
+    return f"{h:02d}:{m:02d}"
+
+
+def _obtener_cfg_agenda_tienda(cfg_tienda=None):
+    cfg = dict(cfg_tienda or _obtener_tienda_personalizacion() or {})
+    enabled = bool(cfg.get("agenda_enabled", True))
+    days_ahead = _clamp_int(cfg.get("agenda_days_ahead"), default=14, min_value=3, max_value=60)
+    slot_minutes = _clamp_int(cfg.get("agenda_slot_minutes"), default=60, min_value=30, max_value=120)
+    if slot_minutes not in {30, 60, 90, 120}:
+        slot_minutes = 60
+    slot_capacity = _clamp_int(cfg.get("agenda_slot_capacity"), default=1, min_value=1, max_value=20)
+    start_h = _hora_hhmm_o_default(cfg.get("agenda_hour_start"), "09:00")
+    end_h = _hora_hhmm_o_default(cfg.get("agenda_hour_end"), "19:00")
+    start_m = _hhmm_a_minutos(start_h) or 9 * 60
+    end_m = _hhmm_a_minutos(end_h) or 19 * 60
+    min_end = start_m + slot_minutes
+    if end_m <= start_m:
+        end_m = min(24 * 60, min_end)
+    if end_m < min_end:
+        end_m = min(24 * 60, min_end)
+    return {
+        "enabled": enabled,
+        "days_ahead": days_ahead,
+        "slot_minutes": slot_minutes,
+        "slot_capacity": slot_capacity,
+        "hour_start": _minutos_a_hhmm(start_m),
+        "hour_end": _minutos_a_hhmm(end_m),
+        "start_minutes": start_m,
+        "end_minutes": end_m,
+    }
+
+
+def _rangos_ocupados_evento_agenda(evento, slot_minutes):
+    tipo = str(evento.get("tipo") or "").strip().lower()
+    hora_inicio = _hhmm_a_minutos(evento.get("hora_inicio"))
+    hora_fin = _hhmm_a_minutos(evento.get("hora_fin"))
+    if tipo == "bloqueo":
+        if hora_inicio is None and hora_fin is None:
+            return {"bloqueo_dia": True, "rangos": []}
+        ini = hora_inicio if hora_inicio is not None else 0
+        fin = hora_fin if hora_fin is not None else (24 * 60)
+        if fin <= ini:
+            fin = min(24 * 60, ini + slot_minutes)
+        return {"bloqueo_dia": False, "rangos": [(ini, fin, True)]}
+
+    if hora_inicio is None:
+        hora_inicio = _hhmm_a_minutos(evento.get("hora_entrega"))
+    if hora_inicio is None:
+        return {"bloqueo_dia": True, "rangos": []}
+    if hora_fin is None or hora_fin <= hora_inicio:
+        hora_fin = min(24 * 60, hora_inicio + slot_minutes)
+    return {"bloqueo_dia": False, "rangos": [(hora_inicio, hora_fin, False)]}
+
+
+def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fecha_hasta):
+    slot_minutes = int(cfg_agenda["slot_minutes"])
+    slot_capacity = int(cfg_agenda["slot_capacity"])
+    start_m = int(cfg_agenda["start_minutes"])
+    end_m = int(cfg_agenda["end_minutes"])
+    days_ahead = int(cfg_agenda["days_ahead"])
+
+    fecha_inicio_dt = datetime.strptime(fecha_desde, "%Y-%m-%d")
+    fecha_hasta_dt = datetime.strptime(fecha_hasta, "%Y-%m-%d")
+    total_days = min(days_ahead, max(1, (fecha_hasta_dt - fecha_inicio_dt).days + 1))
+
+    cursor.execute(
+        """
+        SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, estado
+        FROM agenda_eventos
+        WHERE fecha >= ? AND fecha <= ?
+          AND COALESCE(NULLIF(TRIM(estado), ''), 'pendiente') <> 'cancelado'
+        ORDER BY fecha ASC, hora_inicio ASC, id ASC
+        """,
+        (fecha_desde, fecha_hasta),
+    )
+    eventos_rows = [dict(r) for r in cursor.fetchall()]
+    eventos_por_fecha = {}
+    for ev in eventos_rows:
+        fecha_ev = str(ev.get("fecha") or "").strip()
+        if not fecha_ev:
+            continue
+        eventos_por_fecha.setdefault(fecha_ev, []).append(ev)
+
+    dias = []
+    disponibilidad_mapa = {}
+    for offset in range(total_days):
+        dia_dt = fecha_inicio_dt + timedelta(days=offset)
+        fecha_iso = dia_dt.strftime("%Y-%m-%d")
+        slots = []
+        minute_cursor = start_m
+        while minute_cursor + slot_minutes <= end_m:
+            slots.append(
+                {
+                    "hora_inicio": _minutos_a_hhmm(minute_cursor),
+                    "hora_fin": _minutos_a_hhmm(minute_cursor + slot_minutes),
+                    "ini": minute_cursor,
+                    "fin": minute_cursor + slot_minutes,
+                    "ocupados": 0,
+                    "bloqueado": False,
+                }
+            )
+            minute_cursor += slot_minutes
+
+        eventos_dia = list(eventos_por_fecha.get(fecha_iso, []))
+        bloqueo_dia = False
+        for ev in eventos_dia:
+            occ = _rangos_ocupados_evento_agenda(ev, slot_minutes)
+            if occ.get("bloqueo_dia"):
+                bloqueo_dia = True
+                break
+            for ini_ev, fin_ev, is_block in occ.get("rangos") or []:
+                for slot in slots:
+                    if max(slot["ini"], ini_ev) < min(slot["fin"], fin_ev):
+                        if is_block:
+                            slot["bloqueado"] = True
+                        else:
+                            slot["ocupados"] += 1
+
+        horas_payload = []
+        sin_cupos_total = True
+        for slot in slots:
+            if bloqueo_dia or slot["bloqueado"]:
+                disponible = False
+                ocupados = slot_capacity
+                cupos_disponibles = 0
+            else:
+                ocupados = int(slot["ocupados"])
+                cupos_disponibles = max(0, slot_capacity - ocupados)
+                disponible = cupos_disponibles > 0
+            if disponible:
+                sin_cupos_total = False
+            horas_payload.append(
+                {
+                    "hora_inicio": slot["hora_inicio"],
+                    "hora_fin": slot["hora_fin"],
+                    "label": f"{slot['hora_inicio']} - {slot['hora_fin']}",
+                    "disponible": bool(disponible),
+                    "sin_cupos": not bool(disponible),
+                    "cupos_disponibles": int(cupos_disponibles),
+                    "ocupados": int(ocupados),
+                    "capacidad": int(slot_capacity),
+                }
+            )
+
+        dias.append(
+            {
+                "fecha": fecha_iso,
+                "label": dia_dt.strftime("%a %d/%m"),
+                "sin_cupos": bool(sin_cupos_total),
+                "bloqueado_dia": bool(bloqueo_dia),
+                "horas": horas_payload,
+            }
+        )
+        disponibilidad_mapa[fecha_iso] = {h["hora_inicio"]: h for h in horas_payload}
+
+    return {"dias": dias, "mapa": disponibilidad_mapa}
+
+
 def _normalizar_telefono_cl(raw):
     dig = re.sub(r"\D+", "", str(raw or ""))
     if dig.startswith("56"):
@@ -1226,6 +1415,21 @@ def _default_tienda_personalizacion():
         "offer_float_icon": "✨",
         "offer_float_image_url": "",
         "offer_float_image_size": 46,
+        "agenda_enabled": True,
+        "agenda_menu_label": "Agendar pedido",
+        "agenda_section_title": "Agenda tu pedido",
+        "agenda_section_subtitle": "Selecciona dia y hora disponible para reservar tu torta o pastel.",
+        "agenda_days_ahead": 14,
+        "agenda_hour_start": "09:00",
+        "agenda_hour_end": "19:00",
+        "agenda_slot_minutes": 60,
+        "agenda_slot_capacity": 1,
+        "agenda_form_button_text": "Reservar horario",
+        "agenda_card_bg": "#f8fafc",
+        "agenda_card_border": "#cbd5e1",
+        "agenda_slot_available_bg": "#ecfeff",
+        "agenda_slot_unavailable_bg": "#e5e7eb",
+        "agenda_slot_unavailable_text": "#64748b",
         "custom_css": "",
     }
 
@@ -1304,6 +1508,44 @@ def _normalizar_tienda_personalizacion(payload):
     except (TypeError, ValueError):
         offer_float_image_size = int(base["offer_float_image_size"])
     clean["offer_float_image_size"] = max(24, min(120, offer_float_image_size))
+
+    clean["agenda_enabled"] = bool(data.get("agenda_enabled", base["agenda_enabled"]))
+    clean["agenda_menu_label"] = str(data.get("agenda_menu_label") or base["agenda_menu_label"]).strip()[:60] or base["agenda_menu_label"]
+    clean["agenda_section_title"] = str(data.get("agenda_section_title") or base["agenda_section_title"]).strip()[:90] or base["agenda_section_title"]
+    clean["agenda_section_subtitle"] = str(data.get("agenda_section_subtitle") or base["agenda_section_subtitle"]).strip()[:220] or base["agenda_section_subtitle"]
+    clean["agenda_form_button_text"] = str(data.get("agenda_form_button_text") or base["agenda_form_button_text"]).strip()[:50] or base["agenda_form_button_text"]
+
+    try:
+        agenda_days = int(data.get("agenda_days_ahead") or base["agenda_days_ahead"])
+    except (TypeError, ValueError):
+        agenda_days = int(base["agenda_days_ahead"])
+    clean["agenda_days_ahead"] = max(3, min(60, agenda_days))
+
+    agenda_hora_inicio = str(data.get("agenda_hour_start") or base["agenda_hour_start"]).strip()
+    agenda_hora_fin = str(data.get("agenda_hour_end") or base["agenda_hour_end"]).strip()
+    clean["agenda_hour_start"] = agenda_hora_inicio if _parse_hora_hhmm(agenda_hora_inicio) else base["agenda_hour_start"]
+    clean["agenda_hour_end"] = agenda_hora_fin if _parse_hora_hhmm(agenda_hora_fin) else base["agenda_hour_end"]
+
+    try:
+        slot_minutes = int(data.get("agenda_slot_minutes") or base["agenda_slot_minutes"])
+    except (TypeError, ValueError):
+        slot_minutes = int(base["agenda_slot_minutes"])
+    if slot_minutes not in {30, 60, 90, 120}:
+        slot_minutes = int(base["agenda_slot_minutes"])
+    clean["agenda_slot_minutes"] = slot_minutes
+
+    try:
+        slot_capacity = int(data.get("agenda_slot_capacity") or base["agenda_slot_capacity"])
+    except (TypeError, ValueError):
+        slot_capacity = int(base["agenda_slot_capacity"])
+    clean["agenda_slot_capacity"] = max(1, min(20, slot_capacity))
+
+    clean["agenda_card_bg"] = _normalizar_color_hex(data.get("agenda_card_bg"), base["agenda_card_bg"])
+    clean["agenda_card_border"] = _normalizar_color_hex(data.get("agenda_card_border"), base["agenda_card_border"])
+    clean["agenda_slot_available_bg"] = _normalizar_color_hex(data.get("agenda_slot_available_bg"), base["agenda_slot_available_bg"])
+    clean["agenda_slot_unavailable_bg"] = _normalizar_color_hex(data.get("agenda_slot_unavailable_bg"), base["agenda_slot_unavailable_bg"])
+    clean["agenda_slot_unavailable_text"] = _normalizar_color_hex(data.get("agenda_slot_unavailable_text"), base["agenda_slot_unavailable_text"])
+
     clean["custom_css"] = str(data.get("custom_css") or "").strip()[:5000]
     return clean
 
@@ -2963,6 +3205,149 @@ def api_tienda_pedido_estado(venta_id):
             }
         )
     except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/agenda/disponibilidad', methods=['GET'])
+def api_tienda_agenda_disponibilidad():
+    conn = None
+    try:
+        cfg = _obtener_cfg_agenda_tienda()
+        if not cfg.get("enabled"):
+            return jsonify({"success": True, "enabled": False, "dias": []})
+
+        fecha_desde = str(request.args.get("fecha_desde") or "").strip()
+        fecha_hasta = str(request.args.get("fecha_hasta") or "").strip()
+        hoy_dt = datetime.now(ZoneInfo("America/Santiago")).date()
+        hoy_iso = hoy_dt.strftime("%Y-%m-%d")
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha_desde):
+            fecha_desde = hoy_iso
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha_hasta):
+            fecha_hasta = (datetime.strptime(fecha_desde, "%Y-%m-%d") + timedelta(days=int(cfg["days_ahead"]) - 1)).strftime("%Y-%m-%d")
+
+        conn = get_db()
+        cursor = conn.cursor()
+        data = _calcular_disponibilidad_agenda_tienda(cursor, cfg, fecha_desde, fecha_hasta)
+        return jsonify(
+            {
+                "success": True,
+                "enabled": True,
+                "cfg": {
+                    "days_ahead": int(cfg["days_ahead"]),
+                    "slot_minutes": int(cfg["slot_minutes"]),
+                    "slot_capacity": int(cfg["slot_capacity"]),
+                    "hour_start": str(cfg["hour_start"]),
+                    "hour_end": str(cfg["hour_end"]),
+                },
+                "dias": data.get("dias") or [],
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "dias": []}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/agenda/reservar', methods=['POST'])
+def api_tienda_agenda_reservar():
+    conn = None
+    try:
+        cfg = _obtener_cfg_agenda_tienda()
+        if not cfg.get("enabled"):
+            return jsonify({"success": False, "error": "La agenda publica no esta habilitada"}), 403
+
+        data = request.get_json(silent=True) or {}
+        fecha = str(data.get("fecha") or "").strip()
+        hora_inicio = str(data.get("hora_inicio") or "").strip()
+        nombre = str(data.get("nombre") or "").strip()[:80]
+        email = _normalizar_email(data.get("email"))
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        tipo_pedido = str(data.get("tipo") or "torta").strip()[:40] or "torta"
+        detalle = str(data.get("detalle") or "").strip()[:400]
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha):
+            return jsonify({"success": False, "error": "Fecha invalida"}), 400
+        if not _parse_hora_hhmm(hora_inicio):
+            return jsonify({"success": False, "error": "Hora invalida (HH:MM)"}), 400
+        if len(nombre) < 2:
+            return jsonify({"success": False, "error": "Nombre invalido"}), 400
+        if not email:
+            return jsonify({"success": False, "error": "Correo invalido"}), 400
+        if not telefono:
+            return jsonify({"success": False, "error": "Telefono invalido. Debe tener 8 digitos"}), 400
+
+        fecha_hoy = datetime.now(ZoneInfo("America/Santiago")).date()
+        fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()
+        if fecha_req < fecha_hoy:
+            return jsonify({"success": False, "error": "No puedes reservar fechas pasadas"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        disp = _calcular_disponibilidad_agenda_tienda(cursor, cfg, fecha, fecha)
+        mapa_horas = ((disp.get("mapa") or {}).get(fecha) or {})
+        slot = mapa_horas.get(hora_inicio)
+        if not slot:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Horario no disponible en configuracion actual"}), 400
+        if not bool(slot.get("disponible")):
+            conn.rollback()
+            return jsonify({"success": False, "error": "Ese horario ya no tiene cupo disponible"}), 409
+
+        min_ini = _hhmm_a_minutos(hora_inicio)
+        min_fin = (min_ini or 0) + int(cfg["slot_minutes"])
+        hora_fin = _minutos_a_hhmm(min_fin)
+        titulo = f"Reserva tienda - {tipo_pedido.capitalize()}"
+        ingredientes = f"Reserva desde tienda online\nEmail: {email}"
+        if detalle:
+            ingredientes = f"{ingredientes}\nDetalle: {detalle}"
+        codigo_op = f"OPA-TI-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"[:80]
+
+        cursor.execute(
+            """
+            INSERT INTO agenda_eventos (
+                tipo, titulo, fecha, hora_inicio, hora_fin, hora_entrega,
+                cliente, telefono, es_envio, direccion, ingredientes,
+                total, abono, motivo, alerta_minutos, estado, codigo_operacion
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, 0, 0, ?, 1440, 'pendiente', ?)
+            """,
+            (
+                tipo_pedido,
+                titulo,
+                fecha,
+                hora_inicio,
+                hora_fin,
+                hora_inicio,
+                nombre,
+                telefono,
+                ingredientes,
+                "Reserva cliente tienda online",
+                codigo_op,
+            ),
+        )
+        reserva_id = int(cursor.lastrowid or 0)
+        conn.commit()
+        crear_backup()
+        return jsonify(
+            {
+                "success": True,
+                "reserva": {
+                    "id": reserva_id,
+                    "fecha": fecha,
+                    "hora_inicio": hora_inicio,
+                    "hora_fin": hora_fin,
+                    "cliente": nombre,
+                    "telefono": telefono,
+                },
+            }
+        )
+    except Exception as e:
+        if conn:
+            conn.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
