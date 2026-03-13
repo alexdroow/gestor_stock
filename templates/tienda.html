@@ -2495,6 +2495,19 @@
             }
         }
 
+        function _scrollAgendaReservarEnMobile(delayMs = 280) {
+            if (!document.body.classList.contains("mobile-ui")) return;
+            if (categoriaActiva !== "AGENDA") return;
+            if (!agendaBtnReservarEl) return;
+            window.setTimeout(() => {
+                try {
+                    agendaBtnReservarEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                } catch (_) {
+                    agendaBtnReservarEl.scrollIntoView();
+                }
+            }, Math.max(0, Number(delayMs || 0)));
+        }
+
         function _setAgendaTipo(tipo) {
             const normalizado = ["torta", "pastel"].includes(String(tipo || "").trim().toLowerCase())
                 ? String(tipo).trim().toLowerCase()
@@ -2506,6 +2519,7 @@
             _toggleAgendaCakeBuilder();
             if (normalizado === "torta" && agendaCakeCatalog) {
                 _renderAgendaCakeBuilder();
+                _scrollAgendaReservarEnMobile(360);
             } else {
                 _renderAgendaCakeSummary();
             }
