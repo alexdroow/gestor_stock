@@ -730,10 +730,14 @@
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 120;
+            z-index: 4000;
             padding: 14px;
         }
         .modal-overlay.active { display: flex; }
+        body.agenda-confirm-open #agenda-map,
+        body.agenda-confirm-open #agenda-map * {
+            pointer-events: none !important;
+        }
         .modal {
             width: min(460px, 96vw);
             background: #fff;
@@ -2277,6 +2281,16 @@
             `;
         }
 
+        function _abrirModalAgendaConfirmar() {
+            modalAgendaConfirmarEl?.classList.add("active");
+            document.body.classList.add("agenda-confirm-open");
+        }
+
+        function _cerrarModalAgendaConfirmar() {
+            modalAgendaConfirmarEl?.classList.remove("active");
+            document.body.classList.remove("agenda-confirm-open");
+        }
+
         function _descargarComprobanteReservaAgenda(payload, reservaId = 0) {
             const jspdf = window.jspdf || null;
             if (!jspdf || !jspdf.jsPDF) {
@@ -2342,7 +2356,7 @@
                 _descargarComprobanteReservaAgenda(payload, Number(reserva.id || 0));
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
                 agendaReservaPendiente = null;
-                modalAgendaConfirmarEl?.classList.remove("active");
+                _cerrarModalAgendaConfirmar();
                 _agendaMsg("Reserva realizada correctamente.", "ok");
                 await cargarAgendaDisponibilidad(true);
                 _renderAgendaDiaHora();
@@ -2365,7 +2379,7 @@
             if (payload.entrega_tipo === "despacho" && !payload.direccion_confirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
             agendaReservaPendiente = payload;
             _renderAgendaConfirmacion(payload);
-            modalAgendaConfirmarEl?.classList.add("active");
+            _abrirModalAgendaConfirmar();
         }
 
         function seleccionarAgendaDia(fecha) {
@@ -3267,11 +3281,11 @@
             _descargarComprobanteReservaAgenda(payload, 0);
         });
         agendaConfirmarCancelarEl?.addEventListener("click", () => {
-            modalAgendaConfirmarEl?.classList.remove("active");
+            _cerrarModalAgendaConfirmar();
         });
         agendaConfirmarAceptarEl?.addEventListener("click", _confirmarReservaAgendaPendiente);
         modalAgendaConfirmarEl?.addEventListener("click", (ev) => {
-            if (ev.target === modalAgendaConfirmarEl) modalAgendaConfirmarEl.classList.remove("active");
+            if (ev.target === modalAgendaConfirmarEl) _cerrarModalAgendaConfirmar();
         });
         if (codigoDescuentoEl && mobileCodigoDescuentoEl) {
             codigoDescuentoEl.addEventListener("input", () => { mobileCodigoDescuentoEl.value = codigoDescuentoEl.value; });
