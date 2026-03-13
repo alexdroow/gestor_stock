@@ -1922,6 +1922,7 @@
         })();
         const _urlParams = new URLSearchParams(window.location.search);
         const _forceMobileParam = _urlParams.get("mobile") === "1";
+        const _agendaDebugMode = _urlParams.get("agenda_debug") === "1";
         const _uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
         if (_forceMobileParam || _uaMobile) {
             document.body.classList.add("mobile-ui");
@@ -2589,6 +2590,11 @@
 
         function _actualizarDebugCatalogo(origen = "") {
             if (!agendaCakeDebugEl) return;
+            if (!_agendaDebugMode) {
+                agendaCakeDebugEl.style.display = "none";
+                agendaCakeDebugEl.textContent = "";
+                return;
+            }
             if (!agendaTipoActual || agendaTipoActual !== "torta") {
                 agendaCakeDebugEl.style.display = "none";
                 agendaCakeDebugEl.textContent = "";
