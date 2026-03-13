@@ -151,6 +151,33 @@
         .preview-hero .t { font-weight: 900; }
         .preview-sec { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; }
         .preview-sec .h { font-weight: 800; margin-bottom: 5px; }
+        .icon-palette-title {
+            font-size: .8rem;
+            color: #475569;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .icon-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .icon-chip {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0;
+        }
+        .icon-chip:hover {
+            border-color: #94a3b8;
+            transform: translateY(-1px);
+        }
         @media (max-width: 1100px) {
             .grid { grid-template-columns: 1fr; }
             .fields { grid-template-columns: 1fr; }
@@ -359,6 +386,34 @@
                     <label>Icono flotante oferta
                         <input id="offer_float_icon" type="text" maxlength="8" placeholder="✨">
                     </label>
+                    <div class="full">
+                        <div class="icon-palette-title">Paleta iconos viñeta</div>
+                        <div class="icon-palette">
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="🔥">🔥</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="⭐">⭐</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="🎉">🎉</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="💥">💥</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="⚡">⚡</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="💎">💎</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="🎁">🎁</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="🏷️">🏷️</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_badge_icon" data-emoji="🚀">🚀</button>
+                        </div>
+                    </div>
+                    <div class="full">
+                        <div class="icon-palette-title">Paleta iconos flotantes</div>
+                        <div class="icon-palette">
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="✨">✨</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="🌟">🌟</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="🎈">🎈</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="💫">💫</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="🛍️">🛍️</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="🍰">🍰</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="🧁">🧁</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="🍓">🍓</button>
+                            <button type="button" class="icon-chip" data-emoji-target="offer_float_icon" data-emoji="🎯">🎯</button>
+                        </div>
+                    </div>
                     <label>Tamaño flotante (24-120)
                         <input id="offer_float_image_size" type="text" maxlength="3" placeholder="46">
                     </label>
@@ -569,6 +624,19 @@
         });
     }
 
+    function bindEmojiPalette() {
+        document.querySelectorAll("[data-emoji-target]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const targetId = String(btn.getAttribute("data-emoji-target") || "");
+                const emoji = String(btn.getAttribute("data-emoji") || "");
+                const target = document.getElementById(targetId);
+                if (!target) return;
+                target.value = emoji;
+                renderPreview();
+            });
+        });
+    }
+
     async function cargar() {
         setMsg("Cargando configuracion...");
         try {
@@ -617,6 +685,7 @@
     }
 
     bindColorPickers();
+    bindEmojiPalette();
     cargar();
 </script>
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
