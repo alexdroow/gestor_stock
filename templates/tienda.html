@@ -280,6 +280,23 @@
             gap: 8px;
             align-items: center;
         }
+        .agenda-cake-card {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #fff;
+            color: #334155;
+            padding: 9px 10px;
+            font-size: .84rem;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+        }
+        .agenda-cake-card.active {
+            border-color: var(--accent);
+            background: #ffedd5;
+            color: #9a3412;
+            box-shadow: 0 0 0 2px rgba(244, 93, 8, .12);
+        }
         .agenda-cake-chip button {
             border: 1px solid #cbd5e1;
             border-radius: 7px;
@@ -2637,41 +2654,43 @@
                 }
 
                 const sizesAll = _catalogList("sizes");
-                const sizesRender = sizesAll;
+                const sizesByCat = categorias.length
+                    ? sizesAll.filter((s) => String(s.categoria_id || "") === String(agendaCakeCategoriaActiva || ""))
+                    : sizesAll;
+                const sizesRender = sizesByCat.length ? sizesByCat : sizesAll;
+
                 if (!agendaCakeSelection.size_id && sizesRender.length) {
                     agendaCakeSelection.size_id = String(sizesRender[0].id || "");
                 }
                 if (agendaCakeSelection.size_id && !sizesRender.some((s) => String(s.id || "") === String(agendaCakeSelection.size_id || ""))) {
-                    agendaCakeSelection.size_id = "";
+                    agendaCakeSelection.size_id = String((sizesRender[0] && sizesRender[0].id) || "");
                     agendaCakeSelection.sabor_ids = [];
                 }
+
                 if (agendaCakeSizeCardsEl) {
                     agendaCakeSizeCardsEl.innerHTML = sizesRender.length
                         ? sizesRender.map((s) => {
                             const sid = String(s.id || "");
-                            const checked = sid === String(agendaCakeSelection.size_id || "") ? "checked" : "";
+                            const active = sid === String(agendaCakeSelection.size_id || "") ? "active" : "";
                             const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(s.precio || 0))}` : ""}`;
-                            return `<label class="agenda-cake-chip" style="width:100%;"><span><input type="radio" name="agenda-cake-size" value="${esc(sid)}" ${checked} onchange="agendaCakeSelectSize('${esc(sid)}')"> ${esc(label)}</span></label>`;
+                            return `<div class="agenda-cake-card ${active}" onclick="agendaCakeSelectSize('${esc(sid)}')">${esc(label)}</div>`;
                         }).join("")
                         : `<div class="agenda-cake-empty">Sin tamanos configurados.</div>`;
                 }
+
                 const sizeSelected = _catalogFind("sizes", agendaCakeSelection.size_id);
                 const maxSabores = Math.max(1, Number(sizeSelected?.max_sabores || 1));
 
                 if (agendaCakeFlavorsEl) {
                     const sabores = _catalogList("sabores");
-                    agendaCakeFlavorsEl.innerHTML = sabores.length ? sabores.map((s) => {
-                        const sid = String(s.id || "");
-                        const checked = agendaCakeSelection.sabor_ids.includes(sid) ? "checked" : "";
-                        return `
-                            <label class="agenda-cake-chip">
-                                <span>
-                                    <input type="checkbox" ${checked} onchange="agendaCakeToggleFlavor('${esc(sid)}')">
-                                    ${esc(String(s.nombre || ""))} ${_isCakePricesVisible() ? `(${esc(money.format(Number(s.precio || 0)))})` : ""}
-                                </span>
-                            </label>
-                        `;
-                    }).join("") : `<div class="agenda-cake-empty">No hay sabores configurados en el catalogo.</div>`;
+                    agendaCakeFlavorsEl.innerHTML = sabores.length
+                        ? sabores.map((s) => {
+                            const sid = String(s.id || "");
+                            const active = agendaCakeSelection.sabor_ids.includes(sid) ? "active" : "";
+                            const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` (${money.format(Number(s.precio || 0))})` : ""}`;
+                            return `<div class="agenda-cake-card ${active}" onclick="agendaCakeToggleFlavor('${esc(sid)}')">${esc(label)}</div>`;
+                        }).join("")
+                        : `<div class="agenda-cake-empty">No hay sabores configurados en el catalogo.</div>`;
                 }
                 if (agendaCakeSelection.sabor_ids.length > maxSabores) {
                     agendaCakeSelection.sabor_ids = agendaCakeSelection.sabor_ids.slice(0, maxSabores);
@@ -2679,46 +2698,47 @@
 
                 if (agendaCakeExtrasEl) {
                     const extras = _catalogList("extras");
-                    agendaCakeExtrasEl.innerHTML = extras.length ? extras.map((e) => {
-                        const eid = String(e.id || "");
-                        const curr = (agendaCakeSelection.extra_items || []).find((x) => String(x.id || "") === eid);
-                        const qty = Math.max(0, Number(curr?.qty || 0));
-                        const maxQty = Math.max(1, Number(e.max_cantidad || 1));
-                        return `
-                            <div class="agenda-cake-chip">
-                                <span>${esc(String(e.nombre || ""))} ${_isCakePricesVisible() ? `(${esc(money.format(Number(e.precio || 0)))})` : ""}</span>
-                                <span>
-                                    <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', -1)">-</button>
-                                    <strong style="display:inline-block;min-width:18px;text-align:center;">${qty}</strong>
-                                    <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', 1)" ${qty >= maxQty ? "disabled" : ""}>+</button>
-                                </span>
-                            </div>
-                        `;
-                    }).join("") : `<div class="agenda-cake-empty">No hay extras configurados en el catalogo.</div>`;
+                    agendaCakeExtrasEl.innerHTML = extras.length
+                        ? extras.map((e) => {
+                            const eid = String(e.id || "");
+                            const curr = (agendaCakeSelection.extra_items || []).find((x) => String(x.id || "") === eid);
+                            const qty = Math.max(0, Number(curr?.qty || 0));
+                            const maxQty = Math.max(1, Number(e.max_cantidad || 1));
+                            const label = `${String(e.nombre || "")}${_isCakePricesVisible() ? ` (${money.format(Number(e.precio || 0))})` : ""}`;
+                            return `
+                                <div class="agenda-cake-chip">
+                                    <span>${esc(label)}</span>
+                                    <span>
+                                        <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', -1)">-</button>
+                                        <strong style="display:inline-block;min-width:18px;text-align:center;">${qty}</strong>
+                                        <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', 1)" ${qty >= maxQty ? "disabled" : ""}>+</button>
+                                    </span>
+                                </div>
+                            `;
+                        }).join("")
+                        : `<div class="agenda-cake-empty">No hay extras configurados en el catalogo.</div>`;
                 }
 
                 if (agendaCakeTopperCardsEl) {
                     const toppers = _catalogList("toppers");
                     agendaCakeTopperCardsEl.innerHTML = [
-                        `<label class="agenda-cake-chip" style="width:100%;"><span><input type="radio" name="agenda-cake-topper" value="" ${!agendaCakeSelection.topper_id ? "checked" : ""} onchange="agendaCakeSelectTopper('')"> Sin topper</span></label>`,
+                        `<div class="agenda-cake-card ${!agendaCakeSelection.topper_id ? "active" : ""}" onclick="agendaCakeSelectTopper('')">Sin topper</div>`,
                         ...toppers.map((t) => {
                             const tid = String(t.id || "");
-                            const checked = tid === String(agendaCakeSelection.topper_id || "") ? "checked" : "";
+                            const active = tid === String(agendaCakeSelection.topper_id || "") ? "active" : "";
                             const label = `${String(t.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(t.precio || 0))}` : ""}`;
-                            return `<label class="agenda-cake-chip" style="width:100%;"><span><input type="radio" name="agenda-cake-topper" value="${esc(tid)}" ${checked} onchange="agendaCakeSelectTopper('${esc(tid)}')"> ${esc(label)}</span></label>`;
+                            return `<div class="agenda-cake-card ${active}" onclick="agendaCakeSelectTopper('${esc(tid)}')">${esc(label)}</div>`;
                         }),
                     ].join("");
                 }
+
                 _renderAgendaCakeFiles();
                 _renderAgendaCakeSummary();
             } catch (err) {
                 if (agendaCakeSizeCardsEl) {
                     const sizesFallback = _catalogList("sizes");
                     agendaCakeSizeCardsEl.innerHTML = sizesFallback.length
-                        ? sizesFallback.map((s) => {
-                            const sid = String(s.id || "");
-                            return `<label class="agenda-cake-chip" style="width:100%;"><span><input type="radio" name="agenda-cake-size-fallback" onchange="agendaCakeSelectSize('${esc(sid)}')"> ${esc(String(s.nombre || "Tamano"))}</span></label>`;
-                        }).join("")
+                        ? sizesFallback.map((s) => `<div class="agenda-cake-card" onclick="agendaCakeSelectSize('${esc(String(s.id || ""))}')">${esc(String(s.nombre || "Tamano"))}</div>`).join("")
                         : `<div class="agenda-cake-empty">Error render tamanos.</div>`;
                 }
                 _agendaMsg(`Error render catalogo torta: ${String(err?.message || err || "desconocido")}`, "err");
