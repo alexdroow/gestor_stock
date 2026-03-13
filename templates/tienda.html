@@ -1421,6 +1421,7 @@
                             <span>Arma tu torta</span>
                             <span id="agenda-cake-price-visibility"></span>
                         </div>
+                        <div class="agenda-cake-empty" id="agenda-cake-debug" style="display:none;"></div>
                         <div class="agenda-cake-categories" id="agenda-cake-categories"></div>
                         <label>Tamano
                             <select id="agenda-cake-size"></select>
@@ -1733,6 +1734,7 @@
         const agendaTipoTortaEl = document.getElementById("agenda-tipo-torta");
         const agendaTipoPastelEl = document.getElementById("agenda-tipo-pastel");
         const agendaCakeWrapEl = document.getElementById("agenda-cake-wrap");
+        const agendaCakeDebugEl = document.getElementById("agenda-cake-debug");
         const agendaCakeCategoriesEl = document.getElementById("agenda-cake-categories");
         const agendaCakeSizeEl = document.getElementById("agenda-cake-size");
         const agendaCakeFlavorsEl = document.getElementById("agenda-cake-flavors");
@@ -2344,6 +2346,7 @@
             if (agendaTipoTortaEl) agendaTipoTortaEl.classList.toggle("active", normalizado === "torta");
             if (agendaTipoPastelEl) agendaTipoPastelEl.classList.toggle("active", normalizado === "pastel");
             _toggleAgendaCakeBuilder();
+            _actualizarDebugCatalogo("seleccion");
         }
 
         function _isAgendaCakeVisible() {
@@ -2354,10 +2357,27 @@
             return Boolean(cat && Array.isArray(cat.sizes) && cat.sizes.length);
         }
 
+        function _actualizarDebugCatalogo(origen = "") {
+            if (!agendaCakeDebugEl) return;
+            if (!agendaTipoActual || agendaTipoActual !== "torta") {
+                agendaCakeDebugEl.style.display = "none";
+                agendaCakeDebugEl.textContent = "";
+                return;
+            }
+            const cat = agendaCakeCatalog || {};
+            const sizes = Array.isArray(cat.sizes) ? cat.sizes.length : 0;
+            const sabores = Array.isArray(cat.sabores) ? cat.sabores.length : 0;
+            const extras = Array.isArray(cat.extras) ? cat.extras.length : 0;
+            const toppers = Array.isArray(cat.toppers) ? cat.toppers.length : 0;
+            agendaCakeDebugEl.style.display = "";
+            agendaCakeDebugEl.textContent = `Catalogo (${origen || "actual"}): ${sizes} tamanos, ${sabores} sabores, ${extras} extras, ${toppers} toppers.`;
+        }
+
         function _setAgendaCakeCatalog(cat) {
             if (!cat || typeof cat !== "object") return;
             agendaCakeCatalog = cat;
             _renderAgendaCakeBuilder();
+            _actualizarDebugCatalogo("sync");
         }
 
         function _toggleAgendaCakeBuilder() {
@@ -2583,6 +2603,7 @@
                 }
                 _resetAgendaCakeSelection();
                 _renderAgendaCakeBuilder();
+                _actualizarDebugCatalogo("api");
                 if (agendaCakeCatalog && Array.isArray(agendaCakeCatalog.sizes) && !agendaCakeCatalog.sizes.length) {
                     _agendaMsg("Catalogo de tortas sin tamanos activos. Revisa /ventas/admin-catalogo-torta", "err");
                 }
@@ -2593,8 +2614,23 @@
                     else agendaCakeCatalog = null;
                 }
                 _renderAgendaCakeBuilder();
+                _actualizarDebugCatalogo("fallback");
                 _agendaMsg((err && err.message) ? err.message : "No se pudo cargar catalogo de tortas.", "err");
             }
+        }
+
+        async function _syncCatalogoTortaDesdeProductos() {
+            try {
+                const res = await fetch(`/api/tienda/productos?t=${Date.now()}`, { headers: { Accept: "application/json" }, cache: "no-store" });
+                const data = await res.json();
+                if (!res.ok || !data.success) return;
+                const cat = data?.personalizacion?.catalogo_torta;
+                if (_catalogoTortaConDatos(cat)) {
+                    agendaCakeCatalog = cat;
+                    _renderAgendaCakeBuilder();
+                    _actualizarDebugCatalogo("productos");
+                }
+            } catch (_) {}
         }
 
         function _initAgendaMap() {
@@ -3062,6 +3098,7 @@
             }
             if (agendaMode) {
                 _renderAgendaDiaHora();
+                _actualizarDebugCatalogo("agenda");
                 if (agendaEntregaTipo === "despacho") {
                     setTimeout(() => _initAgendaMap(), 50);
                 }
@@ -3241,6 +3278,7 @@
             categoriaActiva = cat;
             localStorage.setItem(CAT_STORAGE_KEY, categoriaActiva);
             if (categoriaActiva === "AGENDA") {
+                _syncCatalogoTortaDesdeProductos();
                 _cargarCatalogoTortaAgenda();
                 cargarAgendaDisponibilidad(true);
             }
