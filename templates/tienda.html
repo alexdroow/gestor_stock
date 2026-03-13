@@ -2644,13 +2644,15 @@
                     agendaCakeCategoriaActiva = String((categorias[0] && categorias[0].id) || "");
                 }
                 if (agendaCakeCategoriesEl) {
+                    const baseStyle = "display:inline-block;padding:7px 10px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;color:#334155;font-weight:800;font-size:.78rem;margin:0 6px 6px 0;cursor:pointer;pointer-events:auto;";
+                    const activeStyle = "border-color:#f45d08;background:#ffedd5;color:#9a3412;";
                     agendaCakeCategoriesEl.innerHTML = categorias.length
                         ? categorias.map((c) => {
                             const cid = String(c.id || "");
-                            const active = cid === agendaCakeCategoriaActiva ? "active" : "";
-                            return `<button type="button" class="agenda-cake-cat-btn ${active}" onclick="agendaCakeSelectCategory('${esc(cid)}')">${esc(String(c.nombre || cid))}</button>`;
+                            const active = cid === agendaCakeCategoriaActiva;
+                            return `<button type="button" data-cake-cat="${esc(cid)}" style="${baseStyle}${active ? activeStyle : ""}">${esc(String(c.nombre || cid))}</button>`;
                         }).join("")
-                        : `<div class="agenda-cake-empty">No hay categorias activas. Se mostraran todos los tamanos disponibles.</div>`;
+                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay categorias activas. Se mostraran todos los tamanos disponibles.</div>`;
                 }
 
                 const sizesAll = _catalogList("sizes");
@@ -2668,14 +2670,16 @@
                 }
 
                 if (agendaCakeSizeCardsEl) {
+                    const baseStyle = "display:block;width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#334155;font-weight:800;font-size:.84rem;margin-bottom:7px;cursor:pointer;pointer-events:auto;";
+                    const activeStyle = "border-color:#f45d08;background:#ffedd5;color:#9a3412;box-shadow:0 0 0 2px rgba(244,93,8,.12);";
                     agendaCakeSizeCardsEl.innerHTML = sizesRender.length
                         ? sizesRender.map((s) => {
                             const sid = String(s.id || "");
-                            const active = sid === String(agendaCakeSelection.size_id || "") ? "active" : "";
+                            const active = sid === String(agendaCakeSelection.size_id || "");
                             const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(s.precio || 0))}` : ""}`;
-                            return `<div class="agenda-cake-card ${active}" onclick="agendaCakeSelectSize('${esc(sid)}')">${esc(label)}</div>`;
+                            return `<button type="button" data-cake-size="${esc(sid)}" style="${baseStyle}${active ? activeStyle : ""}">${esc(label)}</button>`;
                         }).join("")
-                        : `<div class="agenda-cake-empty">Sin tamanos configurados.</div>`;
+                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">Sin tamanos configurados.</div>`;
                 }
 
                 const sizeSelected = _catalogFind("sizes", agendaCakeSelection.size_id);
@@ -2683,14 +2687,16 @@
 
                 if (agendaCakeFlavorsEl) {
                     const sabores = _catalogList("sabores");
+                    const baseStyle = "display:block;width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#334155;font-weight:700;font-size:.84rem;margin-bottom:7px;cursor:pointer;pointer-events:auto;";
+                    const activeStyle = "border-color:#f45d08;background:#ffedd5;color:#9a3412;box-shadow:0 0 0 2px rgba(244,93,8,.12);";
                     agendaCakeFlavorsEl.innerHTML = sabores.length
                         ? sabores.map((s) => {
                             const sid = String(s.id || "");
-                            const active = agendaCakeSelection.sabor_ids.includes(sid) ? "active" : "";
+                            const active = agendaCakeSelection.sabor_ids.includes(sid);
                             const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` (${money.format(Number(s.precio || 0))})` : ""}`;
-                            return `<div class="agenda-cake-card ${active}" onclick="agendaCakeToggleFlavor('${esc(sid)}')">${esc(label)}</div>`;
+                            return `<button type="button" data-cake-flavor="${esc(sid)}" style="${baseStyle}${active ? activeStyle : ""}">${esc(label)}</button>`;
                         }).join("")
-                        : `<div class="agenda-cake-empty">No hay sabores configurados en el catalogo.</div>`;
+                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay sabores configurados en el catalogo.</div>`;
                 }
                 if (agendaCakeSelection.sabor_ids.length > maxSabores) {
                     agendaCakeSelection.sabor_ids = agendaCakeSelection.sabor_ids.slice(0, maxSabores);
@@ -2706,42 +2712,67 @@
                             const maxQty = Math.max(1, Number(e.max_cantidad || 1));
                             const label = `${String(e.nombre || "")}${_isCakePricesVisible() ? ` (${money.format(Number(e.precio || 0))})` : ""}`;
                             return `
-                                <div class="agenda-cake-chip">
+                                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:8px 9px;margin-bottom:7px;">
                                     <span>${esc(label)}</span>
                                     <span>
-                                        <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', -1)">-</button>
+                                        <button type="button" data-cake-extra-dec="${esc(eid)}" style="border:1px solid #cbd5e1;border-radius:7px;background:#fff;font-weight:800;padding:2px 8px;cursor:pointer;">-</button>
                                         <strong style="display:inline-block;min-width:18px;text-align:center;">${qty}</strong>
-                                        <button type="button" onclick="agendaCakeChangeExtra('${esc(eid)}', 1)" ${qty >= maxQty ? "disabled" : ""}>+</button>
+                                        <button type="button" data-cake-extra-inc="${esc(eid)}" style="border:1px solid #cbd5e1;border-radius:7px;background:#fff;font-weight:800;padding:2px 8px;cursor:pointer;" ${qty >= maxQty ? "disabled" : ""}>+</button>
                                     </span>
                                 </div>
                             `;
                         }).join("")
-                        : `<div class="agenda-cake-empty">No hay extras configurados en el catalogo.</div>`;
+                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay extras configurados en el catalogo.</div>`;
                 }
 
                 if (agendaCakeTopperCardsEl) {
                     const toppers = _catalogList("toppers");
+                    const baseStyle = "display:block;width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#334155;font-weight:700;font-size:.84rem;margin-bottom:7px;cursor:pointer;pointer-events:auto;";
+                    const activeStyle = "border-color:#f45d08;background:#ffedd5;color:#9a3412;box-shadow:0 0 0 2px rgba(244,93,8,.12);";
                     agendaCakeTopperCardsEl.innerHTML = [
-                        `<div class="agenda-cake-card ${!agendaCakeSelection.topper_id ? "active" : ""}" onclick="agendaCakeSelectTopper('')">Sin topper</div>`,
+                        `<button type="button" data-cake-topper="" style="${baseStyle}${!agendaCakeSelection.topper_id ? activeStyle : ""}">Sin topper</button>`,
                         ...toppers.map((t) => {
                             const tid = String(t.id || "");
-                            const active = tid === String(agendaCakeSelection.topper_id || "") ? "active" : "";
+                            const active = tid === String(agendaCakeSelection.topper_id || "");
                             const label = `${String(t.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(t.precio || 0))}` : ""}`;
-                            return `<div class="agenda-cake-card ${active}" onclick="agendaCakeSelectTopper('${esc(tid)}')">${esc(label)}</div>`;
+                            return `<button type="button" data-cake-topper="${esc(tid)}" style="${baseStyle}${active ? activeStyle : ""}">${esc(label)}</button>`;
                         }),
                     ].join("");
                 }
 
                 _renderAgendaCakeFiles();
                 _renderAgendaCakeSummary();
+
+                agendaCakeCategoriesEl?.querySelectorAll("[data-cake-cat]").forEach((el) => {
+                    el.addEventListener("click", () => agendaCakeSelectCategory(String(el.getAttribute("data-cake-cat") || "")));
+                });
+                agendaCakeSizeCardsEl?.querySelectorAll("[data-cake-size]").forEach((el) => {
+                    el.addEventListener("click", () => agendaCakeSelectSize(String(el.getAttribute("data-cake-size") || "")));
+                });
+                agendaCakeFlavorsEl?.querySelectorAll("[data-cake-flavor]").forEach((el) => {
+                    el.addEventListener("click", () => agendaCakeToggleFlavor(String(el.getAttribute("data-cake-flavor") || "")));
+                });
+                agendaCakeTopperCardsEl?.querySelectorAll("[data-cake-topper]").forEach((el) => {
+                    el.addEventListener("click", () => agendaCakeSelectTopper(String(el.getAttribute("data-cake-topper") || "")));
+                });
+                agendaCakeExtrasEl?.querySelectorAll("[data-cake-extra-dec]").forEach((el) => {
+                    el.addEventListener("click", () => agendaCakeChangeExtra(String(el.getAttribute("data-cake-extra-dec") || ""), -1));
+                });
+                agendaCakeExtrasEl?.querySelectorAll("[data-cake-extra-inc]").forEach((el) => {
+                    el.addEventListener("click", () => agendaCakeChangeExtra(String(el.getAttribute("data-cake-extra-inc") || ""), 1));
+                });
             } catch (err) {
                 if (agendaCakeSizeCardsEl) {
                     const sizesFallback = _catalogList("sizes");
                     agendaCakeSizeCardsEl.innerHTML = sizesFallback.length
-                        ? sizesFallback.map((s) => `<div class="agenda-cake-card" onclick="agendaCakeSelectSize('${esc(String(s.id || ""))}')">${esc(String(s.nombre || "Tamano"))}</div>`).join("")
-                        : `<div class="agenda-cake-empty">Error render tamanos.</div>`;
+                        ? sizesFallback.map((s) => `<div style="display:block;padding:9px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#334155;font-weight:700;font-size:.84rem;margin-bottom:7px;">${esc(String(s.nombre || "Tamano"))}</div>`).join("")
+                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">Error render tamanos.</div>`;
                 }
                 _agendaMsg(`Error render catalogo torta: ${String(err?.message || err || "desconocido")}`, "err");
+                if (agendaCakeDebugEl) {
+                    agendaCakeDebugEl.style.display = "";
+                    agendaCakeDebugEl.textContent = `Error render: ${String(err?.message || err || "desconocido")}`;
+                }
             }
         }
 
