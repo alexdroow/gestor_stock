@@ -2288,6 +2288,7 @@
 
         function renderCategoriasMenu() {
             const cats = new Set(["TODOS", "DESTACADOS", "OFERTAS"]);
+            const agendaEnabled = Boolean(tiendaUiCfg.agenda_enabled);
             if (Array.isArray(categoriasDisponibles) && categoriasDisponibles.length) {
                 categoriasDisponibles.forEach((c) => {
                     const nombre = String(c.nombre || "").trim();
@@ -2309,7 +2310,10 @@
                 return `<button type="button" class="cat-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
             }).join("");
             if (mobileCatStripEl) {
-                mobileCatStripEl.innerHTML = all.map((c) => {
+                const agendaChip = agendaEnabled
+                    ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA')">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
+                    : "";
+                mobileCatStripEl.innerHTML = agendaChip + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -2322,7 +2326,10 @@
                 }).join("");
             }
             if (mobileMenuListEl) {
-                mobileMenuListEl.innerHTML = all.map((c) => {
+                const agendaItem = agendaEnabled
+                    ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
+                    : "";
+                mobileMenuListEl.innerHTML = agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
