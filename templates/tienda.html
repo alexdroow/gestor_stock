@@ -160,6 +160,23 @@
             font-size: .92rem;
             margin-top: -2px;
         }
+        .agenda-type-bar {
+            display: grid;
+            gap: 6px;
+        }
+        .agenda-type-bar label {
+            font-size: .84rem;
+            font-weight: 800;
+            color: #334155;
+        }
+        .agenda-type-bar select {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 9px 10px;
+            font: inherit;
+            background: #fff;
+        }
         .agenda-days {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
@@ -1225,6 +1242,14 @@
             <div class="section agenda-section" id="sec-agenda-reservas" style="display:none;">
                 <h2 id="agenda-section-title">Agenda tu pedido</h2>
                 <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
+                <div class="agenda-type-bar">
+                    <label for="agenda-tipo">Tipo de pedido</label>
+                    <select id="agenda-tipo">
+                        <option value="">Selecciona tipo</option>
+                        <option value="torta">Torta (48h)</option>
+                        <option value="pastel">Pastel (24h)</option>
+                    </select>
+                </div>
                 <div class="agenda-days" id="agenda-days-list"></div>
                 <div class="agenda-hours" id="agenda-hours-list"></div>
                 <form class="agenda-form" id="agenda-reserva-form">
@@ -1241,13 +1266,7 @@
                             <span class="phone-prefix">+569</span>
                             <input id="agenda-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
                         </div>
-                        <select id="agenda-tipo">
-                            <option value="">Selecciona tipo</option>
-                            <option value="torta">Torta (48h)</option>
-                            <option value="pastel">Pastel</option>
-                            <option value="postre">Postre</option>
-                            <option value="otro">Otro</option>
-                        </select>
+                        <input type="text" value="Reserva por agenda" disabled>
                     </div>
                     <textarea id="agenda-detalle" maxlength="400" placeholder="Detalle rapido del pedido (opcional)"></textarea>
                     <div class="agenda-despacho-wrap" id="agenda-despacho-wrap">
@@ -2227,6 +2246,14 @@
             try {
                 const tipoSel = String(agendaTipoEl?.value || agendaTipoActual || "").trim().toLowerCase();
                 agendaTipoActual = tipoSel || "";
+                if (!["torta", "pastel"].includes(agendaTipoActual)) {
+                    agendaDias = [];
+                    agendaFechaActiva = "";
+                    agendaHoraActiva = "";
+                    _renderAgendaDiaHora();
+                    if (!silent) _agendaMsg("Selecciona Torta o Pastel para mostrar disponibilidad.", "err");
+                    return;
+                }
                 const url = `/api/tienda/agenda/disponibilidad?tipo=${encodeURIComponent(agendaTipoActual)}`;
                 const res = await fetch(url, { headers: { Accept: "application/json" } });
                 const data = await res.json();
@@ -2243,8 +2270,6 @@
             const t = String(tipoRaw || "").trim().toLowerCase();
             if (t === "torta") return "Torta";
             if (t === "pastel") return "Pastel";
-            if (t === "postre") return "Postre";
-            if (t === "otro") return "Otro";
             return "No seleccionado";
         }
 
@@ -2394,7 +2419,7 @@
             if (payload.nombre.length < 2) return _agendaMsg("Ingresa un nombre valido.", "err");
             if (!payload.email) return _agendaMsg("Ingresa un correo valido.", "err");
             if (!payload.telefono) return _agendaMsg("Telefono invalido, usa 8 digitos.", "err");
-            if (!["torta", "pastel", "postre", "otro"].includes(String(payload.tipo || ""))) {
+            if (!["torta", "pastel"].includes(String(payload.tipo || ""))) {
                 return _agendaMsg("Selecciona el tipo de pedido para aplicar la regla correcta.", "err");
             }
             if (payload.entrega_tipo === "despacho" && payload.direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");

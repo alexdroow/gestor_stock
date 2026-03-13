@@ -1150,17 +1150,14 @@ def _normalizar_tipo_reserva_tienda(raw):
         return "torta"
     if tipo in {"pastel", "pasteles"}:
         return "pastel"
-    if tipo in {"postre", "postres"}:
-        return "postre"
-    return "otro"
+    return ""
 
 
 def _minutos_anticipacion_reserva(tipo):
     t = _normalizar_tipo_reserva_tienda(tipo)
     if t == "torta":
         return 48 * 60
-    if t == "pastel":
-        return 24 * 60
+    # Pastel: 24h.
     return 24 * 60
 
 
@@ -1171,7 +1168,6 @@ def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None):
     # Regla horaria exacta por tipo:
     # - torta: 48h
     # - pastel: 24h
-    # - otros: 24h
     return now_dt + timedelta(minutes=_minutos_anticipacion_reserva(t))
 
 
@@ -3262,6 +3258,22 @@ def api_tienda_agenda_disponibilidad():
         fecha_desde = str(request.args.get("fecha_desde") or "").strip()
         fecha_hasta = str(request.args.get("fecha_hasta") or "").strip()
         tipo_reserva = _normalizar_tipo_reserva_tienda(request.args.get("tipo"))
+        if tipo_reserva not in {"torta", "pastel"}:
+            return jsonify(
+                {
+                    "success": True,
+                    "enabled": True,
+                    "tipo_reserva": "",
+                    "cfg": {
+                        "days_ahead": int(cfg["days_ahead"]),
+                        "slot_minutes": int(cfg["slot_minutes"]),
+                        "slot_capacity": int(cfg["slot_capacity"]),
+                        "hour_start": str(cfg["hour_start"]),
+                        "hour_end": str(cfg["hour_end"]),
+                    },
+                    "dias": [],
+                }
+            )
         hoy_dt = datetime.now(ZoneInfo("America/Santiago")).date()
         hoy_iso = hoy_dt.strftime("%Y-%m-%d")
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha_desde):
@@ -3357,6 +3369,8 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": "Correo invalido"}), 400
         if not telefono:
             return jsonify({"success": False, "error": "Telefono invalido. Debe tener 8 digitos"}), 400
+        if tipo_pedido not in {"torta", "pastel"}:
+            return jsonify({"success": False, "error": "Selecciona tipo de pedido: Torta o Pastel"}), 400
         if entrega_tipo == "despacho":
             if len(direccion) < 8:
                 return jsonify({"success": False, "error": "Ingresa una direccion valida para despacho"}), 400
