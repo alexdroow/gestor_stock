@@ -162,20 +162,41 @@
         }
         .agenda-type-bar {
             display: grid;
-            gap: 6px;
+            gap: 7px;
+            padding: 10px;
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            background: #f8fbff;
         }
         .agenda-type-bar label {
             font-size: .84rem;
             font-weight: 800;
             color: #334155;
         }
-        .agenda-type-bar select {
-            width: 100%;
+        .agenda-type-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .agenda-type-btn {
             border: 1px solid #cbd5e1;
             border-radius: 10px;
-            padding: 9px 10px;
-            font: inherit;
             background: #fff;
+            color: #0f172a;
+            font-weight: 800;
+            font-size: .92rem;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+        .agenda-type-btn:hover {
+            border-color: #94a3b8;
+        }
+        .agenda-type-btn.active {
+            border-color: var(--accent);
+            color: #9a3412;
+            background: #ffedd5;
+            box-shadow: 0 0 0 2px rgba(244, 93, 8, .14);
         }
         .agenda-days {
             display: grid;
@@ -1240,16 +1261,16 @@
             </div>
 
             <div class="section agenda-section" id="sec-agenda-reservas" style="display:none;">
+                <div class="agenda-type-bar">
+                    <label>Tipo de pedido</label>
+                    <div class="agenda-type-actions">
+                        <button type="button" class="agenda-type-btn" id="agenda-tipo-torta">Torta (48h)</button>
+                        <button type="button" class="agenda-type-btn" id="agenda-tipo-pastel">Pasteles (24h)</button>
+                    </div>
+                    <input id="agenda-tipo" type="hidden" value="">
+                </div>
                 <h2 id="agenda-section-title">Agenda tu pedido</h2>
                 <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
-                <div class="agenda-type-bar">
-                    <label for="agenda-tipo">Tipo de pedido</label>
-                    <select id="agenda-tipo">
-                        <option value="">Selecciona tipo</option>
-                        <option value="torta">Torta (48h)</option>
-                        <option value="pastel">Pastel (24h)</option>
-                    </select>
-                </div>
                 <div class="agenda-days" id="agenda-days-list"></div>
                 <div class="agenda-hours" id="agenda-hours-list"></div>
                 <form class="agenda-form" id="agenda-reserva-form">
@@ -1527,6 +1548,8 @@
         const agendaEmailEl = document.getElementById("agenda-email");
         const agendaTelefonoEl = document.getElementById("agenda-telefono");
         const agendaTipoEl = document.getElementById("agenda-tipo");
+        const agendaTipoTortaEl = document.getElementById("agenda-tipo-torta");
+        const agendaTipoPastelEl = document.getElementById("agenda-tipo-pastel");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
         const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
@@ -2104,6 +2127,16 @@
                 agendaDireccionConfirmada = false;
                 if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Mueve el pin al punto exacto y confirma.";
             }
+        }
+
+        function _setAgendaTipo(tipo) {
+            const normalizado = ["torta", "pastel"].includes(String(tipo || "").trim().toLowerCase())
+                ? String(tipo).trim().toLowerCase()
+                : "";
+            agendaTipoActual = normalizado;
+            if (agendaTipoEl) agendaTipoEl.value = normalizado;
+            if (agendaTipoTortaEl) agendaTipoTortaEl.classList.toggle("active", normalizado === "torta");
+            if (agendaTipoPastelEl) agendaTipoPastelEl.classList.toggle("active", normalizado === "pastel");
         }
 
         function _initAgendaMap() {
@@ -3313,8 +3346,14 @@
         }
         agendaEntregaRetiroEl?.addEventListener("click", () => _setAgendaEntregaTipo("retiro"));
         agendaEntregaDespachoEl?.addEventListener("click", () => _setAgendaEntregaTipo("despacho"));
-        agendaTipoEl?.addEventListener("change", () => {
-            agendaTipoActual = String(agendaTipoEl.value || "").trim().toLowerCase();
+        agendaTipoTortaEl?.addEventListener("click", () => {
+            _setAgendaTipo("torta");
+            agendaFechaActiva = "";
+            agendaHoraActiva = "";
+            cargarAgendaDisponibilidad(true);
+        });
+        agendaTipoPastelEl?.addEventListener("click", () => {
+            _setAgendaTipo("pastel");
             agendaFechaActiva = "";
             agendaHoraActiva = "";
             cargarAgendaDisponibilidad(true);
@@ -3350,7 +3389,7 @@
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
         _startAgendaPoll();
-        agendaTipoActual = String(agendaTipoEl?.value || "").trim().toLowerCase();
+        _setAgendaTipo(String(agendaTipoEl?.value || "").trim().toLowerCase());
         _setAgendaEntregaTipo("retiro");
         renderCart();
         cargarProductos();
