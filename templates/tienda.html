@@ -1176,6 +1176,13 @@
         body.mobile-ui .agenda-cake-cart ul {
             max-height: 300px;
         }
+        body.mobile-ui #agenda-reserva-form {
+            padding-bottom: 220px;
+        }
+        body.mobile-ui #agenda-btn-reservar {
+            scroll-margin-bottom: 240px;
+            margin-bottom: 12px;
+        }
         body.mobile-ui .mobile-cat-strip { display: flex; }
         body.mobile-ui .mobile-cart-fab {
             display: inline-flex;
@@ -2503,15 +2510,10 @@
             const steps = [0, 170, 380, 620];
             steps.forEach((extra, idx) => {
                 window.setTimeout(() => {
-                    try {
-                        agendaBtnReservarEl.scrollIntoView({ behavior: idx === 0 ? "smooth" : "auto", block: "end" });
-                    } catch (_) {
-                        agendaBtnReservarEl.scrollIntoView();
-                    }
-                    if (idx >= 1) {
-                        const downExtra = Math.max(120, Math.round(window.innerHeight * 0.28));
-                        window.scrollBy(0, downExtra);
-                    }
+                    const rect = agendaBtnReservarEl.getBoundingClientRect();
+                    const visualBottomSafe = Math.max(220, Math.round(window.innerHeight * 0.30));
+                    const targetTop = window.scrollY + rect.top - (window.innerHeight - visualBottomSafe);
+                    window.scrollTo({ top: Math.max(0, targetTop), behavior: idx === 0 ? "smooth" : "auto" });
                 }, baseDelay + extra);
             });
         }
