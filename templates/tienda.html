@@ -1225,7 +1225,8 @@
                             <input id="agenda-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
                         </div>
                         <select id="agenda-tipo">
-                            <option value="torta">Torta</option>
+                            <option value="">Selecciona tipo</option>
+                            <option value="torta">Torta (48h)</option>
                             <option value="pastel">Pastel</option>
                             <option value="postre">Postre</option>
                             <option value="otro">Otro</option>
@@ -1530,7 +1531,7 @@
         let agendaDireccionConfirmada = false;
         let agendaDireccionPin = { lat: -33.4489, lng: -70.6693 };
         let agendaReservaPendiente = null;
-        let agendaTipoActual = "torta";
+        let agendaTipoActual = "";
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -2207,8 +2208,8 @@
             if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
             if (!silent) _agendaMsg("Cargando disponibilidad...");
             try {
-                const tipoSel = String(agendaTipoEl?.value || agendaTipoActual || "torta").trim().toLowerCase();
-                agendaTipoActual = tipoSel || "torta";
+                const tipoSel = String(agendaTipoEl?.value || agendaTipoActual || "").trim().toLowerCase();
+                agendaTipoActual = tipoSel || "";
                 const url = `/api/tienda/agenda/disponibilidad?tipo=${encodeURIComponent(agendaTipoActual)}`;
                 const res = await fetch(url, { headers: { Accept: "application/json" } });
                 const data = await res.json();
@@ -2226,7 +2227,8 @@
             if (t === "torta") return "Torta";
             if (t === "pastel") return "Pastel";
             if (t === "postre") return "Postre";
-            return "Otro";
+            if (t === "otro") return "Otro";
+            return "No seleccionado";
         }
 
         function _formatearFechaAgenda(fechaIso) {
@@ -2241,7 +2243,7 @@
         }
 
         function _buildAgendaReservaPayload() {
-            const tipo = String(agendaTipoEl?.value || "torta").trim().toLowerCase();
+            const tipo = String(agendaTipoEl?.value || "").trim().toLowerCase();
             const payload = {
                 fecha: String(agendaFechaActiva || ""),
                 hora_inicio: String(agendaHoraActiva || ""),
@@ -2375,6 +2377,9 @@
             if (payload.nombre.length < 2) return _agendaMsg("Ingresa un nombre valido.", "err");
             if (!payload.email) return _agendaMsg("Ingresa un correo valido.", "err");
             if (!payload.telefono) return _agendaMsg("Telefono invalido, usa 8 digitos.", "err");
+            if (!["torta", "pastel", "postre", "otro"].includes(String(payload.tipo || ""))) {
+                return _agendaMsg("Selecciona el tipo de pedido para aplicar la regla correcta.", "err");
+            }
             if (payload.entrega_tipo === "despacho" && payload.direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");
             if (payload.entrega_tipo === "despacho" && !payload.direccion_confirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
             agendaReservaPendiente = payload;
@@ -3264,7 +3269,7 @@
         agendaEntregaRetiroEl?.addEventListener("click", () => _setAgendaEntregaTipo("retiro"));
         agendaEntregaDespachoEl?.addEventListener("click", () => _setAgendaEntregaTipo("despacho"));
         agendaTipoEl?.addEventListener("change", () => {
-            agendaTipoActual = String(agendaTipoEl.value || "torta").trim().toLowerCase();
+            agendaTipoActual = String(agendaTipoEl.value || "").trim().toLowerCase();
             agendaFechaActiva = "";
             agendaHoraActiva = "";
             cargarAgendaDisponibilidad(true);
@@ -3300,7 +3305,7 @@
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
         _startAgendaPoll();
-        agendaTipoActual = String(agendaTipoEl?.value || "torta").trim().toLowerCase();
+        agendaTipoActual = String(agendaTipoEl?.value || "").trim().toLowerCase();
         _setAgendaEntregaTipo("retiro");
         renderCart();
         cargarProductos();

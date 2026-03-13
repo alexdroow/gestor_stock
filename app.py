@@ -1168,22 +1168,10 @@ def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None):
     tz = ZoneInfo("America/Santiago")
     now_dt = now_local or datetime.now(tz)
     t = _normalizar_tipo_reserva_tienda(tipo)
-    cfg = dict(cfg_agenda or {})
-    start_minutes = cfg.get("start_minutes")
-    if start_minutes is None:
-        start_raw = str(cfg.get("hour_start") or "09:00").strip()
-        start_minutes = _hhmm_a_minutos(start_raw)
-    if start_minutes is None:
-        start_minutes = 9 * 60
-
-    if t == "torta":
-        # Torta: 2 dias calendario completos y habilita desde la hora de inicio configurada.
-        fecha_base = now_dt.date() + timedelta(days=2)
-        hh = int(start_minutes // 60)
-        mm = int(start_minutes % 60)
-        return datetime(fecha_base.year, fecha_base.month, fecha_base.day, hh, mm, tzinfo=tz)
-
-    # Pasteles y otros: ventana real de 24h desde la hora actual.
+    # Regla horaria exacta por tipo:
+    # - torta: 48h
+    # - pastel: 24h
+    # - otros: 24h
     return now_dt + timedelta(minutes=_minutos_anticipacion_reserva(t))
 
 
@@ -3384,7 +3372,7 @@ def api_tienda_agenda_reservar():
         if not _cumple_anticipacion_reserva(fecha, hora_inicio, tipo_pedido, cfg_agenda=cfg):
             minutos = _minutos_anticipacion_reserva(tipo_pedido)
             if tipo_pedido == "torta":
-                msg = "Las tortas requieren minimo 2 dias de anticipacion"
+                msg = "Las tortas requieren minimo 48 horas de anticipacion"
             elif tipo_pedido == "pastel":
                 msg = "Los pasteles requieren minimo 24 horas de anticipacion"
             else:
