@@ -1481,14 +1481,35 @@ def _default_tienda_personalizacion():
         "offer_float_image_size": 46,
         "agenda_enabled": True,
         "agenda_menu_label": "Agendar pedido",
+        "agenda_type_label": "Tipo de pedido",
+        "agenda_type_torta_text": "Torta (48h)",
+        "agenda_type_pastel_text": "Pasteles (24h)",
         "agenda_section_title": "Agenda tu pedido",
         "agenda_section_subtitle": "Selecciona dia y hora disponible para reservar tu torta o pastel.",
+        "agenda_builder_title": "Arma tu torta",
+        "agenda_summary_title": "Resumen de cotizacion",
+        "agenda_total_label": "Total estimado",
+        "agenda_delivery_retiro_text": "Retiro en tienda",
+        "agenda_delivery_despacho_text": "Despacho",
+        "agenda_placeholder_name": "Nombre completo",
+        "agenda_placeholder_email": "Correo electronico",
+        "agenda_placeholder_phone": "12345678",
+        "agenda_placeholder_detail": "Detalle rapido del pedido (opcional)",
+        "agenda_placeholder_address": "Direccion de despacho (buscar y confirmar pin)",
+        "agenda_map_search_text": "Buscar",
+        "agenda_map_confirm_text": "Confirmar pin",
+        "agenda_map_help_text": "Mueve el pin al punto exacto y confirma.",
         "agenda_days_ahead": 14,
         "agenda_hour_start": "09:00",
         "agenda_hour_end": "19:00",
         "agenda_slot_minutes": 60,
         "agenda_slot_capacity": 1,
         "agenda_form_button_text": "Reservar horario",
+        "agenda_confirm_title": "Confirmar reserva",
+        "agenda_confirm_warning": "Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.",
+        "agenda_confirm_pdf_text": "Descargar comprobante",
+        "agenda_confirm_cancel_text": "Volver",
+        "agenda_confirm_accept_text": "Confirmar y generar orden PDF",
         "agenda_card_bg": "#f8fafc",
         "agenda_card_border": "#cbd5e1",
         "agenda_slot_available_bg": "#ecfeff",
@@ -1576,9 +1597,30 @@ def _normalizar_tienda_personalizacion(payload):
 
     clean["agenda_enabled"] = bool(data.get("agenda_enabled", base["agenda_enabled"]))
     clean["agenda_menu_label"] = str(data.get("agenda_menu_label") or base["agenda_menu_label"]).strip()[:60] or base["agenda_menu_label"]
+    clean["agenda_type_label"] = str(data.get("agenda_type_label") or base["agenda_type_label"]).strip()[:60] or base["agenda_type_label"]
+    clean["agenda_type_torta_text"] = str(data.get("agenda_type_torta_text") or base["agenda_type_torta_text"]).strip()[:60] or base["agenda_type_torta_text"]
+    clean["agenda_type_pastel_text"] = str(data.get("agenda_type_pastel_text") or base["agenda_type_pastel_text"]).strip()[:60] or base["agenda_type_pastel_text"]
     clean["agenda_section_title"] = str(data.get("agenda_section_title") or base["agenda_section_title"]).strip()[:90] or base["agenda_section_title"]
     clean["agenda_section_subtitle"] = str(data.get("agenda_section_subtitle") or base["agenda_section_subtitle"]).strip()[:220] or base["agenda_section_subtitle"]
+    clean["agenda_builder_title"] = str(data.get("agenda_builder_title") or base["agenda_builder_title"]).strip()[:80] or base["agenda_builder_title"]
+    clean["agenda_summary_title"] = str(data.get("agenda_summary_title") or base["agenda_summary_title"]).strip()[:80] or base["agenda_summary_title"]
+    clean["agenda_total_label"] = str(data.get("agenda_total_label") or base["agenda_total_label"]).strip()[:60] or base["agenda_total_label"]
+    clean["agenda_delivery_retiro_text"] = str(data.get("agenda_delivery_retiro_text") or base["agenda_delivery_retiro_text"]).strip()[:50] or base["agenda_delivery_retiro_text"]
+    clean["agenda_delivery_despacho_text"] = str(data.get("agenda_delivery_despacho_text") or base["agenda_delivery_despacho_text"]).strip()[:50] or base["agenda_delivery_despacho_text"]
+    clean["agenda_placeholder_name"] = str(data.get("agenda_placeholder_name") or base["agenda_placeholder_name"]).strip()[:80] or base["agenda_placeholder_name"]
+    clean["agenda_placeholder_email"] = str(data.get("agenda_placeholder_email") or base["agenda_placeholder_email"]).strip()[:120] or base["agenda_placeholder_email"]
+    clean["agenda_placeholder_phone"] = str(data.get("agenda_placeholder_phone") or base["agenda_placeholder_phone"]).strip()[:20] or base["agenda_placeholder_phone"]
+    clean["agenda_placeholder_detail"] = str(data.get("agenda_placeholder_detail") or base["agenda_placeholder_detail"]).strip()[:180] or base["agenda_placeholder_detail"]
+    clean["agenda_placeholder_address"] = str(data.get("agenda_placeholder_address") or base["agenda_placeholder_address"]).strip()[:180] or base["agenda_placeholder_address"]
+    clean["agenda_map_search_text"] = str(data.get("agenda_map_search_text") or base["agenda_map_search_text"]).strip()[:40] or base["agenda_map_search_text"]
+    clean["agenda_map_confirm_text"] = str(data.get("agenda_map_confirm_text") or base["agenda_map_confirm_text"]).strip()[:40] or base["agenda_map_confirm_text"]
+    clean["agenda_map_help_text"] = str(data.get("agenda_map_help_text") or base["agenda_map_help_text"]).strip()[:180] or base["agenda_map_help_text"]
     clean["agenda_form_button_text"] = str(data.get("agenda_form_button_text") or base["agenda_form_button_text"]).strip()[:50] or base["agenda_form_button_text"]
+    clean["agenda_confirm_title"] = str(data.get("agenda_confirm_title") or base["agenda_confirm_title"]).strip()[:70] or base["agenda_confirm_title"]
+    clean["agenda_confirm_warning"] = str(data.get("agenda_confirm_warning") or base["agenda_confirm_warning"]).strip()[:220] or base["agenda_confirm_warning"]
+    clean["agenda_confirm_pdf_text"] = str(data.get("agenda_confirm_pdf_text") or base["agenda_confirm_pdf_text"]).strip()[:60] or base["agenda_confirm_pdf_text"]
+    clean["agenda_confirm_cancel_text"] = str(data.get("agenda_confirm_cancel_text") or base["agenda_confirm_cancel_text"]).strip()[:40] or base["agenda_confirm_cancel_text"]
+    clean["agenda_confirm_accept_text"] = str(data.get("agenda_confirm_accept_text") or base["agenda_confirm_accept_text"]).strip()[:80] or base["agenda_confirm_accept_text"]
 
     try:
         agenda_days = int(data.get("agenda_days_ahead") or base["agenda_days_ahead"])

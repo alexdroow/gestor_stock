@@ -482,14 +482,77 @@
                     <label>Texto menu agenda
                         <input id="agenda_menu_label" type="text" maxlength="60" placeholder="Agendar pedido">
                     </label>
+                    <label>Etiqueta tipo pedido
+                        <input id="agenda_type_label" type="text" maxlength="60" placeholder="Tipo de pedido">
+                    </label>
+                    <label>Boton tipo torta
+                        <input id="agenda_type_torta_text" type="text" maxlength="60" placeholder="Torta (48h)">
+                    </label>
+                    <label>Boton tipo pastel
+                        <input id="agenda_type_pastel_text" type="text" maxlength="60" placeholder="Pasteles (24h)">
+                    </label>
                     <label>Titulo seccion agenda
                         <input id="agenda_section_title" type="text" maxlength="90" placeholder="Agenda tu pedido">
                     </label>
                     <label class="full">Subtitulo agenda
                         <input id="agenda_section_subtitle" type="text" maxlength="220" placeholder="Selecciona dia y hora disponible para reservar...">
                     </label>
+                    <label>Titulo constructor torta
+                        <input id="agenda_builder_title" type="text" maxlength="80" placeholder="Arma tu torta">
+                    </label>
+                    <label>Titulo resumen cotizacion
+                        <input id="agenda_summary_title" type="text" maxlength="80" placeholder="Resumen de cotizacion">
+                    </label>
+                    <label>Etiqueta total estimado
+                        <input id="agenda_total_label" type="text" maxlength="60" placeholder="Total estimado">
+                    </label>
+                    <label>Texto boton retiro
+                        <input id="agenda_delivery_retiro_text" type="text" maxlength="50" placeholder="Retiro en tienda">
+                    </label>
+                    <label>Texto boton despacho
+                        <input id="agenda_delivery_despacho_text" type="text" maxlength="50" placeholder="Despacho">
+                    </label>
                     <label>Texto boton reserva
                         <input id="agenda_form_button_text" type="text" maxlength="50" placeholder="Reservar horario">
+                    </label>
+                    <label>Placeholder nombre
+                        <input id="agenda_placeholder_name" type="text" maxlength="80" placeholder="Nombre completo">
+                    </label>
+                    <label>Placeholder correo
+                        <input id="agenda_placeholder_email" type="text" maxlength="120" placeholder="Correo electronico">
+                    </label>
+                    <label>Placeholder telefono (+569)
+                        <input id="agenda_placeholder_phone" type="text" maxlength="20" placeholder="12345678">
+                    </label>
+                    <label>Placeholder detalle
+                        <input id="agenda_placeholder_detail" type="text" maxlength="180" placeholder="Detalle rapido del pedido (opcional)">
+                    </label>
+                    <label class="full">Placeholder direccion despacho
+                        <input id="agenda_placeholder_address" type="text" maxlength="180" placeholder="Direccion de despacho (buscar y confirmar pin)">
+                    </label>
+                    <label>Texto boton buscar mapa
+                        <input id="agenda_map_search_text" type="text" maxlength="40" placeholder="Buscar">
+                    </label>
+                    <label>Texto boton confirmar pin
+                        <input id="agenda_map_confirm_text" type="text" maxlength="40" placeholder="Confirmar pin">
+                    </label>
+                    <label class="full">Texto ayuda mapa
+                        <input id="agenda_map_help_text" type="text" maxlength="180" placeholder="Mueve el pin al punto exacto y confirma.">
+                    </label>
+                    <label>Titulo modal confirmar
+                        <input id="agenda_confirm_title" type="text" maxlength="70" placeholder="Confirmar reserva">
+                    </label>
+                    <label class="full">Mensaje alerta modal confirmar
+                        <input id="agenda_confirm_warning" type="text" maxlength="220" placeholder="Verifica muy bien tu telefono: sera el medio principal de contacto...">
+                    </label>
+                    <label>Texto boton PDF modal
+                        <input id="agenda_confirm_pdf_text" type="text" maxlength="60" placeholder="Descargar comprobante">
+                    </label>
+                    <label>Texto boton volver modal
+                        <input id="agenda_confirm_cancel_text" type="text" maxlength="40" placeholder="Volver">
+                    </label>
+                    <label>Texto boton confirmar modal
+                        <input id="agenda_confirm_accept_text" type="text" maxlength="80" placeholder="Confirmar y generar orden PDF">
                     </label>
                     <label>Dias a mostrar (3-60)
                         <input id="agenda_days_ahead" type="number" min="3" max="60" step="1">
@@ -649,7 +712,12 @@
         "offer_card_border_color","offer_card_glow_color","offer_price_color","offer_discount_chip_bg","offer_discount_chip_text",
         "offer_badge_enabled","offer_badge_text","offer_badge_icon","offer_badge_bg","offer_badge_text_color",
         "offer_float_icon","offer_float_image_url","offer_float_image_size",
-        "agenda_enabled","agenda_menu_label","agenda_section_title","agenda_section_subtitle","agenda_form_button_text",
+        "agenda_enabled","agenda_menu_label","agenda_type_label","agenda_type_torta_text","agenda_type_pastel_text",
+        "agenda_section_title","agenda_section_subtitle","agenda_builder_title","agenda_summary_title","agenda_total_label",
+        "agenda_delivery_retiro_text","agenda_delivery_despacho_text","agenda_form_button_text",
+        "agenda_placeholder_name","agenda_placeholder_email","agenda_placeholder_phone","agenda_placeholder_detail","agenda_placeholder_address",
+        "agenda_map_search_text","agenda_map_confirm_text","agenda_map_help_text",
+        "agenda_confirm_title","agenda_confirm_warning","agenda_confirm_pdf_text","agenda_confirm_cancel_text","agenda_confirm_accept_text",
         "agenda_days_ahead","agenda_hour_start","agenda_hour_end","agenda_slot_minutes","agenda_slot_capacity",
         "agenda_card_bg","agenda_card_border","agenda_slot_available_bg","agenda_slot_unavailable_bg","agenda_slot_unavailable_text",
         "custom_css"
@@ -700,9 +768,30 @@
         offer_float_image_size: 46,
         agenda_enabled: true,
         agenda_menu_label: "Agendar pedido",
+        agenda_type_label: "Tipo de pedido",
+        agenda_type_torta_text: "Torta (48h)",
+        agenda_type_pastel_text: "Pasteles (24h)",
         agenda_section_title: "Agenda tu pedido",
         agenda_section_subtitle: "Selecciona dia y hora disponible para reservar tu torta o pastel.",
+        agenda_builder_title: "Arma tu torta",
+        agenda_summary_title: "Resumen de cotizacion",
+        agenda_total_label: "Total estimado",
+        agenda_delivery_retiro_text: "Retiro en tienda",
+        agenda_delivery_despacho_text: "Despacho",
+        agenda_placeholder_name: "Nombre completo",
+        agenda_placeholder_email: "Correo electronico",
+        agenda_placeholder_phone: "12345678",
+        agenda_placeholder_detail: "Detalle rapido del pedido (opcional)",
+        agenda_placeholder_address: "Direccion de despacho (buscar y confirmar pin)",
+        agenda_map_search_text: "Buscar",
+        agenda_map_confirm_text: "Confirmar pin",
+        agenda_map_help_text: "Mueve el pin al punto exacto y confirma.",
         agenda_form_button_text: "Reservar horario",
+        agenda_confirm_title: "Confirmar reserva",
+        agenda_confirm_warning: "Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.",
+        agenda_confirm_pdf_text: "Descargar comprobante",
+        agenda_confirm_cancel_text: "Volver",
+        agenda_confirm_accept_text: "Confirmar y generar orden PDF",
         agenda_days_ahead: 14,
         agenda_hour_start: "09:00",
         agenda_hour_end: "19:00",

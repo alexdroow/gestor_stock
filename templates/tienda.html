@@ -1504,7 +1504,7 @@
 
             <div class="section agenda-section" id="sec-agenda-reservas" style="display:none;">
                 <div class="agenda-type-bar">
-                    <label>Tipo de pedido</label>
+                    <label id="agenda-type-label">Tipo de pedido</label>
                     <div class="agenda-type-actions">
                         <button type="button" class="agenda-type-btn" id="agenda-tipo-torta">Torta (48h)</button>
                         <button type="button" class="agenda-type-btn" id="agenda-tipo-pastel">Pasteles (24h)</button>
@@ -1516,7 +1516,7 @@
                 <div class="agenda-cake-wrap" id="agenda-cake-wrap" style="display:none;">
                     <div class="agenda-cake-builder">
                         <div class="agenda-cake-head">
-                            <span>Arma tu torta</span>
+                            <span id="agenda-cake-builder-title">Arma tu torta</span>
                             <span id="agenda-cake-price-visibility"></span>
                         </div>
                         <div class="agenda-cake-empty" id="agenda-cake-debug" style="display:none;"></div>
@@ -1542,10 +1542,10 @@
                         </label>
                     </div>
                     <aside class="agenda-cake-cart">
-                        <div style="font-size:.9rem;font-weight:900;color:#0f172a;">Resumen de cotizacion</div>
+                        <div id="agenda-cake-summary-title" style="font-size:.9rem;font-weight:900;color:#0f172a;">Resumen de cotizacion</div>
                         <ul id="agenda-cake-summary"></ul>
                         <div class="agenda-cake-total">
-                            <span>Total estimado</span>
+                            <span id="agenda-cake-total-label">Total estimado</span>
                             <span id="agenda-cake-total">$0</span>
                         </div>
                     </aside>
@@ -1566,7 +1566,7 @@
                             <span class="phone-prefix">+569</span>
                             <input id="agenda-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
                         </div>
-                        <input type="text" value="Reserva por agenda" disabled>
+                        <input id="agenda-orden-label" type="text" value="Reserva por agenda" disabled>
                     </div>
                     <textarea id="agenda-detalle" maxlength="400" placeholder="Detalle rapido del pedido (opcional)"></textarea>
                     <div class="agenda-despacho-wrap" id="agenda-despacho-wrap">
@@ -1731,8 +1731,8 @@
 
     <div class="modal-overlay" id="modal-agenda-confirmar">
         <div class="modal">
-            <h3>Confirmar reserva</h3>
-            <div style="font-size:.86rem;color:#b45309;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:8px;">
+            <h3 id="agenda-confirm-title">Confirmar reserva</h3>
+            <div id="agenda-confirm-warning" style="font-size:.86rem;color:#b45309;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:8px;">
                 Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.
             </div>
             <div id="agenda-confirmar-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
@@ -1819,6 +1819,7 @@
         const secOfertasEl = document.getElementById("sec-ofertas");
         const secDestacadosEl = document.getElementById("sec-destacados");
         const secAgendaReservasEl = document.getElementById("sec-agenda-reservas");
+        const agendaTypeLabelEl = document.getElementById("agenda-type-label");
         const agendaSectionTitleEl = document.getElementById("agenda-section-title");
         const agendaSectionSubtitleEl = document.getElementById("agenda-section-subtitle");
         const agendaDaysListEl = document.getElementById("agenda-days-list");
@@ -1844,15 +1845,21 @@
         const agendaCakeSummaryEl = document.getElementById("agenda-cake-summary");
         const agendaCakeTotalEl = document.getElementById("agenda-cake-total");
         const agendaCakePriceVisibilityEl = document.getElementById("agenda-cake-price-visibility");
+        const agendaCakeBuilderTitleEl = document.getElementById("agenda-cake-builder-title");
+        const agendaCakeSummaryTitleEl = document.getElementById("agenda-cake-summary-title");
+        const agendaCakeTotalLabelEl = document.getElementById("agenda-cake-total-label");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
         const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
+        const agendaOrdenLabelEl = document.getElementById("agenda-orden-label");
         const agendaDespachoWrapEl = document.getElementById("agenda-despacho-wrap");
         const agendaDireccionBuscarEl = document.getElementById("agenda-direccion-buscar");
         const agendaBuscarMapaEl = document.getElementById("agenda-buscar-mapa");
         const agendaConfirmarPinEl = document.getElementById("agenda-confirmar-pin");
         const agendaMapMetaEl = document.getElementById("agenda-map-meta");
         const modalAgendaConfirmarEl = document.getElementById("modal-agenda-confirmar");
+        const agendaConfirmTitleEl = document.getElementById("agenda-confirm-title");
+        const agendaConfirmWarningEl = document.getElementById("agenda-confirm-warning");
         const agendaConfirmarDetalleEl = document.getElementById("agenda-confirmar-detalle");
         const agendaConfirmarPdfEl = document.getElementById("agenda-confirmar-pdf");
         const agendaConfirmarCancelarEl = document.getElementById("agenda-confirmar-cancelar");
@@ -1957,14 +1964,35 @@
             offer_float_image_size: 46,
             agenda_enabled: true,
             agenda_menu_label: "Agendar pedido",
+            agenda_type_label: "Tipo de pedido",
+            agenda_type_torta_text: "Torta (48h)",
+            agenda_type_pastel_text: "Pasteles (24h)",
             agenda_section_title: "Agenda tu pedido",
             agenda_section_subtitle: "Selecciona dia y hora disponible para reservar tu torta o pastel.",
+            agenda_builder_title: "Arma tu torta",
+            agenda_summary_title: "Resumen de cotizacion",
+            agenda_total_label: "Total estimado",
+            agenda_delivery_retiro_text: "Retiro en tienda",
+            agenda_delivery_despacho_text: "Despacho",
+            agenda_placeholder_name: "Nombre completo",
+            agenda_placeholder_email: "Correo electronico",
+            agenda_placeholder_phone: "12345678",
+            agenda_placeholder_detail: "Detalle rapido del pedido (opcional)",
+            agenda_placeholder_address: "Direccion de despacho (buscar y confirmar pin)",
+            agenda_map_search_text: "Buscar",
+            agenda_map_confirm_text: "Confirmar pin",
+            agenda_map_help_text: "Mueve el pin al punto exacto y confirma.",
             agenda_days_ahead: 14,
             agenda_hour_start: "09:00",
             agenda_hour_end: "19:00",
             agenda_slot_minutes: 60,
             agenda_slot_capacity: 1,
             agenda_form_button_text: "Reservar horario",
+            agenda_confirm_title: "Confirmar reserva",
+            agenda_confirm_warning: "Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.",
+            agenda_confirm_pdf_text: "Descargar comprobante",
+            agenda_confirm_cancel_text: "Volver",
+            agenda_confirm_accept_text: "Confirmar y generar orden PDF",
             agenda_card_bg: "#f8fafc",
             agenda_card_border: "#cbd5e1",
             agenda_slot_available_bg: "#ecfeff",
@@ -2002,9 +2030,31 @@
                 agendaQuickBtnEl.textContent = String(tiendaUiCfg.agenda_menu_label || TIENDA_UI_DEFAULTS.agenda_menu_label);
                 agendaQuickBtnEl.classList.toggle("active", categoriaActiva === "AGENDA");
             }
+            if (agendaTypeLabelEl) agendaTypeLabelEl.textContent = String(tiendaUiCfg.agenda_type_label || TIENDA_UI_DEFAULTS.agenda_type_label);
+            if (agendaTipoTortaEl) agendaTipoTortaEl.textContent = String(tiendaUiCfg.agenda_type_torta_text || TIENDA_UI_DEFAULTS.agenda_type_torta_text);
+            if (agendaTipoPastelEl) agendaTipoPastelEl.textContent = String(tiendaUiCfg.agenda_type_pastel_text || TIENDA_UI_DEFAULTS.agenda_type_pastel_text);
             if (agendaSectionTitleEl) agendaSectionTitleEl.textContent = String(tiendaUiCfg.agenda_section_title || TIENDA_UI_DEFAULTS.agenda_section_title);
             if (agendaSectionSubtitleEl) agendaSectionSubtitleEl.textContent = String(tiendaUiCfg.agenda_section_subtitle || TIENDA_UI_DEFAULTS.agenda_section_subtitle);
+            if (agendaCakeBuilderTitleEl) agendaCakeBuilderTitleEl.textContent = String(tiendaUiCfg.agenda_builder_title || TIENDA_UI_DEFAULTS.agenda_builder_title);
+            if (agendaCakeSummaryTitleEl) agendaCakeSummaryTitleEl.textContent = String(tiendaUiCfg.agenda_summary_title || TIENDA_UI_DEFAULTS.agenda_summary_title);
+            if (agendaCakeTotalLabelEl) agendaCakeTotalLabelEl.textContent = String(tiendaUiCfg.agenda_total_label || TIENDA_UI_DEFAULTS.agenda_total_label);
+            if (agendaEntregaRetiroEl) agendaEntregaRetiroEl.textContent = String(tiendaUiCfg.agenda_delivery_retiro_text || TIENDA_UI_DEFAULTS.agenda_delivery_retiro_text);
+            if (agendaEntregaDespachoEl) agendaEntregaDespachoEl.textContent = String(tiendaUiCfg.agenda_delivery_despacho_text || TIENDA_UI_DEFAULTS.agenda_delivery_despacho_text);
+            if (agendaNombreEl) agendaNombreEl.placeholder = String(tiendaUiCfg.agenda_placeholder_name || TIENDA_UI_DEFAULTS.agenda_placeholder_name);
+            if (agendaEmailEl) agendaEmailEl.placeholder = String(tiendaUiCfg.agenda_placeholder_email || TIENDA_UI_DEFAULTS.agenda_placeholder_email);
+            if (agendaTelefonoEl) agendaTelefonoEl.placeholder = String(tiendaUiCfg.agenda_placeholder_phone || TIENDA_UI_DEFAULTS.agenda_placeholder_phone);
+            if (agendaDetalleEl) agendaDetalleEl.placeholder = String(tiendaUiCfg.agenda_placeholder_detail || TIENDA_UI_DEFAULTS.agenda_placeholder_detail);
+            if (agendaDireccionBuscarEl) agendaDireccionBuscarEl.placeholder = String(tiendaUiCfg.agenda_placeholder_address || TIENDA_UI_DEFAULTS.agenda_placeholder_address);
+            if (agendaBuscarMapaEl) agendaBuscarMapaEl.textContent = String(tiendaUiCfg.agenda_map_search_text || TIENDA_UI_DEFAULTS.agenda_map_search_text);
+            if (agendaConfirmarPinEl) agendaConfirmarPinEl.textContent = String(tiendaUiCfg.agenda_map_confirm_text || TIENDA_UI_DEFAULTS.agenda_map_confirm_text);
+            if (agendaMapMetaEl) agendaMapMetaEl.textContent = String(tiendaUiCfg.agenda_map_help_text || TIENDA_UI_DEFAULTS.agenda_map_help_text);
+            if (agendaOrdenLabelEl) agendaOrdenLabelEl.value = "Reserva por agenda";
             if (agendaBtnReservarEl) agendaBtnReservarEl.textContent = String(tiendaUiCfg.agenda_form_button_text || TIENDA_UI_DEFAULTS.agenda_form_button_text);
+            if (agendaConfirmTitleEl) agendaConfirmTitleEl.textContent = String(tiendaUiCfg.agenda_confirm_title || TIENDA_UI_DEFAULTS.agenda_confirm_title);
+            if (agendaConfirmWarningEl) agendaConfirmWarningEl.textContent = String(tiendaUiCfg.agenda_confirm_warning || TIENDA_UI_DEFAULTS.agenda_confirm_warning);
+            if (agendaConfirmarPdfEl) agendaConfirmarPdfEl.textContent = String(tiendaUiCfg.agenda_confirm_pdf_text || TIENDA_UI_DEFAULTS.agenda_confirm_pdf_text);
+            if (agendaConfirmarCancelarEl) agendaConfirmarCancelarEl.textContent = String(tiendaUiCfg.agenda_confirm_cancel_text || TIENDA_UI_DEFAULTS.agenda_confirm_cancel_text);
+            if (agendaConfirmarAceptarEl) agendaConfirmarAceptarEl.textContent = String(tiendaUiCfg.agenda_confirm_accept_text || TIENDA_UI_DEFAULTS.agenda_confirm_accept_text);
 
             if (waFabEl) {
                 const visible = Boolean(tiendaUiCfg.show_whatsapp_button);
