@@ -4037,7 +4037,8 @@ def obtener_historial_ventas(fecha_desde=None, fecha_hasta=None):
     query = """
         SELECT v.*, 
                GROUP_CONCAT(vi.producto_nombre || ' (x' || vi.cantidad || ')', ', ') as productos,
-               COALESCE(v.total_monto, vt.total_monto, 0) AS total_monto_calc
+               COALESCE(v.total_monto, vt.total_monto, 0) AS total_monto_calc,
+               COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado_normalizado
         FROM ventas v
         LEFT JOIN venta_items vi ON v.id = vi.venta_id
         LEFT JOIN (
@@ -4078,6 +4079,7 @@ def obtener_historial_ventas(fecha_desde=None, fecha_hasta=None):
             total_monto_calc = 0.0
         if total_monto <= 0 and total_monto_calc > 0:
             venta["total_monto"] = total_monto_calc
+        venta["pedido_estado"] = str(venta.get("pedido_estado_normalizado") or "recibido").strip().lower()
 
         try:
             # Parsear fecha

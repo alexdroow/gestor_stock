@@ -890,6 +890,14 @@
 
         <section class="content">
             <div class="tienda-estado-banner" id="tienda-estado-banner">Cargando estado de tienda...</div>
+            <div id="pedido-activo-box" style="display:none;margin:10px 0 14px;padding:12px;border:1px solid #bfdbfe;background:#f8fbff;border-radius:12px;">
+                <div style="font-weight:800;color:#1e3a8a;">Tu pedido activo</div>
+                <div id="pedido-activo-texto" style="margin-top:4px;font-size:.92rem;color:#1f2937;">Sin pedidos activos.</div>
+                <div id="pedido-activo-meta" style="margin-top:6px;font-size:.82rem;color:#475569;"></div>
+                <div style="margin-top:8px;">
+                    <button type="button" id="pedido-activo-ver" class="btn-primary">Ver detalle</button>
+                </div>
+            </div>
             <div class="mobile-cat-strip" id="mobile-cat-strip"></div>
             <div class="section" id="sec-ofertas">
                 <div class="ofertas-head">
@@ -1094,6 +1102,10 @@
         const mobileMenuModalEl = document.getElementById("mobile-menu-modal");
         const mobileMenuListEl = document.getElementById("mobile-menu-list");
         const tiendaEstadoBannerEl = document.getElementById("tienda-estado-banner");
+        const pedidoActivoBoxEl = document.getElementById("pedido-activo-box");
+        const pedidoActivoTextoEl = document.getElementById("pedido-activo-texto");
+        const pedidoActivoMetaEl = document.getElementById("pedido-activo-meta");
+        const pedidoActivoVerEl = document.getElementById("pedido-activo-ver");
         const ofertasPrevBtnEl = document.getElementById("ofertas-prev");
         const ofertasNextBtnEl = document.getElementById("ofertas-next");
 
@@ -1107,6 +1119,7 @@
         let mensajePostPedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.";
         let ultimoComprobantePedido = null;
         let pedidoEstadoPollTimer = null;
+        let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
         let historialComprasCliente = [];
         const tiendaSessionId = (() => {
@@ -1184,6 +1197,61 @@
                     telefono_digitos: normalizarTelefono8(cliente.telefono || ""),
                 }));
             } catch (_) {}
+        }
+
+        function _estadoPedidoFinal(estadoRaw) {
+            const estado = String(estadoRaw || "").trim().toLowerCase();
+            return estado === "entregado" || estado === "cancelado";
+        }
+
+        function cargarUltimoPedidoLocal() {
+            try {
+                const raw = localStorage.getItem("tienda_ultimo_pedido");
+                if (!raw) return null;
+                const obj = JSON.parse(raw);
+                const ventaId = Number(obj?.venta_id || 0);
+                if (!ventaId) return null;
+                return {
+                    venta_id: ventaId,
+                    codigo_operacion: String(obj?.codigo_operacion || ""),
+                    fecha_hora_local: String(obj?.fecha_hora_local || ""),
+                    estado: String(obj?.estado || "recibido"),
+                    cliente_nombre: String(obj?.cliente_nombre || ""),
+                    cliente_email: String(obj?.cliente_email || ""),
+                    cliente_telefono: String(obj?.cliente_telefono || ""),
+                    subtotal: Number(obj?.subtotal || 0),
+                    descuento: Number(obj?.descuento || 0),
+                    total: Number(obj?.total || 0),
+                    items: Array.isArray(obj?.items) ? obj.items : [],
+                    estado_actualizado: String(obj?.estado_actualizado || ""),
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function guardarUltimoPedidoLocal() {
+            try {
+                if (!ultimoComprobantePedido || !Number(ultimoComprobantePedido.venta_id || 0)) return;
+                localStorage.setItem("tienda_ultimo_pedido", JSON.stringify(ultimoComprobantePedido));
+            } catch (_) {}
+        }
+
+        function _renderPedidoActivoTienda() {
+            if (!pedidoActivoBoxEl) return;
+            const p = ultimoComprobantePedido;
+            if (!p || !Number(p.venta_id || 0)) {
+                pedidoActivoBoxEl.style.display = "none";
+                return;
+            }
+            pedidoActivoBoxEl.style.display = "";
+            if (pedidoActivoTextoEl) {
+                pedidoActivoTextoEl.textContent = `Pedido #${Number(p.venta_id || 0)} - Estado: ${_labelPedidoEstado(p.estado || "recibido")}`;
+            }
+            if (pedidoActivoMetaEl) {
+                const estadoAct = String(p.estado_actualizado || "").trim();
+                pedidoActivoMetaEl.textContent = estadoAct ? `Actualizado: ${estadoAct}` : "";
+            }
         }
 
         function renderEstadoCuenta() {
@@ -1582,11 +1650,15 @@
             if (cuentaTelefonoEl) cuentaTelefonoEl.value = clienteRegistrado?.telefono_digitos || normalizarTelefono8(clienteRegistrado?.telefono || "");
             renderEstadoCuenta();
             modalCuentaEl?.classList.add("active");
-            if (clienteRegistrado) cargarHistorialCliente();
+            if (clienteRegistrado) {
+                cargarHistorialCliente();
+                _startHistorialEstadoPoll();
+            }
         }
 
         function cerrarModalCuenta() {
             modalCuentaEl?.classList.remove("active");
+            _stopHistorialEstadoPoll();
         }
 
         function renderHistorialCliente(ventas) {
@@ -1600,14 +1672,19 @@
                 const vid = Number(v.id || 0);
                 const total = money.format(Number(v.total_monto || 0));
                 const fecha = String(v.fecha_hora || "");
+                const estado = String(v.pedido_estado || "recibido").trim().toLowerCase();
+                const estadoTxt = _labelPedidoEstado(estado);
+                const estadoActualizado = String(v.pedido_estado_actualizado || "").trim();
                 const desc = (Array.isArray(v.items) ? v.items : []).map((it) => `${esc(it.producto_nombre || ("#"+it.producto_id))} x${Number(it.cantidad || 0)}`).join(", ");
                 return `
-                    <div style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:6px;">
+                    <div data-venta-id="${vid}" style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:6px;">
                         <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
                             <strong>Pedido #${vid}</strong>
                             <span>${total}</span>
                         </div>
                         <div style="font-size:.82rem;color:#64748b;">${esc(fecha)}</div>
+                        <div style="font-size:.85rem;color:#0f172a;"><strong>Estado:</strong> <span data-venta-estado="${vid}">${esc(estadoTxt)}</span></div>
+                        <div style="font-size:.78rem;color:#64748b;" data-venta-estado-meta="${vid}">${esc(estadoActualizado ? `Actualizado: ${estadoActualizado}` : "")}</div>
                         <div style="font-size:.84rem;color:#334155;">${desc || "Sin items"}</div>
                         <div style="display:flex;justify-content:flex-end;">
                             <button class="btn-primary" type="button" onclick="repetirCompraVenta(${vid})">Repetir compra</button>
@@ -1667,10 +1744,102 @@
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar historial");
                 historialComprasCliente = Array.isArray(data.ventas) ? data.ventas : [];
                 renderHistorialCliente(historialComprasCliente);
+                _sincronizarPedidoActivoDesdeHistorial();
             } catch (e) {
                 historialComprasCliente = [];
                 renderHistorialCliente([]);
                 msg(e.message || "No se pudo cargar historial", true);
+            }
+        }
+
+        function _sincronizarPedidoActivoDesdeHistorial() {
+            const items = Array.isArray(historialComprasCliente) ? historialComprasCliente : [];
+            if (!items.length) return;
+            const vigente = items.find((v) => !_estadoPedidoFinal(v.pedido_estado)) || items[0];
+            const vigenteId = Number(vigente?.id || 0);
+            if (!vigenteId) return;
+            if (!ultimoComprobantePedido || Number(ultimoComprobantePedido.venta_id || 0) !== vigenteId) {
+                ultimoComprobantePedido = {
+                    ...(ultimoComprobantePedido || {}),
+                    venta_id: vigenteId,
+                    fecha_hora_local: String(vigente?.fecha_hora || ""),
+                    estado: String(vigente?.pedido_estado || "recibido"),
+                    estado_actualizado: String(vigente?.pedido_estado_actualizado || ""),
+                    total: Number(vigente?.total_monto || 0),
+                    subtotal: Number(vigente?.total_monto || 0),
+                    descuento: Number(vigente?.descuento_monto || 0),
+                    codigo_operacion: String(vigente?.codigo_operacion || ""),
+                    items: Array.isArray(vigente?.items) ? vigente.items.map((it) => ({
+                        nombre: String(it.producto_nombre || ""),
+                        cantidad: Number(it.cantidad || 0),
+                        subtotal: Number(it.cantidad || 0) * Number(it.precio_unitario || 0),
+                    })) : [],
+                };
+            } else {
+                ultimoComprobantePedido.estado = String(vigente?.pedido_estado || ultimoComprobantePedido.estado || "recibido");
+                ultimoComprobantePedido.estado_actualizado = String(vigente?.pedido_estado_actualizado || ultimoComprobantePedido.estado_actualizado || "");
+            }
+            guardarUltimoPedidoLocal();
+            _renderPedidoActivoTienda();
+            _startPedidoEstadoPoll();
+        }
+
+        async function _pollEstadosHistorialCliente() {
+            if (!clienteRegistrado) return;
+            if (!Array.isArray(historialComprasCliente) || !historialComprasCliente.length) return;
+            const ids = historialComprasCliente.map((v) => Number(v.id || 0)).filter((id) => id > 0).slice(0, 30);
+            if (!ids.length) return;
+            try {
+                const res = await fetch("/api/tienda/clientes/pedidos-estados", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: clienteRegistrado.email,
+                        telefono: clienteRegistrado.telefono,
+                        venta_ids: ids,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) return;
+                const mapa = new Map();
+                for (const p of (data.pedidos || [])) {
+                    mapa.set(Number(p.id || 0), {
+                        estado: String(p.estado || "recibido"),
+                        estado_actualizado: String(p.estado_actualizado || ""),
+                    });
+                }
+                let hayCambio = false;
+                historialComprasCliente = historialComprasCliente.map((v) => {
+                    const vid = Number(v.id || 0);
+                    const info = mapa.get(vid);
+                    if (!info) return v;
+                    const estadoPrevio = String(v.pedido_estado || "recibido");
+                    if (estadoPrevio !== info.estado || String(v.pedido_estado_actualizado || "") !== info.estado_actualizado) {
+                        hayCambio = true;
+                    }
+                    return {
+                        ...v,
+                        pedido_estado: info.estado,
+                        pedido_estado_actualizado: info.estado_actualizado,
+                    };
+                });
+                if (hayCambio) {
+                    renderHistorialCliente(historialComprasCliente);
+                }
+                _sincronizarPedidoActivoDesdeHistorial();
+            } catch (_) {}
+        }
+
+        function _startHistorialEstadoPoll() {
+            _stopHistorialEstadoPoll();
+            _pollEstadosHistorialCliente();
+            historialEstadoPollTimer = setInterval(_pollEstadosHistorialCliente, 5000);
+        }
+
+        function _stopHistorialEstadoPoll() {
+            if (historialEstadoPollTimer) {
+                clearInterval(historialEstadoPollTimer);
+                historialEstadoPollTimer = null;
             }
         }
 
@@ -1743,6 +1912,7 @@
                     codigo_operacion: String(data.codigo_operacion || ""),
                     fecha_hora_local: new Date().toLocaleString("es-CL"),
                     estado: "recibido",
+                    estado_actualizado: "",
                     cliente_nombre: String(datosCliente?.nombre || ""),
                     cliente_email: String(datosCliente?.email || ""),
                     cliente_telefono: String(datosCliente?.telefono || ""),
@@ -1751,6 +1921,9 @@
                     total: Number(data.total_monto || totalSnapshot || 0),
                     items: itemsSnapshot,
                 };
+                guardarUltimoPedidoLocal();
+                _renderPedidoActivoTienda();
+                _startPedidoEstadoPoll();
                 carrito = [];
                 codigoDescuentoEl.value = "";
                 if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = "";
@@ -1812,12 +1985,17 @@
                 }
             }
             modalExitoEl.classList.add("active");
+            _renderPedidoActivoTienda();
             _startPedidoEstadoPoll();
         }
 
         function cerrarModalExito() {
             modalExitoEl.classList.remove("active");
-            _stopPedidoEstadoPoll();
+        }
+
+        function verDetallePedidoActivo() {
+            if (!ultimoComprobantePedido || !Number(ultimoComprobantePedido.venta_id || 0)) return;
+            abrirModalExito(mensajePostPedido || "Pedido ingresado correctamente.");
         }
 
         function _labelPedidoEstado(estado) {
@@ -1881,18 +2059,42 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) return;
                 const estado = String(((data.pedido || {}).estado) || "recibido");
+                const estadoActualizado = String(((data.pedido || {}).estado_actualizado) || "");
                 p.estado = estado;
+                p.estado_actualizado = estadoActualizado;
                 if (modalExitoEstadoEl) {
                     modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estado)}`;
                 }
                 _renderPedidoSteps(estado);
+                if (Array.isArray(historialComprasCliente) && historialComprasCliente.length) {
+                    historialComprasCliente = historialComprasCliente.map((v) => {
+                        if (Number(v.id || 0) !== Number(p.venta_id || 0)) return v;
+                        return {
+                            ...v,
+                            pedido_estado: estado,
+                            pedido_estado_actualizado: estadoActualizado,
+                        };
+                    });
+                    if (modalCuentaEl?.classList.contains("active")) {
+                        renderHistorialCliente(historialComprasCliente);
+                    }
+                }
+                guardarUltimoPedidoLocal();
+                _renderPedidoActivoTienda();
+                if (_estadoPedidoFinal(estado)) {
+                    _stopPedidoEstadoPoll();
+                }
             } catch (_) {}
         }
 
         function _startPedidoEstadoPoll() {
-            _stopPedidoEstadoPoll();
+            const p = ultimoComprobantePedido;
+            if (!p || !Number(p.venta_id || 0)) return;
+            if (pedidoEstadoPollTimer) return;
             _pollEstadoPedidoCliente();
-            pedidoEstadoPollTimer = setInterval(_pollEstadoPedidoCliente, 5000);
+            if (!_estadoPedidoFinal(p.estado)) {
+                pedidoEstadoPollTimer = setInterval(_pollEstadoPedidoCliente, 5000);
+            }
         }
 
         function _stopPedidoEstadoPoll() {
@@ -2033,6 +2235,7 @@
         document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
+        pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
         document.getElementById("modal-cuenta-cerrar")?.addEventListener("click", cerrarModalCuenta);
         document.getElementById("cuenta-guardar")?.addEventListener("click", registrarCuentaCliente);
         btnCuentaEl?.addEventListener("click", abrirModalCuenta);
@@ -2074,8 +2277,11 @@
         }
 
         clienteRegistrado = cargarClienteLocal();
+        ultimoComprobantePedido = cargarUltimoPedidoLocal();
         renderEstadoCuenta();
         if (clienteRegistrado) cargarHistorialCliente();
+        _renderPedidoActivoTienda();
+        _startPedidoEstadoPoll();
         renderCart();
         cargarProductos();
         _trackTienda("view");

@@ -741,6 +741,7 @@
                                 <th>Fecha y Hora</th>
                                 <th>Codigo pedido</th>
                                 <th>Canal</th>
+                                <th>Estado pedido</th>
                                 <th>Codigo operación</th>
                                 <th>Productos</th>
                                 <th>Total Items</th>
@@ -766,10 +767,20 @@
                                             Uber Eats
                                         {% elif (venta.canal_venta or 'presencial') == 'pedidosya' %}
                                             PedidosYa
+                                        {% elif (venta.canal_venta or 'presencial') == 'tienda_online' %}
+                                            Tienda online
                                         {% else %}
                                             Presencial
                                         {% endif %}
                                     </div>
+                                </td>
+                                <td>
+                                    {% set estado_raw = (venta.pedido_estado or 'recibido')|lower %}
+                                    {% if (venta.canal_venta or 'presencial') == 'tienda_online' %}
+                                        <span id="pedido-estado-{{ venta.id }}" class="detalle-badge">{{ estado_raw }}</span>
+                                    {% else %}
+                                        <span class="detalle-badge">-</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <div class="venta-codigo">{{ venta.codigo_operacion or '-' }}</div>
@@ -799,12 +810,17 @@
                                         <button onclick="verCadena({{ venta.id }}, '{{ (venta.codigo_operacion or '')|e }}')" class="btn btn-secondary btn-sm">
                                             Cadena
                                         </button>
+                                        {% if (venta.canal_venta or 'presencial') == 'tienda_online' and ((venta.pedido_estado or 'recibido')|lower not in ['entregado', 'cancelado']) %}
+                                        <button id="pedido-btn-retiro-{{ venta.id }}" onclick="confirmarRetiro({{ venta.id }})" class="btn btn-secondary btn-sm">
+                                            Confirmar retiro
+                                        </button>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="9">
+                                <td colspan="10">
                                     <div class="empty-state">
                                         <div class="empty-state-icon">&#128220;</div>
                                         <div>No hay ventas registradas</div>
@@ -953,6 +969,31 @@
         function fechaTexto(valor, fallback) {
             const fmt = formatearFechaCorta(valor);
             return fmt || fallback;
+        }
+
+        function estadoPedidoTexto(estadoRaw) {
+            const estado = String(estadoRaw || '').trim().toLowerCase();
+            const labels = {
+                recibido: 'Recibido',
+                confirmado: 'Aceptado',
+                preparando: 'En preparacion',
+                listo: 'Listo para retirar',
+                entregado: 'Entregado',
+                cancelado: 'Cancelado'
+            };
+            return labels[estado] || 'Recibido';
+        }
+
+        function aplicarEstadoPedidoFila(ventaId, estadoRaw) {
+            const estado = String(estadoRaw || '').trim().toLowerCase() || 'recibido';
+            const badge = document.getElementById(`pedido-estado-${Number(ventaId || 0)}`);
+            if (badge) {
+                badge.textContent = estadoPedidoTexto(estado);
+            }
+            const btn = document.getElementById(`pedido-btn-retiro-${Number(ventaId || 0)}`);
+            if (btn && (estado === 'entregado' || estado === 'cancelado')) {
+                btn.remove();
+            }
         }
 
         function renderLotesProducto(item) {
@@ -1156,6 +1197,25 @@
                 });
         }
 
+        async function confirmarRetiro(ventaId) {
+            const idNum = Number(ventaId || 0);
+            if (!idNum) return;
+            if (!confirm(`Confirmar retiro del pedido #${idNum}?`)) return;
+            try {
+                const response = await fetch(`/api/tienda/admin/pedido/${idNum}/estado`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ estado: 'entregado' }),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo confirmar retiro');
+                aplicarEstadoPedidoFila(idNum, data.estado || 'entregado');
+                alert(`Pedido #${idNum} marcado como entregado.`);
+            } catch (err) {
+                alert(err.message || 'No se pudo confirmar retiro');
+            }
+        }
+
         function generarTicketPdf() {
             const data = detalleVentaActual;
             if (!data || !data.venta) return;
@@ -1226,6 +1286,12 @@
 
         document.getElementById('modal-detalle').addEventListener('click', function(e) {
             if (e.target === this) cerrarModal();
+        });
+
+        document.querySelectorAll('[id^="pedido-estado-"]').forEach((el) => {
+            const idNum = Number(String(el.id || '').replace('pedido-estado-', '') || 0);
+            if (!idNum) return;
+            aplicarEstadoPedidoFila(idNum, el.textContent || 'recibido');
         });
 
         fetch('/api/alertas/contador')

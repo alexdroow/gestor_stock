@@ -1529,7 +1529,9 @@ def api_tienda_clientes_historial():
 
         cursor.execute(
             """
-            SELECT id, fecha_hora, codigo_pedido, codigo_operacion, total_monto, descuento_codigo, descuento_monto
+            SELECT id, fecha_hora, codigo_pedido, codigo_operacion, total_monto, descuento_codigo, descuento_monto,
+                   COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
+                   pedido_estado_actualizado
             FROM ventas
             WHERE canal_venta = 'tienda_online'
               AND LOWER(TRIM(COALESCE(cliente_email, ''))) = LOWER(TRIM(?))
@@ -1578,6 +1580,73 @@ def api_tienda_clientes_historial():
             ventas.append(venta)
 
         return jsonify({"success": True, "cliente": dict(cli), "ventas": ventas})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/clientes/pedidos-estados', methods=['POST'])
+def api_tienda_clientes_pedidos_estados():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        email = _normalizar_email(data.get("email"))
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        if not email or not telefono:
+            return jsonify({"success": False, "error": "Debes indicar correo y telefono validos"}), 400
+
+        raw_ids = data.get("venta_ids") or []
+        if not isinstance(raw_ids, list) or not raw_ids:
+            return jsonify({"success": True, "pedidos": []})
+
+        ids = []
+        seen = set()
+        for raw in raw_ids:
+            try:
+                vid = int(raw or 0)
+            except (TypeError, ValueError):
+                vid = 0
+            if vid <= 0 or vid in seen:
+                continue
+            ids.append(vid)
+            seen.add(vid)
+            if len(ids) >= 40:
+                break
+        if not ids:
+            return jsonify({"success": True, "pedidos": []})
+
+        conn = get_db()
+        cursor = conn.cursor()
+        placeholders = ",".join("?" for _ in ids)
+        params = [email, telefono] + ids
+        cursor.execute(
+            f"""
+            SELECT id,
+                   COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
+                   pedido_estado_actualizado
+            FROM ventas
+            WHERE canal_venta = 'tienda_online'
+              AND LOWER(TRIM(COALESCE(cliente_email, ''))) = LOWER(TRIM(?))
+              AND TRIM(COALESCE(cliente_telefono, '')) = TRIM(?)
+              AND id IN ({placeholders})
+            """,
+            tuple(params),
+        )
+        pedidos = []
+        for row in cursor.fetchall():
+            item = dict(row)
+            estado = _normalizar_pedido_estado(item.get("pedido_estado"))
+            pedidos.append(
+                {
+                    "id": int(item.get("id") or 0),
+                    "estado": estado,
+                    "estado_label": _pedido_estado_label(estado),
+                    "estado_actualizado": item.get("pedido_estado_actualizado"),
+                }
+            )
+        return jsonify({"success": True, "pedidos": pedidos})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
