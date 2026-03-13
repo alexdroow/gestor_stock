@@ -890,14 +890,6 @@
 
         <section class="content">
             <div class="tienda-estado-banner" id="tienda-estado-banner">Cargando estado de tienda...</div>
-            <div id="pedido-activo-box" style="display:none;margin:10px 0 14px;padding:12px;border:1px solid #bfdbfe;background:#f8fbff;border-radius:12px;">
-                <div style="font-weight:800;color:#1e3a8a;">Tu pedido activo</div>
-                <div id="pedido-activo-texto" style="margin-top:4px;font-size:.92rem;color:#1f2937;">Sin pedidos activos.</div>
-                <div id="pedido-activo-meta" style="margin-top:6px;font-size:.82rem;color:#475569;"></div>
-                <div style="margin-top:8px;">
-                    <button type="button" id="pedido-activo-ver" class="btn-primary">Ver detalle</button>
-                </div>
-            </div>
             <div class="mobile-cat-strip" id="mobile-cat-strip"></div>
             <div class="section" id="sec-ofertas">
                 <div class="ofertas-head">
@@ -943,6 +935,14 @@
             <button class="checkout-btn" id="btn-checkout" type="button">Confirmar compra</button>
             <button class="clear-cart-btn" id="btn-clear-cart" type="button">Vaciar carrito</button>
             <div class="msg" id="msg"></div>
+            <div id="pedido-activo-box" style="display:none;margin:12px 0 0;padding:12px;border:1px solid #bfdbfe;background:#f8fbff;border-radius:12px;">
+                <div style="font-weight:800;color:#1e3a8a;">Tu pedido activo</div>
+                <div id="pedido-activo-texto" style="margin-top:4px;font-size:.92rem;color:#1f2937;">Sin pedidos activos.</div>
+                <div id="pedido-activo-meta" style="margin-top:6px;font-size:.82rem;color:#475569;"></div>
+                <div style="margin-top:8px;">
+                    <button type="button" id="pedido-activo-ver" class="btn-primary">Ver detalle</button>
+                </div>
+            </div>
         </aside>
     </main>
 
@@ -1211,11 +1211,16 @@
                 const obj = JSON.parse(raw);
                 const ventaId = Number(obj?.venta_id || 0);
                 if (!ventaId) return null;
+                const estado = String(obj?.estado || "recibido").trim().toLowerCase();
+                if (_estadoPedidoFinal(estado)) {
+                    localStorage.removeItem("tienda_ultimo_pedido");
+                    return null;
+                }
                 return {
                     venta_id: ventaId,
                     codigo_operacion: String(obj?.codigo_operacion || ""),
                     fecha_hora_local: String(obj?.fecha_hora_local || ""),
-                    estado: String(obj?.estado || "recibido"),
+                    estado,
                     cliente_nombre: String(obj?.cliente_nombre || ""),
                     cliente_email: String(obj?.cliente_email || ""),
                     cliente_telefono: String(obj?.cliente_telefono || ""),
