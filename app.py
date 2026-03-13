@@ -1164,7 +1164,30 @@ def _minutos_anticipacion_reserva(tipo):
     return 24 * 60
 
 
-def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, now_local=None):
+def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None):
+    tz = ZoneInfo("America/Santiago")
+    now_dt = now_local or datetime.now(tz)
+    t = _normalizar_tipo_reserva_tienda(tipo)
+    cfg = dict(cfg_agenda or {})
+    start_minutes = cfg.get("start_minutes")
+    if start_minutes is None:
+        start_raw = str(cfg.get("hour_start") or "09:00").strip()
+        start_minutes = _hhmm_a_minutos(start_raw)
+    if start_minutes is None:
+        start_minutes = 9 * 60
+
+    if t == "torta":
+        # Torta: 2 dias calendario completos y habilita desde la hora de inicio configurada.
+        fecha_base = now_dt.date() + timedelta(days=2)
+        hh = int(start_minutes // 60)
+        mm = int(start_minutes % 60)
+        return datetime(fecha_base.year, fecha_base.month, fecha_base.day, hh, mm, tzinfo=tz)
+
+    # Pasteles y otros: ventana real de 24h desde la hora actual.
+    return now_dt + timedelta(minutes=_minutos_anticipacion_reserva(t))
+
+
+def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, cfg_agenda=None, now_local=None):
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fecha_iso or "").strip()):
         return False
     hora = str(hora_inicio or "").strip()
@@ -1172,7 +1195,7 @@ def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, now_local=None):
         return False
     now_dt = now_local or datetime.now(ZoneInfo("America/Santiago"))
     slot_dt = datetime.strptime(f"{fecha_iso} {hora}", "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("America/Santiago"))
-    minimo_dt = now_dt + timedelta(minutes=_minutos_anticipacion_reserva(tipo))
+    minimo_dt = _min_datetime_anticipacion_reserva(tipo, cfg_agenda=cfg_agenda, now_local=now_dt)
     return slot_dt >= minimo_dt
 
 
@@ -3270,6 +3293,7 @@ def api_tienda_agenda_disponibilidad():
                     dia.get("fecha"),
                     h.get("hora_inicio"),
                     tipo_reserva,
+                    cfg_agenda=cfg,
                     now_local=now_local,
                 )
                 disponible = bool(h.get("disponible")) and bool(cumple_regla)
@@ -3357,7 +3381,7 @@ def api_tienda_agenda_reservar():
         fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()
         if fecha_req < fecha_hoy:
             return jsonify({"success": False, "error": "No puedes reservar fechas pasadas"}), 400
-        if not _cumple_anticipacion_reserva(fecha, hora_inicio, tipo_pedido):
+        if not _cumple_anticipacion_reserva(fecha, hora_inicio, tipo_pedido, cfg_agenda=cfg):
             minutos = _minutos_anticipacion_reserva(tipo_pedido)
             if tipo_pedido == "torta":
                 msg = "Las tortas requieren minimo 2 dias de anticipacion"
