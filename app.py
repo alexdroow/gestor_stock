@@ -1765,10 +1765,10 @@ def _catalogo_torta_publico(cfg):
     default_cat = str((categorias_activas[0] or {}).get("id") or "general")
     for s in sizes_activas:
         row = dict(s)
-        if not str(row.get("categoria_id") or "").strip():
+        cid = str(row.get("categoria_id") or "").strip()
+        if not cid or cid not in cat_ids:
             row["categoria_id"] = default_cat
-        if str(row.get("categoria_id") or "") in cat_ids:
-            sizes_publicas.append(row)
+        sizes_publicas.append(row)
     return {
         "enabled": bool(cat.get("enabled")),
         "show_prices": bool(cat.get("show_prices")),
