@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tienda</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <style>
         :root {
             --bg: #f5f5f5;
@@ -230,6 +232,64 @@
         .agenda-form textarea {
             min-height: 72px;
             resize: vertical;
+        }
+        .agenda-delivery-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .agenda-delivery-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 9px;
+            background: #fff;
+            color: #1f2937;
+            font-weight: 800;
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+        .agenda-delivery-btn.active {
+            border-color: var(--accent);
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .agenda-despacho-wrap {
+            display: none;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 8px;
+            background: #f8fafc;
+            gap: 8px;
+        }
+        .agenda-despacho-wrap.active {
+            display: grid;
+        }
+        .agenda-map {
+            height: 200px;
+            border-radius: 9px;
+            border: 1px solid #cbd5e1;
+            overflow: hidden;
+        }
+        .agenda-map-actions {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 6px;
+            align-items: center;
+        }
+        .agenda-map-actions input {
+            margin: 0;
+        }
+        .agenda-map-actions button {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 8px;
+            padding: 7px 9px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .agenda-map-meta {
+            font-size: .78rem;
+            color: #64748b;
         }
         .agenda-status {
             font-size: .86rem;
@@ -1147,6 +1207,10 @@
                 <div class="agenda-days" id="agenda-days-list"></div>
                 <div class="agenda-hours" id="agenda-hours-list"></div>
                 <form class="agenda-form" id="agenda-reserva-form">
+                    <div class="agenda-delivery-row">
+                        <button type="button" class="agenda-delivery-btn active" id="agenda-entrega-retiro">Retiro en tienda</button>
+                        <button type="button" class="agenda-delivery-btn" id="agenda-entrega-despacho">Despacho</button>
+                    </div>
                     <div class="grid2">
                         <input id="agenda-nombre" type="text" maxlength="80" placeholder="Nombre completo">
                         <input id="agenda-email" type="email" maxlength="120" placeholder="Correo electronico">
@@ -1164,6 +1228,16 @@
                         </select>
                     </div>
                     <textarea id="agenda-detalle" maxlength="400" placeholder="Detalle rapido del pedido (opcional)"></textarea>
+                    <div class="agenda-despacho-wrap" id="agenda-despacho-wrap">
+                        <input id="agenda-direccion" type="text" maxlength="240" placeholder="Direccion de despacho">
+                        <div class="agenda-map-actions">
+                            <input id="agenda-direccion-buscar" type="text" maxlength="240" placeholder="Buscar direccion en mapa">
+                            <button type="button" id="agenda-buscar-mapa">Buscar</button>
+                            <button type="button" id="agenda-confirmar-pin">Confirmar pin</button>
+                        </div>
+                        <div class="agenda-map" id="agenda-map"></div>
+                        <div class="agenda-map-meta" id="agenda-map-meta">Mueve el pin al punto exacto y confirma.</div>
+                    </div>
                     <button class="checkout-btn" id="agenda-btn-reservar" type="button">Reservar horario</button>
                     <div class="agenda-status" id="agenda-status-msg"></div>
                 </form>
@@ -1315,6 +1389,17 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-agenda-confirmar">
+        <div class="modal">
+            <h3>Confirmar reserva</h3>
+            <div id="agenda-confirmar-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="agenda-confirmar-cancelar">Volver</button>
+                <button class="btn-primary" type="button" id="agenda-confirmar-aceptar">Confirmar y generar orden PDF</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
         const catListEl = document.getElementById("cat-list");
@@ -1398,6 +1483,18 @@
         const agendaTelefonoEl = document.getElementById("agenda-telefono");
         const agendaTipoEl = document.getElementById("agenda-tipo");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
+        const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
+        const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
+        const agendaDespachoWrapEl = document.getElementById("agenda-despacho-wrap");
+        const agendaDireccionEl = document.getElementById("agenda-direccion");
+        const agendaDireccionBuscarEl = document.getElementById("agenda-direccion-buscar");
+        const agendaBuscarMapaEl = document.getElementById("agenda-buscar-mapa");
+        const agendaConfirmarPinEl = document.getElementById("agenda-confirmar-pin");
+        const agendaMapMetaEl = document.getElementById("agenda-map-meta");
+        const modalAgendaConfirmarEl = document.getElementById("modal-agenda-confirmar");
+        const agendaConfirmarDetalleEl = document.getElementById("agenda-confirmar-detalle");
+        const agendaConfirmarCancelarEl = document.getElementById("agenda-confirmar-cancelar");
+        const agendaConfirmarAceptarEl = document.getElementById("agenda-confirmar-aceptar");
         const agendaStatusMsgEl = document.getElementById("agenda-status-msg");
         const agendaBtnReservarEl = document.getElementById("agenda-btn-reservar");
 
@@ -1420,6 +1517,12 @@
         let agendaFechaActiva = "";
         let agendaHoraActiva = "";
         let agendaPollTimer = null;
+        let agendaEntregaTipo = "retiro";
+        let agendaMap = null;
+        let agendaMarker = null;
+        let agendaDireccionConfirmada = false;
+        let agendaDireccionPin = { lat: -33.4489, lng: -70.6693 };
+        let agendaReservaPendiente = null;
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -1945,6 +2048,77 @@
             return d ? `+569${d}` : "";
         }
 
+        function _setAgendaEntregaTipo(tipo) {
+            agendaEntregaTipo = tipo === "despacho" ? "despacho" : "retiro";
+            if (agendaEntregaRetiroEl) agendaEntregaRetiroEl.classList.toggle("active", agendaEntregaTipo === "retiro");
+            if (agendaEntregaDespachoEl) agendaEntregaDespachoEl.classList.toggle("active", agendaEntregaTipo === "despacho");
+            if (agendaDespachoWrapEl) agendaDespachoWrapEl.classList.toggle("active", agendaEntregaTipo === "despacho");
+            if (agendaEntregaTipo === "despacho") {
+                _initAgendaMap();
+            } else {
+                agendaDireccionConfirmada = false;
+                if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Mueve el pin al punto exacto y confirma.";
+            }
+        }
+
+        function _initAgendaMap() {
+            if (!agendaDespachoWrapEl || !agendaDespachoWrapEl.classList.contains("active")) return;
+            const mapEl = document.getElementById("agenda-map");
+            if (!mapEl || typeof L === "undefined") return;
+            if (!agendaMap) {
+                agendaMap = L.map(mapEl).setView([agendaDireccionPin.lat, agendaDireccionPin.lng], 13);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    maxZoom: 19,
+                    attribution: "&copy; OpenStreetMap",
+                }).addTo(agendaMap);
+                agendaMarker = L.marker([agendaDireccionPin.lat, agendaDireccionPin.lng], { draggable: true }).addTo(agendaMap);
+                agendaMarker.on("dragend", () => {
+                    const p = agendaMarker.getLatLng();
+                    agendaDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
+                    agendaDireccionConfirmada = false;
+                    if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Pin movido. Debes confirmar nuevamente.";
+                });
+            } else {
+                agendaMap.invalidateSize();
+            }
+        }
+
+        async function _buscarDireccionAgendaEnMapa() {
+            const query = String(agendaDireccionBuscarEl?.value || agendaDireccionEl?.value || "").trim();
+            if (!query) return _agendaMsg("Escribe una direccion para buscar en el mapa.", "err");
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+                const res = await fetch(url, { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!Array.isArray(data) || !data.length) throw new Error("No se encontro la direccion en el mapa.");
+                const first = data[0];
+                const lat = Number(first.lat || 0);
+                const lng = Number(first.lon || 0);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error("Coordenadas invalidas para esa direccion.");
+                agendaDireccionPin = { lat, lng };
+                if (agendaMap && agendaMarker) {
+                    agendaMap.setView([lat, lng], 16);
+                    agendaMarker.setLatLng([lat, lng]);
+                }
+                if (agendaDireccionEl && !agendaDireccionEl.value.trim()) agendaDireccionEl.value = query;
+                agendaDireccionConfirmada = false;
+                if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Direccion encontrada. Ahora confirma el pin.";
+            } catch (e) {
+                _agendaMsg(e.message || "No se pudo buscar direccion en mapa.", "err");
+            }
+        }
+
+        async function _confirmarPinAgenda() {
+            if (!agendaMap || !agendaMarker) return _agendaMsg("El mapa aun no esta listo.", "err");
+            const p = agendaMarker.getLatLng();
+            agendaDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
+            agendaDireccionConfirmada = true;
+            if (agendaMapMetaEl) {
+                agendaMapMetaEl.textContent = `Pin confirmado: ${agendaDireccionPin.lat.toFixed(6)}, ${agendaDireccionPin.lng.toFixed(6)}`;
+            }
+            _agendaMsg("Direccion y pin confirmados.", "ok");
+        }
+
         function _agendaDiaActual() {
             return (agendaDias || []).find((d) => String(d.fecha || "") === String(agendaFechaActiva || "")) || null;
         }
@@ -2030,9 +2204,12 @@
             const telefono = _normalizarAgendaTelefono(String(agendaTelefonoEl?.value || clienteRegistrado?.telefono || "").trim());
             const tipo = String(agendaTipoEl?.value || "torta").trim();
             const detalle = String(agendaDetalleEl?.value || "").trim();
+            const direccion = String(agendaDireccionEl?.value || "").trim();
             if (nombre.length < 2) return _agendaMsg("Ingresa un nombre valido.", "err");
             if (!email) return _agendaMsg("Ingresa un correo valido.", "err");
             if (!telefono) return _agendaMsg("Telefono invalido, usa 8 digitos.", "err");
+            if (agendaEntregaTipo === "despacho" && direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");
+            if (agendaEntregaTipo === "despacho" && !agendaDireccionConfirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
 
             _agendaMsg("Reservando horario...");
             try {
@@ -2047,6 +2224,11 @@
                         telefono,
                         tipo,
                         detalle,
+                        entrega_tipo: agendaEntregaTipo,
+                        direccion,
+                        direccion_confirmada: agendaEntregaTipo === "retiro" ? true : agendaDireccionConfirmada,
+                        lat: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lat : null,
+                        lng: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lng : null,
                     }),
                 });
                 const data = await res.json();
@@ -2096,6 +2278,9 @@
             }
             if (agendaMode) {
                 _renderAgendaDiaHora();
+                if (agendaEntregaTipo === "despacho") {
+                    setTimeout(() => _initAgendaMap(), 50);
+                }
                 return;
             }
             const visibles = productos.filter((p) => productoFiltrado(p));
@@ -2937,6 +3122,10 @@
                 agendaTelefonoEl.value = onlyDigits;
             });
         }
+        agendaEntregaRetiroEl?.addEventListener("click", () => _setAgendaEntregaTipo("retiro"));
+        agendaEntregaDespachoEl?.addEventListener("click", () => _setAgendaEntregaTipo("despacho"));
+        agendaBuscarMapaEl?.addEventListener("click", _buscarDireccionAgendaEnMapa);
+        agendaConfirmarPinEl?.addEventListener("click", _confirmarPinAgenda);
         agendaBtnReservarEl?.addEventListener("click", reservarAgendaDesdeTienda);
         if (codigoDescuentoEl && mobileCodigoDescuentoEl) {
             codigoDescuentoEl.addEventListener("input", () => { mobileCodigoDescuentoEl.value = codigoDescuentoEl.value; });
@@ -2951,6 +3140,7 @@
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
         _startAgendaPoll();
+        _setAgendaEntregaTipo("retiro");
         renderCart();
         cargarProductos();
         _trackTienda("view");

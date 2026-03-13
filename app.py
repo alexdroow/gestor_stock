@@ -1026,13 +1026,9 @@ def _rangos_ocupados_evento_agenda(evento, slot_minutes):
     hora_inicio = _hhmm_a_minutos(evento.get("hora_inicio"))
     hora_fin = _hhmm_a_minutos(evento.get("hora_fin"))
     if tipo == "bloqueo":
-        if hora_inicio is None and hora_fin is None:
-            return {"bloqueo_dia": True, "rangos": []}
-        ini = hora_inicio if hora_inicio is not None else 0
-        fin = hora_fin if hora_fin is not None else (24 * 60)
-        if fin <= ini:
-            fin = min(24 * 60, ini + slot_minutes)
-        return {"bloqueo_dia": False, "rangos": [(ini, fin, True)]}
+        # En agenda publica, cualquier bloqueo del dia se interpreta como
+        # dia completo sin cupos, independiente del rango horario.
+        return {"bloqueo_dia": True, "rangos": []}
 
     if hora_inicio is None:
         hora_inicio = _hhmm_a_minutos(evento.get("hora_entrega"))
@@ -1053,6 +1049,7 @@ def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fech
     fecha_inicio_dt = datetime.strptime(fecha_desde, "%Y-%m-%d")
     fecha_hasta_dt = datetime.strptime(fecha_hasta, "%Y-%m-%d")
     total_days = min(days_ahead, max(1, (fecha_hasta_dt - fecha_inicio_dt).days + 1))
+    dias_semana_es = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"]
 
     cursor.execute(
         """
@@ -1136,7 +1133,7 @@ def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fech
         dias.append(
             {
                 "fecha": fecha_iso,
-                "label": dia_dt.strftime("%a %d/%m"),
+                "label": f"{dias_semana_es[dia_dt.weekday()]} {dia_dt.strftime('%d/%m')}",
                 "sin_cupos": bool(sin_cupos_total),
                 "bloqueado_dia": bool(bloqueo_dia),
                 "horas": horas_payload,
@@ -3268,6 +3265,19 @@ def api_tienda_agenda_reservar():
         telefono = _normalizar_telefono_cl(data.get("telefono"))
         tipo_pedido = str(data.get("tipo") or "torta").strip()[:40] or "torta"
         detalle = str(data.get("detalle") or "").strip()[:400]
+        entrega_tipo = str(data.get("entrega_tipo") or "retiro").strip().lower()
+        if entrega_tipo not in {"retiro", "despacho"}:
+            entrega_tipo = "retiro"
+        direccion = str(data.get("direccion") or "").strip()[:240]
+        direccion_confirmada = bool(data.get("direccion_confirmada"))
+        try:
+            latitud = float(data.get("lat") or 0)
+        except (TypeError, ValueError):
+            latitud = 0.0
+        try:
+            longitud = float(data.get("lng") or 0)
+        except (TypeError, ValueError):
+            longitud = 0.0
 
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha):
             return jsonify({"success": False, "error": "Fecha invalida"}), 400
@@ -3279,6 +3289,13 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": "Correo invalido"}), 400
         if not telefono:
             return jsonify({"success": False, "error": "Telefono invalido. Debe tener 8 digitos"}), 400
+        if entrega_tipo == "despacho":
+            if len(direccion) < 8:
+                return jsonify({"success": False, "error": "Ingresa una direccion valida para despacho"}), 400
+            if not direccion_confirmada:
+                return jsonify({"success": False, "error": "Debes confirmar la direccion con el pin del mapa"}), 400
+            if not (-90 <= latitud <= 90 and -180 <= longitud <= 180):
+                return jsonify({"success": False, "error": "Coordenadas de despacho invalidas"}), 400
 
         fecha_hoy = datetime.now(ZoneInfo("America/Santiago")).date()
         fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()
@@ -3302,9 +3319,15 @@ def api_tienda_agenda_reservar():
         min_fin = (min_ini or 0) + int(cfg["slot_minutes"])
         hora_fin = _minutos_a_hhmm(min_fin)
         titulo = f"Reserva tienda - {tipo_pedido.capitalize()}"
-        ingredientes = f"Reserva desde tienda online\nEmail: {email}"
+        ingredientes = (
+            f"Reserva desde tienda online\n"
+            f"Email: {email}\n"
+            f"Entrega: {'Despacho' if entrega_tipo == 'despacho' else 'Retiro'}"
+        )
         if detalle:
             ingredientes = f"{ingredientes}\nDetalle: {detalle}"
+        if entrega_tipo == "despacho":
+            ingredientes = f"{ingredientes}\nMapa pin: {latitud:.6f},{longitud:.6f}"
         codigo_op = f"OPA-TI-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"[:80]
 
         cursor.execute(
@@ -3313,7 +3336,7 @@ def api_tienda_agenda_reservar():
                 tipo, titulo, fecha, hora_inicio, hora_fin, hora_entrega,
                 cliente, telefono, es_envio, direccion, ingredientes,
                 total, abono, motivo, alerta_minutos, estado, codigo_operacion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, 0, 0, ?, 1440, 'pendiente', ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1440, 'pendiente', ?)
             """,
             (
                 tipo_pedido,
@@ -3324,6 +3347,8 @@ def api_tienda_agenda_reservar():
                 hora_inicio,
                 nombre,
                 telefono,
+                1 if entrega_tipo == "despacho" else 0,
+                direccion if entrega_tipo == "despacho" else None,
                 ingredientes,
                 "Reserva cliente tienda online",
                 codigo_op,
@@ -3342,6 +3367,10 @@ def api_tienda_agenda_reservar():
                     "hora_fin": hora_fin,
                     "cliente": nombre,
                     "telefono": telefono,
+                    "entrega_tipo": entrega_tipo,
+                    "direccion": direccion if entrega_tipo == "despacho" else "",
+                    "lat": latitud if entrega_tipo == "despacho" else None,
+                    "lng": longitud if entrega_tipo == "despacho" else None,
                 },
             }
         )
@@ -11287,5 +11316,3 @@ def generar_lista_compras_pdf():
 # ESTO DEBE IR AL FINAL, DESPUÉS DE TODAS LAS RUTAS
 if __name__ == '__main__':
     app.run(debug=False, host='127.0.0.1', port=5000, threaded=True)
-
-
