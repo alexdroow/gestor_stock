@@ -1887,6 +1887,9 @@
 
         function aplicarPersonalizacionTienda(rawCfg) {
             tiendaUiCfg = { ...TIENDA_UI_DEFAULTS, ...(rawCfg || {}) };
+            if (_catalogoTortaConDatos(tiendaUiCfg.catalogo_torta)) {
+                agendaCakeCatalog = _normalizarCatalogoTortaCliente(tiendaUiCfg.catalogo_torta);
+            }
             carritoVacioTexto = String(tiendaUiCfg.empty_cart_text || TIENDA_UI_DEFAULTS.empty_cart_text);
             if (brandTextEl) brandTextEl.textContent = String(tiendaUiCfg.brand_text || TIENDA_UI_DEFAULTS.brand_text);
             if (searchInputEl) searchInputEl.placeholder = String(tiendaUiCfg.search_placeholder || TIENDA_UI_DEFAULTS.search_placeholder);
@@ -2357,6 +2360,34 @@
             return Boolean(cat && Array.isArray(cat.sizes) && cat.sizes.length);
         }
 
+        function _normalizarCatalogoTortaCliente(cat) {
+            const src = (cat && typeof cat === "object") ? cat : {};
+            const categoriasRaw = Array.isArray(src.categorias) ? src.categorias : [];
+            const categorias = categoriasRaw.map((c, idx) => ({
+                id: String(c?.id || "").trim().toLowerCase() || `cat-${idx + 1}`,
+                nombre: String(c?.nombre || c?.id || `Categoria ${idx + 1}`).trim(),
+                activo: c?.activo !== false,
+            })).filter((c) => Boolean(c.id));
+            const defaultCatId = String((categorias[0] && categorias[0].id) || "general");
+            const sizesRaw = Array.isArray(src.sizes) ? src.sizes : [];
+            const sizes = sizesRaw.map((s, idx) => ({
+                id: String(s?.id || `size-${idx + 1}`).trim().toLowerCase(),
+                nombre: String(s?.nombre || s?.name || `Tamano ${idx + 1}`).trim(),
+                categoria_id: String(s?.categoria_id || defaultCatId).trim().toLowerCase(),
+                precio: Number(s?.precio || 0),
+                max_sabores: Math.max(1, Number(s?.max_sabores || 1)),
+                activo: s?.activo !== false,
+            })).filter((s) => Boolean(s.id) && Boolean(s.nombre));
+            return {
+                ...src,
+                categorias,
+                sizes,
+                sabores: Array.isArray(src.sabores) ? src.sabores : [],
+                extras: Array.isArray(src.extras) ? src.extras : [],
+                toppers: Array.isArray(src.toppers) ? src.toppers : [],
+            };
+        }
+
         function _actualizarDebugCatalogo(origen = "") {
             if (!agendaCakeDebugEl) return;
             if (!agendaTipoActual || agendaTipoActual !== "torta") {
@@ -2375,7 +2406,7 @@
 
         function _setAgendaCakeCatalog(cat) {
             if (!cat || typeof cat !== "object") return;
-            agendaCakeCatalog = cat;
+            agendaCakeCatalog = _normalizarCatalogoTortaCliente(cat);
             _renderAgendaCakeBuilder();
             _actualizarDebugCatalogo("sync");
         }
@@ -2516,12 +2547,13 @@
             const sizes = categorias.length
                 ? sizesAll.filter((s) => String(s.categoria_id || "") === String(agendaCakeCategoriaActiva || ""))
                 : sizesAll;
-            if (agendaCakeSelection.size_id && !sizes.some((s) => String(s.id || "") === String(agendaCakeSelection.size_id || ""))) {
+            const sizesRender = sizes.length ? sizes : sizesAll;
+            if (agendaCakeSelection.size_id && !sizesRender.some((s) => String(s.id || "") === String(agendaCakeSelection.size_id || ""))) {
                 agendaCakeSelection.size_id = "";
                 agendaCakeSelection.sabor_ids = [];
             }
             if (agendaCakeSizeEl) {
-                agendaCakeSizeEl.innerHTML = `<option value="">${sizes.length ? "Selecciona tamano" : "Sin tamanos configurados"}</option>` + sizes.map((s) => (
+                agendaCakeSizeEl.innerHTML = `<option value="">${sizesRender.length ? "Selecciona tamano" : "Sin tamanos configurados"}</option>` + sizesRender.map((s) => (
                     `<option value="${esc(String(s.id || ""))}">${esc(String(s.nombre || ""))}${_isCakePricesVisible() ? ` - ${esc(money.format(Number(s.precio || 0)))}` : ""}</option>`
                 )).join("");
                 if (agendaCakeSelection.size_id) agendaCakeSizeEl.value = agendaCakeSelection.size_id;
@@ -2591,13 +2623,13 @@
                 const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar catalogo de tortas");
-                const fetched = data.catalogo || null;
+                const fetched = _normalizarCatalogoTortaCliente(data.catalogo || null);
                 if (_catalogoTortaConDatos(fetched)) {
                     agendaCakeCatalog = fetched;
                 } else if (_catalogoTortaConDatos(tiendaUiCfg?.catalogo_torta)) {
-                    agendaCakeCatalog = tiendaUiCfg.catalogo_torta;
+                    agendaCakeCatalog = _normalizarCatalogoTortaCliente(tiendaUiCfg.catalogo_torta);
                 } else if (_catalogoTortaConDatos(TIENDA_UI_INITIAL?.catalogo_torta)) {
-                    agendaCakeCatalog = TIENDA_UI_INITIAL.catalogo_torta;
+                    agendaCakeCatalog = _normalizarCatalogoTortaCliente(TIENDA_UI_INITIAL.catalogo_torta);
                 } else {
                     agendaCakeCatalog = fetched;
                 }
@@ -2609,8 +2641,8 @@
                 }
             } catch (err) {
                 if (!_catalogoTortaConDatos(agendaCakeCatalog)) {
-                    if (_catalogoTortaConDatos(tiendaUiCfg?.catalogo_torta)) agendaCakeCatalog = tiendaUiCfg.catalogo_torta;
-                    else if (_catalogoTortaConDatos(TIENDA_UI_INITIAL?.catalogo_torta)) agendaCakeCatalog = TIENDA_UI_INITIAL.catalogo_torta;
+                    if (_catalogoTortaConDatos(tiendaUiCfg?.catalogo_torta)) agendaCakeCatalog = _normalizarCatalogoTortaCliente(tiendaUiCfg.catalogo_torta);
+                    else if (_catalogoTortaConDatos(TIENDA_UI_INITIAL?.catalogo_torta)) agendaCakeCatalog = _normalizarCatalogoTortaCliente(TIENDA_UI_INITIAL.catalogo_torta);
                     else agendaCakeCatalog = null;
                 }
                 _renderAgendaCakeBuilder();
@@ -2626,7 +2658,7 @@
                 if (!res.ok || !data.success) return;
                 const cat = data?.personalizacion?.catalogo_torta;
                 if (_catalogoTortaConDatos(cat)) {
-                    agendaCakeCatalog = cat;
+                    agendaCakeCatalog = _normalizarCatalogoTortaCliente(cat);
                     _renderAgendaCakeBuilder();
                     _actualizarDebugCatalogo("productos");
                 }
