@@ -223,7 +223,7 @@
             font-weight: 800;
             color: #334155;
         }
-        .agenda-cake-builder input,
+        .agenda-cake-builder input:not([type="checkbox"]):not([type="radio"]),
         .agenda-cake-builder select,
         .agenda-cake-builder textarea {
             width: 100%;
@@ -238,6 +238,16 @@
         .agenda-cake-builder select option {
             color: #0f172a;
             background: #ffffff;
+        }
+        .agenda-cake-builder input[type="checkbox"],
+        .agenda-cake-builder input[type="radio"] {
+            width: auto !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            margin-right: 6px;
+            accent-color: var(--accent);
+            background: transparent !important;
         }
         .agenda-cake-builder textarea {
             min-height: 66px;
