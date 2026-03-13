@@ -3259,63 +3259,181 @@
             }
             const { jsPDF } = jspdf;
             const doc = new jsPDF({ unit: "pt", format: "a4" });
-            const left = 40;
-            let y = 48;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 34;
+            const contentWidth = pageWidth - (margin * 2);
+            let y = 30;
+            const colors = {
+                primary: [15, 23, 42],
+                dark: [17, 24, 39],
+                muted: [100, 116, 139],
+                border: [203, 213, 225],
+                card: [248, 250, 252],
+                warnBg: [255, 251, 235],
+                warnBorder: [253, 230, 138],
+                warnText: [120, 53, 15],
+            };
+            const safe = (v, fb = "-") => {
+                const t = String(v ?? "").trim();
+                return t || fb;
+            };
+            const ensurePage = (neededHeight = 16) => {
+                if (y + neededHeight <= pageHeight - 24) return;
+                doc.addPage();
+                y = 30;
+            };
+            const drawSectionTitle = (title) => {
+                ensurePage(14);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(11);
+                doc.setTextColor(...colors.dark);
+                doc.text(String(title || ""), margin, y);
+                y += 2;
+                doc.setDrawColor(...colors.border);
+                doc.line(margin, y + 1, margin + contentWidth, y + 1);
+                y += 8;
+            };
+            const drawField = (label, value) => {
+                const wrapped = doc.splitTextToSize(safe(value), contentWidth);
+                ensurePage(10 + (wrapped.length * 4.8));
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(...colors.muted);
+                doc.text(String(label || "").toUpperCase(), margin, y);
+                y += 5;
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(12);
+                doc.setTextColor(...colors.dark);
+                doc.text(wrapped, margin, y);
+                y += (wrapped.length * 5.2) + 2;
+            };
+            const drawLink = (label, url) => {
+                drawField(label, url);
+                try {
+                    doc.link(margin, y - 7, contentWidth, 8, { url });
+                } catch (e) {}
+            };
             const entregaTxt = payload.entrega_tipo === "despacho" ? "Despacho" : "Retiro en tienda";
             const fechaTxt = _formatearFechaAgenda(payload.fecha);
             const pinTxt = payload.entrega_tipo === "despacho"
                 ? `${Number(payload.lat || 0).toFixed(6)}, ${Number(payload.lng || 0).toFixed(6)}`
                 : "-";
             const reservaLabel = Number(reservaId || 0) > 0 ? `#${Number(reservaId)}` : "(borrador)";
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(16);
-            doc.text(`Orden de reserva tienda ${reservaLabel}`, left, y);
-            y += 24;
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(11);
-            const lineas = [
-                `Fecha emision: ${new Date().toLocaleString("es-CL")}`,
-                `Cliente: ${payload.nombre || "-"}`,
-                `Correo: ${payload.email || "-"}`,
-                `Telefono: ${payload.telefono || "-"}`,
-                `Tipo pedido: ${_labelTipoReserva(payload.tipo)}`,
-                `Fecha reserva: ${fechaTxt}`,
-                `Hora reserva: ${payload.hora_inicio || "-"}`,
-                `Entrega: ${entregaTxt}`,
-                `Direccion: ${payload.entrega_tipo === "despacho" ? (payload.direccion || "-") : "No aplica"}`,
-                `Pin mapa: ${pinTxt}`,
-                `Detalle: ${payload.detalle || "Sin detalle"}`,
-            ];
+
+            let detallePedido = String(payload.detalle || "Reserva desde tienda online").trim();
             if (String(payload.tipo || "") === "torta" && payload.catalogo_torta) {
                 const cat = payload.catalogo_torta;
                 const sizeName = _catalogFind("sizes", cat.size_id)?.nombre || "-";
                 const sabores = Array.isArray(cat.sabor_ids) ? cat.sabor_ids.map((sid) => _catalogFind("sabores", sid)?.nombre).filter(Boolean) : [];
                 const topperName = _catalogFind("toppers", cat.topper_id)?.nombre || "Sin topper";
-                lineas.push("----- Armado de torta -----");
-                lineas.push(`Tamano: ${sizeName}`);
-                lineas.push(`Sabores: ${sabores.join(", ") || "-"}`);
-                lineas.push(`Topper: ${topperName}`);
+                const linesCat = [
+                    "Reserva desde tienda online",
+                    `Tamano: ${sizeName}`,
+                    `Sabores: ${sabores.join(", ") || "-"}`,
+                    `Topper: ${topperName}`,
+                ];
                 const extras = Array.isArray(cat.extra_items) ? cat.extra_items : [];
-                if (extras.length) {
-                    for (const ex of extras) {
-                        const extraName = _catalogFind("extras", ex.id)?.nombre || String(ex.id || "Extra");
-                        lineas.push(`Extra: ${extraName} x${Number(ex.qty || 0)}`);
-                    }
-                }
-                if (Array.isArray(cat.referencia_urls) && cat.referencia_urls.length) {
-                    cat.referencia_urls.forEach((u, i) => lineas.push(`Referencia ${i + 1}: ${u}`));
-                }
-                if (cat.nota) lineas.push(`Nota catalogo: ${cat.nota}`);
+                extras.forEach((ex) => {
+                    const extraName = _catalogFind("extras", ex.id)?.nombre || String(ex.id || "Extra");
+                    linesCat.push(`Extra: ${extraName} x${Number(ex.qty || 0)}`);
+                });
+                linesCat.push(`Entrega: ${entregaTxt}`);
+                if (payload.entrega_tipo === "despacho") linesCat.push(`Pin mapa: ${pinTxt}`);
+                if (cat.nota) linesCat.push(`Nota catalogo: ${cat.nota}`);
+                detallePedido = linesCat.join("\n");
             }
-            lineas.forEach((linea) => {
-                const partes = doc.splitTextToSize(linea, 510);
-                doc.text(partes, left, y);
-                y += (partes.length * 14);
-            });
-            y += 8;
-            doc.setFont("helvetica", "italic");
+
+            doc.setFillColor(...colors.primary);
+            doc.rect(margin, y, contentWidth, 34, "F");
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(19);
+            doc.text("Sucree Pasteleria", margin + 4, y + 11);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(11);
+            doc.text("Comprobante de Pedido", margin + 4, y + 18);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.text(`Reserva tienda - ${_labelTipoReserva(payload.tipo)}`, margin + 4, y + 25);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.text(`Generado: ${new Date().toLocaleString("es-CL")}`, margin + 4, y + 31);
+            doc.text(String(_labelTipoReserva(payload.tipo)).toUpperCase(), margin + contentWidth - 4, y + 10, { align: "right" });
+            y += 40;
+
+            ensurePage(22);
+            doc.setFillColor(...colors.card);
+            doc.setDrawColor(...colors.border);
+            doc.rect(margin, y, contentWidth, 17, "FD");
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...colors.dark);
             doc.setFontSize(10);
-            doc.text("Comprobante de reserva sin valores. La valorizacion se realiza en agenda interna.", left, y);
+            doc.text(`Entrega: ${safe(fechaTxt)} ${safe(payload.hora_inicio, "")}`.trim(), margin + 4, y + 7);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(...colors.muted);
+            doc.text(`Modalidad: ${entregaTxt}`, margin + 4, y + 13);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.setTextColor(...colors.dark);
+            doc.text(`Orden ${reservaLabel}`, margin + contentWidth - 4, y + 10, { align: "right" });
+            y += 23;
+
+            drawSectionTitle("Datos del Cliente");
+            drawField("Cliente", payload.nombre);
+            drawField("Correo", payload.email);
+            drawField("Telefono", payload.telefono);
+
+            if (payload.entrega_tipo === "despacho") {
+                drawSectionTitle("Entrega y Ubicacion");
+                drawField("Direccion informada por cliente", payload.direccion || "-");
+                drawField("Coordenadas", pinTxt);
+                const mapUrl = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(String(payload.lat || ""))}&mlon=${encodeURIComponent(String(payload.lng || ""))}#map=18/${encodeURIComponent(String(payload.lat || ""))}/${encodeURIComponent(String(payload.lng || ""))}`;
+                drawLink("Mapa de referencia (OpenStreetMap)", mapUrl);
+            } else {
+                drawField("Entrega", "Retiro en local Sucree");
+            }
+
+            drawSectionTitle("Detalle del Pedido");
+            drawField("Descripcion", `Reserva tienda - ${_labelTipoReserva(payload.tipo)}`);
+            drawField("Ingredientes / Detalles", detallePedido);
+
+            drawSectionTitle("Terminos y Condiciones");
+            ensurePage(20);
+            doc.setFillColor(...colors.warnBg);
+            doc.setDrawColor(...colors.warnBorder);
+            doc.rect(margin, y, contentWidth, 8, "FD");
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9.5);
+            doc.setTextColor(...colors.warnText);
+            doc.text("Aplicable a todos los pedidos confirmados mediante abono.", margin + 4, y + 5.5);
+            y += 11;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9.5);
+            doc.setTextColor(...colors.dark);
+            const terminos = [
+                "Una vez iniciado el proceso de elaboracion del pedido, el abono no es reembolsable.",
+                "Las imagenes de referencia compartidas por el cliente son orientativas. El producto final puede presentar variaciones de diseno, color o terminaciones.",
+                "La modalidad principal es retiro en local. En caso de solicitar despacho, este se gestiona mediante Uber Entregas. Sucree Pasteleria entrega el pedido en condiciones optimas, pero no se responsabiliza por danos, demoras o deterioros ocasionados durante el transporte.",
+                "Al realizar el abono, el cliente declara conocer y aceptar estas condiciones.",
+            ];
+            terminos.forEach((t, i) => {
+                const wrapped = doc.splitTextToSize(`${i + 1}. ${t}`, contentWidth - 4);
+                ensurePage((wrapped.length * 4.6) + 4);
+                doc.text(wrapped, margin + 2, y);
+                y += (wrapped.length * 4.6) + 2;
+            });
+
+            ensurePage(15);
+            doc.setDrawColor(...colors.border);
+            doc.line(margin, pageHeight - 16, margin + contentWidth, pageHeight - 16);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8.5);
+            doc.setTextColor(...colors.muted);
+            doc.text("Documento de confirmacion para cliente. Verifica datos antes de enviar.", margin, pageHeight - 10.5);
+            doc.text("Sucree Pasteleria", margin + contentWidth, pageHeight - 10.5, { align: "right" });
+
             const tipoNombre = String(payload.tipo || "reserva").toLowerCase();
             const fechaArchivo = String(payload.fecha || "").replaceAll("/", "-");
             doc.save(`orden_reserva_tienda_-_${tipoNombre}_${fechaArchivo || "sin-fecha"}.pdf`);
