@@ -1229,9 +1229,8 @@
                     </div>
                     <textarea id="agenda-detalle" maxlength="400" placeholder="Detalle rapido del pedido (opcional)"></textarea>
                     <div class="agenda-despacho-wrap" id="agenda-despacho-wrap">
-                        <input id="agenda-direccion" type="text" maxlength="240" placeholder="Direccion de despacho">
                         <div class="agenda-map-actions">
-                            <input id="agenda-direccion-buscar" type="text" maxlength="240" placeholder="Buscar direccion en mapa">
+                            <input id="agenda-direccion-buscar" type="text" maxlength="240" placeholder="Direccion de despacho (buscar y confirmar pin)">
                             <button type="button" id="agenda-buscar-mapa">Buscar</button>
                             <button type="button" id="agenda-confirmar-pin">Confirmar pin</button>
                         </div>
@@ -1486,7 +1485,6 @@
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
         const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
         const agendaDespachoWrapEl = document.getElementById("agenda-despacho-wrap");
-        const agendaDireccionEl = document.getElementById("agenda-direccion");
         const agendaDireccionBuscarEl = document.getElementById("agenda-direccion-buscar");
         const agendaBuscarMapaEl = document.getElementById("agenda-buscar-mapa");
         const agendaConfirmarPinEl = document.getElementById("agenda-confirmar-pin");
@@ -2084,10 +2082,10 @@
         }
 
         async function _buscarDireccionAgendaEnMapa() {
-            const query = String(agendaDireccionBuscarEl?.value || agendaDireccionEl?.value || "").trim();
+            const query = String(agendaDireccionBuscarEl?.value || "").trim();
             if (!query) return _agendaMsg("Escribe una direccion para buscar en el mapa.", "err");
             try {
-                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+                const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=cl&limit=1&q=${encodeURIComponent(query)}`;
                 const res = await fetch(url, { headers: { Accept: "application/json" } });
                 const data = await res.json();
                 if (!Array.isArray(data) || !data.length) throw new Error("No se encontro la direccion en el mapa.");
@@ -2100,7 +2098,8 @@
                     agendaMap.setView([lat, lng], 16);
                     agendaMarker.setLatLng([lat, lng]);
                 }
-                if (agendaDireccionEl && !agendaDireccionEl.value.trim()) agendaDireccionEl.value = query;
+                const displayName = String(first.display_name || query).trim();
+                if (agendaDireccionBuscarEl) agendaDireccionBuscarEl.value = displayName;
                 agendaDireccionConfirmada = false;
                 if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Direccion encontrada. Ahora confirma el pin.";
             } catch (e) {
@@ -2108,10 +2107,26 @@
             }
         }
 
+        async function _reverseGeocodeAgendaPin(lat, lng) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&zoom=18&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}`;
+                const res = await fetch(url, { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                const nombre = String((data && data.display_name) || "").trim();
+                return nombre || "";
+            } catch (_) {
+                return "";
+            }
+        }
+
         async function _confirmarPinAgenda() {
             if (!agendaMap || !agendaMarker) return _agendaMsg("El mapa aun no esta listo.", "err");
             const p = agendaMarker.getLatLng();
             agendaDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
+            const direccionPin = await _reverseGeocodeAgendaPin(agendaDireccionPin.lat, agendaDireccionPin.lng);
+            if (direccionPin && agendaDireccionBuscarEl) {
+                agendaDireccionBuscarEl.value = direccionPin;
+            }
             agendaDireccionConfirmada = true;
             if (agendaMapMetaEl) {
                 agendaMapMetaEl.textContent = `Pin confirmado: ${agendaDireccionPin.lat.toFixed(6)}, ${agendaDireccionPin.lng.toFixed(6)}`;
@@ -2204,7 +2219,7 @@
             const telefono = _normalizarAgendaTelefono(String(agendaTelefonoEl?.value || clienteRegistrado?.telefono || "").trim());
             const tipo = String(agendaTipoEl?.value || "torta").trim();
             const detalle = String(agendaDetalleEl?.value || "").trim();
-            const direccion = String(agendaDireccionEl?.value || "").trim();
+            const direccion = String(agendaDireccionBuscarEl?.value || "").trim();
             if (nombre.length < 2) return _agendaMsg("Ingresa un nombre valido.", "err");
             if (!email) return _agendaMsg("Ingresa un correo valido.", "err");
             if (!telefono) return _agendaMsg("Telefono invalido, usa 8 digitos.", "err");
@@ -3124,6 +3139,10 @@
         }
         agendaEntregaRetiroEl?.addEventListener("click", () => _setAgendaEntregaTipo("retiro"));
         agendaEntregaDespachoEl?.addEventListener("click", () => _setAgendaEntregaTipo("despacho"));
+        agendaDireccionBuscarEl?.addEventListener("input", () => {
+            agendaDireccionConfirmada = false;
+            if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Direccion editada. Debes confirmar pin.";
+        });
         agendaBuscarMapaEl?.addEventListener("click", _buscarDireccionAgendaEnMapa);
         agendaConfirmarPinEl?.addEventListener("click", _confirmarPinAgenda);
         agendaBtnReservarEl?.addEventListener("click", reservarAgendaDesdeTienda);
