@@ -2454,6 +2454,11 @@
             if (agendaTipoTortaEl) agendaTipoTortaEl.classList.toggle("active", normalizado === "torta");
             if (agendaTipoPastelEl) agendaTipoPastelEl.classList.toggle("active", normalizado === "pastel");
             _toggleAgendaCakeBuilder();
+            if (normalizado === "torta" && agendaCakeCatalog) {
+                _renderAgendaCakeBuilder();
+            } else {
+                _renderAgendaCakeSummary();
+            }
             _actualizarDebugCatalogo("seleccion");
         }
 
