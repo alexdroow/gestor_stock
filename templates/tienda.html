@@ -999,17 +999,24 @@
             width: 34px;
             height: 34px;
             border-radius: 999px;
-            border: 1px solid #d1d5db;
-            background: #fff;
-            font-size: 1.25rem;
+            border: 1px solid #fb923c;
+            background: linear-gradient(180deg, #ffedd5, #fed7aa);
+            font-size: 1.08rem;
             line-height: 1;
             cursor: pointer;
-            color: #111827;
+            color: #9a3412;
             font-weight: 700;
+            box-shadow: 0 6px 14px rgba(249, 115, 22, .32);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .quick-add:disabled {
             opacity: .45;
             cursor: not-allowed;
+        }
+        .quick-add .quick-add-glyph {
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .20));
         }
         .cart-panel {
             position: sticky;
@@ -1232,10 +1239,10 @@
             border-radius: 999px;
             background: #111827;
             color: #fff;
-            padding: 24px 40px;
+            padding: 26px 44px;
             font-weight: 800;
-            font-size: 2.2rem;
-            box-shadow: 0 8px 20px rgba(0,0,0,.25);
+            font-size: 2.35rem;
+            box-shadow: 0 10px 24px rgba(0,0,0,.28);
             cursor: pointer;
         }
         .mobile-cart-fab .badge {
@@ -1260,10 +1267,10 @@
             border-radius: 999px;
             background: #111827;
             color: #fff;
-            padding: 22px 28px;
+            padding: 24px 30px;
             font-weight: 800;
-            font-size: 2rem;
-            box-shadow: 0 8px 20px rgba(0,0,0,.25);
+            font-size: 2.2rem;
+            box-shadow: 0 10px 24px rgba(0,0,0,.28);
             cursor: pointer;
         }
         .wa-fab {
@@ -1350,12 +1357,19 @@
         body.mobile-ui .discount-chip,
         body.mobile-ui .agotado-chip { font-size: 1.12rem; padding: 4px 10px; }
         body.mobile-ui .stock { font-size: 1.32rem; }
-        body.mobile-ui .quick-add { width: 58px; height: 58px; font-size: 2rem; }
+        body.mobile-ui .quick-add { width: 68px; height: 68px; font-size: 2.2rem; box-shadow: 0 8px 20px rgba(249, 115, 22, .38); }
         body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(360px, 82vw); width: min(360px, 82vw); }
         body.mobile-ui .section h2 { font-size: 2.2rem; margin-bottom: 12px; }
         body.mobile-ui .tienda-estado-banner { font-size: 1.4rem; padding: 16px 18px; }
         body.mobile-ui .topbar .brand { font-size: 1.8rem; }
         body.mobile-ui .topbar input { font-size: 1.45rem; padding: 12px 14px; }
+        body.mobile-ui .topbar .mobile-menu-btn,
+        body.mobile-ui .topbar .menu-quick-btn {
+            font-size: 1.25rem;
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 6px 14px rgba(0,0,0,.12);
+        }
         body.mobile-ui .mobile-cat-chip { font-size: 1.24rem; padding: 10px 16px; }
         body.mobile-ui .ofertas-nav-btn { width: 44px; height: 44px; font-size: 1.4rem; }
         .mobile-cart-fab .total-chip {
@@ -1541,11 +1555,12 @@
             padding: 14px 16px;
         }
         body.mobile-ui .wa-fab {
-            width: 78px;
-            height: 78px;
-            font-size: 2.1rem;
-            right: 20px;
-            bottom: 126px;
+            width: 88px;
+            height: 88px;
+            font-size: 2.3rem;
+            right: 16px;
+            bottom: 128px;
+            box-shadow: 0 14px 30px rgba(0,0,0,.34);
         }
         .mobile-menu-list {
             display: grid;
@@ -1846,7 +1861,7 @@
     <a class="wa-fab" id="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
         <img id="wa-fab-icon" src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
     </a>
-    <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirMenuMobile()">Menu</button>
+    <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirCategoriasMobile()">Categorias</button>
     <button type="button" class="mobile-cart-fab" id="mobile-cart-fab" onclick="abrirCarritoMobile()">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
     <div class="mobile-menu-modal" id="mobile-menu-modal">
         <div class="mobile-menu-panel">
@@ -2650,7 +2665,7 @@
                         <div class="item-desc">${esc(desc || "Sin descripcion")}</div>
                         <div class="stock">Disponible: ${stock} unidad(es)</div>
                     </div>
-                    <button class="quick-add" type="button" onclick="agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : ""}>+</button>
+                    <button class="quick-add" type="button" onclick="agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : "title=\"Agregar al carrito\""}><span class="quick-add-glyph" aria-hidden="true">&#128722;</span></button>
                 </article>
             `;
         }
@@ -4868,6 +4883,18 @@
             leftNavEl.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
+        function abrirCategoriasMobile() {
+            renderCategoriasMenu();
+            if (mobileMenuModalEl) {
+                mobileMenuModalEl.classList.add("active");
+                if (mobileMenuListEl) {
+                    mobileMenuListEl.scrollTop = 0;
+                }
+                return;
+            }
+            abrirMenuMobile();
+        }
+
         function scrollOfertas(dir) {
             if (!ofertasListEl) return;
             const delta = Math.max(260, Math.round(ofertasListEl.clientWidth * 0.72));
@@ -4914,6 +4941,7 @@
         window.restar = restar;
         window.cambiarCategoria = cambiarCategoria;
         window.abrirMenuMobile = abrirMenuMobile;
+        window.abrirCategoriasMobile = abrirCategoriasMobile;
         window.abrirCarritoMobile = abrirCarritoMobile;
         window.repetirCompraVenta = repetirCompraVenta;
         window.seleccionarAgendaDia = seleccionarAgendaDia;
@@ -5001,7 +5029,7 @@
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
-        if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirMenuMobile);
+        if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirCategoriasMobile);
         agendaQuickBtnEl?.addEventListener("click", () => cambiarCategoria("AGENDA"));
         if (ofertasPrevBtnEl) ofertasPrevBtnEl.addEventListener("click", () => scrollOfertas(-1));
         if (ofertasNextBtnEl) ofertasNextBtnEl.addEventListener("click", () => scrollOfertas(1));
