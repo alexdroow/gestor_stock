@@ -22,6 +22,20 @@
             --agenda-slot-available-bg: #ecfeff;
             --agenda-slot-unavailable-bg: #e5e7eb;
             --agenda-slot-unavailable-text: #64748b;
+            --mobile-fab-bottom: 14px;
+            --mobile-menu-fab-pad: 24px 30px;
+            --mobile-menu-fab-font: 2.2rem;
+            --mobile-cart-fab-pad: 26px 44px;
+            --mobile-cart-fab-font: 2.35rem;
+            --mobile-quick-add-size: 68px;
+            --mobile-quick-add-font: 2.2rem;
+            --mobile-top-btn-font: 1.25rem;
+            --mobile-top-btn-pad: 12px 16px;
+            --mobile-wa-size: 88px;
+            --mobile-wa-bottom: 128px;
+            --mobile-reserve-pad: 220px;
+            --mobile-reserve-scroll-margin: 240px;
+            --mobile-cats-bubble-bottom: 112px;
         }
         * { box-sizing: border-box; }
         body {
@@ -1233,15 +1247,15 @@
             position: fixed;
             left: 50%;
             transform: translateX(-50%);
-            bottom: 14px;
+            bottom: var(--mobile-fab-bottom);
             z-index: 46;
             border: 0;
             border-radius: 999px;
             background: #111827;
             color: #fff;
-            padding: 26px 44px;
+            padding: var(--mobile-cart-fab-pad);
             font-weight: 800;
-            font-size: 2.35rem;
+            font-size: var(--mobile-cart-fab-font);
             box-shadow: 0 10px 24px rgba(0,0,0,.28);
             cursor: pointer;
         }
@@ -1261,15 +1275,15 @@
             display: none;
             position: fixed;
             left: 14px;
-            bottom: 14px;
+            bottom: var(--mobile-fab-bottom);
             z-index: 46;
             border: 0;
             border-radius: 999px;
             background: #111827;
             color: #fff;
-            padding: 24px 30px;
+            padding: var(--mobile-menu-fab-pad);
             font-weight: 800;
-            font-size: 2.2rem;
+            font-size: var(--mobile-menu-fab-font);
             box-shadow: 0 10px 24px rgba(0,0,0,.28);
             cursor: pointer;
         }
@@ -1332,10 +1346,10 @@
             max-height: 300px;
         }
         body.mobile-ui #agenda-reserva-form {
-            padding-bottom: 220px;
+            padding-bottom: var(--mobile-reserve-pad);
         }
         body.mobile-ui #agenda-btn-reservar {
-            scroll-margin-bottom: 240px;
+            scroll-margin-bottom: var(--mobile-reserve-scroll-margin);
             margin-bottom: 12px;
         }
         body.mobile-ui .mobile-cat-strip { display: flex; }
@@ -1357,7 +1371,7 @@
         body.mobile-ui .discount-chip,
         body.mobile-ui .agotado-chip { font-size: 1.12rem; padding: 4px 10px; }
         body.mobile-ui .stock { font-size: 1.32rem; }
-        body.mobile-ui .quick-add { width: 68px; height: 68px; font-size: 2.2rem; box-shadow: 0 8px 20px rgba(249, 115, 22, .38); }
+        body.mobile-ui .quick-add { width: var(--mobile-quick-add-size); height: var(--mobile-quick-add-size); font-size: var(--mobile-quick-add-font); box-shadow: 0 8px 20px rgba(249, 115, 22, .38); }
         body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(360px, 82vw); width: min(360px, 82vw); }
         body.mobile-ui .section h2 { font-size: 2.2rem; margin-bottom: 12px; }
         body.mobile-ui .tienda-estado-banner { font-size: 1.4rem; padding: 16px 18px; }
@@ -1365,8 +1379,8 @@
         body.mobile-ui .topbar input { font-size: 1.45rem; padding: 12px 14px; }
         body.mobile-ui .topbar .mobile-menu-btn,
         body.mobile-ui .topbar .menu-quick-btn {
-            font-size: 1.25rem;
-            padding: 12px 16px;
+            font-size: var(--mobile-top-btn-font);
+            padding: var(--mobile-top-btn-pad);
             border-radius: 12px;
             box-shadow: 0 6px 14px rgba(0,0,0,.12);
         }
@@ -1555,16 +1569,101 @@
             padding: 14px 16px;
         }
         body.mobile-ui .wa-fab {
-            width: 88px;
-            height: 88px;
+            width: var(--mobile-wa-size);
+            height: var(--mobile-wa-size);
             font-size: 2.3rem;
             right: 16px;
-            bottom: 128px;
+            bottom: var(--mobile-wa-bottom);
             box-shadow: 0 14px 30px rgba(0,0,0,.34);
         }
         .mobile-menu-list {
             display: grid;
             gap: 8px;
+        }
+        .mobile-cats-bubble {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: var(--mobile-cats-bubble-bottom);
+            z-index: 67;
+            display: none;
+            max-width: min(460px, calc(100vw - 24px));
+            width: max-content;
+            min-width: min(320px, calc(100vw - 24px));
+            background: rgba(15, 23, 42, .96);
+            border: 1px solid rgba(148, 163, 184, .35);
+            border-radius: 18px;
+            box-shadow: 0 22px 50px rgba(0, 0, 0, .42);
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+        }
+        .mobile-cats-bubble.active {
+            display: block;
+        }
+        .mobile-cats-bubble-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, .25);
+            color: #e2e8f0;
+            font-weight: 800;
+            font-size: .92rem;
+        }
+        .mobile-cats-bubble-close {
+            border: 1px solid rgba(203, 213, 225, .55);
+            background: rgba(30, 41, 59, .82);
+            color: #e2e8f0;
+            border-radius: 999px;
+            width: 30px;
+            height: 30px;
+            display: inline-grid;
+            place-items: center;
+            cursor: pointer;
+            font-weight: 900;
+        }
+        .mobile-cats-bubble-list {
+            padding: 10px;
+            display: grid;
+            gap: 8px;
+            max-height: min(56vh, 520px);
+            overflow: auto;
+        }
+        .mobile-cats-bubble .mobile-cat-chip {
+            width: 100%;
+            text-align: left;
+            border-color: rgba(148, 163, 184, .38);
+            background: rgba(255, 255, 255, .95);
+            color: #0f172a;
+            font-size: .92rem;
+            padding: 12px 14px;
+        }
+        .mobile-cats-bubble .mobile-cat-chip.active {
+            background: #ffedd5;
+            color: #9a3412;
+            border-color: #fdba74;
+        }
+        body.mobile-ui .mobile-cats-bubble {
+            border-radius: 22px;
+            min-width: min(460px, calc(100vw - 24px));
+            max-width: min(460px, calc(100vw - 24px));
+        }
+        body.mobile-ui .mobile-cats-bubble-head {
+            font-size: 1.18rem;
+            padding: 12px 14px;
+        }
+        body.mobile-ui .mobile-cats-bubble-close {
+            width: 38px;
+            height: 38px;
+            font-size: 1.15rem;
+        }
+        body.mobile-ui .mobile-cats-bubble-list {
+            max-height: min(60vh, 680px);
+        }
+        body.mobile-ui .mobile-cats-bubble .mobile-cat-chip {
+            font-size: 1.24rem;
+            padding: 14px 16px;
         }
         .pedido-steps {
             display: grid;
@@ -1862,6 +1961,13 @@
         <img id="wa-fab-icon" src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
     </a>
     <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirCategoriasMobile()">Categorias</button>
+    <div class="mobile-cats-bubble" id="mobile-cats-bubble" aria-hidden="true">
+        <div class="mobile-cats-bubble-head">
+            <span>Categorias</span>
+            <button type="button" class="mobile-cats-bubble-close" id="mobile-cats-bubble-close" aria-label="Cerrar categorias">x</button>
+        </div>
+        <div class="mobile-cats-bubble-list" id="mobile-cats-bubble-list"></div>
+    </div>
     <button type="button" class="mobile-cart-fab" id="mobile-cart-fab" onclick="abrirCarritoMobile()">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
     <div class="mobile-menu-modal" id="mobile-menu-modal">
         <div class="mobile-menu-panel">
@@ -2046,6 +2152,9 @@
         const cartPanelEl = document.querySelector(".cart-panel");
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
         const mobileMenuFabEl = document.getElementById("mobile-menu-fab");
+        const mobileCatsBubbleEl = document.getElementById("mobile-cats-bubble");
+        const mobileCatsBubbleListEl = document.getElementById("mobile-cats-bubble-list");
+        const mobileCatsBubbleCloseEl = document.getElementById("mobile-cats-bubble-close");
         const mobileOverlayEl = document.getElementById("mobile-overlay");
         const mobileCartFabEl = document.getElementById("mobile-cart-fab");
         const mobileCartCountEl = document.getElementById("mobile-cart-count");
@@ -2183,6 +2292,43 @@
         const _uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
         if (_forceMobileParam || _uaMobile) {
             document.body.classList.add("mobile-ui");
+        }
+
+        function _aplicarEscalaMovilDinamica() {
+            if (!document.body.classList.contains("mobile-ui")) return;
+            const vv = window.visualViewport || null;
+            const viewportWidth = Math.max(320, Math.round((vv && vv.width) || window.innerWidth || 390));
+            const viewportHeight = Math.max(480, Math.round((vv && vv.height) || window.innerHeight || 780));
+            const shortSide = Math.max(320, Math.min(viewportWidth, viewportHeight));
+            let scale = 1;
+            if (shortSide <= 350) scale *= 0.9;
+            else if (shortSide <= 380) scale *= 0.96;
+            else if (shortSide >= 430) scale *= 1.08;
+            if (viewportHeight <= 700) scale *= 0.9;
+            else if (viewportHeight >= 940) scale *= 1.07;
+            scale = Math.max(0.82, Math.min(1.22, scale));
+            const browserInsetBottom = Math.max(0, Math.round((window.innerHeight || viewportHeight) - viewportHeight));
+            const reservePad = Math.round(210 * scale) + browserInsetBottom + 14;
+            const reserveScrollMargin = reservePad + 24;
+            const fabBottom = 12 + browserInsetBottom;
+            const menuFabHeight = Math.round(66 * scale);
+            const waBottom = Math.round(118 * scale) + browserInsetBottom;
+            const catsBottom = fabBottom + menuFabHeight + 16;
+            const root = document.documentElement;
+            root.style.setProperty("--mobile-fab-bottom", `${fabBottom}px`);
+            root.style.setProperty("--mobile-menu-fab-pad", `${Math.round(19 * scale)}px ${Math.round(24 * scale)}px`);
+            root.style.setProperty("--mobile-menu-fab-font", `${(1.75 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-cart-fab-pad", `${Math.round(20 * scale)}px ${Math.round(36 * scale)}px`);
+            root.style.setProperty("--mobile-cart-fab-font", `${(1.9 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-quick-add-size", `${Math.round(62 * scale)}px`);
+            root.style.setProperty("--mobile-quick-add-font", `${(1.9 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-top-btn-font", `${(1.05 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-top-btn-pad", `${Math.round(10 * scale)}px ${Math.round(14 * scale)}px`);
+            root.style.setProperty("--mobile-wa-size", `${Math.round(82 * scale)}px`);
+            root.style.setProperty("--mobile-wa-bottom", `${waBottom}px`);
+            root.style.setProperty("--mobile-reserve-pad", `${reservePad}px`);
+            root.style.setProperty("--mobile-reserve-scroll-margin", `${reserveScrollMargin}px`);
+            root.style.setProperty("--mobile-cats-bubble-bottom", `${catsBottom}px`);
         }
         const TIENDA_UI_DEFAULTS = {
             brand_text: "Tienda en linea",
@@ -2714,6 +2860,22 @@
                     ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
                 mobileMenuListEl.innerHTML = agendaItem + all.map((c) => {
+                    const label = c === "TODOS"
+                        ? "Todos"
+                        : c === "DESTACADOS"
+                            ? "Articulos destacados"
+                        : c === "OFERTAS"
+                            ? "Ofertas"
+                            : c;
+                    const active = c === categoriaActiva ? "active" : "";
+                    return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}');cerrarPanelesMobile();">${esc(label)}</button>`;
+                }).join("");
+            }
+            if (mobileCatsBubbleListEl) {
+                const agendaItem = agendaEnabled
+                    ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
+                    : "";
+                mobileCatsBubbleListEl.innerHTML = agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -4885,6 +5047,18 @@
 
         function abrirCategoriasMobile() {
             renderCategoriasMenu();
+            const isMobile = window.matchMedia("(max-width: 900px)").matches || document.body.classList.contains("mobile-ui");
+            if (isMobile && mobileCatsBubbleEl) {
+                const willOpen = !mobileCatsBubbleEl.classList.contains("active");
+                cerrarPanelesMobile();
+                if (willOpen) {
+                    _aplicarEscalaMovilDinamica();
+                    mobileCatsBubbleEl.classList.add("active");
+                    mobileCatsBubbleEl.setAttribute("aria-hidden", "false");
+                    if (mobileCatsBubbleListEl) mobileCatsBubbleListEl.scrollTop = 0;
+                }
+                return;
+            }
             if (mobileMenuModalEl) {
                 mobileMenuModalEl.classList.add("active");
                 if (mobileMenuListEl) {
@@ -4910,6 +5084,10 @@
             if (leftNavEl) leftNavEl.classList.remove("mobile-open");
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
             if (mobileMenuModalEl) mobileMenuModalEl.classList.remove("active");
+            if (mobileCatsBubbleEl) {
+                mobileCatsBubbleEl.classList.remove("active");
+                mobileCatsBubbleEl.setAttribute("aria-hidden", "true");
+            }
             if (mobileOverlayEl) mobileOverlayEl.classList.remove("active");
         }
 
@@ -4942,6 +5120,7 @@
         window.cambiarCategoria = cambiarCategoria;
         window.abrirMenuMobile = abrirMenuMobile;
         window.abrirCategoriasMobile = abrirCategoriasMobile;
+        window._aplicarEscalaMovilDinamica = _aplicarEscalaMovilDinamica;
         window.abrirCarritoMobile = abrirCarritoMobile;
         window.repetirCompraVenta = repetirCompraVenta;
         window.seleccionarAgendaDia = seleccionarAgendaDia;
@@ -5030,6 +5209,14 @@
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
         if (mobileMenuFabEl) mobileMenuFabEl.addEventListener("click", abrirCategoriasMobile);
+        if (mobileCatsBubbleCloseEl) {
+            mobileCatsBubbleCloseEl.addEventListener("click", () => {
+                if (mobileCatsBubbleEl) {
+                    mobileCatsBubbleEl.classList.remove("active");
+                    mobileCatsBubbleEl.setAttribute("aria-hidden", "true");
+                }
+            });
+        }
         agendaQuickBtnEl?.addEventListener("click", () => cambiarCategoria("AGENDA"));
         if (ofertasPrevBtnEl) ofertasPrevBtnEl.addEventListener("click", () => scrollOfertas(-1));
         if (ofertasNextBtnEl) ofertasNextBtnEl.addEventListener("click", () => scrollOfertas(1));
@@ -5044,6 +5231,23 @@
             mobileMenuModalEl.addEventListener("click", (ev) => {
                 if (ev.target === mobileMenuModalEl) mobileMenuModalEl.classList.remove("active");
             });
+        }
+        if (mobileCatsBubbleEl) {
+            mobileCatsBubbleEl.addEventListener("click", (ev) => ev.stopPropagation());
+        }
+        document.addEventListener("click", (ev) => {
+            if (!mobileCatsBubbleEl || !mobileMenuFabEl) return;
+            if (!mobileCatsBubbleEl.classList.contains("active")) return;
+            const target = ev.target;
+            if (target === mobileMenuFabEl || mobileMenuFabEl.contains(target)) return;
+            if (mobileCatsBubbleEl.contains(target)) return;
+            mobileCatsBubbleEl.classList.remove("active");
+            mobileCatsBubbleEl.setAttribute("aria-hidden", "true");
+        });
+        window.addEventListener("resize", _aplicarEscalaMovilDinamica);
+        window.addEventListener("orientationchange", _aplicarEscalaMovilDinamica);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener("resize", _aplicarEscalaMovilDinamica);
         }
         if (clienteTelefonoEl) {
             clienteTelefonoEl.addEventListener("input", () => {
@@ -5166,6 +5370,7 @@
         _setAgendaPastelMode("catalogo", false);
         _setAgendaTipo(String(agendaTipoEl?.value || "").trim().toLowerCase());
         _setAgendaEntregaTipo("retiro");
+        _aplicarEscalaMovilDinamica();
         renderCart();
         cargarProductos();
         _trackTienda("view");
