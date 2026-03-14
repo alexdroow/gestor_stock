@@ -15,7 +15,10 @@ import shutil
 import subprocess
 import threading
 import sqlite3
-import imghdr
+try:
+    import imghdr  # Python <= 3.12
+except ModuleNotFoundError:
+    imghdr = None
 from urllib.parse import urlencode, quote, unquote, urlparse
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError
@@ -24,8 +27,12 @@ from io import BytesIO, StringIO
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
 from camera_hub import CameraHub
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+try:
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+except ModuleNotFoundError:
+    canvas = None
+    A4 = (595.27, 841.89)
 
 # Silenciar ruido nativo de FFmpeg/OpenCV cuando se ejecuta app.py directo.
 # En servidores (Render/gunicorn) conviene dejar stderr visible para diagnostico.
@@ -92,6 +99,26 @@ def _normalizar_next_admin(destino):
         path = f"/{path}"
     query = f"?{parsed.query}" if parsed.query else ""
     return f"{path}{query}"
+
+
+def _detectar_tipo_imagen(data: bytes) -> str:
+    raw = data if isinstance(data, (bytes, bytearray)) else b""
+    if not raw:
+        return ""
+    try:
+        if imghdr is not None:
+            detected = imghdr.what(None, raw)
+            if detected in {"jpeg", "png", "webp"}:
+                return detected
+    except Exception:
+        pass
+    if raw[:3] == b"\xff\xd8\xff":
+        return "jpeg"
+    if raw[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return "webp"
+    return ""
 
 
 @app.before_request
@@ -1263,6 +1290,8 @@ def _normalizar_numero_whatsapp(raw):
 
 
 def _crear_pdf_resumen_pedido_tienda(venta_id, cliente_nombre, cliente_email, cliente_telefono, items, subtotal, descuento, total):
+    if canvas is None:
+        raise RuntimeError("ReportLab no esta instalado en el entorno.")
     base_dir = os.path.join(static_dir, "tienda_pedidos_pdf")
     os.makedirs(base_dir, exist_ok=True)
     filename = f"pedido_{int(venta_id)}_{uuid.uuid4().hex[:10]}.pdf"
@@ -5150,7 +5179,7 @@ def api_actualizar_foto_producto(id):
         if len(data) > 4 * 1024 * 1024:
             return jsonify({'success': False, 'error': 'Imagen demasiado grande (máx 4MB)'}), 400
 
-        tipo = imghdr.what(None, data)
+        tipo = _detectar_tipo_imagen(data)
         if tipo not in {'jpeg', 'png', 'webp'}:
             return jsonify({'success': False, 'error': 'No se pudo validar la imagen'}), 400
         ext_normalizada = '.jpg' if tipo == 'jpeg' else f".{tipo}"
