@@ -409,6 +409,144 @@
             font-size: .8rem;
             padding: 8px;
         }
+        .agenda-pastel-wrap {
+            border: 1px solid #dbe4ef;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background: #f8fafc;
+        }
+        .agenda-pastel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .agenda-pastel-title {
+            font-size: .95rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .agenda-pastel-modes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .agenda-pastel-mode-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #fff;
+            color: #334155;
+            font-weight: 800;
+            padding: 8px 10px;
+            font-size: .8rem;
+            cursor: pointer;
+        }
+        .agenda-pastel-mode-btn.active {
+            border-color: #1d4ed8;
+            color: #1e3a8a;
+            background: #dbeafe;
+        }
+        .agenda-pastel-open-btn {
+            border: 1px solid #1d4ed8;
+            background: #1d4ed8;
+            color: #fff;
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: .85rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .agenda-pastel-summary {
+            margin-top: 8px;
+            border: 1px solid #dbe4ef;
+            border-radius: 10px;
+            background: #fff;
+            padding: 10px;
+        }
+        .agenda-pastel-summary ul {
+            margin: 0;
+            padding-left: 18px;
+            max-height: 120px;
+            overflow: auto;
+        }
+        .agenda-pastel-summary li {
+            margin-bottom: 4px;
+            font-size: .86rem;
+            color: #334155;
+        }
+        .agenda-pastel-special-box textarea,
+        .agenda-pastel-special-box input {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: .9rem;
+            background: #fff;
+        }
+        .agenda-pastel-special-box textarea {
+            min-height: 88px;
+            resize: vertical;
+        }
+        .agenda-pastel-special-help {
+            margin-top: 6px;
+            font-size: .8rem;
+            color: #475569;
+        }
+        .agenda-pastel-modal .modal {
+            width: min(94vw, 760px);
+            max-width: 760px;
+            max-height: 88vh;
+        }
+        .agenda-pastel-modal-list {
+            max-height: 58vh;
+            overflow: auto;
+            display: grid;
+            gap: 8px;
+        }
+        .agenda-pastel-item {
+            border: 1px solid #dbe4ef;
+            border-radius: 10px;
+            background: #fff;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .agenda-pastel-item-name {
+            font-weight: 800;
+            color: #0f172a;
+            font-size: .88rem;
+        }
+        .agenda-pastel-item-meta {
+            font-size: .78rem;
+            color: #64748b;
+        }
+        .agenda-pastel-item-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .agenda-pastel-item-actions button {
+            width: 26px;
+            height: 26px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .agenda-pastel-item-actions span {
+            min-width: 22px;
+            text-align: center;
+            font-weight: 800;
+            color: #0f172a;
+            font-size: .9rem;
+        }
         .agenda-days {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
@@ -1459,6 +1597,9 @@
             .agenda-cake-wrap { grid-template-columns: 1fr; }
             .agenda-cake-pills { gap: 8px; }
             .agenda-cake-pill { width: 100%; justify-content: flex-start; }
+            .agenda-pastel-modes { grid-template-columns: 1fr; }
+            .agenda-pastel-item { grid-template-columns: 1fr; }
+            .agenda-pastel-item-actions { justify-content: flex-start; }
             .mobile-cart-fab {
                 display: inline-flex;
                 align-items: center;
@@ -1566,6 +1707,30 @@
                             <span id="agenda-cake-total">$0</span>
                         </div>
                     </aside>
+                </div>
+                <div class="agenda-pastel-wrap" id="agenda-pastel-wrap" style="display:none;">
+                    <div class="agenda-pastel-head">
+                        <div class="agenda-pastel-title" id="agenda-pastel-catalog-title">Catalogo de pasteles disponibles</div>
+                        <button type="button" class="agenda-pastel-open-btn" id="agenda-pastel-open-catalog">Abrir catalogo de pasteles</button>
+                    </div>
+                    <div class="agenda-pastel-modes">
+                        <button type="button" class="agenda-pastel-mode-btn active" id="agenda-pastel-modo-catalogo">Productos en lista (24h)</button>
+                        <button type="button" class="agenda-pastel-mode-btn" id="agenda-pastel-modo-especial">Solicitud fuera de lista (36h)</button>
+                    </div>
+                    <div id="agenda-pastel-catalogo-block">
+                        <div class="agenda-pastel-summary">
+                            <div style="font-size:.82rem;color:#64748b;margin-bottom:6px;">Carrito de pasteles para la fecha seleccionada</div>
+                            <ul id="agenda-pastel-summary-list"></ul>
+                            <div style="margin-top:6px;font-size:.9rem;font-weight:800;color:#0f172a;">Total estimado: <span id="agenda-pastel-summary-total">$0</span></div>
+                        </div>
+                    </div>
+                    <div class="agenda-pastel-special-box" id="agenda-pastel-especial-block" style="display:none;">
+                        <label style="font-size:.82rem;font-weight:800;color:#334155;margin-bottom:4px;display:block;">Nombre referencial del producto (opcional)</label>
+                        <input id="agenda-pastel-especial-nombre" type="text" maxlength="120" placeholder="Ej: 30 mini pastelitos surtidos">
+                        <label style="font-size:.82rem;font-weight:800;color:#334155;margin:8px 0 4px;display:block;" id="agenda-pastel-special-title">Solicitar producto fuera de lista</label>
+                        <textarea id="agenda-pastel-especial-detalle" maxlength="400" placeholder="Describe el pastel o producto que necesitas para esa fecha."></textarea>
+                        <div class="agenda-pastel-special-help" id="agenda-pastel-special-help">Para productos fuera de lista se requiere minimo 36 horas.</div>
+                    </div>
                 </div>
                 <div class="agenda-days" id="agenda-days-list"></div>
                 <div class="agenda-hours" id="agenda-hours-list"></div>
@@ -1762,6 +1927,16 @@
         </div>
     </div>
 
+    <div class="modal-overlay agenda-pastel-modal" id="modal-agenda-pastel-catalogo">
+        <div class="modal">
+            <h3 id="agenda-pastel-modal-title">Catalogo de pasteles disponibles</h3>
+            <div class="agenda-pastel-modal-list" id="agenda-pastel-modal-list"></div>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="agenda-pastel-modal-cerrar">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
         const catListEl = document.getElementById("cat-list");
@@ -1849,6 +2024,23 @@
         const agendaTipoTortaEl = document.getElementById("agenda-tipo-torta");
         const agendaTipoPastelEl = document.getElementById("agenda-tipo-pastel");
         const agendaCakeWrapEl = document.getElementById("agenda-cake-wrap");
+        const agendaPastelWrapEl = document.getElementById("agenda-pastel-wrap");
+        const agendaPastelCatalogTitleEl = document.getElementById("agenda-pastel-catalog-title");
+        const agendaPastelOpenCatalogEl = document.getElementById("agenda-pastel-open-catalog");
+        const agendaPastelModeCatalogEl = document.getElementById("agenda-pastel-modo-catalogo");
+        const agendaPastelModeEspecialEl = document.getElementById("agenda-pastel-modo-especial");
+        const agendaPastelCatalogBlockEl = document.getElementById("agenda-pastel-catalogo-block");
+        const agendaPastelSummaryListEl = document.getElementById("agenda-pastel-summary-list");
+        const agendaPastelSummaryTotalEl = document.getElementById("agenda-pastel-summary-total");
+        const agendaPastelEspecialBlockEl = document.getElementById("agenda-pastel-especial-block");
+        const agendaPastelEspecialNombreEl = document.getElementById("agenda-pastel-especial-nombre");
+        const agendaPastelEspecialDetalleEl = document.getElementById("agenda-pastel-especial-detalle");
+        const agendaPastelSpecialTitleEl = document.getElementById("agenda-pastel-special-title");
+        const agendaPastelSpecialHelpEl = document.getElementById("agenda-pastel-special-help");
+        const modalAgendaPastelCatalogoEl = document.getElementById("modal-agenda-pastel-catalogo");
+        const agendaPastelModalTitleEl = document.getElementById("agenda-pastel-modal-title");
+        const agendaPastelModalListEl = document.getElementById("agenda-pastel-modal-list");
+        const agendaPastelModalCerrarEl = document.getElementById("agenda-pastel-modal-cerrar");
         const agendaCakeDebugEl = document.getElementById("agenda-cake-debug");
         const agendaCakeCategoriesEl = document.getElementById("agenda-cake-categories");
         const agendaCakeSizeEl = document.getElementById("agenda-cake-size");
@@ -1913,6 +2105,8 @@
         let agendaReservaPendiente = null;
         let agendaTipoActual = "";
         let agendaCakeCatalog = null;
+        let agendaPastelMode = "catalogo";
+        let agendaPastelItems = [];
         let agendaCakeCategoriaActiva = "";
         let agendaCakeSelection = {
             size_id: "",
@@ -1986,6 +2180,15 @@
             agenda_type_label: "Tipo de pedido",
             agenda_type_torta_text: "Torta (48h)",
             agenda_type_pastel_text: "Pasteles (24h)",
+            agenda_pastel_catalog_title: "Catalogo de pasteles disponibles",
+            agenda_pastel_catalog_button_text: "Abrir catalogo de pasteles",
+            agenda_pastel_catalog_empty_text: "No hay pasteles disponibles en este momento.",
+            agenda_pastel_mode_catalog_text: "Productos en lista (24h)",
+            agenda_pastel_mode_special_text: "Solicitud fuera de lista (36h)",
+            agenda_pastel_special_title: "Solicitar producto fuera de lista",
+            agenda_pastel_special_placeholder: "Describe el pastel o producto que necesitas para esa fecha.",
+            agenda_pastel_special_help_text: "Para productos fuera de lista se requiere minimo 36 horas.",
+            agenda_pastel_category_filter: "Pasteles",
             agenda_section_title: "Agenda tu pedido",
             agenda_section_subtitle: "Selecciona dia y hora disponible para reservar tu torta o pastel.",
             agenda_builder_title: "Arma tu torta",
@@ -2067,6 +2270,14 @@
             if (agendaTypeLabelEl) agendaTypeLabelEl.textContent = String(tiendaUiCfg.agenda_type_label || TIENDA_UI_DEFAULTS.agenda_type_label);
             if (agendaTipoTortaEl) agendaTipoTortaEl.textContent = String(tiendaUiCfg.agenda_type_torta_text || TIENDA_UI_DEFAULTS.agenda_type_torta_text);
             if (agendaTipoPastelEl) agendaTipoPastelEl.textContent = String(tiendaUiCfg.agenda_type_pastel_text || TIENDA_UI_DEFAULTS.agenda_type_pastel_text);
+            if (agendaPastelCatalogTitleEl) agendaPastelCatalogTitleEl.textContent = String(tiendaUiCfg.agenda_pastel_catalog_title || TIENDA_UI_DEFAULTS.agenda_pastel_catalog_title);
+            if (agendaPastelOpenCatalogEl) agendaPastelOpenCatalogEl.textContent = String(tiendaUiCfg.agenda_pastel_catalog_button_text || TIENDA_UI_DEFAULTS.agenda_pastel_catalog_button_text);
+            if (agendaPastelModeCatalogEl) agendaPastelModeCatalogEl.textContent = String(tiendaUiCfg.agenda_pastel_mode_catalog_text || TIENDA_UI_DEFAULTS.agenda_pastel_mode_catalog_text);
+            if (agendaPastelModeEspecialEl) agendaPastelModeEspecialEl.textContent = String(tiendaUiCfg.agenda_pastel_mode_special_text || TIENDA_UI_DEFAULTS.agenda_pastel_mode_special_text);
+            if (agendaPastelSpecialTitleEl) agendaPastelSpecialTitleEl.textContent = String(tiendaUiCfg.agenda_pastel_special_title || TIENDA_UI_DEFAULTS.agenda_pastel_special_title);
+            if (agendaPastelEspecialDetalleEl) agendaPastelEspecialDetalleEl.placeholder = String(tiendaUiCfg.agenda_pastel_special_placeholder || TIENDA_UI_DEFAULTS.agenda_pastel_special_placeholder);
+            if (agendaPastelSpecialHelpEl) agendaPastelSpecialHelpEl.textContent = String(tiendaUiCfg.agenda_pastel_special_help_text || TIENDA_UI_DEFAULTS.agenda_pastel_special_help_text);
+            if (agendaPastelModalTitleEl) agendaPastelModalTitleEl.textContent = String(tiendaUiCfg.agenda_pastel_catalog_title || TIENDA_UI_DEFAULTS.agenda_pastel_catalog_title);
             if (agendaSectionTitleEl) agendaSectionTitleEl.textContent = String(tiendaUiCfg.agenda_section_title || TIENDA_UI_DEFAULTS.agenda_section_title);
             if (agendaSectionSubtitleEl) agendaSectionSubtitleEl.innerHTML = renderRichTextLite(tiendaUiCfg.agenda_section_subtitle || TIENDA_UI_DEFAULTS.agenda_section_subtitle);
             if (agendaCakeBuilderTitleEl) agendaCakeBuilderTitleEl.textContent = String(tiendaUiCfg.agenda_builder_title || TIENDA_UI_DEFAULTS.agenda_builder_title);
@@ -2152,6 +2363,8 @@
             root.style.setProperty("--agenda-slot-available-bg", String(tiendaUiCfg.agenda_slot_available_bg || TIENDA_UI_DEFAULTS.agenda_slot_available_bg));
             root.style.setProperty("--agenda-slot-unavailable-bg", String(tiendaUiCfg.agenda_slot_unavailable_bg || TIENDA_UI_DEFAULTS.agenda_slot_unavailable_bg));
             root.style.setProperty("--agenda-slot-unavailable-text", String(tiendaUiCfg.agenda_slot_unavailable_text || TIENDA_UI_DEFAULTS.agenda_slot_unavailable_text));
+
+            _renderAgendaPastelResumen();
             if (tiendaCustomCssEl) tiendaCustomCssEl.textContent = String(tiendaUiCfg.custom_css || "");
 
             if (!Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA") {
@@ -2554,9 +2767,13 @@
             if (agendaTipoTortaEl) agendaTipoTortaEl.classList.toggle("active", normalizado === "torta");
             if (agendaTipoPastelEl) agendaTipoPastelEl.classList.toggle("active", normalizado === "pastel");
             _toggleAgendaCakeBuilder();
+            _toggleAgendaPastelBuilder();
             if (normalizado === "torta" && agendaCakeCatalog) {
                 _renderAgendaCakeBuilder();
                 _scrollAgendaReservarEnMobile(360);
+            } else if (normalizado === "pastel") {
+                _renderAgendaPastelResumen();
+                _scrollAgendaReservarEnMobile(220);
             } else {
                 _renderAgendaCakeSummary();
             }
@@ -2637,6 +2854,15 @@
             agendaCakeWrapEl.style.display = _isAgendaCakeVisible() ? "" : "none";
         }
 
+        function _isAgendaPastelVisible() {
+            return agendaTipoActual === "pastel";
+        }
+
+        function _toggleAgendaPastelBuilder() {
+            if (!agendaPastelWrapEl) return;
+            agendaPastelWrapEl.style.display = _isAgendaPastelVisible() ? "" : "none";
+        }
+
         function _catalogList(key) {
             return Array.isArray(agendaCakeCatalog?.[key]) ? agendaCakeCatalog[key] : [];
         }
@@ -2663,6 +2889,130 @@
             agendaCakeCategoriaActiva = "";
             if (agendaCakeNoteEl) agendaCakeNoteEl.value = "";
             if (agendaCakeFileEl) agendaCakeFileEl.value = "";
+        }
+
+        function _pastelCategoriasPermitidas() {
+            const raw = String(tiendaUiCfg?.agenda_pastel_category_filter || TIENDA_UI_DEFAULTS.agenda_pastel_category_filter || "").trim();
+            if (!raw) return [];
+            return raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+        }
+
+        function _pastelesDisponibles() {
+            const allow = _pastelCategoriasPermitidas();
+            const rows = Array.isArray(productos) ? productos : [];
+            const filtrados = rows.filter((p) => {
+                const max = Math.max(0, Number(p?.max_compra || 0));
+                if (max <= 0) return false;
+                const cat = String(nombreCategoria(p) || "").trim().toLowerCase();
+                if (allow.length && !allow.includes(cat)) return false;
+                return true;
+            });
+            if (filtrados.length || !allow.length) return filtrados;
+            return rows.filter((p) => Math.max(0, Number(p?.max_compra || 0)) > 0);
+        }
+
+        function _pastelItemFind(productId) {
+            return agendaPastelItems.find((x) => Number(x.id || 0) === Number(productId || 0)) || null;
+        }
+
+        function _pastelItemQty(productId) {
+            const row = _pastelItemFind(productId);
+            return Number(row?.cantidad || 0);
+        }
+
+        function _pastelTotal() {
+            return agendaPastelItems.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio || 0)), 0);
+        }
+
+        function _setAgendaPastelMode(modeRaw, refreshAgenda = true) {
+            const mode = modeRaw === "especial" ? "especial" : "catalogo";
+            agendaPastelMode = mode;
+            if (agendaPastelModeCatalogEl) agendaPastelModeCatalogEl.classList.toggle("active", mode === "catalogo");
+            if (agendaPastelModeEspecialEl) agendaPastelModeEspecialEl.classList.toggle("active", mode === "especial");
+            if (agendaPastelCatalogBlockEl) agendaPastelCatalogBlockEl.style.display = mode === "catalogo" ? "" : "none";
+            if (agendaPastelEspecialBlockEl) agendaPastelEspecialBlockEl.style.display = mode === "especial" ? "" : "none";
+            if (refreshAgenda && agendaTipoActual === "pastel") {
+                cargarAgendaDisponibilidad(true);
+            }
+        }
+
+        function _renderAgendaPastelResumen() {
+            if (agendaPastelSummaryListEl) {
+                if (!agendaPastelItems.length) {
+                    agendaPastelSummaryListEl.innerHTML = `<li>${esc(String(tiendaUiCfg.agenda_pastel_catalog_empty_text || TIENDA_UI_DEFAULTS.agenda_pastel_catalog_empty_text))}</li>`;
+                } else {
+                    agendaPastelSummaryListEl.innerHTML = agendaPastelItems.map((it) => {
+                        const subtotal = Number(it.cantidad || 0) * Number(it.precio || 0);
+                        return `<li>${esc(it.nombre)} x${Number(it.cantidad || 0)} - ${esc(money.format(subtotal))}</li>`;
+                    }).join("");
+                }
+            }
+            if (agendaPastelSummaryTotalEl) {
+                agendaPastelSummaryTotalEl.textContent = money.format(_pastelTotal());
+            }
+        }
+
+        function _renderAgendaPastelCatalogoModal() {
+            if (!agendaPastelModalListEl) return;
+            const rows = _pastelesDisponibles();
+            if (!rows.length) {
+                agendaPastelModalListEl.innerHTML = `<div class="agenda-cake-empty">${esc(String(tiendaUiCfg.agenda_pastel_catalog_empty_text || TIENDA_UI_DEFAULTS.agenda_pastel_catalog_empty_text))}</div>`;
+                return;
+            }
+            agendaPastelModalListEl.innerHTML = rows.map((p) => {
+                const id = Number(p.id || 0);
+                const qty = _pastelItemQty(id);
+                return `
+                    <div class="agenda-pastel-item">
+                        <div>
+                            <div class="agenda-pastel-item-name">${esc(p.nombre || "Producto")}</div>
+                            <div class="agenda-pastel-item-meta">${esc(nombreCategoria(p) || "General")} · ${esc(money.format(Number(p.precio_final || 0)))}</div>
+                        </div>
+                        <div class="agenda-pastel-item-actions">
+                            <button type="button" onclick="agendaPastelCambiarCantidad(${id},-1)">-</button>
+                            <span>${qty}</span>
+                            <button type="button" onclick="agendaPastelCambiarCantidad(${id},1)">+</button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function agendaPastelAbrirCatalogo() {
+            _renderAgendaPastelCatalogoModal();
+            modalAgendaPastelCatalogoEl?.classList.add("active");
+        }
+
+        function agendaPastelCerrarCatalogo() {
+            modalAgendaPastelCatalogoEl?.classList.remove("active");
+        }
+
+        function agendaPastelCambiarCantidad(productId, delta) {
+            const pid = Number(productId || 0);
+            const step = Number(delta || 0);
+            if (!pid || !step) return;
+            const prod = _pastelesDisponibles().find((p) => Number(p.id || 0) === pid);
+            if (!prod) return;
+            const max = Math.max(0, Number(prod.max_compra || 0));
+            const rows = Array.isArray(agendaPastelItems) ? [...agendaPastelItems] : [];
+            const idx = rows.findIndex((x) => Number(x.id || 0) === pid);
+            const curr = idx >= 0 ? Number(rows[idx].cantidad || 0) : 0;
+            const next = Math.max(0, Math.min(max, curr + step));
+            if (next <= 0) {
+                if (idx >= 0) rows.splice(idx, 1);
+            } else if (idx >= 0) {
+                rows[idx] = { ...rows[idx], cantidad: next };
+            } else {
+                rows.push({
+                    id: pid,
+                    nombre: String(prod.nombre || "Producto"),
+                    cantidad: next,
+                    precio: Number(prod.precio_final || 0),
+                });
+            }
+            agendaPastelItems = rows;
+            _renderAgendaPastelResumen();
+            _renderAgendaPastelCatalogoModal();
         }
 
         function _isCakePricesVisible() {
@@ -3257,6 +3607,8 @@
                     if (topperId) {
                         url += `&topper_id=${encodeURIComponent(topperId)}`;
                     }
+                } else if (agendaTipoActual === "pastel") {
+                    url += `&pastel_modo=${encodeURIComponent(agendaPastelMode === "especial" ? "especial" : "catalogo")}`;
                 }
                 const res = await fetch(url, { headers: { Accept: "application/json" } });
                 const data = await res.json();
@@ -3299,6 +3651,18 @@
                 referencia_urls: Array.isArray(agendaCakeSelection.referencia_urls) ? [...agendaCakeSelection.referencia_urls] : [],
                 nota: String(agendaCakeSelection.nota || agendaCakeNoteEl?.value || "").trim(),
             } : {};
+            const pastel_catalogo = tipo === "pastel" && agendaPastelMode === "catalogo"
+                ? (Array.isArray(agendaPastelItems) ? agendaPastelItems.map((it) => ({
+                    id: Number(it.id || 0),
+                    cantidad: Math.max(0, Number(it.cantidad || 0)),
+                })).filter((it) => it.id > 0 && it.cantidad > 0) : [])
+                : [];
+            const pastel_especial = tipo === "pastel" && agendaPastelMode === "especial"
+                ? {
+                    nombre: String(agendaPastelEspecialNombreEl?.value || "").trim(),
+                    detalle: String(agendaPastelEspecialDetalleEl?.value || "").trim(),
+                }
+                : {};
             const payload = {
                 fecha: String(agendaFechaActiva || ""),
                 hora_inicio: String(agendaHoraActiva || ""),
@@ -3313,6 +3677,9 @@
                 lat: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lat : null,
                 lng: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lng : null,
                 catalogo_torta,
+                pastel_modo: agendaPastelMode,
+                pastel_catalogo,
+                pastel_especial,
             };
             return payload;
         }
@@ -3340,6 +3707,31 @@
                     <div><strong>Referencias:</strong> ${Number((cat.referencia_urls || []).length || 0)} imagen(es)</div>
                     <div><strong>Subtotal estimado:</strong> ${_isCakePricesVisible() ? esc(money.format(Number(quote.total || 0))) : "Calculado internamente"}</div>
                 `;
+            }
+            if (String(payload.tipo || "") === "pastel") {
+                if (String(payload.pastel_modo || "catalogo") === "especial") {
+                    const esp = payload.pastel_especial || {};
+                    detalleCatalogoHtml = `
+                        <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+                        <div><strong>Solicitud fuera de lista (36h)</strong></div>
+                        <div><strong>Producto:</strong> ${esc(esp.nombre || "-")}</div>
+                        <div><strong>Detalle:</strong> ${esc(esp.detalle || "-")}</div>
+                    `;
+                } else {
+                    const itemsPastel = Array.isArray(payload.pastel_catalogo) ? payload.pastel_catalogo : [];
+                    const htmlRows = itemsPastel.map((it) => {
+                        const prod = _pastelesDisponibles().find((p) => Number(p.id || 0) === Number(it.id || 0));
+                        const nombre = String(prod?.nombre || `Producto #${Number(it.id || 0)}`);
+                        const precio = Number(prod?.precio_final || 0);
+                        const qty = Number(it.cantidad || 0);
+                        return `<div>- ${esc(nombre)} x${qty}${precio > 0 ? ` (${esc(money.format(precio * qty))})` : ""}</div>`;
+                    }).join("");
+                    detalleCatalogoHtml = `
+                        <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+                        <div><strong>Pasteles seleccionados (24h)</strong></div>
+                        ${htmlRows || "<div>- Sin productos</div>"}
+                    `;
+                }
             }
             agendaConfirmarDetalleEl.innerHTML = `
                 <div><strong>Cliente:</strong> ${esc(payload.nombre || "-")}</div>
@@ -3463,6 +3855,30 @@
                 if (payload.entrega_tipo === "despacho") linesCat.push(`Pin mapa: ${pinTxt}`);
                 if (cat.nota) linesCat.push(`Nota catalogo: ${cat.nota}`);
                 detallePedido = linesCat.join("\n");
+            } else if (String(payload.tipo || "") === "pastel") {
+                if (String(payload.pastel_modo || "catalogo") === "especial") {
+                    const esp = payload.pastel_especial || {};
+                    const linesEsp = [
+                        "Reserva desde tienda online",
+                        "Solicitud fuera de lista (36h)",
+                        `Producto: ${String(esp.nombre || "-")}`,
+                        `Detalle: ${String(esp.detalle || "-")}`,
+                        `Entrega: ${entregaTxt}`,
+                    ];
+                    if (payload.entrega_tipo === "despacho") linesEsp.push(`Pin mapa: ${pinTxt}`);
+                    detallePedido = linesEsp.join("\n");
+                } else {
+                    const linesPastel = ["Reserva desde tienda online", "Pasteles seleccionados (24h)"];
+                    const itemsPastel = Array.isArray(payload.pastel_catalogo) ? payload.pastel_catalogo : [];
+                    itemsPastel.forEach((it) => {
+                        const prod = _pastelesDisponibles().find((p) => Number(p.id || 0) === Number(it.id || 0));
+                        const nombre = String(prod?.nombre || `Producto #${Number(it.id || 0)}`);
+                        linesPastel.push(`- ${nombre} x${Number(it.cantidad || 0)}`);
+                    });
+                    linesPastel.push(`Entrega: ${entregaTxt}`);
+                    if (payload.entrega_tipo === "despacho") linesPastel.push(`Pin mapa: ${pinTxt}`);
+                    detallePedido = linesPastel.join("\n");
+                }
             }
 
             const headerTop = y;
@@ -3585,6 +4001,12 @@
                 if (String(payload.tipo || "") === "torta") {
                     _resetAgendaCakeSelection();
                     _renderAgendaCakeBuilder();
+                } else if (String(payload.tipo || "") === "pastel") {
+                    agendaPastelItems = [];
+                    if (agendaPastelEspecialNombreEl) agendaPastelEspecialNombreEl.value = "";
+                    if (agendaPastelEspecialDetalleEl) agendaPastelEspecialDetalleEl.value = "";
+                    _setAgendaPastelMode("catalogo", false);
+                    _renderAgendaPastelResumen();
                 }
                 agendaReservaPendiente = null;
                 _cerrarModalAgendaConfirmar();
@@ -3613,6 +4035,14 @@
                 const cat = payload.catalogo_torta || {};
                 if (!String(cat.size_id || "").trim()) return _agendaMsg("Selecciona tamano de torta.", "err");
                 if (!Array.isArray(cat.sabor_ids) || !cat.sabor_ids.length) return _agendaMsg("Selecciona al menos un sabor.", "err");
+            } else if (payload.tipo === "pastel") {
+                if (String(payload.pastel_modo || "catalogo") === "especial") {
+                    if (String(payload.pastel_especial?.detalle || "").trim().length < 8) {
+                        return _agendaMsg("Describe el producto fuera de lista (minimo 8 caracteres).", "err");
+                    }
+                } else if (!Array.isArray(payload.pastel_catalogo) || !payload.pastel_catalogo.length) {
+                    return _agendaMsg("Abre el catalogo y agrega al menos un pastel para reservar.", "err");
+                }
             }
             if (payload.entrega_tipo === "despacho" && payload.direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");
             if (payload.entrega_tipo === "despacho" && !payload.direccion_confirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
@@ -3706,11 +4136,13 @@
             if (agendaMode) {
                 _renderAgendaDiaHora();
                 _actualizarDebugCatalogo("agenda");
+                _renderAgendaPastelResumen();
                 if (agendaEntregaTipo === "despacho") {
                     setTimeout(() => _initAgendaMap(), 50);
                 }
                 return;
             }
+            agendaPastelCerrarCatalogo();
             const visibles = productos.filter((p) => productoFiltrado(p));
 
             const destacados = visibles
@@ -3911,6 +4343,7 @@
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                 renderCategoriasMenu();
                 renderSecciones();
+                _renderAgendaPastelResumen();
                 msg("");
                 _trackTienda("view");
             } catch (e) {
@@ -3919,6 +4352,7 @@
                 setEstadoTienda(false, "No se pudo validar el estado de la tienda.");
                 renderCategoriasMenu();
                 renderSecciones();
+                _renderAgendaPastelResumen();
                 msg(e.message || "Error cargando productos", true);
             }
         }
@@ -4453,6 +4887,7 @@
         window.agendaCakeToggleFlavor = agendaCakeToggleFlavor;
         window.agendaCakeChangeExtra = agendaCakeChangeExtra;
         window.agendaCakeRemoveFile = agendaCakeRemoveFile;
+        window.agendaPastelCambiarCantidad = agendaPastelCambiarCantidad;
         window.descargarComprobanteUltimoPedido = () => {
             const p = ultimoComprobantePedido;
             if (!p) return msg("No hay comprobante disponible.", true);
@@ -4577,6 +5012,17 @@
             agendaHoraActiva = "";
             cargarAgendaDisponibilidad(true);
         });
+        agendaPastelOpenCatalogEl?.addEventListener("click", agendaPastelAbrirCatalogo);
+        agendaPastelModeCatalogEl?.addEventListener("click", () => {
+            _setAgendaPastelMode("catalogo", true);
+        });
+        agendaPastelModeEspecialEl?.addEventListener("click", () => {
+            _setAgendaPastelMode("especial", true);
+        });
+        agendaPastelModalCerrarEl?.addEventListener("click", agendaPastelCerrarCatalogo);
+        modalAgendaPastelCatalogoEl?.addEventListener("click", (ev) => {
+            if (ev.target === modalAgendaPastelCatalogoEl) agendaPastelCerrarCatalogo();
+        });
         agendaCakeSizeEl?.addEventListener("change", () => {
             agendaCakeSelection.size_id = String(agendaCakeSizeEl.value || "");
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
@@ -4652,6 +5098,7 @@
         _startPedidoEstadoPoll();
         _cargarCatalogoTortaAgenda();
         _startAgendaPoll();
+        _setAgendaPastelMode("catalogo", false);
         _setAgendaTipo(String(agendaTipoEl?.value || "").trim().toLowerCase());
         _setAgendaEntregaTipo("retiro");
         renderCart();

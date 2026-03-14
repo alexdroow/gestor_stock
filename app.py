@@ -1166,27 +1166,43 @@ def _topper_requiere_96h(topper_id=None, topper_nombre=None):
     return True
 
 
-def _minutos_anticipacion_reserva(tipo, topper_requiere_96h=False):
+def _minutos_anticipacion_reserva(tipo, topper_requiere_96h=False, pastel_fuera_lista=False):
     t = _normalizar_tipo_reserva_tienda(tipo)
     if t == "torta":
         if bool(topper_requiere_96h):
             return 96 * 60
         return 48 * 60
+    if t == "pastel" and bool(pastel_fuera_lista):
+        return 36 * 60
     # Pastel: 24h.
     return 24 * 60
 
 
-def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None, topper_requiere_96h=False):
+def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None, topper_requiere_96h=False, pastel_fuera_lista=False):
     tz = ZoneInfo("America/Santiago")
     now_dt = now_local or datetime.now(tz)
     t = _normalizar_tipo_reserva_tienda(tipo)
     # Regla horaria exacta por tipo:
     # - torta: 48h (96h si incluye topper distinto a "sin topper")
     # - pastel: 24h
-    return now_dt + timedelta(minutes=_minutos_anticipacion_reserva(t, topper_requiere_96h=topper_requiere_96h))
+    return now_dt + timedelta(
+        minutes=_minutos_anticipacion_reserva(
+            t,
+            topper_requiere_96h=topper_requiere_96h,
+            pastel_fuera_lista=pastel_fuera_lista,
+        )
+    )
 
 
-def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, cfg_agenda=None, now_local=None, topper_requiere_96h=False):
+def _cumple_anticipacion_reserva(
+    fecha_iso,
+    hora_inicio,
+    tipo,
+    cfg_agenda=None,
+    now_local=None,
+    topper_requiere_96h=False,
+    pastel_fuera_lista=False,
+):
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fecha_iso or "").strip()):
         return False
     hora = str(hora_inicio or "").strip()
@@ -1199,6 +1215,7 @@ def _cumple_anticipacion_reserva(fecha_iso, hora_inicio, tipo, cfg_agenda=None, 
         cfg_agenda=cfg_agenda,
         now_local=now_dt,
         topper_requiere_96h=topper_requiere_96h,
+        pastel_fuera_lista=pastel_fuera_lista,
     )
     return slot_dt >= minimo_dt
 
@@ -1504,6 +1521,15 @@ def _default_tienda_personalizacion():
         "agenda_type_label": "Tipo de pedido",
         "agenda_type_torta_text": "Torta (48h)",
         "agenda_type_pastel_text": "Pasteles (24h)",
+        "agenda_pastel_catalog_title": "Catalogo de pasteles disponibles",
+        "agenda_pastel_catalog_button_text": "Abrir catalogo de pasteles",
+        "agenda_pastel_catalog_empty_text": "No hay pasteles disponibles en este momento.",
+        "agenda_pastel_mode_catalog_text": "Productos en lista (24h)",
+        "agenda_pastel_mode_special_text": "Solicitud fuera de lista (36h)",
+        "agenda_pastel_special_title": "Solicitar producto fuera de lista",
+        "agenda_pastel_special_placeholder": "Describe el pastel o producto que necesitas para esa fecha.",
+        "agenda_pastel_special_help_text": "Para productos fuera de lista se requiere minimo 36 horas.",
+        "agenda_pastel_category_filter": "Pasteles",
         "agenda_section_title": "Agenda tu pedido",
         "agenda_section_subtitle": "Selecciona dia y hora disponible para reservar tu torta o pastel.",
         "agenda_builder_title": "Arma tu torta",
@@ -1650,6 +1676,15 @@ def _normalizar_tienda_personalizacion(payload):
     clean["agenda_type_label"] = str(data.get("agenda_type_label") or base["agenda_type_label"]).strip()[:60] or base["agenda_type_label"]
     clean["agenda_type_torta_text"] = str(data.get("agenda_type_torta_text") or base["agenda_type_torta_text"]).strip()[:60] or base["agenda_type_torta_text"]
     clean["agenda_type_pastel_text"] = str(data.get("agenda_type_pastel_text") or base["agenda_type_pastel_text"]).strip()[:60] or base["agenda_type_pastel_text"]
+    clean["agenda_pastel_catalog_title"] = str(data.get("agenda_pastel_catalog_title") or base["agenda_pastel_catalog_title"]).strip()[:90] or base["agenda_pastel_catalog_title"]
+    clean["agenda_pastel_catalog_button_text"] = str(data.get("agenda_pastel_catalog_button_text") or base["agenda_pastel_catalog_button_text"]).strip()[:70] or base["agenda_pastel_catalog_button_text"]
+    clean["agenda_pastel_catalog_empty_text"] = str(data.get("agenda_pastel_catalog_empty_text") or base["agenda_pastel_catalog_empty_text"]).strip()[:180] or base["agenda_pastel_catalog_empty_text"]
+    clean["agenda_pastel_mode_catalog_text"] = str(data.get("agenda_pastel_mode_catalog_text") or base["agenda_pastel_mode_catalog_text"]).strip()[:70] or base["agenda_pastel_mode_catalog_text"]
+    clean["agenda_pastel_mode_special_text"] = str(data.get("agenda_pastel_mode_special_text") or base["agenda_pastel_mode_special_text"]).strip()[:80] or base["agenda_pastel_mode_special_text"]
+    clean["agenda_pastel_special_title"] = str(data.get("agenda_pastel_special_title") or base["agenda_pastel_special_title"]).strip()[:90] or base["agenda_pastel_special_title"]
+    clean["agenda_pastel_special_placeholder"] = str(data.get("agenda_pastel_special_placeholder") or base["agenda_pastel_special_placeholder"]).strip()[:260] or base["agenda_pastel_special_placeholder"]
+    clean["agenda_pastel_special_help_text"] = str(data.get("agenda_pastel_special_help_text") or base["agenda_pastel_special_help_text"]).strip()[:220] or base["agenda_pastel_special_help_text"]
+    clean["agenda_pastel_category_filter"] = str(data.get("agenda_pastel_category_filter") or base["agenda_pastel_category_filter"]).strip()[:220] or base["agenda_pastel_category_filter"]
     clean["agenda_section_title"] = str(data.get("agenda_section_title") or base["agenda_section_title"]).strip()[:90] or base["agenda_section_title"]
     clean["agenda_section_subtitle"] = _normalizar_html_liviano(
         data.get("agenda_section_subtitle") or base["agenda_section_subtitle"],
@@ -3702,6 +3737,8 @@ def api_tienda_agenda_disponibilidad():
         tipo_reserva = _normalizar_tipo_reserva_tienda(request.args.get("tipo"))
         topper_id = str(request.args.get("topper_id") or "").strip().lower()
         topper_96h = tipo_reserva == "torta" and _topper_requiere_96h(topper_id=topper_id)
+        pastel_modo = str(request.args.get("pastel_modo") or "catalogo").strip().lower()
+        pastel_fuera_lista = tipo_reserva == "pastel" and pastel_modo in {"especial", "fuera_lista", "fuera-lista"}
         if tipo_reserva not in {"torta", "pastel"}:
             return jsonify(
                 {
@@ -3740,6 +3777,7 @@ def api_tienda_agenda_disponibilidad():
                     cfg_agenda=cfg,
                     now_local=now_local,
                     topper_requiere_96h=topper_96h,
+                    pastel_fuera_lista=pastel_fuera_lista,
                 )
                 disponible = bool(h.get("disponible")) and bool(cumple_regla)
                 hh = dict(h)
@@ -3758,6 +3796,7 @@ def api_tienda_agenda_disponibilidad():
                 "enabled": True,
                 "tipo_reserva": tipo_reserva,
                 "topper_requiere_96h": bool(topper_96h),
+                "pastel_fuera_lista": bool(pastel_fuera_lista),
                 "cfg": {
                     "days_ahead": int(cfg["days_ahead"]),
                     "slot_minutes": int(cfg["slot_minutes"]),
@@ -3792,6 +3831,11 @@ def api_tienda_agenda_reservar():
         tipo_pedido = _normalizar_tipo_reserva_tienda(data.get("tipo"))
         detalle = str(data.get("detalle") or "").strip()[:400]
         catalogo_torta_payload = data.get("catalogo_torta") if isinstance(data.get("catalogo_torta"), dict) else {}
+        pastel_catalogo_payload = data.get("pastel_catalogo") if isinstance(data.get("pastel_catalogo"), list) else []
+        pastel_especial_payload = data.get("pastel_especial") if isinstance(data.get("pastel_especial"), dict) else {}
+        pastel_modo = str(data.get("pastel_modo") or "catalogo").strip().lower()
+        if pastel_modo not in {"catalogo", "especial"}:
+            pastel_modo = "especial" if str(pastel_especial_payload.get("detalle") or "").strip() else "catalogo"
         entrega_tipo = str(data.get("entrega_tipo") or "retiro").strip().lower()
         if entrega_tipo not in {"retiro", "despacho"}:
             entrega_tipo = "retiro"
@@ -3819,9 +3863,11 @@ def api_tienda_agenda_reservar():
         if tipo_pedido not in {"torta", "pastel"}:
             return jsonify({"success": False, "error": "Selecciona tipo de pedido: Torta o Pastel"}), 400
 
+        cfg_tienda = _obtener_tienda_personalizacion()
         catalogo_torta_resumen = None
+        pastel_catalogo_resumen = []
+        pastel_especial_detalle = None
         if tipo_pedido == "torta":
-            cfg_tienda = _obtener_tienda_personalizacion()
             catalogo_publico = _catalogo_torta_publico((cfg_tienda or {}).get("catalogo_torta") or {})
             if not bool(catalogo_publico.get("enabled")):
                 return jsonify({"success": False, "error": "El armado de tortas no esta habilitado"}), 400
@@ -3829,6 +3875,98 @@ def api_tienda_agenda_reservar():
                 catalogo_torta_resumen = _validar_payload_catalogo_torta(catalogo_torta_payload, catalogo_publico)
             except ValueError as ve:
                 return jsonify({"success": False, "error": str(ve)}), 400
+        elif tipo_pedido == "pastel":
+            categorias_raw = str((cfg_tienda or {}).get("agenda_pastel_category_filter") or "Pasteles")
+            categorias_allow = {
+                c.strip().lower()
+                for c in categorias_raw.replace(";", ",").split(",")
+                if c.strip()
+            }
+            disponibles = []
+            for p in _obtener_productos_para_venta(include_zero_stock=False):
+                try:
+                    pid = int(p.get("id") or 0)
+                except (TypeError, ValueError):
+                    pid = 0
+                if pid <= 0:
+                    continue
+                stock_max = int(p.get("max_compra") or 0)
+                if stock_max <= 0:
+                    continue
+                cat_nombre = str(p.get("categoria_tienda") or "General").strip().lower()
+                if categorias_allow and cat_nombre not in categorias_allow:
+                    continue
+                disponibles.append(
+                    {
+                        "id": pid,
+                        "nombre": str(p.get("nombre") or "Producto").strip(),
+                        "categoria": str(p.get("categoria_tienda") or "General").strip(),
+                        "precio": float(p.get("precio_final") or 0),
+                        "max_compra": stock_max,
+                    }
+                )
+            if not disponibles and categorias_allow:
+                for p in _obtener_productos_para_venta(include_zero_stock=False):
+                    try:
+                        pid = int(p.get("id") or 0)
+                    except (TypeError, ValueError):
+                        pid = 0
+                    stock_max = int(p.get("max_compra") or 0)
+                    if pid <= 0 or stock_max <= 0:
+                        continue
+                    disponibles.append(
+                        {
+                            "id": pid,
+                            "nombre": str(p.get("nombre") or "Producto").strip(),
+                            "categoria": str(p.get("categoria_tienda") or "General").strip(),
+                            "precio": float(p.get("precio_final") or 0),
+                            "max_compra": stock_max,
+                        }
+                    )
+            mapa_disponibles = {int(p["id"]): p for p in disponibles}
+            if pastel_modo == "catalogo":
+                if not pastel_catalogo_payload:
+                    return jsonify({"success": False, "error": "Selecciona al menos un pastel del catalogo"}), 400
+                acumulado = {}
+                for row in pastel_catalogo_payload:
+                    try:
+                        pid = int(row.get("id") or 0)
+                    except (TypeError, ValueError):
+                        pid = 0
+                    try:
+                        qty = int(row.get("cantidad") or 0)
+                    except (TypeError, ValueError):
+                        qty = 0
+                    if pid <= 0 or qty <= 0:
+                        continue
+                    acumulado[pid] = int(acumulado.get(pid, 0)) + qty
+                if not acumulado:
+                    return jsonify({"success": False, "error": "Selecciona al menos un pastel del catalogo"}), 400
+                for pid, qty in acumulado.items():
+                    prod = mapa_disponibles.get(int(pid))
+                    if not prod:
+                        return jsonify({"success": False, "error": "Uno de los pasteles seleccionados ya no esta disponible"}), 409
+                    max_compra = int(prod.get("max_compra") or 0)
+                    if qty > max_compra:
+                        return jsonify({"success": False, "error": f"{prod.get('nombre')}: maximo {max_compra} unidad(es)"}), 400
+                    pastel_catalogo_resumen.append(
+                        {
+                            "id": int(pid),
+                            "nombre": str(prod.get("nombre") or "Producto"),
+                            "cantidad": int(qty),
+                            "precio_unitario": float(prod.get("precio") or 0),
+                            "subtotal": float(prod.get("precio") or 0) * int(qty),
+                        }
+                    )
+            else:
+                especial_nombre = str(pastel_especial_payload.get("nombre") or "").strip()[:120]
+                especial_detalle = str(pastel_especial_payload.get("detalle") or "").strip()[:400]
+                if len(especial_detalle) < 8:
+                    return jsonify({"success": False, "error": "Describe el producto fuera de lista para procesar tu solicitud"}), 400
+                pastel_especial_detalle = {
+                    "nombre": especial_nombre,
+                    "detalle": especial_detalle,
+                }
 
         if entrega_tipo == "despacho":
             if len(direccion) < 8:
@@ -3843,9 +3981,12 @@ def api_tienda_agenda_reservar():
         if fecha_req < fecha_hoy:
             return jsonify({"success": False, "error": "No puedes reservar fechas pasadas"}), 400
         topper_96h = False
+        pastel_fuera_lista = False
         if tipo_pedido == "torta" and catalogo_torta_resumen:
             topper = catalogo_torta_resumen.get("topper") or {}
             topper_96h = _topper_requiere_96h(topper_id=topper.get("id"), topper_nombre=topper.get("nombre"))
+        if tipo_pedido == "pastel":
+            pastel_fuera_lista = pastel_modo == "especial"
 
         if not _cumple_anticipacion_reserva(
             fecha,
@@ -3853,12 +3994,17 @@ def api_tienda_agenda_reservar():
             tipo_pedido,
             cfg_agenda=cfg,
             topper_requiere_96h=topper_96h,
+            pastel_fuera_lista=pastel_fuera_lista,
         ):
-            minutos = _minutos_anticipacion_reserva(tipo_pedido, topper_requiere_96h=topper_96h)
+            minutos = _minutos_anticipacion_reserva(
+                tipo_pedido,
+                topper_requiere_96h=topper_96h,
+                pastel_fuera_lista=pastel_fuera_lista,
+            )
             if tipo_pedido == "torta":
                 msg = "Las tortas con topper requieren minimo 96 horas de anticipacion" if topper_96h else "Las tortas requieren minimo 48 horas de anticipacion"
             elif tipo_pedido == "pastel":
-                msg = "Los pasteles requieren minimo 24 horas de anticipacion"
+                msg = "Las solicitudes fuera de lista requieren minimo 36 horas de anticipacion" if pastel_fuera_lista else "Los pasteles requieren minimo 24 horas de anticipacion"
             else:
                 horas_min = int(max(1, minutos // 60))
                 msg = f"Este tipo de reserva requiere minimo {horas_min} horas de anticipacion"
@@ -3898,6 +4044,18 @@ def api_tienda_agenda_reservar():
             refs = catalogo_torta_resumen.get("referencia_urls") or []
             for idx, ref in enumerate(refs, start=1):
                 ingredientes = f"{ingredientes}\nRef {idx}: {ref}"
+        if tipo_pedido == "pastel":
+            if pastel_modo == "catalogo" and pastel_catalogo_resumen:
+                ingredientes = f"{ingredientes}\nPasteles catalogo:"
+                for item in pastel_catalogo_resumen:
+                    ingredientes = (
+                        f"{ingredientes}\n- {item.get('nombre')} x{int(item.get('cantidad') or 0)}"
+                    )
+            if pastel_modo == "especial" and pastel_especial_detalle:
+                ingredientes = f"{ingredientes}\nSolicitud fuera de lista (36h):"
+                if pastel_especial_detalle.get("nombre"):
+                    ingredientes = f"{ingredientes}\nProducto solicitado: {pastel_especial_detalle.get('nombre')}"
+                ingredientes = f"{ingredientes}\nDetalle solicitud: {pastel_especial_detalle.get('detalle')}"
         if detalle:
             ingredientes = f"{ingredientes}\nDetalle: {detalle}"
         if entrega_tipo == "despacho":
@@ -3946,6 +4104,9 @@ def api_tienda_agenda_reservar():
                     "lat": latitud if entrega_tipo == "despacho" else None,
                     "lng": longitud if entrega_tipo == "despacho" else None,
                     "catalogo_torta": catalogo_torta_resumen,
+                    "pastel_modo": pastel_modo if tipo_pedido == "pastel" else "",
+                    "pastel_catalogo": pastel_catalogo_resumen if tipo_pedido == "pastel" else [],
+                    "pastel_especial": pastel_especial_detalle if tipo_pedido == "pastel" else None,
                 },
             }
         )
