@@ -216,7 +216,10 @@ init_db()
 
 # Migrar base de datos (agregar columnas nuevas)
 from database import migrar_db
-migrar_db()
+try:
+    migrar_db()
+except Exception as _migrar_err:
+    print(f"[WARN] migrar_db omitida por error: {_migrar_err}")
 
 FACTURAS_DIR = os.path.join(DATA_DIR, "facturas")
 ALLOWED_FACTURA_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}

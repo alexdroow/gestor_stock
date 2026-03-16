@@ -1257,10 +1257,27 @@ def get_db():
     """Obtiene conexión a la base de datos con configuración optimizada"""
     conn = sqlite3.connect(DB_PATH, timeout=30)  # Aumentar timeout a 30 segundos
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")  # Modo WAL para mejor concurrencia
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute("PRAGMA busy_timeout=30000")  # 30 segundos de espera
-    conn.execute("PRAGMA foreign_keys=ON")
+    # Importante: no tumbar toda la app si SQLite no puede cambiar journal
+    # (ej: cuota llena / fs read-only / disk I/O transient en hosting).
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")  # Modo WAL para mejor concurrencia
+    except sqlite3.OperationalError:
+        try:
+            conn.execute("PRAGMA journal_mode=DELETE")
+        except sqlite3.OperationalError:
+            pass
+    try:
+        conn.execute("PRAGMA synchronous=NORMAL")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("PRAGMA busy_timeout=30000")  # 30 segundos de espera
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("PRAGMA foreign_keys=ON")
+    except sqlite3.OperationalError:
+        pass
     return conn
 
 
