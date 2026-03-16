@@ -374,6 +374,44 @@
             gap: 6px;
             flex-wrap: wrap;
         }
+        .agenda-cake-cat-toolbar {
+            display: grid;
+            gap: 7px;
+            margin-bottom: 2px;
+        }
+        .agenda-cake-cat-groups {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .agenda-cake-cat-group-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            padding: 5px 10px;
+            background: #fff;
+            color: #475569;
+            font-size: .76rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .agenda-cake-cat-group-btn.active {
+            border-color: #2563eb;
+            color: #1d4ed8;
+            background: #eff6ff;
+        }
+        .agenda-cake-cat-search-wrap {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 6px;
+        }
+        .agenda-cake-cat-search {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 7px 9px;
+            font-size: .82rem;
+            background: #fff;
+            color: #334155;
+        }
         .agenda-cake-cat-btn {
             border: 1px solid #cbd5e1;
             border-radius: 999px;
@@ -1389,6 +1427,24 @@
         body.mobile-ui .agenda-cake-cart ul {
             max-height: 300px;
         }
+        body.mobile-ui .agenda-cake-cat-groups {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 2px;
+        }
+        body.mobile-ui .agenda-cake-cat-group-btn {
+            white-space: nowrap;
+            font-size: .86rem;
+            padding: 7px 12px;
+        }
+        body.mobile-ui .agenda-cake-cat-search {
+            font-size: .95rem;
+            padding: 9px 11px;
+        }
+        body.mobile-ui .agenda-cake-cat-search-wrap .btn {
+            font-size: .9rem;
+            padding: 8px 10px;
+        }
         body.mobile-ui #agenda-reserva-form {
             padding-bottom: var(--mobile-reserve-pad);
         }
@@ -1886,6 +1942,13 @@
                             <span id="agenda-cake-price-visibility"></span>
                         </div>
                         <div class="agenda-cake-empty" id="agenda-cake-debug" style="display:none;"></div>
+                        <div class="agenda-cake-cat-toolbar" id="agenda-cake-cat-toolbar">
+                            <div class="agenda-cake-cat-groups" id="agenda-cake-cat-groups"></div>
+                            <div class="agenda-cake-cat-search-wrap">
+                                <input id="agenda-cake-cat-search" class="agenda-cake-cat-search" type="search" placeholder="Buscar categoria...">
+                                <button type="button" class="btn btn-out" id="agenda-cake-cat-toggle">Ver mas</button>
+                            </div>
+                        </div>
                         <div class="agenda-cake-categories" id="agenda-cake-categories"></div>
                         <label>Tamano</label>
                         <div class="agenda-cake-pills" id="agenda-cake-size-cards"></div>
@@ -2262,6 +2325,10 @@
         const agendaPastelModalListEl = document.getElementById("agenda-pastel-modal-list");
         const agendaPastelModalCerrarEl = document.getElementById("agenda-pastel-modal-cerrar");
         const agendaCakeDebugEl = document.getElementById("agenda-cake-debug");
+        const agendaCakeCatToolbarEl = document.getElementById("agenda-cake-cat-toolbar");
+        const agendaCakeCatGroupsEl = document.getElementById("agenda-cake-cat-groups");
+        const agendaCakeCatSearchEl = document.getElementById("agenda-cake-cat-search");
+        const agendaCakeCatToggleEl = document.getElementById("agenda-cake-cat-toggle");
         const agendaCakeCategoriesEl = document.getElementById("agenda-cake-categories");
         const agendaCakeSizeEl = document.getElementById("agenda-cake-size");
         const agendaCakeSizeCardsEl = document.getElementById("agenda-cake-size-cards");
@@ -2336,6 +2403,10 @@
         let agendaPastelMode = "catalogo";
         let agendaPastelItems = [];
         let agendaCakeCategoriaActiva = "";
+        let agendaCakeCategoryGroup = "all";
+        let agendaCakeCategorySearch = "";
+        let agendaCakeCategoryExpanded = false;
+        const AGENDA_CAKE_CATS_COLLAPSED = 6;
         let agendaCakeSelection = {
             size_id: "",
             sabor_ids: [],
@@ -3300,6 +3371,20 @@
             return cats.filter((c) => Boolean(c?.id));
         }
 
+        function _groupCategoriaTorta(cat) {
+            const txt = `${String(cat?.nombre || "").toLowerCase()} ${String(cat?.id || "").toLowerCase()}`;
+            if (txt.includes("bizcocho")) return "bizcocho";
+            if (txt.includes("panqueque")) return "panqueque";
+            return "especiales";
+        }
+
+        function _categoriaCoincideFiltro(cat, q) {
+            const query = String(q || "").trim().toLowerCase();
+            if (!query) return true;
+            const txt = `${String(cat?.nombre || "").toLowerCase()} ${String(cat?.id || "").toLowerCase()}`;
+            return txt.includes(query);
+        }
+
         function _catalogFind(key, id) {
             const itemId = String(id || "");
             return _catalogList(key).find((x) => String(x.id || "") === itemId) || null;
@@ -3650,16 +3735,45 @@
                 if (!agendaCakeCategoriaActiva || !categorias.some((c) => String(c.id || "") === agendaCakeCategoriaActiva)) {
                     agendaCakeCategoriaActiva = String((categorias[0] && categorias[0].id) || "");
                 }
+                const gruposCfg = [
+                    { id: "all", label: "Todas" },
+                    { id: "bizcocho", label: "Bizcocho" },
+                    { id: "panqueque", label: "Panqueque" },
+                    { id: "especiales", label: "Especiales" },
+                ];
+                const categoriasFiltradas = categorias.filter((c) => {
+                    const okGroup = agendaCakeCategoryGroup === "all" ? true : _groupCategoriaTorta(c) === agendaCakeCategoryGroup;
+                    return okGroup && _categoriaCoincideFiltro(c, agendaCakeCategorySearch);
+                });
+                if (categoriasFiltradas.length && !categoriasFiltradas.some((c) => String(c.id || "") === agendaCakeCategoriaActiva)) {
+                    agendaCakeCategoriaActiva = String((categoriasFiltradas[0] && categoriasFiltradas[0].id) || "");
+                }
                 if (agendaCakeCategoriesEl) {
                     const baseStyle = "display:inline-block;padding:7px 10px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;color:#334155;font-weight:800;font-size:.78rem;margin:0 6px 6px 0;cursor:pointer;pointer-events:auto;";
                     const activeStyle = "border-color:#f45d08;background:#ffedd5;color:#9a3412;";
-                    agendaCakeCategoriesEl.innerHTML = categorias.length
-                        ? categorias.map((c) => {
+                    const visibles = agendaCakeCategoryExpanded ? categoriasFiltradas : categoriasFiltradas.slice(0, AGENDA_CAKE_CATS_COLLAPSED);
+                    agendaCakeCategoriesEl.innerHTML = categoriasFiltradas.length
+                        ? visibles.map((c) => {
                             const cid = String(c.id || "");
                             const active = cid === agendaCakeCategoriaActiva;
                             return `<button type="button" data-cake-cat="${esc(cid)}" style="${baseStyle}${active ? activeStyle : ""}">${esc(String(c.nombre || cid))}</button>`;
                         }).join("")
-                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay categorias activas. Se mostraran todos los tamanos disponibles.</div>`;
+                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay categorias para ese filtro.</div>`;
+                    if (agendaCakeCatGroupsEl) {
+                        agendaCakeCatGroupsEl.innerHTML = gruposCfg.map((g) => {
+                            const active = g.id === agendaCakeCategoryGroup;
+                            return `<button type="button" class="agenda-cake-cat-group-btn ${active ? "active" : ""}" data-cake-group="${esc(g.id)}">${esc(g.label)}</button>`;
+                        }).join("");
+                    }
+                    if (agendaCakeCatSearchEl && document.activeElement !== agendaCakeCatSearchEl) {
+                        agendaCakeCatSearchEl.value = agendaCakeCategorySearch;
+                    }
+                    if (agendaCakeCatToggleEl) {
+                        const needsToggle = categoriasFiltradas.length > AGENDA_CAKE_CATS_COLLAPSED;
+                        agendaCakeCatToggleEl.style.display = needsToggle ? "" : "none";
+                        agendaCakeCatToggleEl.textContent = agendaCakeCategoryExpanded ? "Ver menos" : "Ver mas";
+                    }
+                    if (agendaCakeCatToolbarEl) agendaCakeCatToolbarEl.style.display = categorias.length ? "" : "none";
                 }
 
                 const sizesAll = _catalogList("sizes");
@@ -3831,6 +3945,13 @@
 
                 agendaCakeCategoriesEl?.querySelectorAll("[data-cake-cat]").forEach((el) => {
                     el.addEventListener("click", () => agendaCakeSelectCategory(String(el.getAttribute("data-cake-cat") || "")));
+                });
+                agendaCakeCatGroupsEl?.querySelectorAll("[data-cake-group]").forEach((el) => {
+                    el.addEventListener("click", () => {
+                        agendaCakeCategoryGroup = String(el.getAttribute("data-cake-group") || "all");
+                        agendaCakeCategoryExpanded = false;
+                        _renderAgendaCakeBuilder();
+                    });
                 });
             } catch (err) {
                 if (agendaCakeSizeCardsEl) {
@@ -5637,6 +5758,15 @@
         });
         agendaCakeTopperEl?.addEventListener("change", () => {
             agendaCakeSelection.topper_id = String(agendaCakeTopperEl.value || "");
+            _renderAgendaCakeBuilder();
+        });
+        agendaCakeCatSearchEl?.addEventListener("input", () => {
+            agendaCakeCategorySearch = String(agendaCakeCatSearchEl.value || "").trim();
+            agendaCakeCategoryExpanded = false;
+            _renderAgendaCakeBuilder();
+        });
+        agendaCakeCatToggleEl?.addEventListener("click", () => {
+            agendaCakeCategoryExpanded = !agendaCakeCategoryExpanded;
             _renderAgendaCakeBuilder();
         });
         agendaCakeNoteEl?.addEventListener("input", () => {
