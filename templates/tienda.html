@@ -2131,9 +2131,9 @@
             </div>
             <div id="agenda-confirmar-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
             <div class="modal-actions">
-                <button class="btn-muted" type="button" id="agenda-confirmar-pdf">Descargar comprobante</button>
                 <button class="btn-muted" type="button" id="agenda-confirmar-cancelar">Volver</button>
                 <button class="btn-primary" type="button" id="agenda-confirmar-aceptar">Confirmar y generar orden PDF</button>
+                <button class="btn-primary" type="button" id="agenda-confirmar-aceptar-enviar">Confirmar generar PDF y enviar a Pasteleria Sucree</button>
             </div>
         </div>
     </div>
@@ -2289,9 +2289,9 @@
         const agendaConfirmTitleEl = document.getElementById("agenda-confirm-title");
         const agendaConfirmWarningEl = document.getElementById("agenda-confirm-warning");
         const agendaConfirmarDetalleEl = document.getElementById("agenda-confirmar-detalle");
-        const agendaConfirmarPdfEl = document.getElementById("agenda-confirmar-pdf");
         const agendaConfirmarCancelarEl = document.getElementById("agenda-confirmar-cancelar");
         const agendaConfirmarAceptarEl = document.getElementById("agenda-confirmar-aceptar");
+        const agendaConfirmarAceptarEnviarEl = document.getElementById("agenda-confirmar-aceptar-enviar");
         const agendaStatusMsgEl = document.getElementById("agenda-status-msg");
         const agendaBtnReservarEl = document.getElementById("agenda-btn-reservar");
 
@@ -2575,9 +2575,9 @@
             if (agendaBtnReservarEl) agendaBtnReservarEl.textContent = String(tiendaUiCfg.agenda_form_button_text || TIENDA_UI_DEFAULTS.agenda_form_button_text);
             if (agendaConfirmTitleEl) agendaConfirmTitleEl.textContent = String(tiendaUiCfg.agenda_confirm_title || TIENDA_UI_DEFAULTS.agenda_confirm_title);
             if (agendaConfirmWarningEl) agendaConfirmWarningEl.textContent = String(tiendaUiCfg.agenda_confirm_warning || TIENDA_UI_DEFAULTS.agenda_confirm_warning);
-            if (agendaConfirmarPdfEl) agendaConfirmarPdfEl.textContent = String(tiendaUiCfg.agenda_confirm_pdf_text || TIENDA_UI_DEFAULTS.agenda_confirm_pdf_text);
             if (agendaConfirmarCancelarEl) agendaConfirmarCancelarEl.textContent = String(tiendaUiCfg.agenda_confirm_cancel_text || TIENDA_UI_DEFAULTS.agenda_confirm_cancel_text);
             if (agendaConfirmarAceptarEl) agendaConfirmarAceptarEl.textContent = String(tiendaUiCfg.agenda_confirm_accept_text || TIENDA_UI_DEFAULTS.agenda_confirm_accept_text);
+            if (agendaConfirmarAceptarEnviarEl) agendaConfirmarAceptarEnviarEl.textContent = "Confirmar generar PDF y enviar a Pasteleria Sucree";
             _renderAgendaShippingQuote();
 
             if (waFabEl) {
@@ -4437,9 +4437,11 @@
             doc.save(`orden_reserva_tienda_-_${tipoNombre}_${fechaArchivo || "sin-fecha"}.pdf`);
         }
 
-        async function _confirmarReservaAgendaPendiente() {
+        async function _confirmarReservaAgendaPendiente(opts = {}) {
             const payload = agendaReservaPendiente;
             if (!payload) return;
+            const sendToPasteleria = Boolean(opts && opts.sendToPasteleria);
+            const waWindow = opts && opts.waWindow ? opts.waWindow : null;
             _agendaMsg("Reservando horario...");
             try {
                 const res = await fetch("/api/tienda/agenda/reservar", {
@@ -4455,6 +4457,20 @@
                     shipping_quote: reserva.shipping_quote || payload.shipping_quote || null,
                 };
                 _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
+                if (sendToPasteleria) {
+                    const contacto = String(payloadFinal.nombre || payloadFinal.email || "cliente").trim();
+                    const msgWa = `Hola mi nombre ${contacto} envio mi cotizacion para una pronta revision.`;
+                    const waUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
+                    try {
+                        if (waWindow && !waWindow.closed) {
+                            waWindow.location.href = waUrl;
+                        } else {
+                            window.open(waUrl, "_blank");
+                        }
+                    } catch (_) {
+                        window.open(waUrl, "_blank");
+                    }
+                }
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
                 if (String(payload.tipo || "") === "torta") {
                     _resetAgendaCakeSelection();
@@ -5600,14 +5616,14 @@
         agendaBuscarMapaEl?.addEventListener("click", _buscarDireccionAgendaEnMapa);
         agendaConfirmarPinEl?.addEventListener("click", _confirmarPinAgenda);
         agendaBtnReservarEl?.addEventListener("click", reservarAgendaDesdeTienda);
-        agendaConfirmarPdfEl?.addEventListener("click", () => {
-            const payload = agendaReservaPendiente || _buildAgendaReservaPayload();
-            _descargarComprobanteReservaAgenda(payload, 0);
-        });
         agendaConfirmarCancelarEl?.addEventListener("click", () => {
             _cerrarModalAgendaConfirmar();
         });
         agendaConfirmarAceptarEl?.addEventListener("click", _confirmarReservaAgendaPendiente);
+        agendaConfirmarAceptarEnviarEl?.addEventListener("click", () => {
+            const waWindow = window.open("about:blank", "_blank");
+            _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
+        });
         modalAgendaConfirmarEl?.addEventListener("click", (ev) => {
             if (ev.target === modalAgendaConfirmarEl) _cerrarModalAgendaConfirmar();
         });
