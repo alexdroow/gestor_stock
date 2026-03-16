@@ -2425,7 +2425,7 @@ def _validar_payload_catalogo_torta(payload, catalogo_publico):
     }
 
 
-def _obtener_tienda_personalizacion():
+def _obtener_tienda_personalizacion(apply_programacion=True):
     conn = None
     try:
         conn = get_db()
@@ -2449,6 +2449,8 @@ def _obtener_tienda_personalizacion():
         except Exception:
             payload = {}
         base = _normalizar_tienda_personalizacion(payload)
+        if not apply_programacion:
+            return base
         return _aplicar_programacion_personalizacion(conn, base)
     except sqlite3.OperationalError:
         # Evita tumbar la tienda publica si la BD esta temporalmente en modo
@@ -2462,7 +2464,7 @@ def _obtener_tienda_personalizacion():
 
 
 def _guardar_tienda_personalizacion(payload):
-    actual = _obtener_tienda_personalizacion()
+    actual = _obtener_tienda_personalizacion(apply_programacion=False)
     merged = dict(actual)
     merged.update(dict(payload or {}))
     config = _normalizar_tienda_personalizacion(merged)
@@ -3167,7 +3169,7 @@ def api_tienda_admin_catalogo_torta():
         return jsonify({"success": False, "error": "No autorizado"}), 401
     try:
         if request.method == "GET":
-            cfg = _obtener_tienda_personalizacion()
+            cfg = _obtener_tienda_personalizacion(apply_programacion=False)
             cat = _normalizar_catalogo_torta_cfg(cfg.get("catalogo_torta"))
             return jsonify({"success": True, "catalogo": cat})
         data = request.get_json(silent=True) or {}
