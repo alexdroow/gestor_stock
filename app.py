@@ -4414,18 +4414,44 @@ def api_tienda_agenda_reservar():
         min_fin = (min_ini or 0) + int(cfg["slot_minutes"])
         hora_fin = _minutos_a_hhmm(min_fin)
         titulo = f"Reserva tienda - {tipo_pedido.capitalize()}"
+        def _fmt_clp(value):
+            try:
+                n = int(round(float(value or 0)))
+            except (TypeError, ValueError):
+                n = 0
+            return f"${n:,}".replace(",", ".")
         ingredientes = (
             f"Reserva desde tienda online\n"
             f"Email: {email}\n"
             f"Entrega: {'Despacho' if entrega_tipo == 'despacho' else 'Retiro'}"
         )
         if catalogo_torta_resumen:
-            ingredientes = f"{ingredientes}\nTamano: {catalogo_torta_resumen['size']['nombre']}"
-            ingredientes = f"{ingredientes}\nSabores: {', '.join([s['nombre'] for s in (catalogo_torta_resumen.get('sabores') or [])])}"
-            for ex in (catalogo_torta_resumen.get("extras") or []):
-                ingredientes = f"{ingredientes}\nExtra: {ex.get('nombre')} x{int(ex.get('qty') or 0)}"
-            if catalogo_torta_resumen.get("topper"):
-                ingredientes = f"{ingredientes}\nTopper: {catalogo_torta_resumen['topper']['nombre']}"
+            size_row = catalogo_torta_resumen.get("size") or {}
+            sabores_rows = list(catalogo_torta_resumen.get("sabores") or [])
+            extras_rows = list(catalogo_torta_resumen.get("extras") or [])
+            topper_row = catalogo_torta_resumen.get("topper") or None
+            subtotal_cat = float(catalogo_torta_resumen.get("subtotal") or 0)
+            ingredientes = f"{ingredientes}\n--- Resumen de cotizacion (cliente) ---"
+            ingredientes = f"{ingredientes}\nTamano: {size_row.get('nombre')} ({_fmt_clp(size_row.get('precio') or 0)})"
+            if sabores_rows:
+                ingredientes = f"{ingredientes}\nSabores:"
+                for sb in sabores_rows:
+                    ingredientes = f"{ingredientes}\n- {sb.get('nombre')} ({_fmt_clp(sb.get('precio') or 0)})"
+            else:
+                ingredientes = f"{ingredientes}\nSabores: (sin sabores informados)"
+            if extras_rows:
+                ingredientes = f"{ingredientes}\nExtras:"
+                for ex in extras_rows:
+                    qty = int(ex.get("qty") or 0)
+                    precio_u = float(ex.get("precio") or 0)
+                    ingredientes = f"{ingredientes}\n- {ex.get('nombre')} x{qty} ({_fmt_clp(precio_u * qty)})"
+            else:
+                ingredientes = f"{ingredientes}\nExtras: Sin extras"
+            if topper_row:
+                ingredientes = f"{ingredientes}\nTopper: {topper_row.get('nombre')} ({_fmt_clp(topper_row.get('precio') or 0)})"
+            else:
+                ingredientes = f"{ingredientes}\nTopper: Sin topper"
+            ingredientes = f"{ingredientes}\nSubtotal estimado productos: {_fmt_clp(subtotal_cat)}"
             if catalogo_torta_resumen.get("nota"):
                 ingredientes = f"{ingredientes}\nNota catalogo: {catalogo_torta_resumen['nota']}"
             refs = catalogo_torta_resumen.get("referencia_urls") or []
@@ -4433,11 +4459,13 @@ def api_tienda_agenda_reservar():
                 ingredientes = f"{ingredientes}\nRef {idx}: {ref}"
         if tipo_pedido == "pastel":
             if pastel_modo == "catalogo" and pastel_catalogo_resumen:
+                ingredientes = f"{ingredientes}\n--- Resumen de cotizacion (cliente) ---"
                 ingredientes = f"{ingredientes}\nPasteles catalogo:"
                 for item in pastel_catalogo_resumen:
                     ingredientes = (
-                        f"{ingredientes}\n- {item.get('nombre')} x{int(item.get('cantidad') or 0)}"
+                        f"{ingredientes}\n- {item.get('nombre')} x{int(item.get('cantidad') or 0)} ({_fmt_clp(item.get('subtotal') or 0)})"
                     )
+                ingredientes = f"{ingredientes}\nSubtotal estimado productos: {_fmt_clp(subtotal_estimado)}"
             if pastel_modo == "especial" and pastel_especial_detalle:
                 ingredientes = f"{ingredientes}\nSolicitud fuera de lista (36h):"
                 if pastel_especial_detalle.get("nombre"):
@@ -4449,12 +4477,13 @@ def api_tienda_agenda_reservar():
             ingredientes = f"{ingredientes}\nMapa pin: {latitud:.6f},{longitud:.6f}"
             if shipping_quote:
                 if bool(shipping_quote.get("inside_maipu")) and shipping_quote.get("shipping_fee") is not None:
-                    ingredientes = (
-                        f"{ingredientes}\nDespacho estimado: ${int(shipping_quote.get('shipping_fee') or 0):,}".replace(",", ".")
-                    )
+                    ingredientes = f"{ingredientes}\nEnvio: {_fmt_clp(shipping_quote.get('shipping_fee') or 0)}"
                     ingredientes = f"{ingredientes}\nDistancia estimada: {float(shipping_quote.get('distance_km') or 0):.2f} km ({shipping_quote.get('range_label')})"
                 else:
                     ingredientes = f"{ingredientes}\n{str(shipping_quote.get('warning') or '')}"
+        despacho_estimado_txt = float(shipping_quote.get("shipping_fee") or 0) if (shipping_quote and bool(shipping_quote.get("inside_maipu"))) else 0.0
+        total_estimado_txt = float(subtotal_estimado) + float(despacho_estimado_txt)
+        ingredientes = f"{ingredientes}\nTotal estimado pedido: {_fmt_clp(total_estimado_txt)}"
         codigo_op = f"OPA-TI-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"[:80]
 
         cursor.execute(
