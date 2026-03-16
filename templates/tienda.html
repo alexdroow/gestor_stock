@@ -2299,7 +2299,11 @@
         let categoriasDisponibles = [];
         let carrito = [];
         const CAT_STORAGE_KEY = "tienda_categoria_activa";
-        let categoriaActiva = String(localStorage.getItem(CAT_STORAGE_KEY) || "TODOS");
+        const categoriaInicialGuardada = String(localStorage.getItem(CAT_STORAGE_KEY) || "TODOS");
+        let categoriaActiva = categoriaInicialGuardada === "AGENDA" ? "TODOS" : categoriaInicialGuardada;
+        if (categoriaInicialGuardada === "AGENDA") {
+            localStorage.setItem(CAT_STORAGE_KEY, "TODOS");
+        }
         let cuponAplicado = { codigo: "", descuento_monto: 0 };
         let tiendaAbierta = true;
         let tiendaEstadoMensaje = "";
