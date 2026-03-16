@@ -1129,6 +1129,24 @@ def _obtener_cfg_envios_tienda(cfg_tienda=None):
     included_msg = str(cfg.get("agenda_delivery_note_text") or "").strip()[:220]
     if not included_msg:
         included_msg = "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu."
+    bands = []
+    for idx in (1, 2, 3):
+        start = str(cfg.get(f"agenda_delivery_band_{idx}_start") or "").strip()
+        end = str(cfg.get(f"agenda_delivery_band_{idx}_end") or "").strip()
+        if not (_parse_hora_hhmm(start) and _parse_hora_hhmm(end)):
+            continue
+        try:
+            extra = int(round(_num(cfg.get(f"agenda_delivery_band_{idx}_extra"), 0, 0, 300000)))
+        except Exception:
+            extra = 0
+        bands.append(
+            {
+                "start": start,
+                "end": end,
+                "extra": max(0, int(extra)),
+                "label": f"{start} a {end}",
+            }
+        )
     return {
         "origin_lat": o_lat,
         "origin_lng": o_lng,
@@ -1139,18 +1157,43 @@ def _obtener_cfg_envios_tienda(cfg_tienda=None):
         "outside_warning": outside_msg,
         "note_text": included_msg,
         "commune_name": "Maipu",
+        "time_bands": bands,
     }
 
 
-def _cotizar_envio_agenda(lat, lng, cfg_tienda=None):
+def _extra_horario_envio(cfg_envios, hora_inicio=None):
+    hora_txt = str(hora_inicio or "").strip()
+    minutos = _hhmm_a_minutos(hora_txt)
+    if minutos is None:
+        return {"extra": 0, "label": ""}
+    for b in (cfg_envios.get("time_bands") or []):
+        ini = _hhmm_a_minutos(b.get("start"))
+        fin = _hhmm_a_minutos(b.get("end"))
+        if ini is None or fin is None:
+            continue
+        if ini <= fin:
+            active = ini <= minutos <= fin
+        else:
+            active = minutos >= ini or minutos <= fin
+        if active:
+            return {"extra": int(b.get("extra") or 0), "label": str(b.get("label") or "").strip()}
+    return {"extra": 0, "label": ""}
+
+
+def _cotizar_envio_agenda(lat, lng, cfg_tienda=None, hora_inicio=None):
     cfg = _obtener_cfg_envios_tienda(cfg_tienda)
     inside = _punto_en_poligono(lat, lng, _MAIPU_POLIGONO)
     distance_km = round(_haversine_km(cfg["origin_lat"], cfg["origin_lng"], lat, lng), 2)
+    extra_horario = _extra_horario_envio(cfg, hora_inicio=hora_inicio)
     quote = {
         "inside_maipu": bool(inside),
         "distance_km": float(distance_km),
         "range_label": "",
         "shipping_fee": None,
+        "shipping_fee_base": None,
+        "shipping_fee_extra": int(extra_horario.get("extra") or 0),
+        "time_band_label": str(extra_horario.get("label") or ""),
+        "hora_inicio": str(hora_inicio or ""),
         "visible_to_client": False,
         "warning": "",
         "note": str(cfg["note_text"]),
@@ -1173,8 +1216,11 @@ def _cotizar_envio_agenda(lat, lng, cfg_tienda=None):
         fee = int(cfg["fee_9_plus"])
         range_label = "9+ km"
 
+    fee_base = int(max(0, fee))
+    fee_extra = int(max(0, extra_horario.get("extra") or 0))
     quote["range_label"] = range_label
-    quote["shipping_fee"] = int(max(0, fee))
+    quote["shipping_fee_base"] = fee_base
+    quote["shipping_fee"] = int(fee_base + fee_extra)
     quote["visible_to_client"] = True
     return quote
 
@@ -1711,6 +1757,15 @@ def _default_tienda_personalizacion():
         "agenda_delivery_fee_3_6": 3500,
         "agenda_delivery_fee_6_9": 4500,
         "agenda_delivery_fee_9_plus": 5500,
+        "agenda_delivery_band_1_start": "10:00",
+        "agenda_delivery_band_1_end": "13:00",
+        "agenda_delivery_band_1_extra": 0,
+        "agenda_delivery_band_2_start": "14:00",
+        "agenda_delivery_band_2_end": "17:00",
+        "agenda_delivery_band_2_extra": 1000,
+        "agenda_delivery_band_3_start": "18:00",
+        "agenda_delivery_band_3_end": "20:00",
+        "agenda_delivery_band_3_extra": 1800,
         "agenda_delivery_note_text": "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
         "agenda_delivery_outside_warning": "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente.",
         "agenda_days_ahead": 14,
@@ -1887,6 +1942,19 @@ def _normalizar_tienda_personalizacion(payload):
         except (TypeError, ValueError):
             fee = int(base[key])
         clean[key] = max(0, min(300000, fee))
+    for idx in (1, 2, 3):
+        key_start = f"agenda_delivery_band_{idx}_start"
+        key_end = f"agenda_delivery_band_{idx}_end"
+        key_extra = f"agenda_delivery_band_{idx}_extra"
+        start_raw = str(data.get(key_start) if data.get(key_start) is not None else base.get(key_start) or "").strip()
+        end_raw = str(data.get(key_end) if data.get(key_end) is not None else base.get(key_end) or "").strip()
+        clean[key_start] = start_raw if _parse_hora_hhmm(start_raw) else str(base.get(key_start) or "")
+        clean[key_end] = end_raw if _parse_hora_hhmm(end_raw) else str(base.get(key_end) or "")
+        try:
+            extra = int(float(data.get(key_extra) if data.get(key_extra) is not None else base.get(key_extra) or 0))
+        except (TypeError, ValueError):
+            extra = int(base.get(key_extra) or 0)
+        clean[key_extra] = max(0, min(300000, extra))
     clean["agenda_delivery_note_text"] = str(data.get("agenda_delivery_note_text") or base["agenda_delivery_note_text"]).strip()[:220] or base["agenda_delivery_note_text"]
     clean["agenda_delivery_outside_warning"] = str(data.get("agenda_delivery_outside_warning") or base["agenda_delivery_outside_warning"]).strip()[:260] or base["agenda_delivery_outside_warning"]
     clean["agenda_form_button_text"] = str(data.get("agenda_form_button_text") or base["agenda_form_button_text"]).strip()[:50] or base["agenda_form_button_text"]
@@ -4016,8 +4084,11 @@ def api_tienda_agenda_despacho_cotizar():
             return jsonify({"success": False, "error": "Coordenadas invalidas para cotizar despacho"}), 400
         if not (-90 <= lat <= 90 and -180 <= lng <= 180):
             return jsonify({"success": False, "error": "Coordenadas fuera de rango"}), 400
+        hora_inicio = str(data.get("hora_inicio") or "").strip()
+        if not _parse_hora_hhmm(hora_inicio):
+            return jsonify({"success": False, "error": "Selecciona primero un horario valido para calcular despacho"}), 400
         cfg_tienda = _obtener_tienda_personalizacion()
-        quote = _cotizar_envio_agenda(lat, lng, cfg_tienda=cfg_tienda)
+        quote = _cotizar_envio_agenda(lat, lng, cfg_tienda=cfg_tienda, hora_inicio=hora_inicio)
         return jsonify({"success": True, "quote": quote})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -4188,7 +4259,7 @@ def api_tienda_agenda_reservar():
                 return jsonify({"success": False, "error": "Debes confirmar la direccion con el pin del mapa"}), 400
             if not (-90 <= latitud <= 90 and -180 <= longitud <= 180):
                 return jsonify({"success": False, "error": "Coordenadas de despacho invalidas"}), 400
-            shipping_quote = _cotizar_envio_agenda(latitud, longitud, cfg_tienda=cfg_tienda)
+            shipping_quote = _cotizar_envio_agenda(latitud, longitud, cfg_tienda=cfg_tienda, hora_inicio=hora_inicio)
 
         fecha_hoy = datetime.now(ZoneInfo("America/Santiago")).date()
         fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()

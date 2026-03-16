@@ -682,6 +682,13 @@
         .agenda-despacho-wrap.active {
             display: grid;
         }
+        .agenda-despacho-wrap.locked {
+            opacity: .68;
+        }
+        .agenda-despacho-wrap.locked .agenda-map {
+            filter: grayscale(.35);
+            pointer-events: none;
+        }
         .agenda-map {
             height: 200px;
             border-radius: 9px;
@@ -1946,6 +1953,7 @@
                     </div>
                     <textarea id="agenda-detalle" maxlength="400" placeholder="Detalle rapido del pedido (opcional)"></textarea>
                     <div class="agenda-despacho-wrap" id="agenda-despacho-wrap">
+                        <div class="agenda-shipping-warning" id="agenda-despacho-step-msg"></div>
                         <div class="agenda-map-actions">
                             <input id="agenda-direccion-buscar" type="text" maxlength="240" placeholder="Direccion de despacho (buscar y confirmar pin)">
                             <button type="button" id="agenda-buscar-mapa">Buscar</button>
@@ -2276,6 +2284,7 @@
         const agendaShippingNoteEl = document.getElementById("agenda-shipping-note");
         const agendaShippingQuoteEl = document.getElementById("agenda-shipping-quote");
         const agendaShippingWarningEl = document.getElementById("agenda-shipping-warning");
+        const agendaDespachoStepMsgEl = document.getElementById("agenda-despacho-step-msg");
         const modalAgendaConfirmarEl = document.getElementById("modal-agenda-confirmar");
         const agendaConfirmTitleEl = document.getElementById("agenda-confirm-title");
         const agendaConfirmWarningEl = document.getElementById("agenda-confirm-warning");
@@ -2457,6 +2466,15 @@
             agenda_delivery_fee_3_6: 3500,
             agenda_delivery_fee_6_9: 4500,
             agenda_delivery_fee_9_plus: 5500,
+            agenda_delivery_band_1_start: "10:00",
+            agenda_delivery_band_1_end: "13:00",
+            agenda_delivery_band_1_extra: 0,
+            agenda_delivery_band_2_start: "14:00",
+            agenda_delivery_band_2_end: "17:00",
+            agenda_delivery_band_2_extra: 1000,
+            agenda_delivery_band_3_start: "18:00",
+            agenda_delivery_band_3_end: "20:00",
+            agenda_delivery_band_3_extra: 1800,
             agenda_delivery_note_text: "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
             agenda_delivery_outside_warning: "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente.",
             agenda_days_ahead: 14,
@@ -3014,6 +3032,25 @@
             _renderAgendaShippingQuote();
         }
 
+        function _updateAgendaDespachoStepState() {
+            const needHora = !String(agendaHoraActiva || "").trim();
+            const locked = agendaEntregaTipo === "despacho" && needHora;
+            if (agendaDespachoWrapEl) agendaDespachoWrapEl.classList.toggle("locked", locked);
+            [agendaDireccionBuscarEl, agendaBuscarMapaEl, agendaConfirmarPinEl].forEach((el) => {
+                if (!el) return;
+                el.disabled = Boolean(locked);
+            });
+            if (agendaDespachoStepMsgEl) {
+                if (locked) {
+                    agendaDespachoStepMsgEl.textContent = "Primero selecciona fecha y hora de entrega para cotizar despacho por franja horaria.";
+                    agendaDespachoStepMsgEl.classList.add("active");
+                } else {
+                    agendaDespachoStepMsgEl.textContent = "";
+                    agendaDespachoStepMsgEl.classList.remove("active");
+                }
+            }
+        }
+
         function _renderAgendaShippingQuote() {
             if (agendaShippingQuoteEl) {
                 agendaShippingQuoteEl.classList.remove("active");
@@ -3033,9 +3070,11 @@
             if (!q) return;
             if (q.inside_maipu && Number.isFinite(Number(q.shipping_fee))) {
                 const fee = Number(q.shipping_fee || 0);
-                const dist = Number(q.distance_km || 0);
+                const bandTxt = String(q.time_band_label || "").trim();
                 if (agendaShippingQuoteEl) {
-                    agendaShippingQuoteEl.textContent = `Despacho estimado: ${money.format(fee)} (${String(q.range_label || "-")}, ${dist.toFixed(2)} km).`;
+                    agendaShippingQuoteEl.textContent = bandTxt
+                        ? `Despacho estimado: ${money.format(fee)} (${bandTxt}).`
+                        : `Despacho estimado: ${money.format(fee)}.`;
                     agendaShippingQuoteEl.classList.add("active");
                 }
                 return;
@@ -3052,6 +3091,11 @@
                 _resetAgendaShippingQuote();
                 return;
             }
+            if (!String(agendaHoraActiva || "").trim()) {
+                _resetAgendaShippingQuote();
+                _agendaMsg("Selecciona primero una hora para cotizar despacho.", "err");
+                return;
+            }
             if (!agendaDireccionConfirmada) {
                 _resetAgendaShippingQuote();
                 return;
@@ -3063,6 +3107,7 @@
                     body: JSON.stringify({
                         lat: Number(agendaDireccionPin.lat || 0),
                         lng: Number(agendaDireccionPin.lng || 0),
+                        hora_inicio: String(agendaHoraActiva || ""),
                     }),
                 });
                 const data = await res.json();
@@ -3086,6 +3131,7 @@
             if (agendaEntregaDespachoEl) agendaEntregaDespachoEl.classList.toggle("active", agendaEntregaTipo === "despacho");
             if (agendaDespachoWrapEl) agendaDespachoWrapEl.classList.toggle("active", agendaEntregaTipo === "despacho");
             _resetAgendaShippingQuote();
+            _updateAgendaDespachoStepState();
             if (agendaEntregaTipo === "despacho") {
                 _initAgendaMap();
             } else {
@@ -3944,6 +3990,7 @@
                     </button>
                 `;
             }).join("");
+            _updateAgendaDespachoStepState();
         }
 
         async function cargarAgendaDisponibilidad(silent = false) {
@@ -4110,7 +4157,7 @@
                 <div><strong>Direccion:</strong> ${esc(direccionTxt || "-")}</div>
                 <div><strong>Pin mapa:</strong> ${esc(pinTxt)}</div>
                 <div><strong>Subtotal estimado:</strong> ${esc(money.format(subtotalEstimado))}</div>
-                ${shippingVisible ? `<div><strong>Despacho estimado:</strong> ${esc(money.format(shippingFee))} (${esc(String(shipping.range_label || "-"))})</div>` : ""}
+                ${shippingVisible ? `<div><strong>Despacho estimado:</strong> ${esc(money.format(shippingFee))}</div>` : ""}
                 ${shippingVisible ? `<div><strong>Total estimado:</strong> ${esc(money.format(totalEstimado))}</div>` : ""}
                 ${payload.entrega_tipo === "despacho" && !shippingVisible ? `<div style="margin-top:6px;padding:7px 8px;border:1px solid #fed7aa;border-radius:8px;background:#fffbeb;color:#7c2d12;font-weight:700;">${esc(String((shipping && shipping.warning) || tiendaUiCfg.agenda_delivery_outside_warning || TIENDA_UI_DEFAULTS.agenda_delivery_outside_warning))}</div>` : ""}
                 ${detalleCatalogoHtml}
@@ -4305,7 +4352,7 @@
                 drawField("Direccion informada por cliente", payload.direccion || "-");
                 drawField("Coordenadas", pinTxt);
                 if (shippingVisible) {
-                    drawField("Despacho estimado", `${money.format(shippingFee)} (${String(shipping.range_label || "-")})`);
+                    drawField("Despacho estimado", `${money.format(shippingFee)}`);
                     drawField("Total estimado", money.format(totalEstimado));
                 } else {
                     drawField("Nota despacho", String((shipping && shipping.warning) || tiendaUiCfg.agenda_delivery_outside_warning || TIENDA_UI_DEFAULTS.agenda_delivery_outside_warning));
@@ -4451,11 +4498,13 @@
         function seleccionarAgendaDia(fecha) {
             agendaFechaActiva = String(fecha || "");
             agendaHoraActiva = "";
+            _resetAgendaShippingQuote();
             _renderAgendaDiaHora();
         }
 
         function seleccionarAgendaHora(hora) {
             agendaHoraActiva = String(hora || "");
+            _resetAgendaShippingQuote();
             _renderAgendaDiaHora();
         }
 
@@ -5553,6 +5602,7 @@
         _setAgendaPastelMode("catalogo", false);
         _setAgendaTipo(String(agendaTipoEl?.value || "").trim().toLowerCase());
         _setAgendaEntregaTipo("retiro");
+        _updateAgendaDespachoStepState();
         _aplicarEscalaMovilDinamica();
         renderCart();
         cargarProductos();
