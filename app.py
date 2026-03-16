@@ -2229,7 +2229,7 @@ def _normalizar_catalogo_torta_cfg(raw):
     cats_in = data.get("categorias")
     if not isinstance(cats_in, list):
         cats_in = list(base.get("categorias") or [])
-    for item in cats_in[:20]:
+    for item in cats_in:
         cat = dict(item or {})
         cid = re.sub(r"[^a-z0-9\-]+", "-", str(cat.get("id") or "").strip().lower()).strip("-")[:60] or _slug_simple(cat.get("nombre") or "categoria")
         nombre = str(cat.get("nombre") or "").strip()[:80] or "Categoria"
@@ -2242,7 +2242,7 @@ def _normalizar_catalogo_torta_cfg(raw):
     sizes_in = data.get("sizes")
     if not isinstance(sizes_in, list):
         sizes_in = list(base.get("sizes") or [])
-    for item in sizes_in[:25]:
+    for item in sizes_in:
         norm = _normalizar_catalogo_torta_item(
             item,
             {"id": "size", "categoria_id": next(iter(categorias_validas), "general"), "nombre": "Tamano", "precio": 0, "max_sabores": 3, "activo": True},
@@ -2255,7 +2255,7 @@ def _normalizar_catalogo_torta_cfg(raw):
     sabores_in = data.get("sabores")
     if not isinstance(sabores_in, list):
         sabores_in = list(base.get("sabores") or [])
-    for item in sabores_in[:60]:
+    for item in sabores_in:
         out["sabores"].append(
             _normalizar_catalogo_torta_item(
                 item,
@@ -2266,7 +2266,7 @@ def _normalizar_catalogo_torta_cfg(raw):
     extras_in = data.get("extras")
     if not isinstance(extras_in, list):
         extras_in = list(base.get("extras") or [])
-    for item in extras_in[:80]:
+    for item in extras_in:
         out["extras"].append(
             _normalizar_catalogo_torta_item(
                 item,
@@ -2278,7 +2278,7 @@ def _normalizar_catalogo_torta_cfg(raw):
     toppers_in = data.get("toppers")
     if not isinstance(toppers_in, list):
         toppers_in = list(base.get("toppers") or [])
-    for item in toppers_in[:40]:
+    for item in toppers_in:
         out["toppers"].append(
             _normalizar_catalogo_torta_item(
                 item,
