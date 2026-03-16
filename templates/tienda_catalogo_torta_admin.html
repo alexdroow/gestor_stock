@@ -318,7 +318,14 @@ function render() {
 }
 
 function bindListInputs(key) {
-    const list = document.getElementById(`list-${key === "sabores" ? "flavors" : key}`);
+    const listIdMap = {
+        categorias: "list-categories",
+        sizes: "list-sizes",
+        sabores: "list-flavors",
+        extras: "list-extras",
+        toppers: "list-toppers",
+    };
+    const list = document.getElementById(listIdMap[key] || "");
     if (!list) return;
     list.querySelectorAll(".row").forEach((row) => {
         const idx = Number(row.getAttribute("data-idx") || -1);
