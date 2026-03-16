@@ -285,6 +285,25 @@
             gap: 8px;
             flex-wrap: wrap;
         }
+        .envios-status {
+            margin-top: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: .85rem;
+            color: #334155;
+            background: #f8fafc;
+        }
+        .envios-status.ok {
+            border-color: #86efac;
+            background: #f0fdf4;
+            color: #166534;
+        }
+        .envios-status.err {
+            border-color: #fecaca;
+            background: #fef2f2;
+            color: #991b1b;
+        }
         .envios-dot {
             width: 12px;
             height: 12px;
@@ -895,6 +914,7 @@
                 <button type="button" class="btn-secondary" id="btn-zona-save">Guardar sector dibujado</button>
                 <button type="button" class="btn-outline" id="btn-zona-fit">Ajustar mapa a sectores</button>
             </div>
+            <div class="envios-status" id="envios-zona-status">Dibuja un sector en el mapa (minimo 3 puntos).</div>
             <div id="envios-zona-map" class="envios-map"></div>
             <div class="envios-list" id="envios-zonas-list"></div>
             <div class="actions" style="margin-top:12px;">
@@ -931,6 +951,7 @@
     const btnZonaResetDraftEl = document.getElementById("btn-zona-reset-draft");
     const btnZonaSaveEl = document.getElementById("btn-zona-save");
     const btnZonaFitEl = document.getElementById("btn-zona-fit");
+    const zonaStatusEl = document.getElementById("envios-zona-status");
 
     const fields = [
         "brand_text","search_placeholder","menu_title","cart_title","sec_ofertas_title","sec_destacados_title",
@@ -1081,6 +1102,12 @@
         msgEl.className = `msg ${type || ""}`.trim();
     }
 
+    function setEnviosStatus(text, type = "") {
+        if (!zonaStatusEl) return;
+        zonaStatusEl.textContent = text || "";
+        zonaStatusEl.className = `envios-status ${type || ""}`.trim();
+    }
+
     function richTextLite(raw) {
         const src = String(raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         let out = src
@@ -1165,12 +1192,18 @@
             try { enviosMap.removeLayer(enviosDraftLayer); } catch (_) {}
             enviosDraftLayer = null;
         }
-        if (enviosDraftPoints.length < 2) return;
+        if (enviosDraftPoints.length < 2) {
+            if (!enviosDraftPoints.length) setEnviosStatus("Dibuja un sector en el mapa (minimo 3 puntos).");
+            else setEnviosStatus("Borrador con 1 punto. Agrega al menos 3 para guardar.", "err");
+            return;
+        }
         if (enviosDraftPoints.length >= 3) {
             enviosDraftLayer = L.polygon(enviosDraftPoints, { color: "#f97316", weight: 2, fillOpacity: 0.16 }).addTo(enviosMap);
         } else {
             enviosDraftLayer = L.polyline(enviosDraftPoints, { color: "#f97316", weight: 2 }).addTo(enviosMap);
         }
+        if (enviosDraftPoints.length >= 3) setEnviosStatus(`Poligono en borrador con ${enviosDraftPoints.length} puntos. Ya puedes guardar el sector.`, "ok");
+        else setEnviosStatus(`Borrador con ${enviosDraftPoints.length} punto(s). Agrega al menos 3 para guardar.`, "err");
     }
 
     function _renderEnviosZonesOnMap() {
@@ -1300,11 +1333,13 @@
     function _guardarZonaDesdeDraft() {
         if (enviosDraftPoints.length < 3) {
             setMsg("Debes dibujar minimo 3 puntos en el mapa para crear el sector.", "err");
+            setEnviosStatus("No se pudo guardar: faltan puntos en el poligono (minimo 3).", "err");
             return;
         }
         const name = String(zonaNombreEl?.value || "").trim();
         if (!name) {
             setMsg("Ingresa un nombre para el sector.", "err");
+            setEnviosStatus("No se pudo guardar: falta el nombre del sector.", "err");
             return;
         }
         const fee = Math.max(0, Math.min(300000, Number(zonaFeeEl?.value || 0) || 0));
@@ -1324,6 +1359,7 @@
         enviosDraftPoints = [];
         _renderEnviosZonesList();
         setMsg(`Sector '${name}' agregado. Guarda cambios para publicar.`, "ok");
+        setEnviosStatus(`Sector '${name}' agregado a la lista. Ahora presiona 'Guardar envios' para dejarlo persistente.`, "ok");
     }
 
     function getPayload() {
@@ -1351,6 +1387,7 @@
         agendaDeliveryZones = _normalizarZonasEnvioClient(cfg.agenda_delivery_zones || []);
         _renderEnviosZonesList();
         _fitEnviosMapToData();
+        _renderEnviosDraft();
         renderPreview();
     }
 
@@ -1712,6 +1749,7 @@
         enviosDraftPoints = [];
         _renderEnviosDraft();
         setMsg("Dibujo temporal limpiado.");
+        setEnviosStatus("Dibujo limpiado. Vuelve a marcar el poligono (minimo 3 puntos).");
     });
     btnZonaSaveEl?.addEventListener("click", _guardarZonaDesdeDraft);
     btnZonaFitEl?.addEventListener("click", _fitEnviosMapToData);
