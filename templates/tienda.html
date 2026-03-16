@@ -4449,6 +4449,7 @@
             if (!payload) return;
             const sendToPasteleria = Boolean(opts && opts.sendToPasteleria);
             const waWindow = opts && opts.waWindow ? opts.waWindow : null;
+            let sentPdfToPasteleria = false;
             _agendaMsg("Reservando horario...");
             try {
                 const res = await fetch("/api/tienda/agenda/reservar", {
@@ -4465,17 +4466,34 @@
                 };
                 _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
                 if (sendToPasteleria) {
-                    const contacto = String(payloadFinal.nombre || payloadFinal.email || "cliente").trim();
-                    const msgWa = `Hola mi nombre ${contacto} envio mi cotizacion para una pronta revision.`;
-                    const waUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
                     try {
-                        if (waWindow && !waWindow.closed) {
-                            waWindow.location.href = waUrl;
-                        } else {
+                        const waRes = await fetch(`/api/tienda/agenda/reserva/${Number(reserva.id || 0)}/whatsapp-pasteleria`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", Accept: "application/json" },
+                            body: JSON.stringify({
+                                nombre: String(payloadFinal.nombre || "").trim(),
+                                email: String(payloadFinal.email || "").trim(),
+                            }),
+                        });
+                        const waData = await waRes.json();
+                        if (!waRes.ok || !waData.success) {
+                            throw new Error(waData.error || "No se pudo enviar PDF por WhatsApp");
+                        }
+                        if (waWindow && !waWindow.closed) waWindow.close();
+                        sentPdfToPasteleria = true;
+                    } catch (_) {
+                        const contacto = String(payloadFinal.nombre || payloadFinal.email || "cliente").trim();
+                        const msgWa = `Hola mi nombre ${contacto} envio mi cotizacion para una pronta revision.`;
+                        const waUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
+                        try {
+                            if (waWindow && !waWindow.closed) {
+                                waWindow.location.href = waUrl;
+                            } else {
+                                window.open(waUrl, "_blank");
+                            }
+                        } catch (_) {
                             window.open(waUrl, "_blank");
                         }
-                    } catch (_) {
-                        window.open(waUrl, "_blank");
                     }
                 }
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
@@ -4492,7 +4510,9 @@
                 _resetAgendaShippingQuote();
                 agendaReservaPendiente = null;
                 _cerrarModalAgendaConfirmar();
-                if (payloadFinal.entrega_tipo === "despacho" && payloadFinal.shipping_quote && !payloadFinal.shipping_quote.inside_maipu) {
+                if (sentPdfToPasteleria) {
+                    _agendaMsg("Reserva confirmada. PDF enviado a Pasteleria Sucree por WhatsApp.", "ok");
+                } else if (payloadFinal.entrega_tipo === "despacho" && payloadFinal.shipping_quote && !payloadFinal.shipping_quote.inside_maipu) {
                     _agendaMsg("Reserva enviada. Direccion fuera de Maipu: el valor de despacho sera cotizado internamente y te contactaremos por WhatsApp (10:00 a 20:00).", "ok");
                 } else {
                     _agendaMsg("Reserva enviada. Espera la confirmacion que sera enviada al WhatsApp. Horario de atencion: 10:00 a 20:00.", "ok");

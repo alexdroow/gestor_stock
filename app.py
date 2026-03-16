@@ -1617,6 +1617,70 @@ def _crear_pdf_resumen_pedido_tienda(venta_id, cliente_nombre, cliente_email, cl
     return filename
 
 
+def _crear_pdf_reserva_agenda_tienda(reserva):
+    if canvas is None:
+        raise RuntimeError("ReportLab no esta instalado en el entorno.")
+    rid = int(reserva.get("id") or 0)
+    base_dir = os.path.join(static_dir, "tienda_pedidos_pdf")
+    os.makedirs(base_dir, exist_ok=True)
+    filename = f"reserva_agenda_{rid}_{uuid.uuid4().hex[:10]}.pdf"
+    abs_path = os.path.join(base_dir, filename)
+
+    def _wrap(txt, max_len=92):
+        text = str(txt or "").strip()
+        if not text:
+            return [""]
+        out = []
+        raw_lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        for ln in raw_lines:
+            line = ln.strip()
+            if not line:
+                out.append("")
+                continue
+            while len(line) > max_len:
+                cut = line.rfind(" ", 0, max_len + 1)
+                if cut <= 0:
+                    cut = max_len
+                out.append(line[:cut].strip())
+                line = line[cut:].strip()
+            out.append(line)
+        return out or [""]
+
+    c = canvas.Canvas(abs_path, pagesize=A4)
+    width, height = A4
+    y = height - 50
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, y, f"Reserva agenda tienda #{rid}")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    c.drawString(40, y, f"Generado: {datetime.now(ZoneInfo('America/Santiago')).strftime('%d-%m-%Y %H:%M:%S')}")
+    y -= 16
+    c.drawString(40, y, f"Tipo: {str(reserva.get('tipo') or '').capitalize()}")
+    y -= 14
+    c.drawString(40, y, f"Fecha: {reserva.get('fecha') or '-'} {reserva.get('hora_inicio') or '-'}")
+    y -= 14
+    c.drawString(40, y, f"Cliente: {reserva.get('cliente') or '-'}")
+    y -= 14
+    c.drawString(40, y, f"Telefono: {reserva.get('telefono') or '-'}")
+    y -= 14
+    c.drawString(40, y, f"Direccion: {reserva.get('direccion') or 'Retiro en tienda'}")
+    y -= 20
+
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "Ingredientes / Detalles")
+    y -= 14
+    c.setFont("Helvetica", 10)
+    for ln in _wrap(reserva.get("ingredientes") or "", max_len=96):
+        c.drawString(42, y, ln[:150])
+        y -= 13
+        if y < 72:
+            c.showPage()
+            y = height - 50
+            c.setFont("Helvetica", 10)
+    c.save()
+    return filename
+
+
 def _enviar_whatsapp_twilio(body_text, media_url=None):
     account_sid = str(os.environ.get("TWILIO_ACCOUNT_SID") or "").strip()
     auth_token = str(os.environ.get("TWILIO_AUTH_TOKEN") or "").strip()
@@ -1694,6 +1758,13 @@ def _notificar_whatsapp_pedido_tienda_async(venta_id, cliente_nombre, cliente_em
             print(f"[WARN] Error en notificacion WhatsApp pedido #{venta_id}: {e}")
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def _twilio_whatsapp_configurado():
+    account_sid = str(os.environ.get("TWILIO_ACCOUNT_SID") or "").strip()
+    auth_token = str(os.environ.get("TWILIO_AUTH_TOKEN") or "").strip()
+    from_number = _normalizar_numero_whatsapp(os.environ.get("TWILIO_WHATSAPP_FROM"))
+    return bool(account_sid and auth_token and from_number)
 
 
 def _parse_hora_hhmm(valor):
@@ -4543,6 +4614,58 @@ def api_tienda_agenda_reservar():
     except Exception as e:
         if conn:
             conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/agenda/reserva/<int:reserva_id>/whatsapp-pasteleria', methods=['POST'])
+def api_tienda_agenda_reserva_whatsapp_pasteleria(reserva_id):
+    conn = None
+    try:
+        if int(reserva_id or 0) <= 0:
+            return jsonify({"success": False, "error": "ID de reserva invalido"}), 400
+        if not _bool_env("GESTIONSTOCK_WHATSAPP_ENABLED", default=False):
+            return jsonify({"success": False, "error": "WhatsApp automatico deshabilitado en servidor"}), 400
+        if not _twilio_whatsapp_configurado():
+            return jsonify({"success": False, "error": "Twilio WhatsApp no esta configurado en servidor"}), 400
+
+        data = request.get_json(silent=True) or {}
+        nombre_origen = str(data.get("nombre") or "").strip()
+        email_origen = str(data.get("email") or "").strip()
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, cliente, telefono, direccion, ingredientes, codigo_operacion
+            FROM agenda_eventos
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (int(reserva_id),),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Reserva no encontrada"}), 404
+        reserva = dict(row)
+        filename = _crear_pdf_reserva_agenda_tienda(reserva)
+        media_url = f"{str(request.url_root or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
+
+        contacto = nombre_origen or email_origen or str(reserva.get("cliente") or "").strip() or f"reserva #{int(reserva_id)}"
+        body = (
+            f"Hola mi nombre {contacto} envio mi cotizacion para una pronta revision.\n"
+            f"Reserva #{int(reserva_id)}\n"
+            f"Tipo: {str(reserva.get('tipo') or '').capitalize()}\n"
+            f"Fecha: {reserva.get('fecha') or '-'} {reserva.get('hora_inicio') or '-'}\n"
+            "Adjunto PDF de la reserva."
+        )
+        ok, err = _enviar_whatsapp_twilio(body, media_url=media_url)
+        if not ok:
+            return jsonify({"success": False, "error": err or "No se pudo enviar WhatsApp"}), 502
+        return jsonify({"success": True, "media_url": media_url})
+    except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
