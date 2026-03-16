@@ -2185,7 +2185,6 @@ def _obtener_tienda_personalizacion():
     conn = None
     try:
         conn = get_db()
-        _asegurar_presets_personalizacion(conn)
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -2207,6 +2206,12 @@ def _obtener_tienda_personalizacion():
             payload = {}
         base = _normalizar_tienda_personalizacion(payload)
         return _aplicar_programacion_personalizacion(conn, base)
+    except sqlite3.OperationalError:
+        # Evita tumbar la tienda publica si la BD esta temporalmente en modo
+        # solo lectura, sin espacio o con error de I/O.
+        return _default_tienda_personalizacion()
+    except Exception:
+        return _default_tienda_personalizacion()
     finally:
         if conn:
             conn.close()
