@@ -250,6 +250,49 @@
             font: inherit;
             font-size: .82rem;
         }
+        .panel-mode-hidden {
+            display: none !important;
+        }
+        .envios-toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .envios-map {
+            height: 360px;
+            border: 1px solid #dbe2ea;
+            border-radius: 10px;
+            background: #fff;
+        }
+        .envios-list {
+            display: grid;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .envios-item {
+            border: 1px solid #dbe2ea;
+            border-radius: 9px;
+            padding: 8px;
+            display: grid;
+            gap: 6px;
+            background: #fff;
+        }
+        .envios-item-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .envios-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            display: inline-block;
+            margin-right: 6px;
+            border: 1px solid #0f172a22;
+        }
         @media (max-width: 1100px) {
             .grid { grid-template-columns: 1fr; }
             .fields { grid-template-columns: 1fr; }
@@ -261,6 +304,8 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
 </head>
 <body>
@@ -269,17 +314,18 @@
         <div class="top">
             <h1>Personalizacion de Tienda</h1>
             <div class="top-links">
+                <a href="#" id="link-panel-editor">Editor tienda</a>
                 <a href="/ventas/admin-catalogo">Catalogo tienda</a>
                 <a href="/ventas/admin-catalogo-torta">Catalogo torta</a>
-                <a href="#panel-envios">Envios pedidos</a>
+                <a href="#" id="link-panel-envios">Envios pedidos</a>
                 <a href="/ventas/cupones">Cupones</a>
                 <a href="/ventas">Ventas</a>
                 <a href="/tienda" target="_blank" rel="noopener">Abrir tienda</a>
             </div>
         </div>
 
-        <div class="grid">
-            <section class="panel">
+        <div class="grid" id="grid-editor-main">
+            <section class="panel" id="panel-editor-general">
                 <h2>Textos principales</h2>
                 <div class="fields">
                     <label>Marca / titulo superior
@@ -595,62 +641,12 @@
                     </label>
                 </div>
 
-                <h2 id="panel-envios">Envios pedidos (solo Maipu)</h2>
-                <div class="fields">
-                    <label>Origen despacho (latitud)
-                        <input id="agenda_delivery_origin_lat" type="number" step="0.000001" min="-90" max="90" placeholder="-33.5191105">
-                    </label>
-                    <label>Origen despacho (longitud)
-                        <input id="agenda_delivery_origin_lng" type="number" step="0.000001" min="-180" max="180" placeholder="-70.7849094">
-                    </label>
-                    <label>0 a 3 km ($)
-                        <input id="agenda_delivery_fee_0_3" type="number" min="0" max="300000" step="100">
-                    </label>
-                    <label>3 a 6 km ($)
-                        <input id="agenda_delivery_fee_3_6" type="number" min="0" max="300000" step="100">
-                    </label>
-                    <label>6 a 9 km ($)
-                        <input id="agenda_delivery_fee_6_9" type="number" min="0" max="300000" step="100">
-                    </label>
-                    <label>9+ km ($)
-                        <input id="agenda_delivery_fee_9_plus" type="number" min="0" max="300000" step="100">
-                    </label>
-                    <label>Franja 1 inicio
-                        <input id="agenda_delivery_band_1_start" type="time" placeholder="10:00">
-                    </label>
-                    <label>Franja 1 fin
-                        <input id="agenda_delivery_band_1_end" type="time" placeholder="13:00">
-                    </label>
-                    <label>Recargo franja 1 ($)
-                        <input id="agenda_delivery_band_1_extra" type="number" min="0" max="300000" step="100">
-                    </label>
-                    <label>Franja 2 inicio
-                        <input id="agenda_delivery_band_2_start" type="time" placeholder="14:00">
-                    </label>
-                    <label>Franja 2 fin
-                        <input id="agenda_delivery_band_2_end" type="time" placeholder="17:00">
-                    </label>
-                    <label>Recargo franja 2 ($)
-                        <input id="agenda_delivery_band_2_extra" type="number" min="0" max="300000" step="100">
-                    </label>
-                    <label>Franja 3 inicio
-                        <input id="agenda_delivery_band_3_start" type="time" placeholder="18:00">
-                    </label>
-                    <label>Franja 3 fin
-                        <input id="agenda_delivery_band_3_end" type="time" placeholder="20:00">
-                    </label>
-                    <label>Recargo franja 3 ($)
-                        <input id="agenda_delivery_band_3_extra" type="number" min="0" max="300000" step="100">
-                    </label>
-                    <label class="full">Texto informativo despacho dentro de Maipu
-                        <input id="agenda_delivery_note_text" type="text" maxlength="220" placeholder="El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.">
-                    </label>
-                    <label class="full">Advertencia para direccion fuera de Maipu
-                        <input id="agenda_delivery_outside_warning" type="text" maxlength="260" placeholder="Direccion fuera de Maipu: el valor de despacho no se puede mostrar...">
-                    </label>
-                    <label class="full" style="font-size:.8rem;color:#64748b;">
-                        Nota: fuera de Maipu no se mostrara valor de despacho al cliente; quedara para cotizacion interna.
-                    </label>
+                <h2>Envios de pedidos</h2>
+                <div style="font-size:.9rem;color:#475569;margin-bottom:8px;">
+                    Esta configuracion ahora se administra en una seccion exclusiva para mantener el editor ordenado.
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn-outline" id="btn-ir-envios">Abrir seccion exclusiva de envios</button>
                 </div>
 
                 <h2>Agenda de reservas: mensajes y disponibilidad</h2>
@@ -772,7 +768,7 @@
                 </div>
             </section>
 
-            <section class="panel">
+            <section class="panel" id="panel-editor-preview">
                 <h2>Vista previa rapida</h2>
                 <div class="preview" id="preview">
                     <div class="preview-top">
@@ -810,6 +806,102 @@
                 </div>
             </section>
         </div>
+
+        <section class="panel panel-mode-hidden" id="panel-envios-exclusivo">
+            <h2 id="panel-envios">Envios pedidos (seccion exclusiva)</h2>
+            <div style="font-size:.9rem;color:#475569;margin-bottom:10px;">
+                Configura origen, tramos base, recargos por horario y sectores dibujados en mapa con tarifa propia.
+            </div>
+            <div class="envios-toolbar">
+                <button type="button" class="btn-outline" id="btn-volver-editor">Volver al editor</button>
+            </div>
+            <div class="fields">
+                <label>Origen despacho (latitud)
+                    <input id="agenda_delivery_origin_lat" type="number" step="0.000001" min="-90" max="90" placeholder="-33.5191105">
+                </label>
+                <label>Origen despacho (longitud)
+                    <input id="agenda_delivery_origin_lng" type="number" step="0.000001" min="-180" max="180" placeholder="-70.7849094">
+                </label>
+                <label>0 a 3 km ($)
+                    <input id="agenda_delivery_fee_0_3" type="number" min="0" max="300000" step="100">
+                </label>
+                <label>3 a 6 km ($)
+                    <input id="agenda_delivery_fee_3_6" type="number" min="0" max="300000" step="100">
+                </label>
+                <label>6 a 9 km ($)
+                    <input id="agenda_delivery_fee_6_9" type="number" min="0" max="300000" step="100">
+                </label>
+                <label>9+ km ($)
+                    <input id="agenda_delivery_fee_9_plus" type="number" min="0" max="300000" step="100">
+                </label>
+                <label>Franja 1 inicio
+                    <input id="agenda_delivery_band_1_start" type="time" placeholder="10:00">
+                </label>
+                <label>Franja 1 fin
+                    <input id="agenda_delivery_band_1_end" type="time" placeholder="13:00">
+                </label>
+                <label>Recargo franja 1 ($)
+                    <input id="agenda_delivery_band_1_extra" type="number" min="0" max="300000" step="100">
+                </label>
+                <label>Franja 2 inicio
+                    <input id="agenda_delivery_band_2_start" type="time" placeholder="14:00">
+                </label>
+                <label>Franja 2 fin
+                    <input id="agenda_delivery_band_2_end" type="time" placeholder="17:00">
+                </label>
+                <label>Recargo franja 2 ($)
+                    <input id="agenda_delivery_band_2_extra" type="number" min="0" max="300000" step="100">
+                </label>
+                <label>Franja 3 inicio
+                    <input id="agenda_delivery_band_3_start" type="time" placeholder="18:00">
+                </label>
+                <label>Franja 3 fin
+                    <input id="agenda_delivery_band_3_end" type="time" placeholder="20:00">
+                </label>
+                <label>Recargo franja 3 ($)
+                    <input id="agenda_delivery_band_3_extra" type="number" min="0" max="300000" step="100">
+                </label>
+                <label class="full">Texto informativo despacho dentro de Maipu
+                    <input id="agenda_delivery_note_text" type="text" maxlength="220" placeholder="El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.">
+                </label>
+                <label class="full">Advertencia para direccion fuera de Maipu
+                    <input id="agenda_delivery_outside_warning" type="text" maxlength="260" placeholder="Direccion fuera de Maipu: el valor de despacho no se puede mostrar...">
+                </label>
+            </div>
+            <h2>Sectores en mapa y tarifa</h2>
+            <div class="fields">
+                <label>Nombre sector
+                    <input id="envios-zona-nombre" type="text" maxlength="90" placeholder="Ej: Maipu Centro">
+                </label>
+                <label>Tarifa sector ($)
+                    <input id="envios-zona-fee" type="number" min="0" max="300000" step="100" value="3000">
+                </label>
+                <label>Prioridad (mayor gana)
+                    <input id="envios-zona-priority" type="number" min="-999" max="999" step="1" value="10">
+                </label>
+                <label>Color sector
+                    <div class="color-field">
+                        <input id="envios-zona-color" type="text" placeholder="#2563eb" value="#2563eb">
+                        <input type="color" data-color-target="envios-zona-color" value="#2563eb">
+                    </div>
+                </label>
+                <label class="toggle"><input id="envios-zona-active" type="checkbox" checked> Sector activo</label>
+                <label class="full" style="font-size:.82rem;color:#64748b;">
+                    Haz clic en el mapa para dibujar el poligono del sector. Minimo 3 puntos.
+                </label>
+            </div>
+            <div class="envios-toolbar">
+                <button type="button" class="btn-outline" id="btn-zona-reset-draft">Limpiar dibujo</button>
+                <button type="button" class="btn-secondary" id="btn-zona-save">Guardar sector dibujado</button>
+                <button type="button" class="btn-outline" id="btn-zona-fit">Ajustar mapa a sectores</button>
+            </div>
+            <div id="envios-zona-map" class="envios-map"></div>
+            <div class="envios-list" id="envios-zonas-list"></div>
+            <div class="actions" style="margin-top:12px;">
+                <button type="button" class="btn-primary" id="btn-guardar-envios">Guardar envios</button>
+                <button type="button" class="btn-outline" id="btn-recargar-envios">Recargar envios</button>
+            </div>
+        </section>
     </main>
 </div>
 
@@ -819,6 +911,27 @@
     const PROGRAM_ENDPOINT = "/api/tienda/admin/personalizacion/programaciones";
     const VERSIONES_ENDPOINT = "/api/tienda/admin/personalizacion/versiones";
     const msgEl = document.getElementById("msg");
+    const panelEditorGeneralEl = document.getElementById("panel-editor-general");
+    const panelEditorPreviewEl = document.getElementById("panel-editor-preview");
+    const panelEnviosExclusivoEl = document.getElementById("panel-envios-exclusivo");
+    const linkPanelEditorEl = document.getElementById("link-panel-editor");
+    const linkPanelEnviosEl = document.getElementById("link-panel-envios");
+    const btnIrEnviosEl = document.getElementById("btn-ir-envios");
+    const btnVolverEditorEl = document.getElementById("btn-volver-editor");
+    const btnGuardarEnviosEl = document.getElementById("btn-guardar-envios");
+    const btnRecargarEnviosEl = document.getElementById("btn-recargar-envios");
+
+    const zonaNombreEl = document.getElementById("envios-zona-nombre");
+    const zonaFeeEl = document.getElementById("envios-zona-fee");
+    const zonaPriorityEl = document.getElementById("envios-zona-priority");
+    const zonaColorEl = document.getElementById("envios-zona-color");
+    const zonaActiveEl = document.getElementById("envios-zona-active");
+    const zonasListEl = document.getElementById("envios-zonas-list");
+    const zonaMapEl = document.getElementById("envios-zona-map");
+    const btnZonaResetDraftEl = document.getElementById("btn-zona-reset-draft");
+    const btnZonaSaveEl = document.getElementById("btn-zona-save");
+    const btnZonaFitEl = document.getElementById("btn-zona-fit");
+
     const fields = [
         "brand_text","search_placeholder","menu_title","cart_title","sec_ofertas_title","sec_destacados_title",
         "empty_cart_text","whatsapp_url","whatsapp_title","whatsapp_icon_url","show_whatsapp_button",
@@ -937,6 +1050,7 @@
         agenda_delivery_band_3_extra: 1800,
         agenda_delivery_note_text: "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
         agenda_delivery_outside_warning: "Direccion fuera de Maipu: el valor de despacho no se puede mostrar. Confirma el PIN y realiza la reserva de horario y te contactaremos para cotizarlo internamente.",
+        agenda_delivery_zones: [],
         agenda_form_button_text: "Reservar horario",
         agenda_confirm_title: "Confirmar reserva",
         agenda_confirm_warning: "Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.",
@@ -956,6 +1070,11 @@
         custom_css: ""
     };
     let PRESETS_CACHE = [];
+    let agendaDeliveryZones = [];
+    let enviosMap = null;
+    let enviosDraftPoints = [];
+    let enviosDraftLayer = null;
+    let enviosZonesLayer = null;
 
     function setMsg(text, type) {
         msgEl.textContent = text || "";
@@ -1007,6 +1126,206 @@
         renderPreview();
     }
 
+    function _normalizarZonasEnvioClient(raw) {
+        const arr = Array.isArray(raw) ? raw : [];
+        return arr.map((z, idx) => {
+            const zid = String(z?.id || `zone-${idx + 1}`).trim().toLowerCase().slice(0, 60);
+            const name = String(z?.name || z?.nombre || `Sector ${idx + 1}`).trim().slice(0, 90);
+            const fee = Math.max(0, Math.min(300000, Number(z?.fee || z?.tarifa || 0) || 0));
+            const priority = Math.max(-999, Math.min(999, Number(z?.priority || z?.prioridad || 0) || 0));
+            let color = String(z?.color || "#2563eb").trim();
+            if (!/^#([0-9a-fA-F]{6})$/.test(color)) color = "#2563eb";
+            const active = z?.active !== false;
+            const polygonRaw = Array.isArray(z?.polygon) ? z.polygon : [];
+            const polygon = polygonRaw.map((p) => {
+                if (Array.isArray(p) && p.length >= 2) return [Number(p[0] || 0), Number(p[1] || 0)];
+                if (p && typeof p === "object") return [Number(p.lat || 0), Number(p.lng || 0)];
+                return [0, 0];
+            }).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]) && p[0] >= -90 && p[0] <= 90 && p[1] >= -180 && p[1] <= 180);
+            return { id: zid, name, fee, priority, color, active, polygon };
+        }).filter((z) => z.polygon.length >= 3);
+    }
+
+    function setPanelMode(mode) {
+        const env = mode === "envios";
+        if (panelEditorGeneralEl) panelEditorGeneralEl.classList.toggle("panel-mode-hidden", env);
+        if (panelEditorPreviewEl) panelEditorPreviewEl.classList.toggle("panel-mode-hidden", env);
+        if (panelEnviosExclusivoEl) panelEnviosExclusivoEl.classList.toggle("panel-mode-hidden", !env);
+        if (env) {
+            window.location.hash = "panel-envios";
+            setTimeout(() => initEnviosMap(), 80);
+        } else if (window.location.hash === "#panel-envios") {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+    }
+
+    function _renderEnviosDraft() {
+        if (!enviosMap || !enviosZonesLayer) return;
+        if (enviosDraftLayer) {
+            try { enviosMap.removeLayer(enviosDraftLayer); } catch (_) {}
+            enviosDraftLayer = null;
+        }
+        if (enviosDraftPoints.length < 2) return;
+        if (enviosDraftPoints.length >= 3) {
+            enviosDraftLayer = L.polygon(enviosDraftPoints, { color: "#f97316", weight: 2, fillOpacity: 0.16 }).addTo(enviosMap);
+        } else {
+            enviosDraftLayer = L.polyline(enviosDraftPoints, { color: "#f97316", weight: 2 }).addTo(enviosMap);
+        }
+    }
+
+    function _renderEnviosZonesOnMap() {
+        if (!enviosMap) return;
+        if (enviosZonesLayer) {
+            try { enviosMap.removeLayer(enviosZonesLayer); } catch (_) {}
+        }
+        enviosZonesLayer = L.layerGroup().addTo(enviosMap);
+        const items = Array.isArray(agendaDeliveryZones) ? agendaDeliveryZones : [];
+        items.forEach((z, idx) => {
+            const poly = Array.isArray(z.polygon) ? z.polygon : [];
+            if (poly.length < 3) return;
+            const color = z.color || "#2563eb";
+            L.polygon(poly, {
+                color,
+                weight: 2,
+                fillOpacity: z.active === false ? 0.08 : 0.2,
+                opacity: z.active === false ? 0.45 : 0.9,
+            }).bindTooltip(`${z.name || `Sector ${idx + 1}`} · $${Number(z.fee || 0).toLocaleString("es-CL")}`).addTo(enviosZonesLayer);
+        });
+        _renderEnviosDraft();
+    }
+
+    function _fitEnviosMapToData() {
+        if (!enviosMap) return;
+        const all = [];
+        (agendaDeliveryZones || []).forEach((z) => {
+            (z.polygon || []).forEach((p) => all.push(p));
+        });
+        enviosDraftPoints.forEach((p) => all.push(p));
+        if (!all.length) {
+            const lat = Number(document.getElementById("agenda_delivery_origin_lat")?.value || DEFAULTS.agenda_delivery_origin_lat || -33.5191105);
+            const lng = Number(document.getElementById("agenda_delivery_origin_lng")?.value || DEFAULTS.agenda_delivery_origin_lng || -70.7849094);
+            enviosMap.setView([lat, lng], 13);
+            return;
+        }
+        const bounds = L.latLngBounds(all.map((p) => [Number(p[0]), Number(p[1])]));
+        enviosMap.fitBounds(bounds.pad(0.12));
+    }
+
+    function _renderEnviosZonesList() {
+        if (!zonasListEl) return;
+        const items = Array.isArray(agendaDeliveryZones) ? agendaDeliveryZones : [];
+        if (!items.length) {
+            zonasListEl.innerHTML = "<div class='envios-item'>Sin sectores cargados.</div>";
+            _renderEnviosZonesOnMap();
+            return;
+        }
+        zonasListEl.innerHTML = items.map((z, idx) => {
+            const name = String(z.name || `Sector ${idx + 1}`);
+            const fee = Number(z.fee || 0).toLocaleString("es-CL");
+            const prio = Number(z.priority || 0);
+            const pts = Array.isArray(z.polygon) ? z.polygon.length : 0;
+            const activeTxt = z.active === false ? "Inactivo" : "Activo";
+            return `
+                <div class="envios-item">
+                    <div class="envios-item-top">
+                        <div><span class="envios-dot" style="background:${z.color || "#2563eb"}"></span><strong>${name}</strong></div>
+                        <div>${activeTxt}</div>
+                    </div>
+                    <div style="font-size:.84rem;color:#334155;">Tarifa: <strong>$${fee}</strong> · Prioridad: <strong>${prio}</strong> · Puntos: <strong>${pts}</strong></div>
+                    <div class="item-actions">
+                        <button type="button" class="btn-outline" onclick="enviosZoomZona(${idx})">Ver</button>
+                        <button type="button" class="btn-outline" onclick="enviosDuplicarZona(${idx})">Duplicar</button>
+                        <button type="button" class="btn-outline" onclick="enviosEliminarZona(${idx})">Eliminar</button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+        _renderEnviosZonesOnMap();
+    }
+
+    function initEnviosMap() {
+        if (!zonaMapEl || !window.L) return;
+        const lat = Number(document.getElementById("agenda_delivery_origin_lat")?.value || DEFAULTS.agenda_delivery_origin_lat || -33.5191105);
+        const lng = Number(document.getElementById("agenda_delivery_origin_lng")?.value || DEFAULTS.agenda_delivery_origin_lng || -70.7849094);
+        if (!enviosMap) {
+            enviosMap = L.map(zonaMapEl).setView([lat, lng], 13);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap",
+            }).addTo(enviosMap);
+            enviosMap.on("click", (ev) => {
+                const p = [Number(ev.latlng.lat), Number(ev.latlng.lng)];
+                enviosDraftPoints.push(p);
+                _renderEnviosDraft();
+            });
+        }
+        setTimeout(() => enviosMap.invalidateSize(), 120);
+        _renderEnviosZonesOnMap();
+        _fitEnviosMapToData();
+    }
+
+    function enviosEliminarZona(index) {
+        const idx = Number(index);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= agendaDeliveryZones.length) return;
+        agendaDeliveryZones.splice(idx, 1);
+        _renderEnviosZonesList();
+    }
+
+    function enviosDuplicarZona(index) {
+        const idx = Number(index);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= agendaDeliveryZones.length) return;
+        const z = agendaDeliveryZones[idx];
+        const dup = {
+            ...z,
+            id: `${String(z.id || "zone")}-copy-${Date.now()}`,
+            name: `${String(z.name || "Sector")} (copia)`,
+            polygon: (z.polygon || []).map((p) => [Number(p[0]), Number(p[1])]),
+        };
+        agendaDeliveryZones.push(dup);
+        _renderEnviosZonesList();
+    }
+
+    function enviosZoomZona(index) {
+        if (!enviosMap) return;
+        const z = agendaDeliveryZones[Number(index)];
+        if (!z || !Array.isArray(z.polygon) || z.polygon.length < 3) return;
+        const bounds = L.latLngBounds(z.polygon.map((p) => [Number(p[0]), Number(p[1])]));
+        enviosMap.fitBounds(bounds.pad(0.12));
+    }
+
+    window.enviosEliminarZona = enviosEliminarZona;
+    window.enviosDuplicarZona = enviosDuplicarZona;
+    window.enviosZoomZona = enviosZoomZona;
+
+    function _guardarZonaDesdeDraft() {
+        if (enviosDraftPoints.length < 3) {
+            setMsg("Debes dibujar minimo 3 puntos en el mapa para crear el sector.", "err");
+            return;
+        }
+        const name = String(zonaNombreEl?.value || "").trim();
+        if (!name) {
+            setMsg("Ingresa un nombre para el sector.", "err");
+            return;
+        }
+        const fee = Math.max(0, Math.min(300000, Number(zonaFeeEl?.value || 0) || 0));
+        const priority = Math.max(-999, Math.min(999, Number(zonaPriorityEl?.value || 0) || 0));
+        const color = /^#([0-9a-fA-F]{6})$/.test(String(zonaColorEl?.value || "").trim()) ? String(zonaColorEl.value).trim() : "#2563eb";
+        const active = Boolean(zonaActiveEl?.checked);
+        const zone = {
+            id: `zone-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            name,
+            fee,
+            priority,
+            color,
+            active,
+            polygon: enviosDraftPoints.map((p) => [Number(p[0]), Number(p[1])]),
+        };
+        agendaDeliveryZones.push(zone);
+        enviosDraftPoints = [];
+        _renderEnviosZonesList();
+        setMsg(`Sector '${name}' agregado. Guarda cambios para publicar.`, "ok");
+    }
+
     function getPayload() {
         const payload = {};
         for (const id of fields) {
@@ -1014,6 +1333,7 @@
             if (!el) continue;
             payload[id] = el.type === "checkbox" ? Boolean(el.checked) : String(el.value || "");
         }
+        payload.agenda_delivery_zones = _normalizarZonasEnvioClient(agendaDeliveryZones);
         return payload;
     }
 
@@ -1028,6 +1348,9 @@
                 el.value = String(cfg[id] ?? "");
             }
         }
+        agendaDeliveryZones = _normalizarZonasEnvioClient(cfg.agenda_delivery_zones || []);
+        _renderEnviosZonesList();
+        _fitEnviosMapToData();
         renderPreview();
     }
 
@@ -1383,6 +1706,37 @@
 
     document.getElementById("btn-guardar").addEventListener("click", guardar);
     document.getElementById("btn-recargar").addEventListener("click", cargar);
+    btnGuardarEnviosEl?.addEventListener("click", guardar);
+    btnRecargarEnviosEl?.addEventListener("click", cargar);
+    btnZonaResetDraftEl?.addEventListener("click", () => {
+        enviosDraftPoints = [];
+        _renderEnviosDraft();
+        setMsg("Dibujo temporal limpiado.");
+    });
+    btnZonaSaveEl?.addEventListener("click", _guardarZonaDesdeDraft);
+    btnZonaFitEl?.addEventListener("click", _fitEnviosMapToData);
+    linkPanelEnviosEl?.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        setPanelMode("envios");
+    });
+    linkPanelEditorEl?.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        setPanelMode("editor");
+    });
+    btnIrEnviosEl?.addEventListener("click", () => setPanelMode("envios"));
+    btnVolverEditorEl?.addEventListener("click", () => setPanelMode("editor"));
+    document.getElementById("agenda_delivery_origin_lat")?.addEventListener("change", () => {
+        if (!enviosMap) return;
+        const lat = Number(document.getElementById("agenda_delivery_origin_lat")?.value || DEFAULTS.agenda_delivery_origin_lat || -33.5191105);
+        const lng = Number(document.getElementById("agenda_delivery_origin_lng")?.value || DEFAULTS.agenda_delivery_origin_lng || -70.7849094);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) enviosMap.setView([lat, lng], Math.max(13, enviosMap.getZoom() || 13));
+    });
+    document.getElementById("agenda_delivery_origin_lng")?.addEventListener("change", () => {
+        if (!enviosMap) return;
+        const lat = Number(document.getElementById("agenda_delivery_origin_lat")?.value || DEFAULTS.agenda_delivery_origin_lat || -33.5191105);
+        const lng = Number(document.getElementById("agenda_delivery_origin_lng")?.value || DEFAULTS.agenda_delivery_origin_lng || -70.7849094);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) enviosMap.setView([lat, lng], Math.max(13, enviosMap.getZoom() || 13));
+    });
     document.getElementById("btn-preset-duplicar")?.addEventListener("click", duplicarPresetActual);
     document.getElementById("btn-prog-crear")?.addEventListener("click", crearProgramacion);
     document.getElementById("btn-restaurar").addEventListener("click", () => {
@@ -1413,6 +1767,11 @@
     bindColorPickers();
     bindEmojiPalette();
     bindRichTools();
+    if (window.location.hash === "#panel-envios") {
+        setPanelMode("envios");
+    } else {
+        setPanelMode("editor");
+    }
     cargarPresets();
     cargarProgramaciones();
     cargarVersiones();

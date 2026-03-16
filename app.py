@@ -1167,7 +1167,78 @@ def _obtener_cfg_envios_tienda(cfg_tienda=None):
         "note_text": included_msg,
         "commune_name": "Maipu",
         "time_bands": bands,
+        "zones": _normalizar_agenda_delivery_zones(cfg.get("agenda_delivery_zones")),
     }
+
+
+def _normalizar_agenda_delivery_zones(raw):
+    zonas = []
+    data = raw if isinstance(raw, list) else []
+    for idx, z in enumerate(data[:120]):
+        if not isinstance(z, dict):
+            continue
+        nombre = str(z.get("name") or z.get("nombre") or f"Sector {idx + 1}").strip()[:90]
+        if not nombre:
+            nombre = f"Sector {idx + 1}"
+        zid = str(z.get("id") or f"zone-{idx + 1}").strip().lower()[:60]
+        try:
+            tarifa = int(float(z.get("fee") or z.get("tarifa") or 0))
+        except (TypeError, ValueError):
+            tarifa = 0
+        tarifa = max(0, min(300000, tarifa))
+        try:
+            prioridad = int(float(z.get("priority") or z.get("prioridad") or 0))
+        except (TypeError, ValueError):
+            prioridad = 0
+        prioridad = max(-999, min(999, prioridad))
+        color = str(z.get("color") or "#2563eb").strip()
+        if not re.match(r"^#([0-9a-fA-F]{6})$", color):
+            color = "#2563eb"
+        activo = bool(z.get("active", True))
+        poly_raw = z.get("polygon") if isinstance(z.get("polygon"), list) else []
+        poly = []
+        for p in poly_raw[:200]:
+            lat = lng = None
+            if isinstance(p, (list, tuple)) and len(p) >= 2:
+                lat, lng = p[0], p[1]
+            elif isinstance(p, dict):
+                lat = p.get("lat")
+                lng = p.get("lng")
+            try:
+                latf = float(lat)
+                lngf = float(lng)
+            except (TypeError, ValueError):
+                continue
+            if -90 <= latf <= 90 and -180 <= lngf <= 180:
+                poly.append([latf, lngf])
+        if len(poly) < 3:
+            continue
+        zonas.append(
+            {
+                "id": zid,
+                "name": nombre,
+                "fee": tarifa,
+                "priority": prioridad,
+                "color": color,
+                "active": activo,
+                "polygon": poly,
+            }
+        )
+    return zonas
+
+
+def _buscar_sector_envio(lat, lng, zones):
+    activos = [z for z in (zones or []) if bool(z.get("active", True))]
+    if not activos:
+        return None
+    activos.sort(key=lambda z: (int(z.get("priority") or 0), -int(z.get("fee") or 0)), reverse=True)
+    for z in activos:
+        poly = z.get("polygon") if isinstance(z.get("polygon"), list) else []
+        if len(poly) < 3:
+            continue
+        if _punto_en_poligono(lat, lng, poly):
+            return z
+    return None
 
 
 def _extra_horario_envio(cfg_envios, hora_inicio=None):
@@ -1219,7 +1290,22 @@ def _cotizar_envio_agenda(lat, lng, cfg_tienda=None, hora_inicio=None):
         quote["warning"] = warning_fuera
         return quote
 
-    if distance_km <= 3:
+    fee = None
+    range_label = ""
+    quote["zone_name"] = ""
+    quote["zone_id"] = ""
+    zones = cfg.get("zones") or []
+    if zones:
+        sector = _buscar_sector_envio(lat, lng, zones)
+        if not sector:
+            quote["inside_maipu"] = False
+            quote["warning"] = warning_fuera
+            return quote
+        fee = int(sector.get("fee") or 0)
+        quote["zone_name"] = str(sector.get("name") or "")
+        quote["zone_id"] = str(sector.get("id") or "")
+        range_label = f"Sector: {quote['zone_name']}"
+    elif distance_km <= 3:
         fee = int(cfg["fee_0_3"])
         range_label = "0 a 3 km"
     elif distance_km <= 6:
@@ -1782,6 +1868,7 @@ def _default_tienda_personalizacion():
         "agenda_delivery_band_3_extra": 1800,
         "agenda_delivery_note_text": "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
         "agenda_delivery_outside_warning": "Direccion fuera de Maipu: el valor de despacho no se puede mostrar. Confirma el PIN y realiza la reserva de horario y te contactaremos para cotizarlo internamente.",
+        "agenda_delivery_zones": [],
         "agenda_days_ahead": 14,
         "agenda_hour_start": "09:00",
         "agenda_hour_end": "19:00",
@@ -1971,6 +2058,7 @@ def _normalizar_tienda_personalizacion(payload):
         clean[key_extra] = max(0, min(300000, extra))
     clean["agenda_delivery_note_text"] = str(data.get("agenda_delivery_note_text") or base["agenda_delivery_note_text"]).strip()[:220] or base["agenda_delivery_note_text"]
     clean["agenda_delivery_outside_warning"] = str(data.get("agenda_delivery_outside_warning") or base["agenda_delivery_outside_warning"]).strip()[:260] or base["agenda_delivery_outside_warning"]
+    clean["agenda_delivery_zones"] = _normalizar_agenda_delivery_zones(data.get("agenda_delivery_zones") if data.get("agenda_delivery_zones") is not None else base.get("agenda_delivery_zones"))
     clean["agenda_form_button_text"] = str(data.get("agenda_form_button_text") or base["agenda_form_button_text"]).strip()[:50] or base["agenda_form_button_text"]
     clean["agenda_confirm_title"] = str(data.get("agenda_confirm_title") or base["agenda_confirm_title"]).strip()[:70] or base["agenda_confirm_title"]
     clean["agenda_confirm_warning"] = str(data.get("agenda_confirm_warning") or base["agenda_confirm_warning"]).strip()[:220] or base["agenda_confirm_warning"]
