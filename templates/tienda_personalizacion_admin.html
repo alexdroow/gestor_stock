@@ -1759,8 +1759,9 @@
         }
     }
 
-    async function guardar() {
+    async function guardar(source = "general") {
         setMsg("Guardando cambios...");
+        if (source === "envios") setEnviosStatus("Guardando configuracion de envios...");
         try {
             const res = await fetch(ENDPOINT, {
                 method: "POST",
@@ -1772,14 +1773,21 @@
             fillForm(data.config || {});
             syncColorPickersFromText();
             setMsg("Personalizacion guardada correctamente.", "ok");
+            if (source === "envios") {
+                const hhmm = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+                setEnviosStatus(`Envios guardados correctamente a las ${hhmm}.`, "ok");
+            }
         } catch (err) {
             setMsg(err.message || "Error guardando", "err");
+            if (source === "envios") {
+                setEnviosStatus(`No se pudieron guardar envios: ${err.message || "error desconocido"}.`, "err");
+            }
         }
     }
 
     document.getElementById("btn-guardar").addEventListener("click", guardar);
     document.getElementById("btn-recargar").addEventListener("click", cargar);
-    btnGuardarEnviosEl?.addEventListener("click", guardar);
+    btnGuardarEnviosEl?.addEventListener("click", () => guardar("envios"));
     btnRecargarEnviosEl?.addEventListener("click", cargar);
     btnZonaResetDraftEl?.addEventListener("click", () => {
         enviosDraftPoints = [];
