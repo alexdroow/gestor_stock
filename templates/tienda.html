@@ -3264,10 +3264,8 @@
             _toggleAgendaPastelBuilder();
             if (normalizado === "torta" && agendaCakeCatalog) {
                 _renderAgendaCakeBuilder();
-                _scrollAgendaReservarEnMobile(360);
             } else if (normalizado === "pastel") {
                 _renderAgendaPastelResumen();
-                _scrollAgendaReservarEnMobile(220);
             } else {
                 _renderAgendaCakeSummary();
             }
@@ -4210,7 +4208,6 @@
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar disponibilidad");
                 agendaDias = Array.isArray(data.dias) ? data.dias : [];
                 _renderAgendaDiaHora();
-                if (agendaTipoActual === "torta") _scrollAgendaReservarEnMobile(120);
                 if (!silent) _agendaMsg("Disponibilidad actualizada.", "ok");
             } catch (e) {
                 if (!silent) _agendaMsg(e.message || "Error al cargar disponibilidad", "err");
