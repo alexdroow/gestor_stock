@@ -3034,6 +3034,17 @@
         function _resetAgendaShippingQuote() {
             agendaShippingQuote = null;
             _renderAgendaShippingQuote();
+            _renderAgendaCakeSummary();
+            _renderAgendaPastelResumen();
+        }
+
+        function _agendaShippingFeeResumen() {
+            if (agendaEntregaTipo !== "despacho") return null;
+            const q = agendaShippingQuote || null;
+            if (!q || !q.inside_maipu) return null;
+            const fee = Number(q.shipping_fee || 0);
+            if (!Number.isFinite(fee)) return null;
+            return Math.max(0, fee);
         }
 
         function _updateAgendaDespachoStepState() {
@@ -3081,6 +3092,8 @@
                         : `Despacho estimado: ${money.format(fee)}.`;
                     agendaShippingQuoteEl.classList.add("active");
                 }
+                _renderAgendaCakeSummary();
+                _renderAgendaPastelResumen();
                 return;
             }
             const warning = String(q.warning || tiendaUiCfg.agenda_delivery_outside_warning || TIENDA_UI_DEFAULTS.agenda_delivery_outside_warning || "").trim();
@@ -3088,6 +3101,8 @@
                 agendaShippingWarningEl.textContent = warning;
                 agendaShippingWarningEl.classList.add("active");
             }
+            _renderAgendaCakeSummary();
+            _renderAgendaPastelResumen();
         }
 
         async function _cotizarDespachoAgendaDesdePin() {
@@ -3341,18 +3356,23 @@
         }
 
         function _renderAgendaPastelResumen() {
+            const shippingFee = _agendaShippingFeeResumen();
             if (agendaPastelSummaryListEl) {
                 if (!agendaPastelItems.length) {
                     agendaPastelSummaryListEl.innerHTML = `<li>${esc(String(tiendaUiCfg.agenda_pastel_catalog_empty_text || TIENDA_UI_DEFAULTS.agenda_pastel_catalog_empty_text))}</li>`;
                 } else {
-                    agendaPastelSummaryListEl.innerHTML = agendaPastelItems.map((it) => {
+                    const rows = agendaPastelItems.map((it) => {
                         const subtotal = Number(it.cantidad || 0) * Number(it.precio || 0);
                         return `<li>${esc(it.nombre)} x${Number(it.cantidad || 0)} - ${esc(money.format(subtotal))}</li>`;
-                    }).join("");
+                    });
+                    if (shippingFee !== null) {
+                        rows.push(`<li><strong>Envio:</strong> ${esc(money.format(shippingFee))}</li>`);
+                    }
+                    agendaPastelSummaryListEl.innerHTML = rows.join("");
                 }
             }
             if (agendaPastelSummaryTotalEl) {
-                agendaPastelSummaryTotalEl.textContent = money.format(_pastelTotal());
+                agendaPastelSummaryTotalEl.textContent = money.format(_pastelTotal() + (shippingFee !== null ? shippingFee : 0));
             }
         }
 
@@ -3472,10 +3492,18 @@
                 return;
             }
             const quote = _cakeTotalAndItems();
-            agendaCakeSummaryEl.innerHTML = quote.items.length
-                ? quote.items.map((it) => `<li>${esc(it)}</li>`).join("")
+            const shippingFee = _agendaShippingFeeResumen();
+            const rows = quote.items.length
+                ? quote.items.map((it) => `<li>${esc(it)}</li>`)
+                : [];
+            if (shippingFee !== null) {
+                rows.push(`<li><strong>Envio:</strong> ${esc(money.format(shippingFee))}</li>`);
+            }
+            agendaCakeSummaryEl.innerHTML = rows.length
+                ? rows.join("")
                 : "<li>Selecciona tamano y sabores.</li>";
-            agendaCakeTotalEl.textContent = _isCakePricesVisible() ? money.format(quote.total) : "Total calculado internamente";
+            const totalConEnvio = quote.total + (shippingFee !== null ? shippingFee : 0);
+            agendaCakeTotalEl.textContent = _isCakePricesVisible() ? money.format(totalConEnvio) : "Total calculado internamente";
             if (agendaCakePriceVisibilityEl) {
                 agendaCakePriceVisibilityEl.textContent = _isCakePricesVisible() ? "Precios visibles" : "Precios ocultos para cliente";
             }
