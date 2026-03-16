@@ -81,6 +81,18 @@
             border-radius: 8px;
             background: #fff;
         }
+        .cat-tools {
+            grid-column: 1 / span 4;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-sm {
+            padding: 6px 9px;
+            font-size: .78rem;
+        }
         .cat-opts {
             display: flex;
             flex-wrap: wrap;
@@ -241,6 +253,7 @@ let state = {
     extras: [],
     toppers: [],
 };
+let categoriaPanelAbierto = {};
 
 function setMsg(text, type = "") {
     msgEl.textContent = text || "";
@@ -302,6 +315,8 @@ function rowHtmlCategory(item, idx) {
             </label>
         `).join("");
     };
+    const rowKey = String(item.id || `cat-${idx}`);
+    const abierto = Boolean(categoriaPanelAbierto[rowKey]);
     return `
         <div class="row cat" data-idx="${idx}">
             <label>Nombre categoria<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
@@ -311,7 +326,13 @@ function rowHtmlCategory(item, idx) {
             <label><input data-k="use_category_ingredients" type="checkbox" ${item.use_category_ingredients ? "checked" : ""}> Ingredientes exclusivos</label>
             <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activa</label>
             <button class="btn btn-del" type="button" onclick="removeRow('categorias', ${idx})">X</button>
-            <div class="cat-grid" style="${item.use_category_ingredients ? "" : "opacity:.65;"}">
+            <div class="cat-tools">
+                <button class="btn btn-out btn-sm" type="button" onclick="toggleCategoriaPanel('${esc(rowKey)}')">
+                    ${abierto ? "Ocultar opciones" : "Configurar ingredientes"}
+                </button>
+                <span class="muted">${item.use_category_ingredients ? "Modo exclusivo activo" : "Usa ingredientes generales"}</span>
+            </div>
+            <div class="cat-grid" style="${abierto ? "" : "display:none;"} ${item.use_category_ingredients ? "" : "opacity:.65;"}">
                 <div class="muted"><strong>Ingredientes por categoria</strong> (si se activa, reemplaza lista general).</div>
                 <div><strong>Sabores permitidos</strong></div>
                 <div class="cat-opts">${makeChecks(sabores, "sabores_ids")}</div>
@@ -423,10 +444,24 @@ function bindListInputs(key) {
 
 function removeRow(key, idx) {
     if (!Array.isArray(state[key])) return;
+    if (key === "categorias") {
+        const row = state[key][Number(idx || 0)];
+        const rowKey = String(row?.id || "");
+        if (rowKey && Object.prototype.hasOwnProperty.call(categoriaPanelAbierto, rowKey)) {
+            delete categoriaPanelAbierto[rowKey];
+        }
+    }
     state[key].splice(Number(idx || 0), 1);
     render();
 }
 window.removeRow = removeRow;
+function toggleCategoriaPanel(rowKey) {
+    const key = String(rowKey || "").trim();
+    if (!key) return;
+    categoriaPanelAbierto[key] = !Boolean(categoriaPanelAbierto[key]);
+    render();
+}
+window.toggleCategoriaPanel = toggleCategoriaPanel;
 
 function newItem(base) {
     return { ...base, id: slug(base.nombre || "item") };
