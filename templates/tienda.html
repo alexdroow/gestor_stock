@@ -2139,7 +2139,6 @@
             <div id="agenda-confirmar-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="agenda-confirmar-cancelar">Volver</button>
-                <button class="btn-primary" type="button" id="agenda-confirmar-aceptar">Confirmar y generar orden PDF</button>
                 <button class="btn-primary" type="button" id="agenda-confirmar-aceptar-enviar">Confirmar generar PDF y enviar a Pasteleria Sucree</button>
             </div>
         </div>
@@ -2297,7 +2296,6 @@
         const agendaConfirmWarningEl = document.getElementById("agenda-confirm-warning");
         const agendaConfirmarDetalleEl = document.getElementById("agenda-confirmar-detalle");
         const agendaConfirmarCancelarEl = document.getElementById("agenda-confirmar-cancelar");
-        const agendaConfirmarAceptarEl = document.getElementById("agenda-confirmar-aceptar");
         const agendaConfirmarAceptarEnviarEl = document.getElementById("agenda-confirmar-aceptar-enviar");
         const agendaStatusMsgEl = document.getElementById("agenda-status-msg");
         const agendaBtnReservarEl = document.getElementById("agenda-btn-reservar");
@@ -2583,7 +2581,6 @@
             if (agendaConfirmTitleEl) agendaConfirmTitleEl.textContent = String(tiendaUiCfg.agenda_confirm_title || TIENDA_UI_DEFAULTS.agenda_confirm_title);
             if (agendaConfirmWarningEl) agendaConfirmWarningEl.textContent = String(tiendaUiCfg.agenda_confirm_warning || TIENDA_UI_DEFAULTS.agenda_confirm_warning);
             if (agendaConfirmarCancelarEl) agendaConfirmarCancelarEl.textContent = String(tiendaUiCfg.agenda_confirm_cancel_text || TIENDA_UI_DEFAULTS.agenda_confirm_cancel_text);
-            if (agendaConfirmarAceptarEl) agendaConfirmarAceptarEl.textContent = String(tiendaUiCfg.agenda_confirm_accept_text || TIENDA_UI_DEFAULTS.agenda_confirm_accept_text);
             if (agendaConfirmarAceptarEnviarEl) agendaConfirmarAceptarEnviarEl.textContent = "Confirmar generar PDF y enviar a Pasteleria Sucree";
             _renderAgendaShippingQuote();
 
@@ -5646,7 +5643,6 @@
         agendaConfirmarCancelarEl?.addEventListener("click", () => {
             _cerrarModalAgendaConfirmar();
         });
-        agendaConfirmarAceptarEl?.addEventListener("click", _confirmarReservaAgendaPendiente);
         agendaConfirmarAceptarEnviarEl?.addEventListener("click", () => {
             const waWindow = window.open("about:blank", "_blank");
             _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
