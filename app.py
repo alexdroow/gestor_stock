@@ -1117,8 +1117,17 @@ def _obtener_cfg_envios_tienda(cfg_tienda=None):
             out = float(d)
         return max(float(mn), min(float(mx), out))
 
-    o_lat = _num(cfg.get("agenda_delivery_origin_lat"), -33.510910, -90, 90)
-    o_lng = _num(cfg.get("agenda_delivery_origin_lng"), -70.784909, -180, 180)
+    # Punto base interno de calculo: Rubidio 1815, Maipu, Santiago.
+    base_lat = -33.5191105
+    base_lng = -70.7849094
+    # Coordenada historica previa (menos precisa) para autoajuste.
+    legacy_lat = -33.510910
+    legacy_lng = -70.784909
+    o_lat = _num(cfg.get("agenda_delivery_origin_lat"), base_lat, -90, 90)
+    o_lng = _num(cfg.get("agenda_delivery_origin_lng"), base_lng, -180, 180)
+    # Si aun esta el valor legacy, migrar en caliente al punto exacto.
+    if abs(o_lat - legacy_lat) < 0.00001 and abs(o_lng - legacy_lng) < 0.00001:
+        o_lat, o_lng = base_lat, base_lng
     f_0_3 = int(round(_num(cfg.get("agenda_delivery_fee_0_3"), 2500, 0, 300000)))
     f_3_6 = int(round(_num(cfg.get("agenda_delivery_fee_3_6"), 3500, 0, 300000)))
     f_6_9 = int(round(_num(cfg.get("agenda_delivery_fee_6_9"), 4500, 0, 300000)))
@@ -1751,8 +1760,8 @@ def _default_tienda_personalizacion():
         "agenda_map_search_text": "Buscar",
         "agenda_map_confirm_text": "Confirmar pin",
         "agenda_map_help_text": "Mueve el pin al punto exacto y confirma.",
-        "agenda_delivery_origin_lat": -33.510910,
-        "agenda_delivery_origin_lng": -70.784909,
+        "agenda_delivery_origin_lat": -33.5191105,
+        "agenda_delivery_origin_lng": -70.7849094,
         "agenda_delivery_fee_0_3": 2500,
         "agenda_delivery_fee_3_6": 3500,
         "agenda_delivery_fee_6_9": 4500,
