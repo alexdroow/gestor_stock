@@ -3157,9 +3157,11 @@
         }
 
         function _setAgendaTipo(tipo) {
-            const normalizado = ["torta", "pastel"].includes(String(tipo || "").trim().toLowerCase())
-                ? String(tipo).trim().toLowerCase()
-                : "";
+            const t = String(tipo || "").trim().toLowerCase();
+            const previo = ["torta", "pastel"].includes(String(agendaTipoActual || "").trim().toLowerCase())
+                ? String(agendaTipoActual || "").trim().toLowerCase()
+                : "torta";
+            const normalizado = ["torta", "pastel"].includes(t) ? t : previo;
             agendaTipoActual = normalizado;
             if (agendaTipoEl) agendaTipoEl.value = normalizado;
             if (agendaTipoTortaEl) agendaTipoTortaEl.classList.toggle("active", normalizado === "torta");
@@ -3997,16 +3999,8 @@
             if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
             if (!silent) _agendaMsg("Cargando disponibilidad...");
             try {
-                const tipoSel = String(agendaTipoEl?.value || agendaTipoActual || "").trim().toLowerCase();
-                agendaTipoActual = tipoSel || "";
-                if (!["torta", "pastel"].includes(agendaTipoActual)) {
-                    agendaDias = [];
-                    agendaFechaActiva = "";
-                    agendaHoraActiva = "";
-                    _renderAgendaDiaHora();
-                    if (!silent) _agendaMsg("Selecciona Torta o Pastel para mostrar disponibilidad.", "err");
-                    return;
-                }
+                const tipoSel = String(agendaTipoEl?.value || agendaTipoActual || "torta").trim().toLowerCase();
+                _setAgendaTipo(["torta", "pastel"].includes(tipoSel) ? tipoSel : "torta");
                 let url = `/api/tienda/agenda/disponibilidad?tipo=${encodeURIComponent(agendaTipoActual)}`;
                 if (agendaTipoActual === "torta") {
                     const topperId = String(agendaCakeSelection?.topper_id || "").trim().toLowerCase();
@@ -5598,9 +5592,9 @@
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
         _cargarCatalogoTortaAgenda();
-        _startAgendaPoll();
         _setAgendaPastelMode("catalogo", false);
-        _setAgendaTipo(String(agendaTipoEl?.value || "").trim().toLowerCase());
+        _setAgendaTipo("torta");
+        _startAgendaPoll();
         _setAgendaEntregaTipo("retiro");
         _updateAgendaDespachoStepState();
         _aplicarEscalaMovilDinamica();
