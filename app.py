@@ -1134,7 +1134,7 @@ def _obtener_cfg_envios_tienda(cfg_tienda=None):
     f_9p = int(round(_num(cfg.get("agenda_delivery_fee_9_plus"), 5500, 0, 300000)))
     outside_msg = str(cfg.get("agenda_delivery_outside_warning") or "").strip()[:260]
     if not outside_msg:
-        outside_msg = "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente."
+        outside_msg = "Direccion fuera de Maipu: el valor de despacho no se puede mostrar. Confirma el PIN y realiza la reserva de horario y te contactaremos para cotizarlo internamente."
     included_msg = str(cfg.get("agenda_delivery_note_text") or "").strip()[:220]
     if not included_msg:
         included_msg = "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu."
@@ -1191,6 +1191,8 @@ def _extra_horario_envio(cfg_envios, hora_inicio=None):
 
 def _cotizar_envio_agenda(lat, lng, cfg_tienda=None, hora_inicio=None):
     cfg = _obtener_cfg_envios_tienda(cfg_tienda)
+    max_km_cotizacion = 6.0
+    warning_fuera = "Direccion fuera de Maipu: el valor de despacho no se puede mostrar. Confirma el PIN y realiza la reserva de horario y te contactaremos para cotizarlo internamente."
     inside = _punto_en_poligono(lat, lng, _MAIPU_POLIGONO)
     distance_km = round(_haversine_km(cfg["origin_lat"], cfg["origin_lng"], lat, lng), 2)
     extra_horario = _extra_horario_envio(cfg, hora_inicio=hora_inicio)
@@ -1209,7 +1211,12 @@ def _cotizar_envio_agenda(lat, lng, cfg_tienda=None, hora_inicio=None):
         "commune_name": str(cfg["commune_name"]),
     }
     if not inside:
-        quote["warning"] = str(cfg["outside_warning"])
+        quote["inside_maipu"] = False
+        quote["warning"] = warning_fuera
+        return quote
+    if distance_km > max_km_cotizacion:
+        quote["inside_maipu"] = False
+        quote["warning"] = warning_fuera
         return quote
 
     if distance_km <= 3:
@@ -1218,12 +1225,10 @@ def _cotizar_envio_agenda(lat, lng, cfg_tienda=None, hora_inicio=None):
     elif distance_km <= 6:
         fee = int(cfg["fee_3_6"])
         range_label = "3 a 6 km"
-    elif distance_km <= 9:
-        fee = int(cfg["fee_6_9"])
-        range_label = "6 a 9 km"
     else:
-        fee = int(cfg["fee_9_plus"])
-        range_label = "9+ km"
+        quote["inside_maipu"] = False
+        quote["warning"] = warning_fuera
+        return quote
 
     fee_base = int(max(0, fee))
     fee_extra = int(max(0, extra_horario.get("extra") or 0))
@@ -1776,7 +1781,7 @@ def _default_tienda_personalizacion():
         "agenda_delivery_band_3_end": "20:00",
         "agenda_delivery_band_3_extra": 1800,
         "agenda_delivery_note_text": "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
-        "agenda_delivery_outside_warning": "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente.",
+        "agenda_delivery_outside_warning": "Direccion fuera de Maipu: el valor de despacho no se puede mostrar. Confirma el PIN y realiza la reserva de horario y te contactaremos para cotizarlo internamente.",
         "agenda_days_ahead": 14,
         "agenda_hour_start": "09:00",
         "agenda_hour_end": "19:00",
