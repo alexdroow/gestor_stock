@@ -463,6 +463,46 @@
             font-size: .8rem;
             padding: 8px;
         }
+        .agenda-mobile-steps {
+            display: none;
+            gap: 8px;
+            margin: 8px 0 10px;
+        }
+        .agenda-mobile-step-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: .8rem;
+            font-weight: 800;
+            background: #fff;
+            color: #475569;
+            cursor: pointer;
+        }
+        .agenda-mobile-step-btn.active {
+            border-color: #2563eb;
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+        .agenda-mobile-step-btn.done {
+            border-color: #16a34a;
+            background: #f0fdf4;
+            color: #166534;
+        }
+        .agenda-mobile-step-btn.locked {
+            opacity: .55;
+        }
+        .agenda-subtitle-toggle {
+            display: none;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: .82rem;
+            font-weight: 800;
+            color: #334155;
+            background: #fff;
+            margin-top: 7px;
+            cursor: pointer;
+        }
         .agenda-pastel-wrap {
             border: 1px solid #dbe4ef;
             border-radius: 12px;
@@ -1427,6 +1467,52 @@
         body.mobile-ui .agenda-cake-cart ul {
             max-height: 300px;
         }
+        body.mobile-ui .agenda-mobile-steps {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        body.mobile-ui .agenda-mobile-step-btn {
+            font-size: .93rem;
+            padding: 10px 11px;
+        }
+        body.mobile-ui .agenda-subtitle {
+            font-size: 1rem;
+            line-height: 1.45;
+            max-height: 52px;
+            overflow: hidden;
+            position: relative;
+        }
+        body.mobile-ui .agenda-subtitle.expanded {
+            max-height: none;
+        }
+        body.mobile-ui .agenda-subtitle-toggle {
+            display: inline-flex;
+            align-items: center;
+        }
+        body.mobile-ui .agenda-type-label,
+        body.mobile-ui .agenda-type-btn,
+        body.mobile-ui .agenda-day-btn,
+        body.mobile-ui .agenda-hour-btn,
+        body.mobile-ui .agenda-delivery-btn,
+        body.mobile-ui #agenda-btn-reservar {
+            font-size: 1rem;
+        }
+        body.mobile-ui .agenda-day-btn,
+        body.mobile-ui .agenda-hour-btn {
+            min-height: 56px;
+        }
+        body.mobile-ui .agenda-cake-builder,
+        body.mobile-ui .agenda-cake-cart,
+        body.mobile-ui .agenda-pastel-wrap,
+        body.mobile-ui #agenda-reserva-form {
+            border-radius: 14px;
+        }
+        body.mobile-ui .agenda-cake-builder label,
+        body.mobile-ui .agenda-cake-builder div,
+        body.mobile-ui #agenda-reserva-form input,
+        body.mobile-ui #agenda-reserva-form textarea {
+            font-size: .98rem;
+        }
         body.mobile-ui .agenda-cake-cat-groups {
             flex-wrap: nowrap;
             overflow-x: auto;
@@ -1935,6 +2021,13 @@
                 </div>
                 <h2 id="agenda-section-title">Agenda tu pedido</h2>
                 <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
+                <button type="button" class="agenda-subtitle-toggle" id="agenda-subtitle-toggle">Ver detalles</button>
+                <div class="agenda-mobile-steps" id="agenda-mobile-steps">
+                    <button type="button" class="agenda-mobile-step-btn" data-step="1">1. Tipo</button>
+                    <button type="button" class="agenda-mobile-step-btn" data-step="2">2. Pedido</button>
+                    <button type="button" class="agenda-mobile-step-btn" data-step="3">3. Fecha y hora</button>
+                    <button type="button" class="agenda-mobile-step-btn" data-step="4">4. Datos</button>
+                </div>
                 <div class="agenda-cake-wrap" id="agenda-cake-wrap" style="display:none;">
                     <div class="agenda-cake-builder">
                         <div class="agenda-cake-head">
@@ -2306,6 +2399,9 @@
         const agendaTipoEl = document.getElementById("agenda-tipo");
         const agendaTipoTortaEl = document.getElementById("agenda-tipo-torta");
         const agendaTipoPastelEl = document.getElementById("agenda-tipo-pastel");
+        const agendaSubtitleEl = document.getElementById("agenda-section-subtitle");
+        const agendaSubtitleToggleEl = document.getElementById("agenda-subtitle-toggle");
+        const agendaMobileStepsEl = document.getElementById("agenda-mobile-steps");
         const agendaCakeWrapEl = document.getElementById("agenda-cake-wrap");
         const agendaPastelWrapEl = document.getElementById("agenda-pastel-wrap");
         const agendaPastelCatalogTitleEl = document.getElementById("agenda-pastel-catalog-title");
@@ -2366,6 +2462,7 @@
         const agendaConfirmarAceptarEnviarEl = document.getElementById("agenda-confirmar-aceptar-enviar");
         const agendaStatusMsgEl = document.getElementById("agenda-status-msg");
         const agendaBtnReservarEl = document.getElementById("agenda-btn-reservar");
+        const agendaReservaFormEl = document.getElementById("agenda-reserva-form");
 
         let productos = [];
         let categoriasDisponibles = [];
@@ -2403,6 +2500,8 @@
         let agendaPastelMode = "catalogo";
         let agendaPastelItems = [];
         let agendaCakeCategoriaActiva = "";
+        let agendaMobileStep = 1;
+        let agendaSubtitleExpanded = false;
         let agendaCakeCategoryGroup = "all";
         let agendaCakeCategorySearch = "";
         let agendaCakeCategoryExpanded = false;
@@ -3250,6 +3349,86 @@
             });
         }
 
+        function _agendaIsMobileWizardEnabled() {
+            return document.body.classList.contains("mobile-ui") && categoriaActiva === "AGENDA";
+        }
+
+        function _agendaPaso2Completo() {
+            const tipo = String(agendaTipoActual || "").trim().toLowerCase();
+            if (tipo === "torta") {
+                return Boolean(String(agendaCakeSelection?.size_id || "").trim()) && Array.isArray(agendaCakeSelection?.sabor_ids) && agendaCakeSelection.sabor_ids.length > 0;
+            }
+            if (tipo === "pastel") {
+                if (String(agendaPastelMode || "catalogo") === "especial") {
+                    return String(agendaPastelEspecialDetalleEl?.value || "").trim().length >= 8;
+                }
+                return Array.isArray(agendaPastelItems) && agendaPastelItems.length > 0;
+            }
+            return false;
+        }
+
+        function _agendaPaso3Completo() {
+            return Boolean(String(agendaFechaActiva || "").trim()) && Boolean(String(agendaHoraActiva || "").trim());
+        }
+
+        function _agendaStepMaxUnlocked() {
+            let max = 1;
+            if (["torta", "pastel"].includes(String(agendaTipoActual || "").trim().toLowerCase())) max = 2;
+            if (_agendaPaso2Completo()) max = 3;
+            if (_agendaPaso3Completo()) max = 4;
+            return max;
+        }
+
+        function _agendaApplyMobileWizard(autoAdvance = false) {
+            if (!_agendaIsMobileWizardEnabled()) {
+                if (agendaMobileStepsEl) agendaMobileStepsEl.style.display = "none";
+                if (agendaSubtitleToggleEl) agendaSubtitleToggleEl.style.display = "none";
+                if (agendaSubtitleEl) agendaSubtitleEl.classList.remove("expanded");
+                if (agendaDaysListEl) agendaDaysListEl.style.display = "";
+                if (agendaHoursListEl) agendaHoursListEl.style.display = "";
+                if (agendaReservaFormEl) agendaReservaFormEl.style.display = "";
+                _toggleAgendaCakeBuilder();
+                _toggleAgendaPastelBuilder();
+                return;
+            }
+            if (agendaMobileStepsEl) agendaMobileStepsEl.style.display = "";
+            if (agendaSubtitleEl && agendaSubtitleToggleEl) {
+                const txt = String(agendaSubtitleEl.textContent || "").trim();
+                const longText = txt.length > 150;
+                agendaSubtitleToggleEl.style.display = longText ? "inline-flex" : "none";
+                if (!longText) agendaSubtitleExpanded = false;
+                agendaSubtitleEl.classList.toggle("expanded", Boolean(agendaSubtitleExpanded));
+                agendaSubtitleToggleEl.textContent = agendaSubtitleExpanded ? "Ocultar detalles" : "Ver detalles";
+            }
+            const maxUnlocked = _agendaStepMaxUnlocked();
+            if (autoAdvance) agendaMobileStep = Math.min(4, Math.max(1, maxUnlocked));
+            if (agendaMobileStep > maxUnlocked) agendaMobileStep = maxUnlocked;
+            if (agendaMobileStep < 1) agendaMobileStep = 1;
+
+            const showStep2 = agendaMobileStep >= 2;
+            const showStep3 = agendaMobileStep >= 3;
+            const showStep4 = agendaMobileStep >= 4;
+
+            if (!showStep2) {
+                if (agendaCakeWrapEl) agendaCakeWrapEl.style.display = "none";
+                if (agendaPastelWrapEl) agendaPastelWrapEl.style.display = "none";
+            } else {
+                _toggleAgendaCakeBuilder();
+                _toggleAgendaPastelBuilder();
+            }
+            if (agendaDaysListEl) agendaDaysListEl.style.display = showStep3 ? "" : "none";
+            if (agendaHoursListEl) agendaHoursListEl.style.display = showStep3 ? "" : "none";
+            if (agendaReservaFormEl) agendaReservaFormEl.style.display = showStep4 ? "" : "none";
+
+            agendaMobileStepsEl?.querySelectorAll("[data-step]").forEach((btn) => {
+                const step = Number(btn.getAttribute("data-step") || 1);
+                btn.classList.remove("active", "done", "locked");
+                if (step === agendaMobileStep) btn.classList.add("active");
+                else if (step < agendaMobileStep) btn.classList.add("done");
+                if (step > maxUnlocked) btn.classList.add("locked");
+            });
+        }
+
         function _setAgendaTipo(tipo) {
             const t = String(tipo || "").trim().toLowerCase();
             const previo = ["torta", "pastel"].includes(String(agendaTipoActual || "").trim().toLowerCase())
@@ -3269,6 +3448,7 @@
             } else {
                 _renderAgendaCakeSummary();
             }
+            _agendaApplyMobileWizard(true);
             _actualizarDebugCatalogo("seleccion");
         }
 
@@ -3490,6 +3670,7 @@
             if (agendaPastelSummaryTotalEl) {
                 agendaPastelSummaryTotalEl.textContent = money.format(_pastelTotal() + (shippingFee !== null ? shippingFee : 0));
             }
+            _agendaApplyMobileWizard(true);
         }
 
         function _renderAgendaPastelCatalogoModal() {
@@ -3964,6 +4145,7 @@
                     agendaCakeDebugEl.textContent = `Error render: ${String(err?.message || err || "desconocido")}`;
                 }
             }
+            _agendaApplyMobileWizard(true);
         }
 
         function agendaCakeSelectCategory(catId) {
@@ -4182,6 +4364,7 @@
                 `;
             }).join("");
             _updateAgendaDespachoStepState();
+            _agendaApplyMobileWizard(true);
         }
 
         async function cargarAgendaDisponibilidad(silent = false) {
@@ -4722,12 +4905,14 @@
             agendaHoraActiva = "";
             _resetAgendaShippingQuote();
             _renderAgendaDiaHora();
+            _agendaApplyMobileWizard(true);
         }
 
         function seleccionarAgendaHora(hora) {
             agendaHoraActiva = String(hora || "");
             _resetAgendaShippingQuote();
             _renderAgendaDiaHora();
+            _agendaApplyMobileWizard(true);
         }
 
         function agendaCakeToggleFlavor(flavorId) {
@@ -4809,6 +4994,7 @@
                 if (agendaEntregaTipo === "despacho") {
                     setTimeout(() => _initAgendaMap(), 50);
                 }
+                _agendaApplyMobileWizard(false);
                 return;
             }
             agendaPastelCerrarCatalogo();
@@ -4986,12 +5172,14 @@
             categoriaActiva = cat;
             localStorage.setItem(CAT_STORAGE_KEY, categoriaActiva);
             if (categoriaActiva === "AGENDA") {
+                agendaMobileStep = 1;
                 _syncCatalogoTortaDesdeProductos();
                 _cargarCatalogoTortaAgenda();
                 cargarAgendaDisponibilidad(true);
             }
             renderCategoriasMenu();
             renderSecciones();
+            _agendaApplyMobileWizard(false);
         }
 
         async function cargarProductos() {
@@ -5735,6 +5923,19 @@
             agendaHoraActiva = "";
             cargarAgendaDisponibilidad(true);
         });
+        agendaMobileStepsEl?.querySelectorAll("[data-step]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const req = Number(btn.getAttribute("data-step") || 1);
+                const maxUnlocked = _agendaStepMaxUnlocked();
+                agendaMobileStep = Math.max(1, Math.min(maxUnlocked, req));
+                _agendaApplyMobileWizard(false);
+            });
+        });
+        agendaSubtitleToggleEl?.addEventListener("click", () => {
+            agendaSubtitleExpanded = !agendaSubtitleExpanded;
+            if (agendaSubtitleEl) agendaSubtitleEl.classList.toggle("expanded", agendaSubtitleExpanded);
+            if (agendaSubtitleToggleEl) agendaSubtitleToggleEl.textContent = agendaSubtitleExpanded ? "Ocultar detalles" : "Ver detalles";
+        });
         agendaPastelOpenCatalogEl?.addEventListener("click", agendaPastelAbrirCatalogo);
         agendaPastelModeCatalogEl?.addEventListener("click", () => {
             _setAgendaPastelMode("catalogo", true);
@@ -5834,6 +6035,7 @@
         _startAgendaPoll();
         _setAgendaEntregaTipo("retiro");
         _updateAgendaDespachoStepState();
+        _agendaApplyMobileWizard(false);
         _aplicarEscalaMovilDinamica();
         renderCart();
         cargarProductos();
