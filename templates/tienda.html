@@ -176,6 +176,12 @@
             font-size: .92rem;
             margin-top: -2px;
         }
+        .agenda-mini-title {
+            font-size: .9rem;
+            font-weight: 800;
+            color: #334155;
+            margin-bottom: 6px;
+        }
         .agenda-type-bar {
             display: grid;
             gap: 7px;
@@ -1476,9 +1482,9 @@
             padding: 10px 11px;
         }
         body.mobile-ui .agenda-subtitle {
-            font-size: 1rem;
-            line-height: 1.45;
-            max-height: 52px;
+            font-size: 1.05rem;
+            line-height: 1.4;
+            max-height: 26px;
             overflow: hidden;
             position: relative;
         }
@@ -1495,7 +1501,7 @@
         body.mobile-ui .agenda-hour-btn,
         body.mobile-ui .agenda-delivery-btn,
         body.mobile-ui #agenda-btn-reservar {
-            font-size: 1rem;
+            font-size: 1.05rem;
         }
         body.mobile-ui .agenda-day-btn,
         body.mobile-ui .agenda-hour-btn {
@@ -1511,7 +1517,21 @@
         body.mobile-ui .agenda-cake-builder div,
         body.mobile-ui #agenda-reserva-form input,
         body.mobile-ui #agenda-reserva-form textarea {
-            font-size: .98rem;
+            font-size: 1.04rem;
+        }
+        body.mobile-ui #sec-agenda-reservas input,
+        body.mobile-ui #sec-agenda-reservas select,
+        body.mobile-ui #sec-agenda-reservas textarea,
+        body.mobile-ui #sec-agenda-reservas button {
+            font-size: 1.02rem !important;
+        }
+        body.mobile-ui #sec-agenda-reservas .agenda-cake-head span:first-child,
+        body.mobile-ui #sec-agenda-reservas .agenda-pastel-title,
+        body.mobile-ui #sec-agenda-reservas .agenda-mini-title {
+            font-size: 1.12rem !important;
+        }
+        body.mobile-ui #sec-agenda-reservas[data-mobile-step="2"] .agenda-cake-cart {
+            display: none;
         }
         body.mobile-ui .agenda-cake-cat-groups {
             flex-wrap: nowrap;
@@ -2046,11 +2066,11 @@
                         <label>Tamano</label>
                         <div class="agenda-cake-pills" id="agenda-cake-size-cards"></div>
                         <div>
-                            <div style="font-size:.82rem;font-weight:800;color:#334155;margin-bottom:4px;">Sabores (maximo segun tamano)</div>
+                            <div class="agenda-mini-title">Sabores (maximo segun tamano)</div>
                             <div class="agenda-cake-list" id="agenda-cake-flavors"></div>
                         </div>
                         <div>
-                            <div style="font-size:.82rem;font-weight:800;color:#334155;margin-bottom:4px;">Extras</div>
+                            <div class="agenda-mini-title">Extras</div>
                             <div class="agenda-cake-list" id="agenda-cake-extras"></div>
                         </div>
                         <label>Topper</label>
@@ -2083,7 +2103,7 @@
                     </div>
                     <div id="agenda-pastel-catalogo-block">
                         <div class="agenda-pastel-summary">
-                            <div style="font-size:.82rem;color:#64748b;margin-bottom:6px;">Carrito de pasteles para la fecha seleccionada</div>
+                            <div class="agenda-mini-title" style="color:#64748b;">Carrito de pasteles para la fecha seleccionada</div>
                             <ul id="agenda-pastel-summary-list"></ul>
                             <div style="margin-top:6px;font-size:.9rem;font-weight:800;color:#0f172a;">Total estimado: <span id="agenda-pastel-summary-total">$0</span></div>
                         </div>
@@ -3384,6 +3404,7 @@
                 if (agendaMobileStepsEl) agendaMobileStepsEl.style.display = "none";
                 if (agendaSubtitleToggleEl) agendaSubtitleToggleEl.style.display = "none";
                 if (agendaSubtitleEl) agendaSubtitleEl.classList.remove("expanded");
+                if (secAgendaReservasEl) secAgendaReservasEl.removeAttribute("data-mobile-step");
                 if (agendaDaysListEl) agendaDaysListEl.style.display = "";
                 if (agendaHoursListEl) agendaHoursListEl.style.display = "";
                 if (agendaReservaFormEl) agendaReservaFormEl.style.display = "";
@@ -3401,13 +3422,14 @@
                 agendaSubtitleToggleEl.textContent = agendaSubtitleExpanded ? "Ocultar detalles" : "Ver detalles";
             }
             const maxUnlocked = _agendaStepMaxUnlocked();
-            if (autoAdvance) agendaMobileStep = Math.min(4, Math.max(1, maxUnlocked));
+            // El avance principal se controla por acciones del usuario (pasos/taps),
+            // para evitar que en movil aparezca todo de una vez.
             if (agendaMobileStep > maxUnlocked) agendaMobileStep = maxUnlocked;
             if (agendaMobileStep < 1) agendaMobileStep = 1;
 
-            const showStep2 = agendaMobileStep >= 2;
-            const showStep3 = agendaMobileStep >= 3;
-            const showStep4 = agendaMobileStep >= 4;
+            const showStep2 = agendaMobileStep === 2;
+            const showStep3 = agendaMobileStep === 3;
+            const showStep4 = agendaMobileStep === 4;
 
             if (!showStep2) {
                 if (agendaCakeWrapEl) agendaCakeWrapEl.style.display = "none";
@@ -3419,6 +3441,7 @@
             if (agendaDaysListEl) agendaDaysListEl.style.display = showStep3 ? "" : "none";
             if (agendaHoursListEl) agendaHoursListEl.style.display = showStep3 ? "" : "none";
             if (agendaReservaFormEl) agendaReservaFormEl.style.display = showStep4 ? "" : "none";
+            if (secAgendaReservasEl) secAgendaReservasEl.setAttribute("data-mobile-step", String(agendaMobileStep));
 
             agendaMobileStepsEl?.querySelectorAll("[data-step]").forEach((btn) => {
                 const step = Number(btn.getAttribute("data-step") || 1);
@@ -3447,6 +3470,9 @@
                 _renderAgendaPastelResumen();
             } else {
                 _renderAgendaCakeSummary();
+            }
+            if (_agendaIsMobileWizardEnabled() && agendaMobileStep < 2) {
+                agendaMobileStep = 2;
             }
             _agendaApplyMobileWizard(true);
             _actualizarDebugCatalogo("seleccion");
@@ -3649,6 +3675,9 @@
             if (refreshAgenda && agendaTipoActual === "pastel") {
                 cargarAgendaDisponibilidad(true);
             }
+            if (_agendaIsMobileWizardEnabled() && agendaMobileStep < 2) {
+                agendaMobileStep = 2;
+            }
         }
 
         function _renderAgendaPastelResumen() {
@@ -3732,6 +3761,7 @@
                 });
             }
             agendaPastelItems = rows;
+            if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaPastelResumen();
             _renderAgendaPastelCatalogoModal();
         }
@@ -4165,6 +4195,7 @@
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
             const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
             agendaCakeSelection.sabor_ids = (agendaCakeSelection.sabor_ids || []).slice(0, maxSabores);
+            if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
         }
 
@@ -4904,6 +4935,7 @@
             agendaFechaActiva = String(fecha || "");
             agendaHoraActiva = "";
             _resetAgendaShippingQuote();
+            if (_agendaIsMobileWizardEnabled()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaDiaHora();
             _agendaApplyMobileWizard(true);
         }
@@ -4911,6 +4943,7 @@
         function seleccionarAgendaHora(hora) {
             agendaHoraActiva = String(hora || "");
             _resetAgendaShippingQuote();
+            if (_agendaIsMobileWizardEnabled()) agendaMobileStep = Math.max(agendaMobileStep, 4);
             _renderAgendaDiaHora();
             _agendaApplyMobileWizard(true);
         }
@@ -4931,6 +4964,7 @@
                 }
                 agendaCakeSelection.sabor_ids = [...current, sid];
             }
+            if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
         }
 
@@ -4953,6 +4987,7 @@
             }
             const maxItems = Math.max(1, Number(agendaCakeCatalog?.max_extra_items || 8));
             agendaCakeSelection.extra_items = rows.slice(0, maxItems);
+            if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
         }
 
@@ -5942,6 +5977,12 @@
         });
         agendaPastelModeEspecialEl?.addEventListener("click", () => {
             _setAgendaPastelMode("especial", true);
+        });
+        agendaPastelEspecialDetalleEl?.addEventListener("input", () => {
+            if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) {
+                agendaMobileStep = Math.max(agendaMobileStep, 3);
+            }
+            _agendaApplyMobileWizard(false);
         });
         agendaPastelModalCerrarEl?.addEventListener("click", agendaPastelCerrarCatalogo);
         modalAgendaPastelCatalogoEl?.addEventListener("click", (ev) => {
