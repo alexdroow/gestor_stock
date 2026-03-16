@@ -1096,6 +1096,7 @@
     let enviosDraftPoints = [];
     let enviosDraftLayer = null;
     let enviosZonesLayer = null;
+    let enviosEditZoneIndex = null;
 
     function setMsg(text, type) {
         msgEl.textContent = text || "";
@@ -1267,6 +1268,7 @@
                     <div style="font-size:.84rem;color:#334155;">Tarifa: <strong>$${fee}</strong> · Prioridad: <strong>${prio}</strong> · Puntos: <strong>${pts}</strong></div>
                     <div class="item-actions">
                         <button type="button" class="btn-outline" onclick="enviosZoomZona(${idx})">Ver</button>
+                        <button type="button" class="btn-outline" onclick="enviosEditarZona(${idx})">Editar</button>
                         <button type="button" class="btn-outline" onclick="enviosDuplicarZona(${idx})">Duplicar</button>
                         <button type="button" class="btn-outline" onclick="enviosEliminarZona(${idx})">Eliminar</button>
                     </div>
@@ -1301,6 +1303,12 @@
         const idx = Number(index);
         if (!Number.isFinite(idx) || idx < 0 || idx >= agendaDeliveryZones.length) return;
         agendaDeliveryZones.splice(idx, 1);
+        if (enviosEditZoneIndex === idx) {
+            enviosEditZoneIndex = null;
+            if (btnZonaSaveEl) btnZonaSaveEl.textContent = "Guardar sector dibujado";
+        } else if (Number.isFinite(enviosEditZoneIndex) && enviosEditZoneIndex > idx) {
+            enviosEditZoneIndex -= 1;
+        }
         _renderEnviosZonesList();
     }
 
@@ -1326,9 +1334,27 @@
         enviosMap.fitBounds(bounds.pad(0.12));
     }
 
+    function enviosEditarZona(index) {
+        const idx = Number(index);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= agendaDeliveryZones.length) return;
+        const z = agendaDeliveryZones[idx];
+        enviosEditZoneIndex = idx;
+        if (zonaNombreEl) zonaNombreEl.value = String(z.name || "");
+        if (zonaFeeEl) zonaFeeEl.value = String(Number(z.fee || 0));
+        if (zonaPriorityEl) zonaPriorityEl.value = String(Number(z.priority || 0));
+        if (zonaColorEl) zonaColorEl.value = String(z.color || "#2563eb");
+        if (zonaActiveEl) zonaActiveEl.checked = z.active !== false;
+        enviosDraftPoints = (Array.isArray(z.polygon) ? z.polygon : []).map((p) => [Number(p[0]), Number(p[1])]);
+        if (btnZonaSaveEl) btnZonaSaveEl.textContent = "Guardar cambios del sector";
+        _renderEnviosDraft();
+        _fitEnviosMapToData();
+        setEnviosStatus(`Editando sector '${String(z.name || `#${idx + 1}`)}'. Ajusta datos/poligono y guarda cambios del sector.`, "ok");
+    }
+
     window.enviosEliminarZona = enviosEliminarZona;
     window.enviosDuplicarZona = enviosDuplicarZona;
     window.enviosZoomZona = enviosZoomZona;
+    window.enviosEditarZona = enviosEditarZona;
 
     function _guardarZonaDesdeDraft() {
         if (enviosDraftPoints.length < 3) {
@@ -1355,11 +1381,21 @@
             active,
             polygon: enviosDraftPoints.map((p) => [Number(p[0]), Number(p[1])]),
         };
-        agendaDeliveryZones.push(zone);
+        if (Number.isFinite(enviosEditZoneIndex) && enviosEditZoneIndex >= 0 && enviosEditZoneIndex < agendaDeliveryZones.length) {
+            zone.id = String(agendaDeliveryZones[enviosEditZoneIndex].id || zone.id);
+            agendaDeliveryZones[enviosEditZoneIndex] = zone;
+            setMsg(`Sector '${name}' actualizado. Guarda envios para publicar.`, "ok");
+            setEnviosStatus(`Sector '${name}' actualizado en la lista. Presiona 'Guardar envios' para persistir.`, "ok");
+        } else {
+            agendaDeliveryZones.push(zone);
+            setMsg(`Sector '${name}' agregado. Guarda cambios para publicar.`, "ok");
+            setEnviosStatus(`Sector '${name}' agregado a la lista. Ahora presiona 'Guardar envios' para dejarlo persistente.`, "ok");
+        }
+        enviosEditZoneIndex = null;
+        if (btnZonaSaveEl) btnZonaSaveEl.textContent = "Guardar sector dibujado";
         enviosDraftPoints = [];
         _renderEnviosZonesList();
-        setMsg(`Sector '${name}' agregado. Guarda cambios para publicar.`, "ok");
-        setEnviosStatus(`Sector '${name}' agregado a la lista. Ahora presiona 'Guardar envios' para dejarlo persistente.`, "ok");
+        if (zonaNombreEl) zonaNombreEl.value = "";
     }
 
     function getPayload() {
@@ -1747,6 +1783,8 @@
     btnRecargarEnviosEl?.addEventListener("click", cargar);
     btnZonaResetDraftEl?.addEventListener("click", () => {
         enviosDraftPoints = [];
+        enviosEditZoneIndex = null;
+        if (btnZonaSaveEl) btnZonaSaveEl.textContent = "Guardar sector dibujado";
         _renderEnviosDraft();
         setMsg("Dibujo temporal limpiado.");
         setEnviosStatus("Dibujo limpiado. Vuelve a marcar el poligono (minimo 3 puntos).");
