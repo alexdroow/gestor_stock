@@ -1470,19 +1470,31 @@ def _topper_requiere_96h(topper_id=None, topper_nombre=None):
     return True
 
 
-def _minutos_anticipacion_reserva(tipo, topper_requiere_96h=False, pastel_fuera_lista=False):
+def _minutos_anticipacion_reserva(tipo, topper_requiere_96h=False, pastel_fuera_lista=False, min_horas_categoria=None):
     t = _normalizar_tipo_reserva_tienda(tipo)
     if t == "torta":
-        if bool(topper_requiere_96h):
-            return 96 * 60
-        return 48 * 60
+        base_min = 96 * 60 if bool(topper_requiere_96h) else 48 * 60
+        try:
+            cat_min = int(float(min_horas_categoria or 0))
+        except (TypeError, ValueError):
+            cat_min = 0
+        if cat_min > 0:
+            base_min = max(base_min, cat_min * 60)
+        return base_min
     if t == "pastel" and bool(pastel_fuera_lista):
         return 36 * 60
     # Pastel: 24h.
     return 24 * 60
 
 
-def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None, topper_requiere_96h=False, pastel_fuera_lista=False):
+def _min_datetime_anticipacion_reserva(
+    tipo,
+    cfg_agenda=None,
+    now_local=None,
+    topper_requiere_96h=False,
+    pastel_fuera_lista=False,
+    min_horas_categoria=None,
+):
     tz = ZoneInfo("America/Santiago")
     now_dt = now_local or datetime.now(tz)
     t = _normalizar_tipo_reserva_tienda(tipo)
@@ -1494,6 +1506,7 @@ def _min_datetime_anticipacion_reserva(tipo, cfg_agenda=None, now_local=None, to
             t,
             topper_requiere_96h=topper_requiere_96h,
             pastel_fuera_lista=pastel_fuera_lista,
+            min_horas_categoria=min_horas_categoria,
         )
     )
 
@@ -1506,6 +1519,7 @@ def _cumple_anticipacion_reserva(
     now_local=None,
     topper_requiere_96h=False,
     pastel_fuera_lista=False,
+    min_horas_categoria=None,
 ):
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fecha_iso or "").strip()):
         return False
@@ -1520,6 +1534,7 @@ def _cumple_anticipacion_reserva(
         now_local=now_dt,
         topper_requiere_96h=topper_requiere_96h,
         pastel_fuera_lista=pastel_fuera_lista,
+        min_horas_categoria=min_horas_categoria,
     )
     return slot_dt >= minimo_dt
 
@@ -1828,8 +1843,26 @@ def _default_tienda_personalizacion():
         "max_extra_items": 8,
         "max_reference_images": 3,
         "categorias": [
-            {"id": "bizcocho", "nombre": "Tortas Bizcocho", "activo": True},
-            {"id": "panqueque", "nombre": "Tortas Panqueque", "activo": True},
+            {
+                "id": "bizcocho",
+                "nombre": "Tortas Bizcocho",
+                "activo": True,
+                "min_lead_hours": 48,
+                "use_category_ingredients": False,
+                "sabores_ids": [],
+                "extras_ids": [],
+                "toppers_ids": [],
+            },
+            {
+                "id": "panqueque",
+                "nombre": "Tortas Panqueque",
+                "activo": True,
+                "min_lead_hours": 48,
+                "use_category_ingredients": False,
+                "sabores_ids": [],
+                "extras_ids": [],
+                "toppers_ids": [],
+            },
         ],
         "sizes": [
             {"id": "torta-15-bizcocho", "categoria_id": "bizcocho", "nombre": "15 personas (Bizcocho)", "precio": 25990, "max_sabores": 3, "activo": True},
@@ -2233,7 +2266,39 @@ def _normalizar_catalogo_torta_cfg(raw):
         cat = dict(item or {})
         cid = re.sub(r"[^a-z0-9\-]+", "-", str(cat.get("id") or "").strip().lower()).strip("-")[:60] or _slug_simple(cat.get("nombre") or "categoria")
         nombre = str(cat.get("nombre") or "").strip()[:80] or "Categoria"
-        out["categorias"].append({"id": cid, "nombre": nombre, "activo": bool(cat.get("activo", True))})
+        try:
+            min_lead_hours = int(cat.get("min_lead_hours") if cat.get("min_lead_hours") is not None else 48)
+        except (TypeError, ValueError):
+            min_lead_hours = 48
+        min_lead_hours = max(1, min(336, min_lead_hours))
+        use_category_ingredients = bool(cat.get("use_category_ingredients", False))
+        sabores_ids = [
+            re.sub(r"[^a-z0-9\-]+", "-", str(x or "").strip().lower()).strip("-")[:60]
+            for x in (cat.get("sabores_ids") if isinstance(cat.get("sabores_ids"), list) else [])
+            if str(x or "").strip()
+        ]
+        extras_ids = [
+            re.sub(r"[^a-z0-9\-]+", "-", str(x or "").strip().lower()).strip("-")[:60]
+            for x in (cat.get("extras_ids") if isinstance(cat.get("extras_ids"), list) else [])
+            if str(x or "").strip()
+        ]
+        toppers_ids = [
+            re.sub(r"[^a-z0-9\-]+", "-", str(x or "").strip().lower()).strip("-")[:60]
+            for x in (cat.get("toppers_ids") if isinstance(cat.get("toppers_ids"), list) else [])
+            if str(x or "").strip()
+        ]
+        out["categorias"].append(
+            {
+                "id": cid,
+                "nombre": nombre,
+                "activo": bool(cat.get("activo", True)),
+                "min_lead_hours": min_lead_hours,
+                "use_category_ingredients": use_category_ingredients,
+                "sabores_ids": list(dict.fromkeys(sabores_ids)),
+                "extras_ids": list(dict.fromkeys(extras_ids)),
+                "toppers_ids": list(dict.fromkeys(toppers_ids)),
+            }
+        )
     if not out["categorias"]:
         out["categorias"] = list(base.get("categorias") or [{"id": "general", "nombre": "General", "activo": True}])
 
@@ -2299,7 +2364,24 @@ def _normalizar_catalogo_torta_cfg(raw):
 
 def _catalogo_torta_publico(cfg):
     cat = _normalizar_catalogo_torta_cfg(cfg)
+    sabores_activos = [x for x in (cat.get("sabores") or []) if bool(x.get("activo"))]
+    extras_activos = [x for x in (cat.get("extras") or []) if bool(x.get("activo"))]
+    toppers_activos = [x for x in (cat.get("toppers") or []) if bool(x.get("activo"))]
+    sabores_ids = {str(x.get("id") or "") for x in sabores_activos}
+    extras_ids = {str(x.get("id") or "") for x in extras_activos}
+    toppers_ids = {str(x.get("id") or "") for x in toppers_activos}
     categorias_activas = [x for x in (cat.get("categorias") or []) if bool(x.get("activo"))]
+    categorias_activas = [
+        {
+            **x,
+            "min_lead_hours": max(1, int(x.get("min_lead_hours") or 48)),
+            "use_category_ingredients": bool(x.get("use_category_ingredients", False)),
+            "sabores_ids": [sid for sid in (x.get("sabores_ids") or []) if sid in sabores_ids],
+            "extras_ids": [eid for eid in (x.get("extras_ids") or []) if eid in extras_ids],
+            "toppers_ids": [tid for tid in (x.get("toppers_ids") or []) if tid in toppers_ids],
+        }
+        for x in categorias_activas
+    ]
     sizes_activas = [x for x in (cat.get("sizes") or []) if bool(x.get("activo"))]
     if not categorias_activas:
         ids_detectadas = []
@@ -2333,14 +2415,25 @@ def _catalogo_torta_publico(cfg):
         "max_reference_images": int(cat.get("max_reference_images") or 3),
         "categorias": categorias_activas,
         "sizes": sizes_publicas,
-        "sabores": [x for x in (cat.get("sabores") or []) if bool(x.get("activo"))],
-        "extras": [x for x in (cat.get("extras") or []) if bool(x.get("activo"))],
-        "toppers": [x for x in (cat.get("toppers") or []) if bool(x.get("activo"))],
+        "sabores": sabores_activos,
+        "extras": extras_activos,
+        "toppers": toppers_activos,
     }
+
+
+def _catalogo_torta_categoria_publica(catalogo_publico, categoria_id):
+    cid = str(categoria_id or "").strip().lower()
+    if not cid:
+        return None
+    for row in (catalogo_publico.get("categorias") or []):
+        if str(row.get("id") or "").strip().lower() == cid:
+            return row
+    return None
 
 
 def _validar_payload_catalogo_torta(payload, catalogo_publico):
     data = dict(payload or {})
+    categoria_id = str(data.get("categoria_id") or "").strip().lower()
     size_id = str(data.get("size_id") or "").strip().lower()
     sabor_ids = data.get("sabor_ids") if isinstance(data.get("sabor_ids"), list) else []
     extra_items = data.get("extra_items") if isinstance(data.get("extra_items"), list) else []
@@ -2356,6 +2449,17 @@ def _validar_payload_catalogo_torta(payload, catalogo_publico):
     size = sizes.get(size_id)
     if not size:
         raise ValueError("Debes seleccionar un tamano de torta valido")
+    size_categoria_id = str(size.get("categoria_id") or "").strip().lower()
+    if not categoria_id:
+        categoria_id = size_categoria_id
+    categoria = _catalogo_torta_categoria_publica(catalogo_publico, categoria_id) or _catalogo_torta_categoria_publica(catalogo_publico, size_categoria_id)
+    if not categoria:
+        categoria = {"id": size_categoria_id or categoria_id or "general", "nombre": "Categoria", "min_lead_hours": 48, "use_category_ingredients": False}
+    categoria_id = str(categoria.get("id") or size_categoria_id or categoria_id or "general")
+    use_category_ingredients = bool(categoria.get("use_category_ingredients", False))
+    allowed_sabores = {str(x or "").strip().lower() for x in (categoria.get("sabores_ids") or []) if str(x or "").strip()} if use_category_ingredients else set()
+    allowed_extras = {str(x or "").strip().lower() for x in (categoria.get("extras_ids") or []) if str(x or "").strip()} if use_category_ingredients else set()
+    allowed_toppers = {str(x or "").strip().lower() for x in (categoria.get("toppers_ids") or []) if str(x or "").strip()} if use_category_ingredients else set()
 
     sabores_limpios = []
     seen_flavors = set()
@@ -2367,11 +2471,15 @@ def _validar_payload_catalogo_torta(payload, catalogo_publico):
         sabor = sabores.get(sid)
         if not sabor:
             continue
+        if use_category_ingredients and sid not in allowed_sabores:
+            continue
         sabores_limpios.append(sabor)
         seen_flavors.add(sid)
         if len(sabores_limpios) >= max_sabores:
             break
     if not sabores_limpios:
+        if use_category_ingredients:
+            raise ValueError("Debes seleccionar al menos un sabor permitido para esta categoria")
         raise ValueError("Debes seleccionar al menos un sabor")
 
     extras_final = []
@@ -2383,6 +2491,8 @@ def _validar_payload_catalogo_torta(payload, catalogo_publico):
             continue
         extra = extras.get(eid)
         if not extra:
+            continue
+        if use_category_ingredients and eid not in allowed_extras:
             continue
         try:
             qty = int(item.get("qty") or 0)
@@ -2398,6 +2508,8 @@ def _validar_payload_catalogo_torta(payload, catalogo_publico):
     topper = toppers.get(topper_id) if topper_id else None
     if topper_id and not topper:
         raise ValueError("El topper seleccionado no es valido")
+    if topper and use_category_ingredients and str(topper.get("id") or "").strip().lower() not in allowed_toppers:
+        raise ValueError("El topper seleccionado no esta permitido para esta categoria")
 
     max_refs = max(0, int(catalogo_publico.get("max_reference_images") or 3))
     refs_limpias = []
@@ -2415,6 +2527,12 @@ def _validar_payload_catalogo_torta(payload, catalogo_publico):
         subtotal += float(topper.get("precio") or 0)
 
     return {
+        "categoria": {
+            "id": categoria_id,
+            "nombre": str(categoria.get("nombre") or "Categoria"),
+            "min_lead_hours": max(1, int(categoria.get("min_lead_hours") or 48)),
+            "use_category_ingredients": use_category_ingredients,
+        },
         "size": {"id": size.get("id"), "nombre": size.get("nombre"), "precio": float(size.get("precio") or 0), "max_sabores": max_sabores},
         "sabores": [{"id": s.get("id"), "nombre": s.get("nombre"), "precio": float(s.get("precio") or 0)} for s in sabores_limpios],
         "extras": extras_final,
@@ -4171,6 +4289,17 @@ def api_tienda_agenda_disponibilidad():
         tipo_reserva = _normalizar_tipo_reserva_tienda(request.args.get("tipo"))
         topper_id = str(request.args.get("topper_id") or "").strip().lower()
         topper_96h = tipo_reserva == "torta" and _topper_requiere_96h(topper_id=topper_id)
+        categoria_id = str(request.args.get("categoria_id") or "").strip().lower()
+        min_horas_categoria = None
+        if tipo_reserva == "torta":
+            cfg_tienda = _obtener_tienda_personalizacion()
+            catalogo_publico = _catalogo_torta_publico((cfg_tienda or {}).get("catalogo_torta") or {})
+            categoria = _catalogo_torta_categoria_publica(catalogo_publico, categoria_id)
+            if categoria:
+                try:
+                    min_horas_categoria = int(categoria.get("min_lead_hours") or 0)
+                except (TypeError, ValueError):
+                    min_horas_categoria = None
         pastel_modo = str(request.args.get("pastel_modo") or "catalogo").strip().lower()
         pastel_fuera_lista = tipo_reserva == "pastel" and pastel_modo in {"especial", "fuera_lista", "fuera-lista"}
         if tipo_reserva not in {"torta", "pastel"}:
@@ -4212,6 +4341,7 @@ def api_tienda_agenda_disponibilidad():
                     now_local=now_local,
                     topper_requiere_96h=topper_96h,
                     pastel_fuera_lista=pastel_fuera_lista,
+                    min_horas_categoria=min_horas_categoria,
                 )
                 disponible = bool(h.get("disponible")) and bool(cumple_regla)
                 hh = dict(h)
@@ -4231,6 +4361,7 @@ def api_tienda_agenda_disponibilidad():
                 "tipo_reserva": tipo_reserva,
                 "topper_requiere_96h": bool(topper_96h),
                 "pastel_fuera_lista": bool(pastel_fuera_lista),
+                "min_horas_categoria": int(min_horas_categoria or 0),
                 "cfg": {
                     "days_ahead": int(cfg["days_ahead"]),
                     "slot_minutes": int(cfg["slot_minutes"]),
@@ -4442,9 +4573,14 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": "No puedes reservar fechas pasadas"}), 400
         topper_96h = False
         pastel_fuera_lista = False
+        min_horas_categoria = None
         if tipo_pedido == "torta" and catalogo_torta_resumen:
             topper = catalogo_torta_resumen.get("topper") or {}
             topper_96h = _topper_requiere_96h(topper_id=topper.get("id"), topper_nombre=topper.get("nombre"))
+            try:
+                min_horas_categoria = int((catalogo_torta_resumen.get("categoria") or {}).get("min_lead_hours") or 0)
+            except (TypeError, ValueError):
+                min_horas_categoria = None
         if tipo_pedido == "pastel":
             pastel_fuera_lista = pastel_modo == "especial"
 
@@ -4455,14 +4591,20 @@ def api_tienda_agenda_reservar():
             cfg_agenda=cfg,
             topper_requiere_96h=topper_96h,
             pastel_fuera_lista=pastel_fuera_lista,
+            min_horas_categoria=min_horas_categoria,
         ):
             minutos = _minutos_anticipacion_reserva(
                 tipo_pedido,
                 topper_requiere_96h=topper_96h,
                 pastel_fuera_lista=pastel_fuera_lista,
+                min_horas_categoria=min_horas_categoria,
             )
             if tipo_pedido == "torta":
-                msg = "Las tortas con topper requieren minimo 96 horas de anticipacion" if topper_96h else "Las tortas requieren minimo 48 horas de anticipacion"
+                horas_min = int(max(1, minutos // 60))
+                if min_horas_categoria and int(min_horas_categoria) > 48:
+                    msg = f"La categoria seleccionada requiere minimo {horas_min} horas de anticipacion"
+                else:
+                    msg = "Las tortas con topper requieren minimo 96 horas de anticipacion" if topper_96h else "Las tortas requieren minimo 48 horas de anticipacion"
             elif tipo_pedido == "pastel":
                 msg = "Las solicitudes fuera de lista requieren minimo 36 horas de anticipacion" if pastel_fuera_lista else "Los pasteles requieren minimo 24 horas de anticipacion"
             else:

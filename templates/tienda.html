@@ -3218,6 +3218,11 @@
                 id: String(c?.id || "").trim().toLowerCase() || `cat-${idx + 1}`,
                 nombre: String(c?.nombre || c?.id || `Categoria ${idx + 1}`).trim(),
                 activo: c?.activo !== false,
+                min_lead_hours: Math.max(1, Number(c?.min_lead_hours || 48)),
+                use_category_ingredients: Boolean(c?.use_category_ingredients),
+                sabores_ids: Array.isArray(c?.sabores_ids) ? c.sabores_ids.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean) : [],
+                extras_ids: Array.isArray(c?.extras_ids) ? c.extras_ids.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean) : [],
+                toppers_ids: Array.isArray(c?.toppers_ids) ? c.toppers_ids.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean) : [],
             })).filter((c) => Boolean(c.id));
             const defaultCatId = String((categorias[0] && categorias[0].id) || "general");
             const sizesRaw = Array.isArray(src.sizes) ? src.sizes : [];
@@ -3298,6 +3303,30 @@
         function _catalogFind(key, id) {
             const itemId = String(id || "");
             return _catalogList(key).find((x) => String(x.id || "") === itemId) || null;
+        }
+
+        function _catalogCategoriaActivaCfg() {
+            const cid = String(agendaCakeCategoriaActiva || "").trim().toLowerCase();
+            return _catalogCategoriasActivas().find((c) => String(c?.id || "").trim().toLowerCase() === cid) || null;
+        }
+
+        function _catalogListByCategoria(key) {
+            const rows = _catalogList(key);
+            const cat = _catalogCategoriaActivaCfg();
+            if (!cat || !cat.use_category_ingredients) return rows;
+            if (key === "sabores") {
+                const allow = new Set((cat.sabores_ids || []).map((x) => String(x || "").trim().toLowerCase()));
+                return rows.filter((x) => allow.has(String(x?.id || "").trim().toLowerCase()));
+            }
+            if (key === "extras") {
+                const allow = new Set((cat.extras_ids || []).map((x) => String(x || "").trim().toLowerCase()));
+                return rows.filter((x) => allow.has(String(x?.id || "").trim().toLowerCase()));
+            }
+            if (key === "toppers") {
+                const allow = new Set((cat.toppers_ids || []).map((x) => String(x || "").trim().toLowerCase()));
+                return rows.filter((x) => allow.has(String(x?.id || "").trim().toLowerCase()));
+            }
+            return rows;
         }
 
         function _resetAgendaCakeSelection() {
@@ -3675,7 +3704,7 @@
                 const maxSabores = Math.max(1, Number(sizeSelected?.max_sabores || 1));
 
                 if (agendaCakeFlavorsEl) {
-                    const sabores = _catalogList("sabores");
+                    const sabores = _catalogListByCategoria("sabores");
                     agendaCakeFlavorsEl.innerHTML = "";
                     if (!sabores.length) {
                         agendaCakeFlavorsEl.innerHTML = `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay sabores configurados en el catalogo.</div>`;
@@ -3713,7 +3742,7 @@
                 }
 
                 if (agendaCakeExtrasEl) {
-                    const extras = _catalogList("extras");
+                    const extras = _catalogListByCategoria("extras");
                     agendaCakeExtrasEl.innerHTML = "";
                     if (!extras.length) {
                         agendaCakeExtrasEl.innerHTML = `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay extras configurados en el catalogo.</div>`;
@@ -3765,7 +3794,7 @@
                 }
 
                 if (agendaCakeTopperCardsEl) {
-                    const toppers = _catalogList("toppers");
+                    const toppers = _catalogListByCategoria("toppers");
                     agendaCakeTopperCardsEl.innerHTML = "";
                     const select = document.createElement("select");
                     select.style.width = "100%";
@@ -3795,8 +3824,8 @@
 
                 const sizeNodes = Number(agendaCakeSizeCardsEl?.querySelectorAll("option,button,input,label,div").length || 0);
                 const flavorNodes = Number(agendaCakeFlavorsEl?.querySelectorAll("option,button,input,label,div").length || 0);
-                if ((sizesRender.length > 0 && sizeNodes === 0) || (_catalogList("sabores").length > 0 && flavorNodes === 0)) {
-                    _renderAgendaCakeEmergency(sizesRender, _catalogList("sabores"), _catalogList("extras"), _catalogList("toppers"));
+                if ((sizesRender.length > 0 && sizeNodes === 0) || (_catalogListByCategoria("sabores").length > 0 && flavorNodes === 0)) {
+                    _renderAgendaCakeEmergency(sizesRender, _catalogListByCategoria("sabores"), _catalogListByCategoria("extras"), _catalogListByCategoria("toppers"));
                 }
                 _actualizarDebugCatalogo(`seleccion | render s:${sizeNodes} f:${flavorNodes}`);
 
@@ -3822,7 +3851,12 @@
             agendaCakeCategoriaActiva = String(catId || "");
             agendaCakeSelection.size_id = "";
             agendaCakeSelection.sabor_ids = [];
+            agendaCakeSelection.extra_items = [];
+            agendaCakeSelection.topper_id = "";
             _renderAgendaCakeBuilder();
+            agendaFechaActiva = "";
+            agendaHoraActiva = "";
+            cargarAgendaDisponibilidad(true);
         }
 
         function agendaCakeSelectSize(sizeId) {
@@ -4042,6 +4076,10 @@
                     const topperId = String(agendaCakeSelection?.topper_id || "").trim().toLowerCase();
                     if (topperId) {
                         url += `&topper_id=${encodeURIComponent(topperId)}`;
+                    }
+                    const categoriaId = String(agendaCakeCategoriaActiva || "").trim().toLowerCase();
+                    if (categoriaId) {
+                        url += `&categoria_id=${encodeURIComponent(categoriaId)}`;
                     }
                 } else if (agendaTipoActual === "pastel") {
                     url += `&pastel_modo=${encodeURIComponent(agendaPastelMode === "especial" ? "especial" : "catalogo")}`;
@@ -4579,7 +4617,8 @@
             if (!sid) return;
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
             const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
-            const current = Array.isArray(agendaCakeSelection.sabor_ids) ? agendaCakeSelection.sabor_ids : [];
+            const allowedFlavors = new Set(_catalogListByCategoria("sabores").map((x) => String(x?.id || "")));
+            const current = (Array.isArray(agendaCakeSelection.sabor_ids) ? agendaCakeSelection.sabor_ids : []).filter((x) => allowedFlavors.has(String(x || "")));
             if (current.includes(sid)) {
                 agendaCakeSelection.sabor_ids = current.filter((x) => x !== sid);
             } else {

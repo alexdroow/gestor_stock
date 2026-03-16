@@ -68,6 +68,34 @@
             align-items: end;
         }
         .row.extras { grid-template-columns: 1.2fr .6fr .5fr .4fr auto; }
+        .row.cat {
+            grid-template-columns: 1fr .3fr .35fr .3fr auto;
+            align-items: start;
+        }
+        .cat-grid {
+            grid-column: 1 / span 4;
+            display: grid;
+            gap: 6px;
+            padding: 8px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .cat-opts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .cat-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: .78rem;
+            background: #f8fafc;
+        }
         label { display: grid; gap: 4px; font-size: .82rem; font-weight: 700; color: #334155; }
         input, select {
             width: 100%;
@@ -231,6 +259,10 @@ function esc(v) {
 function activeCount(arr) {
     return (Array.isArray(arr) ? arr : []).filter((x) => Boolean(x.activo)).length;
 }
+function parseIdList(v) {
+    if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter(Boolean);
+    return [];
+}
 
 function renderSummary() {
     document.getElementById("sum-sizes").textContent = String(activeCount(state.sizes));
@@ -257,11 +289,37 @@ function rowHtmlSize(item, idx) {
     `;
 }
 function rowHtmlCategory(item, idx) {
+    const sabores = (Array.isArray(state.sabores) ? state.sabores : []).filter((x) => String(x?.id || "").trim());
+    const extras = (Array.isArray(state.extras) ? state.extras : []).filter((x) => String(x?.id || "").trim());
+    const toppers = (Array.isArray(state.toppers) ? state.toppers : []).filter((x) => String(x?.id || "").trim());
+    const makeChecks = (rows, key) => {
+        const selected = new Set(parseIdList(item[key]));
+        if (!rows.length) return `<div class="muted">Sin items configurados.</div>`;
+        return rows.map((r) => `
+            <label class="cat-chip">
+                <input type="checkbox" data-cat-list="${esc(key)}" data-item-id="${esc(r.id || '')}" ${selected.has(String(r.id || "")) ? "checked" : ""}>
+                ${esc(r.nombre || r.id || "Item")}
+            </label>
+        `).join("");
+    };
     return `
-        <div class="row" data-idx="${idx}" style="grid-template-columns:1fr .4fr auto;">
+        <div class="row cat" data-idx="${idx}">
             <label>Nombre categoria<input data-k="nombre" value="${esc(item.nombre || "")}"></label>
+            <label>Min horas agenda
+                <input data-k="min_lead_hours" type="number" min="1" max="336" step="1" value="${Math.max(1, n(item.min_lead_hours, 48))}">
+            </label>
+            <label><input data-k="use_category_ingredients" type="checkbox" ${item.use_category_ingredients ? "checked" : ""}> Ingredientes exclusivos</label>
             <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activa</label>
             <button class="btn btn-del" type="button" onclick="removeRow('categorias', ${idx})">X</button>
+            <div class="cat-grid" style="${item.use_category_ingredients ? "" : "opacity:.65;"}">
+                <div class="muted"><strong>Ingredientes por categoria</strong> (si se activa, reemplaza lista general).</div>
+                <div><strong>Sabores permitidos</strong></div>
+                <div class="cat-opts">${makeChecks(sabores, "sabores_ids")}</div>
+                <div><strong>Extras permitidos</strong></div>
+                <div class="cat-opts">${makeChecks(extras, "extras_ids")}</div>
+                <div><strong>Toppers permitidos</strong></div>
+                <div class="cat-opts">${makeChecks(toppers, "toppers_ids")}</div>
+            </div>
         </div>
     `;
 }
@@ -335,13 +393,27 @@ function bindListInputs(key) {
                 const field = inp.getAttribute("data-k");
                 if (!field) return;
                 if (inp.type === "checkbox") state[key][idx][field] = Boolean(inp.checked);
-                else if (field === "precio" || field === "max_sabores" || field === "max_cantidad") state[key][idx][field] = n(inp.value, 0);
+                else if (field === "precio" || field === "max_sabores" || field === "max_cantidad" || field === "min_lead_hours") state[key][idx][field] = n(inp.value, 0);
                 else state[key][idx][field] = String(inp.value || "");
                 if (field === "nombre") state[key][idx].id = slug(inp.value);
                 if (field === "categoria_id") state[key][idx].categoria_id = String(inp.value || "");
+                if (field === "use_category_ingredients") render();
                 renderSummary();
             });
         });
+        if (key === "categorias") {
+            row.querySelectorAll("[data-cat-list]").forEach((chk) => {
+                chk.addEventListener("change", () => {
+                    const listKey = String(chk.getAttribute("data-cat-list") || "");
+                    const itemId = String(chk.getAttribute("data-item-id") || "");
+                    if (!["sabores_ids", "extras_ids", "toppers_ids"].includes(listKey) || !itemId) return;
+                    const curr = new Set(parseIdList(state[key][idx][listKey]));
+                    if (chk.checked) curr.add(itemId);
+                    else curr.delete(itemId);
+                    state[key][idx][listKey] = Array.from(curr);
+                });
+            });
+        }
         if (key === "sizes") {
             const catSel = row.querySelector('select[data-k="categoria_id"]');
             if (catSel) catSel.value = String(state[key][idx].categoria_id || "");
@@ -379,7 +451,16 @@ function payload() {
         show_prices: Boolean(document.getElementById("show_prices").checked),
         max_extra_items: Math.max(1, Math.min(20, n(document.getElementById("max_extra_items").value, 8))),
         max_reference_images: Math.max(0, Math.min(10, n(document.getElementById("max_reference_images").value, 3))),
-        categorias: state.categorias.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+        categorias: state.categorias.map((x) => ({
+            id: slug(x.id || x.nombre),
+            nombre: String(x.nombre || "").trim(),
+            activo: Boolean(x.activo),
+            min_lead_hours: Math.max(1, Math.min(336, n(x.min_lead_hours, 48))),
+            use_category_ingredients: Boolean(x.use_category_ingredients),
+            sabores_ids: parseIdList(x.sabores_ids).map((v) => slug(v)),
+            extras_ids: parseIdList(x.extras_ids).map((v) => slug(v)),
+            toppers_ids: parseIdList(x.toppers_ids).map((v) => slug(v)),
+        })).filter((x) => x.nombre),
         sizes: state.sizes.map((x) => ({ id: slug(x.id || x.nombre), categoria_id: slug(x.categoria_id || ""), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_sabores: Math.max(1, Math.min(8, n(x.max_sabores, 3))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
         sabores: state.sabores.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), activo: Boolean(x.activo) })).filter((x) => x.nombre),
         extras: state.extras.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_cantidad: Math.max(1, Math.min(20, n(x.max_cantidad, 1))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
@@ -412,7 +493,18 @@ document.getElementById("enabled").addEventListener("change", () => { state.enab
 document.getElementById("show_prices").addEventListener("change", () => { state.show_prices = Boolean(document.getElementById("show_prices").checked); renderSummary(); });
 document.getElementById("max_extra_items").addEventListener("input", () => { state.max_extra_items = n(document.getElementById("max_extra_items").value, 8); });
 document.getElementById("max_reference_images").addEventListener("input", () => { state.max_reference_images = n(document.getElementById("max_reference_images").value, 3); });
-document.getElementById("add-category").addEventListener("click", () => { state.categorias.push(newItem({ nombre: "Nueva categoria", activo: true })); render(); });
+document.getElementById("add-category").addEventListener("click", () => {
+    state.categorias.push(newItem({
+        nombre: "Nueva categoria",
+        activo: true,
+        min_lead_hours: 48,
+        use_category_ingredients: false,
+        sabores_ids: [],
+        extras_ids: [],
+        toppers_ids: [],
+    }));
+    render();
+});
 document.getElementById("add-size").addEventListener("click", () => {
     const firstCat = (state.categorias && state.categorias[0]) ? String(state.categorias[0].id || "") : "";
     state.sizes.push(newItem({ nombre: "Nuevo tamano", categoria_id: firstCat, precio: 0, max_sabores: 3, activo: true }));
