@@ -720,6 +720,34 @@
             padding: 7px 9px;
             font-weight: 700;
         }
+        .agenda-shipping-quote {
+            margin-top: 6px;
+            font-size: .84rem;
+            color: #065f46;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 8px;
+            padding: 7px 9px;
+            font-weight: 800;
+            display: none;
+        }
+        .agenda-shipping-quote.active {
+            display: block;
+        }
+        .agenda-shipping-warning {
+            margin-top: 6px;
+            font-size: .82rem;
+            color: #7c2d12;
+            background: #fffbeb;
+            border: 1px solid #fed7aa;
+            border-radius: 8px;
+            padding: 7px 9px;
+            font-weight: 700;
+            display: none;
+        }
+        .agenda-shipping-warning.active {
+            display: block;
+        }
         .agenda-status {
             font-size: .86rem;
             color: var(--muted);
@@ -1925,7 +1953,9 @@
                         </div>
                         <div class="agenda-map" id="agenda-map"></div>
                         <div class="agenda-map-meta" id="agenda-map-meta">Mueve el pin al punto exacto y confirma.</div>
-                        <div class="agenda-shipping-note">Importante: el valor de despacho no esta incluido en esta reserva.</div>
+                        <div class="agenda-shipping-note" id="agenda-shipping-note">Importante: el valor de despacho no esta incluido en esta reserva.</div>
+                        <div class="agenda-shipping-quote" id="agenda-shipping-quote"></div>
+                        <div class="agenda-shipping-warning" id="agenda-shipping-warning"></div>
                     </div>
                     <button class="checkout-btn" id="agenda-btn-reservar" type="button">Reservar horario</button>
                     <div class="agenda-status" id="agenda-status-msg"></div>
@@ -2243,6 +2273,9 @@
         const agendaBuscarMapaEl = document.getElementById("agenda-buscar-mapa");
         const agendaConfirmarPinEl = document.getElementById("agenda-confirmar-pin");
         const agendaMapMetaEl = document.getElementById("agenda-map-meta");
+        const agendaShippingNoteEl = document.getElementById("agenda-shipping-note");
+        const agendaShippingQuoteEl = document.getElementById("agenda-shipping-quote");
+        const agendaShippingWarningEl = document.getElementById("agenda-shipping-warning");
         const modalAgendaConfirmarEl = document.getElementById("modal-agenda-confirmar");
         const agendaConfirmTitleEl = document.getElementById("agenda-confirm-title");
         const agendaConfirmWarningEl = document.getElementById("agenda-confirm-warning");
@@ -2278,6 +2311,7 @@
         let agendaMarker = null;
         let agendaDireccionConfirmada = false;
         let agendaDireccionPin = { lat: -33.4489, lng: -70.6693 };
+        let agendaShippingQuote = null;
         let agendaReservaPendiente = null;
         let agendaTipoActual = "";
         let agendaCakeCatalog = null;
@@ -2417,6 +2451,14 @@
             agenda_map_search_text: "Buscar",
             agenda_map_confirm_text: "Confirmar pin",
             agenda_map_help_text: "Mueve el pin al punto exacto y confirma.",
+            agenda_delivery_origin_lat: -33.510910,
+            agenda_delivery_origin_lng: -70.784909,
+            agenda_delivery_fee_0_3: 2500,
+            agenda_delivery_fee_3_6: 3500,
+            agenda_delivery_fee_6_9: 4500,
+            agenda_delivery_fee_9_plus: 5500,
+            agenda_delivery_note_text: "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
+            agenda_delivery_outside_warning: "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente.",
             agenda_days_ahead: 14,
             agenda_hour_start: "09:00",
             agenda_hour_end: "19:00",
@@ -2506,6 +2548,7 @@
             if (agendaBuscarMapaEl) agendaBuscarMapaEl.textContent = String(tiendaUiCfg.agenda_map_search_text || TIENDA_UI_DEFAULTS.agenda_map_search_text);
             if (agendaConfirmarPinEl) agendaConfirmarPinEl.textContent = String(tiendaUiCfg.agenda_map_confirm_text || TIENDA_UI_DEFAULTS.agenda_map_confirm_text);
             if (agendaMapMetaEl) agendaMapMetaEl.textContent = String(tiendaUiCfg.agenda_map_help_text || TIENDA_UI_DEFAULTS.agenda_map_help_text);
+            if (agendaShippingNoteEl) agendaShippingNoteEl.textContent = String(tiendaUiCfg.agenda_delivery_note_text || TIENDA_UI_DEFAULTS.agenda_delivery_note_text);
             if (agendaOrdenLabelEl) agendaOrdenLabelEl.value = "Reserva por agenda";
             if (agendaBtnReservarEl) agendaBtnReservarEl.textContent = String(tiendaUiCfg.agenda_form_button_text || TIENDA_UI_DEFAULTS.agenda_form_button_text);
             if (agendaConfirmTitleEl) agendaConfirmTitleEl.textContent = String(tiendaUiCfg.agenda_confirm_title || TIENDA_UI_DEFAULTS.agenda_confirm_title);
@@ -2513,6 +2556,7 @@
             if (agendaConfirmarPdfEl) agendaConfirmarPdfEl.textContent = String(tiendaUiCfg.agenda_confirm_pdf_text || TIENDA_UI_DEFAULTS.agenda_confirm_pdf_text);
             if (agendaConfirmarCancelarEl) agendaConfirmarCancelarEl.textContent = String(tiendaUiCfg.agenda_confirm_cancel_text || TIENDA_UI_DEFAULTS.agenda_confirm_cancel_text);
             if (agendaConfirmarAceptarEl) agendaConfirmarAceptarEl.textContent = String(tiendaUiCfg.agenda_confirm_accept_text || TIENDA_UI_DEFAULTS.agenda_confirm_accept_text);
+            _renderAgendaShippingQuote();
 
             if (waFabEl) {
                 const visible = Boolean(tiendaUiCfg.show_whatsapp_button);
@@ -2953,6 +2997,84 @@
             agendaStatusMsgEl.className = `agenda-status ${type || ""}`.trim();
         }
 
+        function _agendaSubtotalEstimado(payload = null) {
+            const basePayload = payload || _buildAgendaReservaPayload();
+            const tipo = String(basePayload?.tipo || agendaTipoActual || "").trim().toLowerCase();
+            if (tipo === "torta") {
+                return Number(_cakeTotalAndItems().total || 0);
+            }
+            if (tipo === "pastel" && String(basePayload?.pastel_modo || agendaPastelMode || "catalogo") === "catalogo") {
+                return Number(_pastelTotal() || 0);
+            }
+            return 0;
+        }
+
+        function _resetAgendaShippingQuote() {
+            agendaShippingQuote = null;
+            _renderAgendaShippingQuote();
+        }
+
+        function _renderAgendaShippingQuote() {
+            if (agendaShippingQuoteEl) {
+                agendaShippingQuoteEl.classList.remove("active");
+                agendaShippingQuoteEl.textContent = "";
+            }
+            if (agendaShippingWarningEl) {
+                agendaShippingWarningEl.classList.remove("active");
+                agendaShippingWarningEl.textContent = "";
+            }
+            if (!agendaShippingNoteEl) return;
+            const defaultNote = String(tiendaUiCfg.agenda_delivery_note_text || TIENDA_UI_DEFAULTS.agenda_delivery_note_text || "");
+            agendaShippingNoteEl.style.display = "";
+            agendaShippingNoteEl.textContent = defaultNote;
+
+            if (agendaEntregaTipo !== "despacho") return;
+            const q = agendaShippingQuote || null;
+            if (!q) return;
+            if (q.inside_maipu && Number.isFinite(Number(q.shipping_fee))) {
+                const fee = Number(q.shipping_fee || 0);
+                const dist = Number(q.distance_km || 0);
+                if (agendaShippingQuoteEl) {
+                    agendaShippingQuoteEl.textContent = `Despacho estimado: ${money.format(fee)} (${String(q.range_label || "-")}, ${dist.toFixed(2)} km).`;
+                    agendaShippingQuoteEl.classList.add("active");
+                }
+                return;
+            }
+            const warning = String(q.warning || tiendaUiCfg.agenda_delivery_outside_warning || TIENDA_UI_DEFAULTS.agenda_delivery_outside_warning || "").trim();
+            if (agendaShippingWarningEl && warning) {
+                agendaShippingWarningEl.textContent = warning;
+                agendaShippingWarningEl.classList.add("active");
+            }
+        }
+
+        async function _cotizarDespachoAgendaDesdePin() {
+            if (agendaEntregaTipo !== "despacho") {
+                _resetAgendaShippingQuote();
+                return;
+            }
+            if (!agendaDireccionConfirmada) {
+                _resetAgendaShippingQuote();
+                return;
+            }
+            try {
+                const res = await fetch("/api/tienda/agenda/despacho-cotizar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lat: Number(agendaDireccionPin.lat || 0),
+                        lng: Number(agendaDireccionPin.lng || 0),
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cotizar despacho");
+                agendaShippingQuote = data.quote || null;
+                _renderAgendaShippingQuote();
+            } catch (err) {
+                _resetAgendaShippingQuote();
+                _agendaMsg(err.message || "No se pudo cotizar despacho", "err");
+            }
+        }
+
         function _normalizarAgendaTelefono(raw) {
             const d = normalizarTelefono8(raw);
             return d ? `+569${d}` : "";
@@ -2963,6 +3085,7 @@
             if (agendaEntregaRetiroEl) agendaEntregaRetiroEl.classList.toggle("active", agendaEntregaTipo === "retiro");
             if (agendaEntregaDespachoEl) agendaEntregaDespachoEl.classList.toggle("active", agendaEntregaTipo === "despacho");
             if (agendaDespachoWrapEl) agendaDespachoWrapEl.classList.toggle("active", agendaEntregaTipo === "despacho");
+            _resetAgendaShippingQuote();
             if (agendaEntregaTipo === "despacho") {
                 _initAgendaMap();
             } else {
@@ -3697,6 +3820,7 @@
                     const p = agendaMarker.getLatLng();
                     agendaDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
                     agendaDireccionConfirmada = false;
+                    _resetAgendaShippingQuote();
                     if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Pin movido. Debes confirmar nuevamente.";
                 });
             } else {
@@ -3724,6 +3848,7 @@
                 const displayName = String(first.display_name || query).trim();
                 if (agendaDireccionBuscarEl) agendaDireccionBuscarEl.value = displayName;
                 agendaDireccionConfirmada = false;
+                _resetAgendaShippingQuote();
                 if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Direccion encontrada. Ahora confirma el pin.";
             } catch (e) {
                 _agendaMsg(e.message || "No se pudo buscar direccion en mapa.", "err");
@@ -3751,10 +3876,15 @@
                 agendaDireccionBuscarEl.value = direccionPin;
             }
             agendaDireccionConfirmada = true;
+            await _cotizarDespachoAgendaDesdePin();
             if (agendaMapMetaEl) {
                 agendaMapMetaEl.textContent = `Pin confirmado: ${agendaDireccionPin.lat.toFixed(6)}, ${agendaDireccionPin.lng.toFixed(6)}`;
             }
-            _agendaMsg("Direccion y pin confirmados.", "ok");
+            if (agendaShippingQuote?.inside_maipu) {
+                _agendaMsg("Direccion y pin confirmados. Despacho cotizado.", "ok");
+            } else {
+                _agendaMsg("Direccion y pin confirmados. Fuera de Maipu: cotizacion interna.", "ok");
+            }
         }
 
         function _agendaDiaActual() {
@@ -3905,6 +4035,7 @@
                 direccion_confirmada: agendaEntregaTipo === "retiro" ? true : agendaDireccionConfirmada,
                 lat: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lat : null,
                 lng: agendaEntregaTipo === "despacho" ? agendaDireccionPin.lng : null,
+                shipping_quote: agendaEntregaTipo === "despacho" ? (agendaShippingQuote || null) : null,
                 catalogo_torta,
                 pastel_modo: agendaPastelMode,
                 pastel_catalogo,
@@ -3920,6 +4051,11 @@
             const pinTxt = payload.entrega_tipo === "despacho"
                 ? `${Number(payload.lat || 0).toFixed(6)}, ${Number(payload.lng || 0).toFixed(6)}`
                 : "-";
+            const subtotalEstimado = Number(_agendaSubtotalEstimado(payload) || 0);
+            const shipping = payload?.shipping_quote || null;
+            const shippingVisible = Boolean(payload.entrega_tipo === "despacho" && shipping && shipping.inside_maipu && Number.isFinite(Number(shipping.shipping_fee)));
+            const shippingFee = shippingVisible ? Number(shipping.shipping_fee || 0) : 0;
+            const totalEstimado = subtotalEstimado + shippingFee;
             let detalleCatalogoHtml = "";
             if (String(payload.tipo || "") === "torta" && payload.catalogo_torta) {
                 const cat = payload.catalogo_torta;
@@ -3973,6 +4109,10 @@
                 <div><strong>Entrega:</strong> ${esc(entregaTxt)}</div>
                 <div><strong>Direccion:</strong> ${esc(direccionTxt || "-")}</div>
                 <div><strong>Pin mapa:</strong> ${esc(pinTxt)}</div>
+                <div><strong>Subtotal estimado:</strong> ${esc(money.format(subtotalEstimado))}</div>
+                ${shippingVisible ? `<div><strong>Despacho estimado:</strong> ${esc(money.format(shippingFee))} (${esc(String(shipping.range_label || "-"))})</div>` : ""}
+                ${shippingVisible ? `<div><strong>Total estimado:</strong> ${esc(money.format(totalEstimado))}</div>` : ""}
+                ${payload.entrega_tipo === "despacho" && !shippingVisible ? `<div style="margin-top:6px;padding:7px 8px;border:1px solid #fed7aa;border-radius:8px;background:#fffbeb;color:#7c2d12;font-weight:700;">${esc(String((shipping && shipping.warning) || tiendaUiCfg.agenda_delivery_outside_warning || TIENDA_UI_DEFAULTS.agenda_delivery_outside_warning))}</div>` : ""}
                 ${detalleCatalogoHtml}
                 <div style="margin-top:6px;"><strong>Detalle:</strong> ${esc(payload.detalle || "Sin detalle")}</div>
             `;
@@ -4061,6 +4201,11 @@
             const pinTxt = payload.entrega_tipo === "despacho"
                 ? `${Number(payload.lat || 0).toFixed(6)}, ${Number(payload.lng || 0).toFixed(6)}`
                 : "-";
+            const subtotalEstimado = Number(_agendaSubtotalEstimado(payload) || 0);
+            const shipping = payload?.shipping_quote || null;
+            const shippingVisible = Boolean(payload.entrega_tipo === "despacho" && shipping && shipping.inside_maipu && Number.isFinite(Number(shipping.shipping_fee)));
+            const shippingFee = shippingVisible ? Number(shipping.shipping_fee || 0) : 0;
+            const totalEstimado = subtotalEstimado + shippingFee;
             const reservaLabel = Number(reservaId || 0) > 0 ? `#${Number(reservaId)}` : "(borrador)";
 
             let detallePedido = String(payload.detalle || "Reserva desde tienda online").trim();
@@ -4159,7 +4304,12 @@
                 drawSectionTitle("Entrega y Ubicacion");
                 drawField("Direccion informada por cliente", payload.direccion || "-");
                 drawField("Coordenadas", pinTxt);
-                drawField("Nota despacho", "El valor de despacho no esta incluido en esta reserva.");
+                if (shippingVisible) {
+                    drawField("Despacho estimado", `${money.format(shippingFee)} (${String(shipping.range_label || "-")})`);
+                    drawField("Total estimado", money.format(totalEstimado));
+                } else {
+                    drawField("Nota despacho", String((shipping && shipping.warning) || tiendaUiCfg.agenda_delivery_outside_warning || TIENDA_UI_DEFAULTS.agenda_delivery_outside_warning));
+                }
                 const mapUrl = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(String(payload.lat || ""))}&mlon=${encodeURIComponent(String(payload.lng || ""))}#map=18/${encodeURIComponent(String(payload.lat || ""))}/${encodeURIComponent(String(payload.lng || ""))}`;
                 drawLink("Mapa de referencia (OpenStreetMap)", mapUrl);
             } else {
@@ -4186,7 +4336,9 @@
             const terminos = [
                 "Una vez iniciado el proceso de elaboracion del pedido, el abono no es reembolsable.",
                 "Las imagenes de referencia compartidas por el cliente son orientativas. El producto final puede presentar variaciones de diseno, color o terminaciones.",
-                "El valor de despacho no esta incluido en la cotizacion ni en esta orden de reserva.",
+                shippingVisible
+                    ? `Despacho estimado incluido para direcciones dentro de Maipu: ${money.format(shippingFee)}.`
+                    : "Si la direccion queda fuera de Maipu, el valor de despacho se revisa de forma interna y se confirma por WhatsApp.",
                 "La modalidad principal es retiro en local. En caso de solicitar despacho, este se gestiona mediante Uber Entregas. Sucree Pasteleria entrega el pedido en condiciones optimas, pero no se responsabiliza por danos, demoras o deterioros ocasionados durante el transporte.",
                 "Al realizar el abono, el cliente declara conocer y aceptar estas condiciones.",
             ];
@@ -4225,7 +4377,11 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo reservar");
                 const reserva = data.reserva || {};
-                _descargarComprobanteReservaAgenda(payload, Number(reserva.id || 0));
+                const payloadFinal = {
+                    ...payload,
+                    shipping_quote: reserva.shipping_quote || payload.shipping_quote || null,
+                };
+                _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
                 if (String(payload.tipo || "") === "torta") {
                     _resetAgendaCakeSelection();
@@ -4237,9 +4393,14 @@
                     _setAgendaPastelMode("catalogo", false);
                     _renderAgendaPastelResumen();
                 }
+                _resetAgendaShippingQuote();
                 agendaReservaPendiente = null;
                 _cerrarModalAgendaConfirmar();
-                _agendaMsg("Reserva enviada. Espera la confirmacion que sera enviada al WhatsApp. Horario de atencion: 10:00 a 20:00.", "ok");
+                if (payloadFinal.entrega_tipo === "despacho" && payloadFinal.shipping_quote && !payloadFinal.shipping_quote.inside_maipu) {
+                    _agendaMsg("Reserva enviada. Direccion fuera de Maipu: el valor de despacho sera cotizado internamente y te contactaremos por WhatsApp (10:00 a 20:00).", "ok");
+                } else {
+                    _agendaMsg("Reserva enviada. Espera la confirmacion que sera enviada al WhatsApp. Horario de atencion: 10:00 a 20:00.", "ok");
+                }
                 await cargarAgendaDisponibilidad(true);
                 _renderAgendaDiaHora();
             } catch (e) {
@@ -4275,6 +4436,13 @@
             }
             if (payload.entrega_tipo === "despacho" && payload.direccion.length < 8) return _agendaMsg("Ingresa direccion para despacho.", "err");
             if (payload.entrega_tipo === "despacho" && !payload.direccion_confirmada) return _agendaMsg("Confirma la direccion con el pin del mapa.", "err");
+            if (payload.entrega_tipo === "despacho" && !agendaShippingQuote) {
+                await _cotizarDespachoAgendaDesdePin();
+                payload.shipping_quote = agendaShippingQuote || null;
+            }
+            if (payload.entrega_tipo === "despacho" && !payload.shipping_quote) {
+                return _agendaMsg("No se pudo cotizar despacho. Reintenta confirmar el pin.", "err");
+            }
             agendaReservaPendiente = payload;
             _renderAgendaConfirmacion(payload);
             _abrirModalAgendaConfirmar();
@@ -5351,6 +5519,7 @@
         });
         agendaDireccionBuscarEl?.addEventListener("input", () => {
             agendaDireccionConfirmada = false;
+            _resetAgendaShippingQuote();
             if (agendaMapMetaEl) agendaMapMetaEl.textContent = "Direccion editada. Debes confirmar pin.";
         });
         agendaBuscarMapaEl?.addEventListener("click", _buscarDireccionAgendaEnMapa);

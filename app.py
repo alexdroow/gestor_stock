@@ -1048,6 +1048,134 @@ def _obtener_cfg_agenda_tienda(cfg_tienda=None):
     }
 
 
+_MAIPU_POLIGONO = [
+    (-33.5660, -70.8970),
+    (-33.5420, -70.8670),
+    (-33.5100, -70.8490),
+    (-33.4850, -70.8390),
+    (-33.4620, -70.8140),
+    (-33.4520, -70.7770),
+    (-33.4600, -70.7380),
+    (-33.4870, -70.7020),
+    (-33.5220, -70.6780),
+    (-33.5570, -70.6870),
+    (-33.5790, -70.7230),
+    (-33.5860, -70.7770),
+    (-33.5760, -70.8310),
+]
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    try:
+        lat1f = float(lat1)
+        lon1f = float(lon1)
+        lat2f = float(lat2)
+        lon2f = float(lon2)
+    except (TypeError, ValueError):
+        return 0.0
+    r = 6371.0
+    p1 = math.radians(lat1f)
+    p2 = math.radians(lat2f)
+    dp = math.radians(lat2f - lat1f)
+    dl = math.radians(lon2f - lon1f)
+    a = (math.sin(dp / 2) ** 2) + (math.cos(p1) * math.cos(p2) * (math.sin(dl / 2) ** 2))
+    c = 2 * math.atan2(math.sqrt(max(0.0, a)), math.sqrt(max(0.0, 1 - a)))
+    return max(0.0, r * c)
+
+
+def _punto_en_poligono(lat, lon, polygon):
+    try:
+        y = float(lat)
+        x = float(lon)
+    except (TypeError, ValueError):
+        return False
+    if not polygon or len(polygon) < 3:
+        return False
+    inside = False
+    j = len(polygon) - 1
+    for i in range(len(polygon)):
+        yi, xi = polygon[i]
+        yj, xj = polygon[j]
+        intersect = ((xi > x) != (xj > x)) and (
+            y < ((yj - yi) * (x - xi) / ((xj - xi) if (xj - xi) else 1e-12)) + yi
+        )
+        if intersect:
+            inside = not inside
+        j = i
+    return inside
+
+
+def _obtener_cfg_envios_tienda(cfg_tienda=None):
+    cfg = dict(cfg_tienda or _obtener_tienda_personalizacion() or {})
+    def _num(v, d=0, mn=0, mx=999999):
+        try:
+            out = float(v)
+        except (TypeError, ValueError):
+            out = float(d)
+        return max(float(mn), min(float(mx), out))
+
+    o_lat = _num(cfg.get("agenda_delivery_origin_lat"), -33.510910, -90, 90)
+    o_lng = _num(cfg.get("agenda_delivery_origin_lng"), -70.784909, -180, 180)
+    f_0_3 = int(round(_num(cfg.get("agenda_delivery_fee_0_3"), 2500, 0, 300000)))
+    f_3_6 = int(round(_num(cfg.get("agenda_delivery_fee_3_6"), 3500, 0, 300000)))
+    f_6_9 = int(round(_num(cfg.get("agenda_delivery_fee_6_9"), 4500, 0, 300000)))
+    f_9p = int(round(_num(cfg.get("agenda_delivery_fee_9_plus"), 5500, 0, 300000)))
+    outside_msg = str(cfg.get("agenda_delivery_outside_warning") or "").strip()[:260]
+    if not outside_msg:
+        outside_msg = "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente."
+    included_msg = str(cfg.get("agenda_delivery_note_text") or "").strip()[:220]
+    if not included_msg:
+        included_msg = "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu."
+    return {
+        "origin_lat": o_lat,
+        "origin_lng": o_lng,
+        "fee_0_3": f_0_3,
+        "fee_3_6": f_3_6,
+        "fee_6_9": f_6_9,
+        "fee_9_plus": f_9p,
+        "outside_warning": outside_msg,
+        "note_text": included_msg,
+        "commune_name": "Maipu",
+    }
+
+
+def _cotizar_envio_agenda(lat, lng, cfg_tienda=None):
+    cfg = _obtener_cfg_envios_tienda(cfg_tienda)
+    inside = _punto_en_poligono(lat, lng, _MAIPU_POLIGONO)
+    distance_km = round(_haversine_km(cfg["origin_lat"], cfg["origin_lng"], lat, lng), 2)
+    quote = {
+        "inside_maipu": bool(inside),
+        "distance_km": float(distance_km),
+        "range_label": "",
+        "shipping_fee": None,
+        "visible_to_client": False,
+        "warning": "",
+        "note": str(cfg["note_text"]),
+        "commune_name": str(cfg["commune_name"]),
+    }
+    if not inside:
+        quote["warning"] = str(cfg["outside_warning"])
+        return quote
+
+    if distance_km <= 3:
+        fee = int(cfg["fee_0_3"])
+        range_label = "0 a 3 km"
+    elif distance_km <= 6:
+        fee = int(cfg["fee_3_6"])
+        range_label = "3 a 6 km"
+    elif distance_km <= 9:
+        fee = int(cfg["fee_6_9"])
+        range_label = "6 a 9 km"
+    else:
+        fee = int(cfg["fee_9_plus"])
+        range_label = "9+ km"
+
+    quote["range_label"] = range_label
+    quote["shipping_fee"] = int(max(0, fee))
+    quote["visible_to_client"] = True
+    return quote
+
+
 def _rangos_ocupados_evento_agenda(evento, slot_minutes):
     tipo = str(evento.get("tipo") or "").strip().lower()
     hora_inicio = _hhmm_a_minutos(evento.get("hora_inicio"))
@@ -1574,6 +1702,14 @@ def _default_tienda_personalizacion():
         "agenda_map_search_text": "Buscar",
         "agenda_map_confirm_text": "Confirmar pin",
         "agenda_map_help_text": "Mueve el pin al punto exacto y confirma.",
+        "agenda_delivery_origin_lat": -33.510910,
+        "agenda_delivery_origin_lng": -70.784909,
+        "agenda_delivery_fee_0_3": 2500,
+        "agenda_delivery_fee_3_6": 3500,
+        "agenda_delivery_fee_6_9": 4500,
+        "agenda_delivery_fee_9_plus": 5500,
+        "agenda_delivery_note_text": "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
+        "agenda_delivery_outside_warning": "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente.",
         "agenda_days_ahead": 14,
         "agenda_hour_start": "09:00",
         "agenda_hour_end": "19:00",
@@ -1732,6 +1868,24 @@ def _normalizar_tienda_personalizacion(payload):
     clean["agenda_map_search_text"] = str(data.get("agenda_map_search_text") or base["agenda_map_search_text"]).strip()[:40] or base["agenda_map_search_text"]
     clean["agenda_map_confirm_text"] = str(data.get("agenda_map_confirm_text") or base["agenda_map_confirm_text"]).strip()[:40] or base["agenda_map_confirm_text"]
     clean["agenda_map_help_text"] = str(data.get("agenda_map_help_text") or base["agenda_map_help_text"]).strip()[:180] or base["agenda_map_help_text"]
+    try:
+        delivery_origin_lat = float(data.get("agenda_delivery_origin_lat") if data.get("agenda_delivery_origin_lat") is not None else base["agenda_delivery_origin_lat"])
+    except (TypeError, ValueError):
+        delivery_origin_lat = float(base["agenda_delivery_origin_lat"])
+    try:
+        delivery_origin_lng = float(data.get("agenda_delivery_origin_lng") if data.get("agenda_delivery_origin_lng") is not None else base["agenda_delivery_origin_lng"])
+    except (TypeError, ValueError):
+        delivery_origin_lng = float(base["agenda_delivery_origin_lng"])
+    clean["agenda_delivery_origin_lat"] = max(-90.0, min(90.0, delivery_origin_lat))
+    clean["agenda_delivery_origin_lng"] = max(-180.0, min(180.0, delivery_origin_lng))
+    for key in ("agenda_delivery_fee_0_3", "agenda_delivery_fee_3_6", "agenda_delivery_fee_6_9", "agenda_delivery_fee_9_plus"):
+        try:
+            fee = int(float(data.get(key) if data.get(key) is not None else base[key]))
+        except (TypeError, ValueError):
+            fee = int(base[key])
+        clean[key] = max(0, min(300000, fee))
+    clean["agenda_delivery_note_text"] = str(data.get("agenda_delivery_note_text") or base["agenda_delivery_note_text"]).strip()[:220] or base["agenda_delivery_note_text"]
+    clean["agenda_delivery_outside_warning"] = str(data.get("agenda_delivery_outside_warning") or base["agenda_delivery_outside_warning"]).strip()[:260] or base["agenda_delivery_outside_warning"]
     clean["agenda_form_button_text"] = str(data.get("agenda_form_button_text") or base["agenda_form_button_text"]).strip()[:50] or base["agenda_form_button_text"]
     clean["agenda_confirm_title"] = str(data.get("agenda_confirm_title") or base["agenda_confirm_title"]).strip()[:70] or base["agenda_confirm_title"]
     clean["agenda_confirm_warning"] = str(data.get("agenda_confirm_warning") or base["agenda_confirm_warning"]).strip()[:220] or base["agenda_confirm_warning"]
@@ -3843,6 +3997,24 @@ def api_tienda_agenda_disponibilidad():
             conn.close()
 
 
+@app.route('/api/tienda/agenda/despacho-cotizar', methods=['POST'])
+def api_tienda_agenda_despacho_cotizar():
+    try:
+        data = request.get_json(silent=True) or {}
+        try:
+            lat = float(data.get("lat"))
+            lng = float(data.get("lng"))
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Coordenadas invalidas para cotizar despacho"}), 400
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            return jsonify({"success": False, "error": "Coordenadas fuera de rango"}), 400
+        cfg_tienda = _obtener_tienda_personalizacion()
+        quote = _cotizar_envio_agenda(lat, lng, cfg_tienda=cfg_tienda)
+        return jsonify({"success": True, "quote": quote})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/tienda/agenda/reservar', methods=['POST'])
 def api_tienda_agenda_reservar():
     conn = None
@@ -3893,9 +4065,11 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": "Selecciona tipo de pedido: Torta o Pastel"}), 400
 
         cfg_tienda = _obtener_tienda_personalizacion()
+        shipping_quote = None
         catalogo_torta_resumen = None
         pastel_catalogo_resumen = []
         pastel_especial_detalle = None
+        subtotal_estimado = 0.0
         if tipo_pedido == "torta":
             catalogo_publico = _catalogo_torta_publico((cfg_tienda or {}).get("catalogo_torta") or {})
             if not bool(catalogo_publico.get("enabled")):
@@ -3904,6 +4078,7 @@ def api_tienda_agenda_reservar():
                 catalogo_torta_resumen = _validar_payload_catalogo_torta(catalogo_torta_payload, catalogo_publico)
             except ValueError as ve:
                 return jsonify({"success": False, "error": str(ve)}), 400
+            subtotal_estimado = float(catalogo_torta_resumen.get("subtotal") or 0)
         elif tipo_pedido == "pastel":
             categorias_raw = str((cfg_tienda or {}).get("agenda_pastel_category_filter") or "Pasteles")
             categorias_allow = {
@@ -3987,6 +4162,7 @@ def api_tienda_agenda_reservar():
                             "subtotal": float(prod.get("precio") or 0) * int(qty),
                         }
                     )
+                subtotal_estimado = sum(float(it.get("subtotal") or 0) for it in pastel_catalogo_resumen)
             else:
                 especial_nombre = str(pastel_especial_payload.get("nombre") or "").strip()[:120]
                 especial_detalle = str(pastel_especial_payload.get("detalle") or "").strip()[:400]
@@ -4004,6 +4180,7 @@ def api_tienda_agenda_reservar():
                 return jsonify({"success": False, "error": "Debes confirmar la direccion con el pin del mapa"}), 400
             if not (-90 <= latitud <= 90 and -180 <= longitud <= 180):
                 return jsonify({"success": False, "error": "Coordenadas de despacho invalidas"}), 400
+            shipping_quote = _cotizar_envio_agenda(latitud, longitud, cfg_tienda=cfg_tienda)
 
         fecha_hoy = datetime.now(ZoneInfo("America/Santiago")).date()
         fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()
@@ -4089,6 +4266,14 @@ def api_tienda_agenda_reservar():
             ingredientes = f"{ingredientes}\nDetalle: {detalle}"
         if entrega_tipo == "despacho":
             ingredientes = f"{ingredientes}\nMapa pin: {latitud:.6f},{longitud:.6f}"
+            if shipping_quote:
+                if bool(shipping_quote.get("inside_maipu")) and shipping_quote.get("shipping_fee") is not None:
+                    ingredientes = (
+                        f"{ingredientes}\nDespacho estimado: ${int(shipping_quote.get('shipping_fee') or 0):,}".replace(",", ".")
+                    )
+                    ingredientes = f"{ingredientes}\nDistancia estimada: {float(shipping_quote.get('distance_km') or 0):.2f} km ({shipping_quote.get('range_label')})"
+                else:
+                    ingredientes = f"{ingredientes}\n{str(shipping_quote.get('warning') or '')}"
         codigo_op = f"OPA-TI-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"[:80]
 
         cursor.execute(
@@ -4118,6 +4303,8 @@ def api_tienda_agenda_reservar():
         reserva_id = int(cursor.lastrowid or 0)
         conn.commit()
         crear_backup()
+        despacho_estimado = float(shipping_quote.get("shipping_fee") or 0) if (shipping_quote and bool(shipping_quote.get("inside_maipu"))) else 0.0
+        total_estimado = float(subtotal_estimado) + float(despacho_estimado)
         return jsonify(
             {
                 "success": True,
@@ -4136,6 +4323,10 @@ def api_tienda_agenda_reservar():
                     "pastel_modo": pastel_modo if tipo_pedido == "pastel" else "",
                     "pastel_catalogo": pastel_catalogo_resumen if tipo_pedido == "pastel" else [],
                     "pastel_especial": pastel_especial_detalle if tipo_pedido == "pastel" else None,
+                    "shipping_quote": shipping_quote if entrega_tipo == "despacho" else None,
+                    "subtotal_estimado": round(float(subtotal_estimado), 2),
+                    "despacho_estimado": round(float(despacho_estimado), 2),
+                    "total_estimado": round(float(total_estimado), 2),
                 },
             }
         )

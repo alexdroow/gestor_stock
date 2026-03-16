@@ -271,6 +271,7 @@
             <div class="top-links">
                 <a href="/ventas/admin-catalogo">Catalogo tienda</a>
                 <a href="/ventas/admin-catalogo-torta">Catalogo torta</a>
+                <a href="#panel-envios">Envios pedidos</a>
                 <a href="/ventas/cupones">Cupones</a>
                 <a href="/ventas">Ventas</a>
                 <a href="/tienda" target="_blank" rel="noopener">Abrir tienda</a>
@@ -592,6 +593,41 @@
                     <label class="full">Texto ayuda mapa
                         <input id="agenda_map_help_text" type="text" maxlength="180" placeholder="Mueve el pin al punto exacto y confirma.">
                     </label>
+                </div>
+
+                <h2 id="panel-envios">Envios pedidos (solo Maipu)</h2>
+                <div class="fields">
+                    <label>Origen despacho (latitud)
+                        <input id="agenda_delivery_origin_lat" type="number" step="0.000001" min="-90" max="90" placeholder="-33.510910">
+                    </label>
+                    <label>Origen despacho (longitud)
+                        <input id="agenda_delivery_origin_lng" type="number" step="0.000001" min="-180" max="180" placeholder="-70.784909">
+                    </label>
+                    <label>0 a 3 km ($)
+                        <input id="agenda_delivery_fee_0_3" type="number" min="0" max="300000" step="100">
+                    </label>
+                    <label>3 a 6 km ($)
+                        <input id="agenda_delivery_fee_3_6" type="number" min="0" max="300000" step="100">
+                    </label>
+                    <label>6 a 9 km ($)
+                        <input id="agenda_delivery_fee_6_9" type="number" min="0" max="300000" step="100">
+                    </label>
+                    <label>9+ km ($)
+                        <input id="agenda_delivery_fee_9_plus" type="number" min="0" max="300000" step="100">
+                    </label>
+                    <label class="full">Texto informativo despacho dentro de Maipu
+                        <input id="agenda_delivery_note_text" type="text" maxlength="220" placeholder="El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.">
+                    </label>
+                    <label class="full">Advertencia para direccion fuera de Maipu
+                        <input id="agenda_delivery_outside_warning" type="text" maxlength="260" placeholder="Direccion fuera de Maipu: el valor de despacho no se muestra online...">
+                    </label>
+                    <label class="full" style="font-size:.8rem;color:#64748b;">
+                        Nota: fuera de Maipu no se mostrara valor de despacho al cliente; quedara para cotizacion interna.
+                    </label>
+                </div>
+
+                <h2>Agenda de reservas: mensajes y disponibilidad</h2>
+                <div class="fields">
                     <label>Titulo modal confirmar
                         <input id="agenda_confirm_title" type="text" maxlength="70" placeholder="Confirmar reserva">
                     </label>
@@ -774,6 +810,8 @@
         "agenda_delivery_retiro_text","agenda_delivery_despacho_text","agenda_form_button_text",
         "agenda_placeholder_name","agenda_placeholder_email","agenda_placeholder_phone","agenda_placeholder_detail","agenda_placeholder_address",
         "agenda_map_search_text","agenda_map_confirm_text","agenda_map_help_text",
+        "agenda_delivery_origin_lat","agenda_delivery_origin_lng","agenda_delivery_fee_0_3","agenda_delivery_fee_3_6","agenda_delivery_fee_6_9","agenda_delivery_fee_9_plus",
+        "agenda_delivery_note_text","agenda_delivery_outside_warning",
         "agenda_confirm_title","agenda_confirm_warning","agenda_confirm_pdf_text","agenda_confirm_cancel_text","agenda_confirm_accept_text",
         "agenda_days_ahead","agenda_hour_start","agenda_hour_end","agenda_slot_minutes","agenda_slot_capacity",
         "agenda_card_bg","agenda_card_border","agenda_slot_available_bg","agenda_slot_unavailable_bg","agenda_slot_unavailable_text",
@@ -852,6 +890,14 @@
         agenda_map_search_text: "Buscar",
         agenda_map_confirm_text: "Confirmar pin",
         agenda_map_help_text: "Mueve el pin al punto exacto y confirma.",
+        agenda_delivery_origin_lat: -33.510910,
+        agenda_delivery_origin_lng: -70.784909,
+        agenda_delivery_fee_0_3: 2500,
+        agenda_delivery_fee_3_6: 3500,
+        agenda_delivery_fee_6_9: 4500,
+        agenda_delivery_fee_9_plus: 5500,
+        agenda_delivery_note_text: "El valor de despacho se calcula automaticamente para direcciones dentro de Maipu.",
+        agenda_delivery_outside_warning: "Direccion fuera de Maipu: el valor de despacho no se muestra online. Te contactaremos para cotizarlo internamente.",
         agenda_form_button_text: "Reservar horario",
         agenda_confirm_title: "Confirmar reserva",
         agenda_confirm_warning: "Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.",
