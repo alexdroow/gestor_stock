@@ -175,7 +175,7 @@
         <span class="title">Envíos Pedidos</span>
         <span class="sub">Tarifas por sector, mapa y configuración despacho</span>
       </button>
-      <button class="btn btn-sub" data-route="/agenda?launcher_compact=1">
+      <button class="btn btn-sub" data-route="/agenda?launcher_compact=1" data-open-new="1" data-window-features="width=1560,height=980">
         <span class="title">Agenda Admin</span>
         <span class="sub">Reservas, calendario y gestión de eventos</span>
       </button>
@@ -259,13 +259,14 @@
       btn.addEventListener("click", () => {
         const route = btn.getAttribute("data-route") || "";
         const openNew = btn.getAttribute("data-open-new") === "1";
+        const windowFeatures = btn.getAttribute("data-window-features") || "";
         const baseUrl = normalizarBase(baseInput.value);
         const fullUrl = `${baseUrl}${route.startsWith("/") ? route : `/${route}`}`;
         baseInput.value = baseUrl;
         localStorage.setItem(STORAGE_KEY, baseUrl);
         setStatus(`Abriendo: ${route}...`);
         if (openNew) {
-          const win = window.open(fullUrl, "_blank");
+          const win = window.open(fullUrl, "_blank", windowFeatures);
           if (!win) {
             setStatus("No se pudo abrir ventana nueva (popup bloqueado).", true);
             return;
