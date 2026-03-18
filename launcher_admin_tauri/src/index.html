@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -52,6 +52,18 @@
       padding: 10px;
       background: #f8fafc;
     }
+    .cfg-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .cfg-row input { flex: 1; }
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
     label { font-size: .84rem; font-weight: 700; color: #334155; }
     input {
       width: 100%;
@@ -87,6 +99,21 @@
     }
     .btn .title { display: block; font-size: .95rem; }
     .btn .sub { display: block; margin-top: 2px; font-size: .78rem; color: #64748b; font-weight: 600; }
+    .mini-btn {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #0f172a;
+      border-radius: 10px;
+      font-weight: 700;
+      padding: 9px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .mini-btn.accent {
+      background: #16a34a;
+      border-color: #16a34a;
+      color: #fff;
+    }
     .status {
       min-height: 20px;
       font-size: .88rem;
@@ -120,7 +147,14 @@
 
     <section class="cfg">
       <label for="base-url">URL base admin</label>
-      <input id="base-url" type="text" value="https://alexdroow.pythonanywhere.com" />
+      <div class="cfg-row">
+        <input id="base-url" type="text" value="https://alexdroow.pythonanywhere.com" />
+        <button id="save-base-url" class="mini-btn" type="button">Guardar URL</button>
+      </div>
+      <div class="quick-actions">
+        <button id="open-editor-window" class="mini-btn" type="button">Abrir Editor en ventana</button>
+        <button id="save-open-editor" class="mini-btn accent" type="button">Guardar en editor abierto</button>
+      </div>
       <div class="muted">Puedes cambiarla si en el futuro migras a dominio propio.</div>
     </section>
 
@@ -145,8 +179,8 @@
         <span class="title">Agenda Admin</span>
         <span class="sub">Reservas, calendario y gestión de eventos</span>
       </button>
-      <button class="btn btn-sub" data-route="/ventas">
-        <span class="title">Ventas Admin</span>
+      <button class="btn btn-sub" data-route="/ventas" data-open-new="1">
+        <span class="title">Admin Sucree Stock</span>
         <span class="sub">Estado tienda, pedidos y operación diaria</span>
       </button>
     </section>
@@ -160,11 +194,13 @@
   </main>
 
   <script>
-    const { invoke } = window.__TAURI__.tauri;
     const baseInput = document.getElementById("base-url");
+    const saveBaseBtn = document.getElementById("save-base-url");
+    const openEditorWindowBtn = document.getElementById("open-editor-window");
+    const saveOpenEditorBtn = document.getElementById("save-open-editor");
     const statusEl = document.getElementById("status");
     const STORAGE_KEY = "launcher_admin_base_url";
-
+    let editorWindowRef = null;
     function setStatus(msg, isErr = false) {
       statusEl.textContent = msg || "";
       statusEl.classList.toggle("err", Boolean(isErr));
@@ -185,19 +221,59 @@
       localStorage.setItem(STORAGE_KEY, n);
     });
 
+    saveBaseBtn.addEventListener("click", () => {
+      const n = normalizarBase(baseInput.value);
+      baseInput.value = n;
+      localStorage.setItem(STORAGE_KEY, n);
+      setStatus("URL base guardada.");
+    });
+
+    openEditorWindowBtn.addEventListener("click", () => {
+      const baseUrl = normalizarBase(baseInput.value);
+      const editorUrl = `${baseUrl}/ventas/admin-personalizacion`;
+      baseInput.value = baseUrl;
+      localStorage.setItem(STORAGE_KEY, baseUrl);
+      editorWindowRef = window.open(editorUrl, "sucree_editor_window");
+      if (!editorWindowRef) {
+        setStatus("No se pudo abrir el editor en ventana (popup bloqueado).", true);
+        return;
+      }
+      setStatus("Editor abierto en ventana separada.");
+    });
+
+    saveOpenEditorBtn.addEventListener("click", () => {
+      if (!editorWindowRef || editorWindowRef.closed) {
+        setStatus("Primero abre el editor en ventana separada.", true);
+        return;
+      }
+      try {
+        editorWindowRef.postMessage({ type: "SUCREE_LAUNCHER_SAVE" }, "*");
+        editorWindowRef.focus();
+        setStatus("Solicitud de guardado enviada al editor.");
+      } catch (err) {
+        setStatus("No se pudo enviar la orden de guardado al editor.", true);
+      }
+    });
+
     document.querySelectorAll("[data-route]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         const route = btn.getAttribute("data-route") || "";
+        const openNew = btn.getAttribute("data-open-new") === "1";
         const baseUrl = normalizarBase(baseInput.value);
+        const fullUrl = `${baseUrl}${route.startsWith("/") ? route : `/${route}`}`;
         baseInput.value = baseUrl;
         localStorage.setItem(STORAGE_KEY, baseUrl);
-        try {
-          await invoke("open_admin_panel", { baseUrl, route });
-          setStatus(`Abierto: ${route}`);
-        } catch (e) {
-          const msg = (e && e.toString) ? e.toString() : "No se pudo abrir el panel";
-          setStatus(msg, true);
+        setStatus(`Abriendo: ${route}...`);
+        if (openNew) {
+          const win = window.open(fullUrl, "_blank");
+          if (!win) {
+            setStatus("No se pudo abrir ventana nueva (popup bloqueado).", true);
+            return;
+          }
+          setStatus(`Abierto en nueva ventana: ${route}`);
+          return;
         }
+        window.location.href = fullUrl;
       });
     });
   </script>

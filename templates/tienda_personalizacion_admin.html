@@ -1828,6 +1828,11 @@
         syncColorPickersFromText();
         setMsg("Valores base cargados en formulario. Presiona 'Guardar cambios' para aplicar.");
     });
+    window.addEventListener("message", (ev) => {
+        const type = String(ev?.data?.type || "");
+        if (type !== "SUCREE_LAUNCHER_SAVE") return;
+        guardar();
+    });
     document.querySelectorAll("[data-quick-preset]").forEach((btn) => {
         btn.addEventListener("click", async () => {
             const slug = String(btn.getAttribute("data-quick-preset") || "");
