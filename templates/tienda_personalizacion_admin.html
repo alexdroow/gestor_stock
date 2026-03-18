@@ -42,6 +42,14 @@
             background: #fff;
             font-weight: 700;
         }
+        .top-links .top-save {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .top-links .top-save:hover {
+            filter: brightness(0.96);
+        }
         .grid {
             margin-top: 12px;
             display: grid;
@@ -333,6 +341,7 @@
         <div class="top">
             <h1>Personalizacion de Tienda</h1>
             <div class="top-links">
+                <a href="#" id="btn-guardar-top" class="top-save">Guardar cambios</a>
                 <a href="#" id="link-panel-editor">Editor tienda</a>
                 <a href="/ventas/admin-catalogo">Catalogo tienda</a>
                 <a href="/ventas/admin-catalogo-torta">Catalogo torta</a>
@@ -940,6 +949,7 @@
     const btnVolverEditorEl = document.getElementById("btn-volver-editor");
     const btnGuardarEnviosEl = document.getElementById("btn-guardar-envios");
     const btnRecargarEnviosEl = document.getElementById("btn-recargar-envios");
+    const btnGuardarTopEl = document.getElementById("btn-guardar-top");
 
     const zonaNombreEl = document.getElementById("envios-zona-nombre");
     const zonaFeeEl = document.getElementById("envios-zona-fee");
@@ -1786,6 +1796,10 @@
     }
 
     document.getElementById("btn-guardar").addEventListener("click", guardar);
+    btnGuardarTopEl?.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        guardar();
+    });
     document.getElementById("btn-recargar").addEventListener("click", cargar);
     btnGuardarEnviosEl?.addEventListener("click", () => guardar("envios"));
     btnRecargarEnviosEl?.addEventListener("click", cargar);
