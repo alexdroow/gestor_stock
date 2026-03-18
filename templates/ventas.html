@@ -21,6 +21,9 @@
             min-height: 100vh;
             color: #0f172a;
         }
+        html.launcher-compact {
+            zoom: 0.90;
+        }
         
         .sidebar {
             width: 260px;
@@ -1512,6 +1515,19 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
 </head>
 <body>
+    <script>
+        (function () {
+            try {
+                const qs = new URLSearchParams(window.location.search || "");
+                const forceCompact = qs.get("launcher_compact") === "1";
+                const ua = String(navigator.userAgent || "").toLowerCase();
+                const inTauri = ua.includes("tauri");
+                if (forceCompact || inTauri) {
+                    document.documentElement.classList.add("launcher-compact");
+                }
+            } catch (_) {}
+        })();
+    </script>
     <div style="display: flex; min-height: 100vh;">
         <!-- Sidebar -->
         {% include "_sidebar.html" %}
