@@ -1,0 +1,205 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Launcher Admin Sucrée</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --line: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #ea580c;
+      --accent-dark: #c2410c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+    .app {
+      width: min(920px, 100%);
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, .08);
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .head {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 1.2rem; }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .cfg {
+      display: grid;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+    label { font-size: .84rem; font-weight: 700; color: #334155; }
+    input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 9px 10px;
+      font: inherit;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .btn {
+      border: 0;
+      border-radius: 11px;
+      padding: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      text-align: left;
+      transition: transform .1s ease, box-shadow .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-main {
+      color: #fff;
+      background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+      box-shadow: 0 8px 20px rgba(234, 88, 12, .25);
+    }
+    .btn-sub {
+      background: #fff;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+    }
+    .btn .title { display: block; font-size: .95rem; }
+    .btn .sub { display: block; margin-top: 2px; font-size: .78rem; color: #64748b; font-weight: 600; }
+    .status {
+      min-height: 20px;
+      font-size: .88rem;
+      color: #0f766e;
+    }
+    .status.err { color: #b91c1c; }
+    .foot {
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: .82rem;
+      color: #64748b;
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      .btn { text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="head">
+      <div>
+        <h1>Launcher Admin Pastelería Sucrée</h1>
+        <div class="muted">Abre solo paneles administrativos de tu plataforma.</div>
+      </div>
+    </div>
+
+    <section class="cfg">
+      <label for="base-url">URL base admin</label>
+      <input id="base-url" type="text" value="https://alexdroow.pythonanywhere.com" />
+      <div class="muted">Puedes cambiarla si en el futuro migras a dominio propio.</div>
+    </section>
+
+    <section class="grid">
+      <button class="btn btn-main" data-route="/ventas/admin-personalizacion">
+        <span class="title">Personalización Tienda</span>
+        <span class="sub">Textos, banners, estilo, agenda y reglas visuales</span>
+      </button>
+      <button class="btn btn-main" data-route="/ventas/admin-catalogo">
+        <span class="title">Catálogo Tienda</span>
+        <span class="sub">Productos, categorías y configuración comercial</span>
+      </button>
+      <button class="btn btn-main" data-route="/ventas/admin-catalogo-torta">
+        <span class="title">Catálogo Torta</span>
+        <span class="sub">Tamaños, sabores, extras, toppers y reglas</span>
+      </button>
+      <button class="btn btn-main" data-route="/ventas/admin-envios">
+        <span class="title">Envíos Pedidos</span>
+        <span class="sub">Tarifas por sector, mapa y configuración despacho</span>
+      </button>
+      <button class="btn btn-sub" data-route="/agenda">
+        <span class="title">Agenda Admin</span>
+        <span class="sub">Reservas, calendario y gestión de eventos</span>
+      </button>
+      <button class="btn btn-sub" data-route="/ventas">
+        <span class="title">Ventas Admin</span>
+        <span class="sub">Estado tienda, pedidos y operación diaria</span>
+      </button>
+    </section>
+
+    <div id="status" class="status"></div>
+
+    <div class="foot">
+      <span>Modo seguro: rutas públicas de tienda excluidas.</span>
+      <span>Versión launcher: 0.1.0</span>
+    </div>
+  </main>
+
+  <script>
+    const { invoke } = window.__TAURI__.tauri;
+    const baseInput = document.getElementById("base-url");
+    const statusEl = document.getElementById("status");
+    const STORAGE_KEY = "launcher_admin_base_url";
+
+    function setStatus(msg, isErr = false) {
+      statusEl.textContent = msg || "";
+      statusEl.classList.toggle("err", Boolean(isErr));
+    }
+
+    function normalizarBase(raw) {
+      const txt = String(raw || "").trim();
+      if (!txt) return "https://alexdroow.pythonanywhere.com";
+      return txt.replace(/\/+$/, "");
+    }
+
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) baseInput.value = saved;
+
+    baseInput.addEventListener("change", () => {
+      const n = normalizarBase(baseInput.value);
+      baseInput.value = n;
+      localStorage.setItem(STORAGE_KEY, n);
+    });
+
+    document.querySelectorAll("[data-route]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const route = btn.getAttribute("data-route") || "";
+        const baseUrl = normalizarBase(baseInput.value);
+        baseInput.value = baseUrl;
+        localStorage.setItem(STORAGE_KEY, baseUrl);
+        try {
+          await invoke("open_admin_panel", { baseUrl, route });
+          setStatus(`Abierto: ${route}`);
+        } catch (e) {
+          const msg = (e && e.toString) ? e.toString() : "No se pudo abrir el panel";
+          setStatus(msg, true);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

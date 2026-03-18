@@ -1,0 +1,22 @@
+﻿[package]
+name = "launcher_admin_sucree"
+version = "0.1.0"
+description = "Launcher de escritorio para paneles admin"
+authors = ["Pasteleria Sucree"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "1.6", features = ["window-create"] }
+url = "2"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
