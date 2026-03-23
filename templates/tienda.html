@@ -1789,6 +1789,10 @@
             display: inline-flex;
             align-items: center;
         }
+        body.mobile-ui .mobile-agenda-summary-fab {
+            padding: var(--mobile-menu-fab-pad);
+            font-size: var(--mobile-menu-fab-font);
+        }
         body.mobile-ui .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
         body.mobile-ui .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
         body.mobile-ui .item-name { font-size: 1.17rem; min-height: auto; }
@@ -1967,6 +1971,11 @@
         body.mobile-ui .mobile-cart-close {
             font-size: 0.91rem;
             padding: 7px 11px;
+        }
+        body.mobile-ui #agenda-confirmar-aceptar-enviar {
+            font-size: 0.72rem !important;
+            padding: 7px 9px !important;
+            line-height: 1.15;
         }
         .mobile-cart-head {
             display: flex;
@@ -2861,7 +2870,7 @@
             const fabBottom = 12 + browserInsetBottom;
             const menuFabHeight = Math.round(33 * scale);
             const summaryBottom = fabBottom + menuFabHeight + 12;
-            const waBottom = summaryBottom + Math.round(43 * scale);
+            const waBottom = Math.round((summaryBottom + Math.round(43 * scale)) * 1.10);
             const catsBottom = fabBottom + menuFabHeight + 16;
             const root = document.documentElement;
             root.style.setProperty("--mobile-fab-bottom", `${fabBottom}px`);
