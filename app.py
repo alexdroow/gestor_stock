@@ -978,6 +978,340 @@ def _nombre_desde_email(email):
     return " ".join(part.capitalize() for part in base.split() if part)[:80] or "Cliente tienda"
 
 
+def _normalizar_fecha_nacimiento(raw):
+    txt = str(raw or "").strip()
+    if not txt:
+        return ""
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(txt, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return ""
+
+
+def _slug_simple(raw):
+    txt = str(raw or "").strip().lower()
+    txt = re.sub(r"[^a-z0-9]+", "-", txt)
+    txt = re.sub(r"-{2,}", "-", txt).strip("-")
+    return txt[:80] or "nivel"
+
+
+def _config_programa_clientes_default():
+    return {
+        "enabled": True,
+        "purchase_amount_base": 1000,
+        "purchase_points": 10,
+        "agenda_points": 20,
+    }
+
+
+def _normalizar_config_programa_clientes(payload):
+    base = _config_programa_clientes_default()
+    data = dict(payload or {})
+    cfg = dict(base)
+    cfg["enabled"] = bool(data.get("enabled", base["enabled"]))
+    cfg["purchase_amount_base"] = _clamp_int(data.get("purchase_amount_base"), default=1000, min_value=500, max_value=10000000)
+    cfg["purchase_points"] = _clamp_int(data.get("purchase_points"), default=10, min_value=0, max_value=100000)
+    cfg["agenda_points"] = _clamp_int(data.get("agenda_points"), default=20, min_value=0, max_value=100000)
+    return cfg
+
+
+def _obtener_config_programa_clientes(conn):
+    cfg = _config_programa_clientes_default()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT config_json FROM tienda_clientes_programa WHERE id = 1 LIMIT 1")
+        row = cursor.fetchone()
+        if row and str(row["config_json"] or "").strip():
+            raw = json.loads(str(row["config_json"] or "{}"))
+            cfg = _normalizar_config_programa_clientes(raw)
+    except Exception:
+        cfg = _config_programa_clientes_default()
+    return cfg
+
+
+def _guardar_config_programa_clientes(conn, payload):
+    cfg = _normalizar_config_programa_clientes(payload)
+    conn.execute(
+        """
+        INSERT INTO tienda_clientes_programa (id, config_json, actualizado_en)
+        VALUES (1, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+            config_json = excluded.config_json,
+            actualizado_en = CURRENT_TIMESTAMP
+        """,
+        (json.dumps(cfg, ensure_ascii=False),),
+    )
+    return cfg
+
+
+def _cargar_niveles_clientes(conn, solo_activos=False):
+    cursor = conn.cursor()
+    query = """
+        SELECT id, nombre, slug, orden, puntos_minimos, beneficios_json, descuento_pct, activo
+        FROM tienda_clientes_niveles
+    """
+    params = ()
+    if solo_activos:
+        query += " WHERE activo = 1"
+    query += " ORDER BY orden ASC, puntos_minimos ASC, id ASC"
+    cursor.execute(query, params)
+    out = []
+    for row in cursor.fetchall():
+        r = dict(row)
+        try:
+            beneficios = json.loads(str(r.get("beneficios_json") or "{}"))
+        except Exception:
+            beneficios = {}
+        if not isinstance(beneficios, dict):
+            beneficios = {}
+        out.append(
+            {
+                "id": int(r.get("id") or 0),
+                "nombre": str(r.get("nombre") or "").strip(),
+                "slug": str(r.get("slug") or "").strip(),
+                "orden": int(r.get("orden") or 0),
+                "puntos_minimos": int(r.get("puntos_minimos") or 0),
+                "beneficios": beneficios,
+                "descuento_pct": float(r.get("descuento_pct") or 0),
+                "activo": bool(r.get("activo")),
+            }
+        )
+    return out
+
+
+def _normalizar_niveles_clientes(rows):
+    niveles = []
+    for idx, raw in enumerate(list(rows or []), start=1):
+        item = dict(raw or {})
+        nombre = str(item.get("nombre") or "").strip()[:60] or f"Nivel {idx}"
+        slug = _slug_simple(item.get("slug") or nombre)
+        nivel_id = int(item.get("id") or 0) if str(item.get("id") or "").strip() else 0
+        beneficios = item.get("beneficios")
+        if not isinstance(beneficios, dict):
+            beneficios = {}
+        b_items = beneficios.get("beneficios")
+        if isinstance(b_items, list):
+            beneficios["beneficios"] = [str(x).strip()[:120] for x in b_items if str(x).strip()][:15]
+        else:
+            beneficios["beneficios"] = []
+        niveles.append(
+            {
+                "id": nivel_id,
+                "nombre": nombre,
+                "slug": slug,
+                "orden": _clamp_int(item.get("orden"), default=idx, min_value=0, max_value=9999),
+                "puntos_minimos": _clamp_int(item.get("puntos_minimos"), default=0, min_value=0, max_value=100000000),
+                "beneficios_json": json.dumps(beneficios, ensure_ascii=False),
+                "descuento_pct": max(0.0, min(100.0, float(item.get("descuento_pct") or 0))),
+                "activo": 1 if bool(item.get("activo", True)) else 0,
+            }
+        )
+    niveles.sort(key=lambda n: (int(n["orden"]), int(n["puntos_minimos"]), str(n["nombre"])))
+    if not niveles:
+        niveles = [
+            {
+                "id": 0,
+                "nombre": "Bronce",
+                "slug": "bronce",
+                "orden": 1,
+                "puntos_minimos": 0,
+                "beneficios_json": json.dumps({"beneficios": ["Acceso base a promociones"]}, ensure_ascii=False),
+                "descuento_pct": 0.0,
+                "activo": 1,
+            }
+        ]
+    return niveles
+
+
+def _guardar_niveles_clientes(conn, niveles):
+    rows = _normalizar_niveles_clientes(niveles)
+    cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
+    cursor.execute("DELETE FROM tienda_clientes_niveles")
+    for row in rows:
+        cursor.execute(
+            """
+            INSERT INTO tienda_clientes_niveles (id, nombre, slug, orden, puntos_minimos, beneficios_json, descuento_pct, activo, creado_en, actualizado_en)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                int(row["id"]) if int(row["id"]) > 0 else None,
+                row["nombre"],
+                row["slug"],
+                int(row["orden"]),
+                int(row["puntos_minimos"]),
+                row["beneficios_json"],
+                float(row["descuento_pct"]),
+                int(row["activo"]),
+            ),
+        )
+    conn.commit()
+
+
+def _resolver_nivel_cliente(puntos_total, niveles):
+    pts = int(max(0, int(puntos_total or 0)))
+    activos = [n for n in (niveles or []) if bool(n.get("activo"))]
+    if not activos:
+        return None
+    best = activos[0]
+    for n in activos:
+        if pts >= int(n.get("puntos_minimos") or 0):
+            best = n
+    return best
+
+
+def _actualizar_nivel_cliente_cursor(cursor, cliente_id):
+    cursor.execute("SELECT puntos_total FROM tienda_clientes WHERE id = ? LIMIT 1", (int(cliente_id),))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    puntos_total = int(row["puntos_total"] or 0)
+    niveles = _cargar_niveles_clientes(cursor.connection, solo_activos=True)
+    nivel = _resolver_nivel_cliente(puntos_total, niveles)
+    nivel_id = int(nivel.get("id") or 0) if nivel else None
+    cursor.execute(
+        """
+        UPDATE tienda_clientes
+        SET nivel_id = ?, actualizado_en = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (nivel_id, int(cliente_id)),
+    )
+    return nivel
+
+
+def _obtener_cliente_por_contacto_cursor(cursor, email, telefono):
+    cursor.execute(
+        """
+        SELECT c.*, n.nombre AS nivel_nombre, n.slug AS nivel_slug, n.puntos_minimos AS nivel_puntos_minimos,
+               n.descuento_pct AS nivel_descuento_pct, n.beneficios_json AS nivel_beneficios_json
+        FROM tienda_clientes c
+        LEFT JOIN tienda_clientes_niveles n ON n.id = c.nivel_id
+        WHERE c.email = ? AND c.telefono = ?
+        LIMIT 1
+        """,
+        (str(email or "").strip().lower(), str(telefono or "").strip()),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    out = dict(row)
+    try:
+        beneficios = json.loads(str(out.get("nivel_beneficios_json") or "{}"))
+    except Exception:
+        beneficios = {}
+    out["nivel"] = {
+        "id": int(out.get("nivel_id") or 0) if out.get("nivel_id") is not None else None,
+        "nombre": str(out.get("nivel_nombre") or "").strip(),
+        "slug": str(out.get("nivel_slug") or "").strip(),
+        "puntos_minimos": int(out.get("nivel_puntos_minimos") or 0),
+        "descuento_pct": float(out.get("nivel_descuento_pct") or 0),
+        "beneficios": beneficios if isinstance(beneficios, dict) else {},
+    }
+    return out
+
+
+def _upsert_cliente_tienda_cursor(
+    cursor,
+    *,
+    nombre,
+    email,
+    telefono,
+    fecha_nacimiento="",
+    email_confirmado=0,
+    direccion_default="",
+    direccion_lat=None,
+    direccion_lng=None,
+):
+    em = str(email or "").strip().lower()
+    te = str(telefono or "").strip()
+    nom = str(nombre or "").strip()[:80] or _nombre_desde_email(em)
+    fecha_nac = _normalizar_fecha_nacimiento(fecha_nacimiento)
+    dir_txt = str(direccion_default or "").strip()[:240] or None
+    lat = float(direccion_lat) if direccion_lat is not None and str(direccion_lat).strip() != "" else None
+    lng = float(direccion_lng) if direccion_lng is not None and str(direccion_lng).strip() != "" else None
+    cursor.execute(
+        """
+        INSERT INTO tienda_clientes (
+            nombre, email, telefono, fecha_nacimiento, email_confirmado, direccion_default, direccion_lat, direccion_lng,
+            activo, actualizado_en, ultimo_login
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(email, telefono) DO UPDATE SET
+            nombre = excluded.nombre,
+            fecha_nacimiento = COALESCE(NULLIF(excluded.fecha_nacimiento, ''), tienda_clientes.fecha_nacimiento),
+            email_confirmado = CASE WHEN excluded.email_confirmado = 1 THEN 1 ELSE tienda_clientes.email_confirmado END,
+            direccion_default = COALESCE(excluded.direccion_default, tienda_clientes.direccion_default),
+            direccion_lat = COALESCE(excluded.direccion_lat, tienda_clientes.direccion_lat),
+            direccion_lng = COALESCE(excluded.direccion_lng, tienda_clientes.direccion_lng),
+            activo = 1,
+            actualizado_en = CURRENT_TIMESTAMP,
+            ultimo_login = CURRENT_TIMESTAMP
+        """,
+        (nom, em, te, (fecha_nac or None), 1 if email_confirmado else 0, dir_txt, lat, lng),
+    )
+    cli = _obtener_cliente_por_contacto_cursor(cursor, em, te)
+    if cli and (not cli.get("nivel_id")):
+        _actualizar_nivel_cliente_cursor(cursor, int(cli["id"]))
+        cli = _obtener_cliente_por_contacto_cursor(cursor, em, te)
+    return cli
+
+
+def _registrar_puntos_cliente_cursor(cursor, *, cliente_id, puntos, tipo, origen_tipo, origen_id, detalle):
+    pts = int(puntos or 0)
+    if pts == 0:
+        return False
+    cid = int(cliente_id or 0)
+    if cid <= 0:
+        return False
+    o_tipo = str(origen_tipo or "").strip()[:40] or "manual"
+    o_id = int(origen_id or 0)
+    try:
+        cursor.execute(
+            """
+            INSERT INTO tienda_clientes_puntos_mov (cliente_id, tipo, origen_tipo, origen_id, puntos, detalle, creado_en)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (cid, str(tipo or "ajuste").strip()[:30], o_tipo, o_id, pts, str(detalle or "").strip()[:220]),
+        )
+    except sqlite3.IntegrityError:
+        return False
+    cursor.execute(
+        """
+        UPDATE tienda_clientes
+        SET puntos_actual = CASE WHEN COALESCE(puntos_actual, 0) + ? < 0 THEN 0 ELSE COALESCE(puntos_actual, 0) + ? END,
+            puntos_total = CASE WHEN ? > 0 THEN COALESCE(puntos_total, 0) + ? ELSE COALESCE(puntos_total, 0) END,
+            actualizado_en = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (pts, pts, pts, pts, cid),
+    )
+    _actualizar_nivel_cliente_cursor(cursor, cid)
+    return True
+
+
+def _puntos_compra(total_monto, cfg_programa):
+    cfg = _normalizar_config_programa_clientes(cfg_programa)
+    if not cfg.get("enabled"):
+        return 0
+    base = int(cfg.get("purchase_amount_base") or 0)
+    puntos_por_base = int(cfg.get("purchase_points") or 0)
+    if base <= 0 or puntos_por_base <= 0:
+        return 0
+    monto = max(0.0, float(total_monto or 0))
+    bloques = int(monto // float(base))
+    return max(0, bloques * puntos_por_base)
+
+
+def _puntos_agenda(cfg_programa):
+    cfg = _normalizar_config_programa_clientes(cfg_programa)
+    if not cfg.get("enabled"):
+        return 0
+    return max(0, int(cfg.get("agenda_points") or 0))
+
+
 def _normalizar_pedido_estado(raw):
     v = str(raw or "").strip().lower()
     if v in {"recibido", "confirmado", "preparando", "listo", "entregado", "cancelado"}:
@@ -3089,39 +3423,44 @@ def api_tienda_clientes_registrar():
     try:
         data = request.get_json(silent=True) or {}
         email = _normalizar_email(data.get("email"))
+        email_confirm = _normalizar_email(data.get("email_confirm"))
         if not email:
             return jsonify({"success": False, "error": "Correo electronico invalido"}), 400
+        if email_confirm and email_confirm != email:
+            return jsonify({"success": False, "error": "El correo y la confirmacion no coinciden"}), 400
         telefono = _normalizar_telefono_cl(data.get("telefono"))
         if not telefono:
             return jsonify({"success": False, "error": "Telefono invalido. Debe tener 8 digitos"}), 400
-        nombre = str(data.get("nombre") or "").strip()[:80] or _nombre_desde_email(email)
+        nombre = str(data.get("nombre") or "").strip()[:80]
+        if len(nombre) < 2:
+            return jsonify({"success": False, "error": "Nombre invalido"}), 400
+        fecha_nacimiento = _normalizar_fecha_nacimiento(data.get("fecha_nacimiento"))
+        if not fecha_nacimiento:
+            return jsonify({"success": False, "error": "Fecha de nacimiento invalida"}), 400
+        direccion_default = str(data.get("direccion_default") or "").strip()[:240]
+        try:
+            direccion_lat = float(data.get("direccion_lat")) if data.get("direccion_lat") not in (None, "") else None
+            direccion_lng = float(data.get("direccion_lng")) if data.get("direccion_lng") not in (None, "") else None
+        except (TypeError, ValueError):
+            direccion_lat, direccion_lng = None, None
 
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO tienda_clientes (nombre, email, telefono, activo, actualizado_en, ultimo_login)
-            VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT(email, telefono) DO UPDATE SET
-                nombre = excluded.nombre,
-                activo = 1,
-                actualizado_en = CURRENT_TIMESTAMP,
-                ultimo_login = CURRENT_TIMESTAMP
-            """,
-            (nombre, email, telefono),
+        cursor.execute("BEGIN IMMEDIATE")
+        cliente = _upsert_cliente_tienda_cursor(
+            cursor,
+            nombre=nombre,
+            email=email,
+            telefono=telefono,
+            fecha_nacimiento=fecha_nacimiento,
+            email_confirmado=1 if (not email_confirm or email_confirm == email) else 0,
+            direccion_default=direccion_default,
+            direccion_lat=direccion_lat,
+            direccion_lng=direccion_lng,
         )
         conn.commit()
-        cursor.execute(
-            """
-            SELECT id, nombre, email, telefono, activo, creado_en, actualizado_en, ultimo_login
-            FROM tienda_clientes
-            WHERE email = ? AND telefono = ?
-            LIMIT 1
-            """,
-            (email, telefono),
-        )
-        row = cursor.fetchone()
-        cliente = dict(row) if row else {"nombre": nombre, "email": email, "telefono": telefono}
+        if not cliente:
+            cliente = _obtener_cliente_por_contacto_cursor(cursor, email, telefono) or {"nombre": nombre, "email": email, "telefono": telefono}
         return jsonify({"success": True, "cliente": cliente})
     except Exception as e:
         if conn:
@@ -3144,17 +3483,8 @@ def api_tienda_clientes_historial():
 
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, nombre, email, telefono, activo
-            FROM tienda_clientes
-            WHERE email = ? AND telefono = ? AND activo = 1
-            LIMIT 1
-            """,
-            (email, telefono),
-        )
-        cli = cursor.fetchone()
-        if not cli:
+        cli = _obtener_cliente_por_contacto_cursor(cursor, email, telefono)
+        if not cli or not bool(cli.get("activo", 1)):
             return jsonify({"success": False, "error": "Cliente no registrado"}), 404
 
         cursor.execute(
@@ -3209,8 +3539,110 @@ def api_tienda_clientes_historial():
             ]
             ventas.append(venta)
 
-        return jsonify({"success": True, "cliente": dict(cli), "ventas": ventas})
+        cursor.execute(
+            """
+            SELECT id, fecha, hora_inicio, hora_fin, estado, tipo, titulo, direccion, es_envio, cliente_email, cliente_telefono, creado
+            FROM agenda_eventos
+            WHERE LOWER(TRIM(COALESCE(cliente_email, ''))) = LOWER(TRIM(?))
+              AND TRIM(COALESCE(cliente_telefono, '')) = TRIM(?)
+            ORDER BY fecha DESC, hora_inicio DESC, id DESC
+            LIMIT 40
+            """,
+            (email, telefono),
+        )
+        agenda_reservas = [dict(r) for r in cursor.fetchall()]
+        niveles = _cargar_niveles_clientes(conn, solo_activos=True)
+        nivel_actual = cli.get("nivel") if isinstance(cli.get("nivel"), dict) else None
+        puntos_total = int(cli.get("puntos_total") or 0)
+        puntos_faltantes = 0
+        siguiente_nivel = None
+        if niveles:
+            for n in niveles:
+                if int(n.get("puntos_minimos") or 0) > puntos_total:
+                    siguiente_nivel = n
+                    puntos_faltantes = int(n.get("puntos_minimos") or 0) - puntos_total
+                    break
+        return jsonify(
+            {
+                "success": True,
+                "cliente": cli,
+                "ventas": ventas,
+                "agenda_reservas": agenda_reservas,
+                "programa": {
+                    "nivel_actual": nivel_actual,
+                    "siguiente_nivel": siguiente_nivel,
+                    "puntos_total": puntos_total,
+                    "puntos_actual": int(cli.get("puntos_actual") or 0),
+                    "puntos_faltantes": max(0, puntos_faltantes),
+                },
+            }
+        )
     except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/clientes/perfil', methods=['POST'])
+def api_tienda_clientes_perfil():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        email = _normalizar_email(data.get("email"))
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        if not email or not telefono:
+            return jsonify({"success": False, "error": "Debes indicar correo y telefono validos"}), 400
+        conn = get_db()
+        cursor = conn.cursor()
+        cli = _obtener_cliente_por_contacto_cursor(cursor, email, telefono)
+        if not cli:
+            return jsonify({"success": False, "error": "Cliente no registrado"}), 404
+        return jsonify({"success": True, "cliente": cli})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/clientes/actualizar', methods=['POST'])
+def api_tienda_clientes_actualizar():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        email = _normalizar_email(data.get("email"))
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        if not email or not telefono:
+            return jsonify({"success": False, "error": "Debes indicar correo y telefono validos"}), 400
+        nombre = str(data.get("nombre") or "").strip()[:80]
+        fecha_nacimiento = _normalizar_fecha_nacimiento(data.get("fecha_nacimiento"))
+        direccion_default = str(data.get("direccion_default") or "").strip()[:240]
+        try:
+            direccion_lat = float(data.get("direccion_lat")) if data.get("direccion_lat") not in (None, "") else None
+            direccion_lng = float(data.get("direccion_lng")) if data.get("direccion_lng") not in (None, "") else None
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Coordenadas de direccion invalidas"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cli = _upsert_cliente_tienda_cursor(
+            cursor,
+            nombre=nombre or _nombre_desde_email(email),
+            email=email,
+            telefono=telefono,
+            fecha_nacimiento=fecha_nacimiento,
+            email_confirmado=1,
+            direccion_default=direccion_default,
+            direccion_lat=direccion_lat,
+            direccion_lng=direccion_lng,
+        )
+        conn.commit()
+        return jsonify({"success": True, "cliente": cli})
+    except Exception as e:
+        if conn:
+            conn.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
@@ -3299,9 +3731,187 @@ def ventas_admin_catalogo_torta():
     return render_template('tienda_catalogo_torta_admin.html')
 
 
+@app.route('/ventas/admin-clientes')
+def ventas_admin_clientes():
+    return render_template('tienda_clientes_admin.html')
+
+
 @app.route('/ventas/cupones')
 def ventas_admin_cupones():
     return render_template('cupones_admin.html')
+
+
+@app.route('/api/tienda/admin/clientes/programa', methods=['GET', 'POST'])
+def api_tienda_admin_clientes_programa():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        if request.method == "GET":
+            return jsonify({"success": True, "programa": _obtener_config_programa_clientes(conn)})
+        data = request.get_json(silent=True) or {}
+        conn.execute("BEGIN IMMEDIATE")
+        programa = _guardar_config_programa_clientes(conn, data.get("programa") if isinstance(data.get("programa"), dict) else data)
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "programa": programa})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/clientes/niveles', methods=['GET', 'POST'])
+def api_tienda_admin_clientes_niveles():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        if request.method == "GET":
+            return jsonify({"success": True, "niveles": _cargar_niveles_clientes(conn, solo_activos=False)})
+        data = request.get_json(silent=True) or {}
+        niveles = data.get("niveles") if isinstance(data.get("niveles"), list) else []
+        _guardar_niveles_clientes(conn, niveles)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM tienda_clientes")
+        ids = [int(r["id"]) for r in cursor.fetchall()]
+        for cid in ids:
+            _actualizar_nivel_cliente_cursor(cursor, cid)
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "niveles": _cargar_niveles_clientes(conn, solo_activos=False)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/clientes', methods=['GET'])
+def api_tienda_admin_clientes():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        q = str(request.args.get("q") or "").strip().lower()
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT c.id, c.nombre, c.email, c.telefono, c.fecha_nacimiento, c.activo, c.creado_en, c.ultimo_login,
+                   c.puntos_actual, c.puntos_total, c.nivel_id,
+                   n.nombre AS nivel_nombre, n.descuento_pct AS nivel_descuento_pct
+            FROM tienda_clientes c
+            LEFT JOIN tienda_clientes_niveles n ON n.id = c.nivel_id
+            ORDER BY datetime(c.actualizado_en) DESC, c.id DESC
+            """
+        )
+        clientes = []
+        for row in cursor.fetchall():
+            item = dict(row)
+            if q:
+                bucket = " ".join([
+                    str(item.get("nombre") or ""),
+                    str(item.get("email") or ""),
+                    str(item.get("telefono") or ""),
+                    str(item.get("nivel_nombre") or ""),
+                ]).lower()
+                if q not in bucket:
+                    continue
+            cid = int(item.get("id") or 0)
+            cursor.execute("SELECT COUNT(*) AS total FROM ventas WHERE canal_venta='tienda_online' AND LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (item.get("email"), item.get("telefono")))
+            compras = int((cursor.fetchone() or {}).get("total") or 0)
+            cursor.execute("SELECT COUNT(*) AS total FROM agenda_eventos WHERE LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (item.get("email"), item.get("telefono")))
+            reservas = int((cursor.fetchone() or {}).get("total") or 0)
+            item["compras_total"] = compras
+            item["reservas_total"] = reservas
+            item["id"] = cid
+            item["puntos_actual"] = int(item.get("puntos_actual") or 0)
+            item["puntos_total"] = int(item.get("puntos_total") or 0)
+            item["nivel_descuento_pct"] = float(item.get("nivel_descuento_pct") or 0)
+            clientes.append(item)
+        return jsonify({"success": True, "clientes": clientes})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/clientes/<int:cliente_id>', methods=['GET'])
+def api_tienda_admin_cliente_detalle(cliente_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT c.*, n.nombre AS nivel_nombre, n.descuento_pct AS nivel_descuento_pct
+            FROM tienda_clientes c
+            LEFT JOIN tienda_clientes_niveles n ON n.id = c.nivel_id
+            WHERE c.id = ?
+            LIMIT 1
+            """,
+            (int(cliente_id),),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Cliente no encontrado"}), 404
+        cli = dict(row)
+        email = _normalizar_email(cli.get("email"))
+        telefono = _normalizar_telefono_cl(cli.get("telefono"))
+        cursor.execute(
+            """
+            SELECT id, fecha_hora, codigo_pedido, codigo_operacion, total_monto, descuento_codigo, descuento_monto,
+                   COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado, pedido_estado_actualizado
+            FROM ventas
+            WHERE canal_venta='tienda_online'
+              AND LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?))
+              AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)
+            ORDER BY datetime(fecha_hora) DESC, id DESC
+            LIMIT 120
+            """,
+            (email, telefono),
+        )
+        ventas = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT id, fecha, hora_inicio, hora_fin, estado, tipo, titulo, direccion, es_envio, creado
+            FROM agenda_eventos
+            WHERE LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?))
+              AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)
+            ORDER BY fecha DESC, hora_inicio DESC, id DESC
+            LIMIT 120
+            """,
+            (email, telefono),
+        )
+        reservas = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT id, tipo, origen_tipo, origen_id, puntos, detalle, creado_en
+            FROM tienda_clientes_puntos_mov
+            WHERE cliente_id = ?
+            ORDER BY datetime(creado_en) DESC, id DESC
+            LIMIT 200
+            """,
+            (int(cliente_id),),
+        )
+        movimientos = [dict(r) for r in cursor.fetchall()]
+        return jsonify({"success": True, "cliente": cli, "ventas": ventas, "reservas": reservas, "movimientos": movimientos})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/tienda/admin/personalizacion', methods=['GET', 'POST'])
@@ -4841,9 +5451,9 @@ def api_tienda_agenda_reservar():
             """
             INSERT INTO agenda_eventos (
                 tipo, titulo, fecha, hora_inicio, hora_fin, hora_entrega,
-                cliente, telefono, es_envio, direccion, ingredientes,
+                cliente, telefono, cliente_email, cliente_telefono, es_envio, direccion, ingredientes,
                 total, abono, motivo, alerta_minutos, estado, codigo_operacion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1440, 'pendiente', ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1440, 'pendiente', ?)
             """,
             (
                 tipo_pedido,
@@ -4854,6 +5464,8 @@ def api_tienda_agenda_reservar():
                 hora_inicio,
                 nombre,
                 telefono,
+                email,
+                telefono,
                 1 if entrega_tipo == "despacho" else 0,
                 direccion if entrega_tipo == "despacho" else None,
                 ingredientes,
@@ -4862,6 +5474,28 @@ def api_tienda_agenda_reservar():
             ),
         )
         reserva_id = int(cursor.lastrowid or 0)
+        cliente = _upsert_cliente_tienda_cursor(
+            cursor,
+            nombre=nombre,
+            email=email,
+            telefono=telefono,
+            email_confirmado=1,
+            direccion_default=(direccion if entrega_tipo == "despacho" else ""),
+            direccion_lat=(latitud if entrega_tipo == "despacho" else None),
+            direccion_lng=(longitud if entrega_tipo == "despacho" else None),
+        )
+        if cliente:
+            cfg_prog = _obtener_config_programa_clientes(conn)
+            puntos = _puntos_agenda(cfg_prog)
+            _registrar_puntos_cliente_cursor(
+                cursor,
+                cliente_id=int(cliente.get("id") or 0),
+                puntos=puntos,
+                tipo="agenda",
+                origen_tipo="agenda_reserva",
+                origen_id=reserva_id,
+                detalle=f"Reserva agenda #{reserva_id}",
+            )
         conn.commit()
         crear_backup()
         despacho_estimado = float(shipping_quote.get("shipping_fee") or 0) if (shipping_quote and bool(shipping_quote.get("inside_maipu"))) else 0.0
@@ -7937,7 +8571,28 @@ def api_tienda_checkout():
 
         subtotal = sum(float(it["precio_unitario"]) * int(it["cantidad"]) for it in items_limpios)
         descuento_monto = 0.0
+        descuento_nivel_monto = 0.0
+        descuento_nivel_pct = 0.0
         cupon_aplicado = None
+        cliente_prev = None
+        conn_cli = None
+        try:
+            conn_cli = get_db()
+            cur_cli = conn_cli.cursor()
+            cliente_prev = _obtener_cliente_por_contacto_cursor(cur_cli, cliente_email, cliente_telefono)
+        except Exception:
+            cliente_prev = None
+        finally:
+            if conn_cli:
+                conn_cli.close()
+        if cliente_prev and isinstance(cliente_prev.get("nivel"), dict):
+            try:
+                descuento_nivel_pct = float((cliente_prev.get("nivel") or {}).get("descuento_pct") or 0)
+            except (TypeError, ValueError):
+                descuento_nivel_pct = 0.0
+            descuento_nivel_pct = max(0.0, min(100.0, descuento_nivel_pct))
+            if descuento_nivel_pct > 0:
+                descuento_nivel_monto = round(subtotal * (descuento_nivel_pct / 100.0), 2)
         if cupon_codigo:
             cupon = _obtener_cupon_por_codigo(cupon_codigo)
             valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref)
@@ -7958,7 +8613,7 @@ def api_tienda_checkout():
             permitir_agenda=False,
         )
         venta_id = int(respuesta.get("venta_id") or 0)
-        total_neto = subtotal - descuento_monto
+        total_neto = subtotal - descuento_monto - descuento_nivel_monto
         if total_neto < 0:
             total_neto = 0
         conn = None
@@ -7977,7 +8632,7 @@ def api_tienda_checkout():
                     cliente_email,
                     cliente_telefono,
                     (cupon_codigo or None),
-                    descuento_monto,
+                    (descuento_monto + descuento_nivel_monto),
                     total_neto,
                     venta_id,
                 ),
@@ -7990,18 +8645,25 @@ def api_tienda_checkout():
                     """,
                     (int(cupon_aplicado["id"]), venta_id, (cliente_ref or None), descuento_monto),
                 )
-            cursor.execute(
-                """
-                INSERT INTO tienda_clientes (nombre, email, telefono, activo, actualizado_en, ultimo_login)
-                VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT(email, telefono) DO UPDATE SET
-                    nombre = excluded.nombre,
-                    activo = 1,
-                    actualizado_en = CURRENT_TIMESTAMP,
-                    ultimo_login = CURRENT_TIMESTAMP
-                """,
-                (cliente_nombre, cliente_email, cliente_telefono),
+            cliente = _upsert_cliente_tienda_cursor(
+                cursor,
+                nombre=cliente_nombre,
+                email=cliente_email,
+                telefono=cliente_telefono,
+                email_confirmado=1,
             )
+            if cliente:
+                cfg_prog = _obtener_config_programa_clientes(conn)
+                puntos_compra = _puntos_compra(total_neto, cfg_prog)
+                _registrar_puntos_cliente_cursor(
+                    cursor,
+                    cliente_id=int(cliente.get("id") or 0),
+                    puntos=puntos_compra,
+                    tipo="compra",
+                    origen_tipo="venta_tienda",
+                    origen_id=venta_id,
+                    detalle=f"Compra tienda #{venta_id}",
+                )
             conn.commit()
         finally:
             if conn:
@@ -8009,6 +8671,8 @@ def api_tienda_checkout():
 
         respuesta["subtotal"] = round(subtotal, 2)
         respuesta["descuento_monto"] = round(descuento_monto, 2)
+        respuesta["descuento_nivel_monto"] = round(descuento_nivel_monto, 2)
+        respuesta["descuento_nivel_pct"] = round(descuento_nivel_pct, 2)
         respuesta["codigo_descuento"] = cupon_codigo or None
         respuesta["cliente_nombre"] = cliente_nombre
         respuesta["cliente_email"] = cliente_email

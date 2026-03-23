@@ -7145,6 +7145,8 @@ def migrar_db():
         _ensure_column(conn, "productos", "orden_tienda", "INTEGER DEFAULT 0")
         _ensure_column(conn, "productos", "activo_tienda", "INTEGER DEFAULT 1")
         _ensure_column(conn, "agenda_eventos", "codigo_operacion", "TEXT")
+        _ensure_column(conn, "agenda_eventos", "cliente_email", "TEXT")
+        _ensure_column(conn, "agenda_eventos", "cliente_telefono", "TEXT")
         _ensure_column(conn, "ventas", "codigo_pedido", "TEXT")
         _ensure_column(conn, "ventas", "canal_venta", "TEXT DEFAULT 'presencial'")
         _ensure_column(conn, "ventas", "codigo_operacion", "TEXT")
@@ -7574,6 +7576,114 @@ def migrar_db():
                 telefono = TRIM(COALESCE(telefono, '')),
                 nombre = COALESCE(TRIM(nombre), ''),
                 activo = CASE WHEN activo IS NULL OR activo = 0 THEN 0 ELSE 1 END
+            """
+        )
+        _ensure_column(conn, "tienda_clientes", "fecha_nacimiento", "TEXT")
+        _ensure_column(conn, "tienda_clientes", "email_confirmado", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "tienda_clientes", "nivel_id", "INTEGER")
+        _ensure_column(conn, "tienda_clientes", "puntos_actual", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "tienda_clientes", "puntos_total", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "tienda_clientes", "direccion_default", "TEXT")
+        _ensure_column(conn, "tienda_clientes", "direccion_lat", "REAL")
+        _ensure_column(conn, "tienda_clientes", "direccion_lng", "REAL")
+        conn.execute(
+            """
+            UPDATE tienda_clientes
+            SET email_confirmado = CASE
+                    WHEN email_confirmado IS NULL OR email_confirmado = 0 THEN 0
+                    ELSE 1
+                END,
+                puntos_actual = CASE
+                    WHEN puntos_actual IS NULL OR puntos_actual < 0 THEN 0
+                    ELSE CAST(puntos_actual AS INTEGER)
+                END,
+                puntos_total = CASE
+                    WHEN puntos_total IS NULL OR puntos_total < 0 THEN 0
+                    ELSE CAST(puntos_total AS INTEGER)
+                END,
+                direccion_default = NULLIF(TRIM(COALESCE(direccion_default, '')), '')
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_clientes_niveles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                slug TEXT UNIQUE,
+                orden INTEGER NOT NULL DEFAULT 0,
+                puntos_minimos INTEGER NOT NULL DEFAULT 0,
+                beneficios_json TEXT NOT NULL DEFAULT '{}',
+                descuento_pct REAL NOT NULL DEFAULT 0,
+                activo INTEGER NOT NULL DEFAULT 1,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_clientes_programa (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                config_json TEXT NOT NULL DEFAULT '{}',
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO tienda_clientes_programa (id, config_json, actualizado_en)
+            VALUES (1, '{}', CURRENT_TIMESTAMP)
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_clientes_programa
+            SET config_json = COALESCE(NULLIF(TRIM(config_json), ''), '{}')
+            WHERE id = 1
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_clientes_puntos_mov (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente_id INTEGER NOT NULL,
+                tipo TEXT NOT NULL DEFAULT 'ajuste',
+                origen_tipo TEXT NOT NULL DEFAULT '',
+                origen_id INTEGER,
+                puntos INTEGER NOT NULL DEFAULT 0,
+                detalle TEXT DEFAULT '',
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(cliente_id, origen_tipo, origen_id),
+                FOREIGN KEY(cliente_id) REFERENCES tienda_clientes(id) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO tienda_clientes_niveles
+                (id, nombre, slug, orden, puntos_minimos, beneficios_json, descuento_pct, activo, creado_en, actualizado_en)
+            VALUES
+                (1, 'Bronce', 'bronce', 1, 0, '{"beneficios":["Acceso base a promociones"]}', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (2, 'Plata', 'plata', 2, 500, '{"beneficios":["Atencion prioritaria","Promociones para miembros"]}', 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (3, 'Oro', 'oro', 3, 1500, '{"beneficios":["Descuentos exclusivos","Prioridad en agenda"]}', 6, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_clientes_email_tel
+            ON tienda_clientes(email, telefono)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_clientes_nivel
+            ON tienda_clientes(nivel_id, puntos_total)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_clientes_mov_cliente
+            ON tienda_clientes_puntos_mov(cliente_id, creado_en DESC)
             """
         )
         conn.execute(

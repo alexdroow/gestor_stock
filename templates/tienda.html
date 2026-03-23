@@ -2457,20 +2457,41 @@
     <div class="modal-overlay" id="modal-cuenta">
         <div class="modal" style="width:min(760px,96vw);">
             <h3>Mi cuenta</h3>
-            <div id="cuenta-estado" style="font-size:.9rem;color:#334155;">Registra tu correo y telefono para comprar mas rapido.</div>
+            <div id="cuenta-estado" style="font-size:.9rem;color:#334155;">Registra tus datos para compras y reservas mas rapidas.</div>
+            <div class="two">
+                <input id="cuenta-nombre" type="text" placeholder="Nombre completo" maxlength="80">
+                <input id="cuenta-fecha-nacimiento" type="date">
+            </div>
             <div class="two">
                 <input id="cuenta-email" type="email" placeholder="Correo electronico">
+                <input id="cuenta-email-confirm" type="email" placeholder="Confirmar correo electronico">
+            </div>
+            <div class="two">
                 <div class="phone-wrap">
                     <span class="phone-prefix">+569</span>
                     <input id="cuenta-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
                 </div>
+                <div id="cuenta-programa" style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;font-size:.85rem;color:#334155;">Nivel: - · Puntos: 0</div>
             </div>
+            <div style="font-size:.88rem;font-weight:700;color:#334155;">Direccion por defecto para agenda</div>
+            <div class="agenda-map-actions" style="margin-top:0;">
+                <input id="cuenta-direccion-buscar" type="text" placeholder="Buscar direccion y confirmar pin">
+                <button type="button" id="cuenta-buscar-mapa">Buscar</button>
+                <button type="button" id="cuenta-confirmar-pin">Confirmar pin</button>
+            </div>
+            <div class="agenda-map" id="cuenta-map" style="height:220px;"></div>
+            <div class="agenda-map-meta" id="cuenta-map-meta">Mueve el pin y confirma para guardar direccion por defecto.</div>
             <div class="modal-actions" style="justify-content:flex-start;">
                 <button class="btn-primary" type="button" id="cuenta-guardar">Registrarme / Ingresar</button>
+                <button class="btn-muted" type="button" id="cuenta-guardar-direccion">Guardar direccion</button>
             </div>
             <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de compras</div>
             <div id="cuenta-historial" style="max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
                 <div style="color:#64748b;font-size:.88rem;">Sin historial cargado.</div>
+            </div>
+            <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de reservas en agenda</div>
+            <div id="cuenta-historial-agenda" style="max-height:220px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
+                <div style="color:#64748b;font-size:.88rem;">Sin reservas cargadas.</div>
             </div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-cuenta-cerrar">Cerrar</button>
@@ -2652,9 +2673,19 @@
         const modalExitoDetalleEl = document.getElementById("modal-exito-detalle");
         const modalCuentaEl = document.getElementById("modal-cuenta");
         const cuentaEstadoEl = document.getElementById("cuenta-estado");
+        const cuentaNombreEl = document.getElementById("cuenta-nombre");
+        const cuentaFechaNacimientoEl = document.getElementById("cuenta-fecha-nacimiento");
         const cuentaEmailEl = document.getElementById("cuenta-email");
+        const cuentaEmailConfirmEl = document.getElementById("cuenta-email-confirm");
         const cuentaTelefonoEl = document.getElementById("cuenta-telefono");
+        const cuentaProgramaEl = document.getElementById("cuenta-programa");
         const cuentaHistorialEl = document.getElementById("cuenta-historial");
+        const cuentaHistorialAgendaEl = document.getElementById("cuenta-historial-agenda");
+        const cuentaDireccionBuscarEl = document.getElementById("cuenta-direccion-buscar");
+        const cuentaBuscarMapaEl = document.getElementById("cuenta-buscar-mapa");
+        const cuentaConfirmarPinEl = document.getElementById("cuenta-confirmar-pin");
+        const cuentaMapMetaEl = document.getElementById("cuenta-map-meta");
+        const cuentaGuardarDireccionEl = document.getElementById("cuenta-guardar-direccion");
         const btnCuentaEl = document.getElementById("btn-cuenta");
         const leftNavEl = document.querySelector(".left-nav");
         const cartPanelEl = document.querySelector(".cart-panel");
@@ -2805,6 +2836,10 @@
         let agendaMarker = null;
         let agendaDireccionConfirmada = false;
         let agendaDireccionPin = { lat: -33.4489, lng: -70.6693 };
+        let cuentaMap = null;
+        let cuentaMarker = null;
+        let cuentaDireccionPin = { lat: -33.4489, lng: -70.6693 };
+        let cuentaDireccionConfirmada = false;
         let agendaShippingQuote = null;
         let agendaReservaPendiente = null;
         let agendaTipoActual = "";
@@ -3201,6 +3236,13 @@
                     email,
                     telefono: `+569${tel8}`,
                     telefono_digitos: tel8,
+                    fecha_nacimiento: String(obj?.fecha_nacimiento || "").trim(),
+                    puntos_total: Number(obj?.puntos_total || 0),
+                    puntos_actual: Number(obj?.puntos_actual || 0),
+                    nivel: obj?.nivel && typeof obj.nivel === "object" ? obj.nivel : null,
+                    direccion_default: String(obj?.direccion_default || "").trim(),
+                    direccion_lat: (obj?.direccion_lat ?? null),
+                    direccion_lng: (obj?.direccion_lng ?? null),
                 };
             } catch (_) {
                 return null;
@@ -3215,6 +3257,13 @@
                     email: String(cliente.email || "").trim().toLowerCase(),
                     telefono: String(cliente.telefono || "").trim(),
                     telefono_digitos: normalizarTelefono8(cliente.telefono || ""),
+                    fecha_nacimiento: String(cliente.fecha_nacimiento || "").trim(),
+                    puntos_total: Number(cliente.puntos_total || 0),
+                    puntos_actual: Number(cliente.puntos_actual || 0),
+                    nivel: cliente.nivel && typeof cliente.nivel === "object" ? cliente.nivel : null,
+                    direccion_default: String(cliente.direccion_default || "").trim(),
+                    direccion_lat: (cliente.direccion_lat ?? null),
+                    direccion_lng: (cliente.direccion_lng ?? null),
                 }));
             } catch (_) {}
         }
@@ -3287,12 +3336,26 @@
                 if (clienteRegistrado) {
                     cuentaEstadoEl.textContent = `Cuenta activa: ${clienteRegistrado.email} / ${clienteRegistrado.telefono}`;
                 } else {
-                    cuentaEstadoEl.textContent = "Registra tu correo y telefono para comprar mas rapido.";
+                    cuentaEstadoEl.textContent = "Registra nombre, nacimiento, correo y telefono para comprar y agendar mas rapido.";
+                }
+            }
+            if (cuentaProgramaEl) {
+                if (clienteRegistrado) {
+                    const lvl = clienteRegistrado.nivel || {};
+                    cuentaProgramaEl.textContent = `Nivel: ${String(lvl.nombre || "Sin nivel")} · Puntos: ${Number(clienteRegistrado.puntos_total || 0)}`;
+                } else {
+                    cuentaProgramaEl.textContent = "Nivel: - · Puntos: 0";
                 }
             }
             if (agendaNombreEl && clienteRegistrado) agendaNombreEl.value = String(clienteRegistrado.nombre || "");
             if (agendaEmailEl && clienteRegistrado) agendaEmailEl.value = String(clienteRegistrado.email || "");
             if (agendaTelefonoEl && clienteRegistrado) agendaTelefonoEl.value = String(clienteRegistrado.telefono_digitos || normalizarTelefono8(clienteRegistrado.telefono || ""));
+            if (agendaDireccionBuscarEl && clienteRegistrado?.direccion_default) {
+                agendaDireccionBuscarEl.value = String(clienteRegistrado.direccion_default || "");
+            }
+            if (clienteRegistrado?.direccion_lat && clienteRegistrado?.direccion_lng) {
+                agendaDireccionPin = { lat: Number(clienteRegistrado.direccion_lat), lng: Number(clienteRegistrado.direccion_lng) };
+            }
         }
 
         function msg(text, isErr = false) {
@@ -4624,6 +4687,96 @@
             } catch (_) {}
         }
 
+        function _initCuentaMap() {
+            if (!modalCuentaEl || !modalCuentaEl.classList.contains("active")) return;
+            const mapEl = document.getElementById("cuenta-map");
+            if (!mapEl || typeof L === "undefined") return;
+            if (!cuentaMap) {
+                cuentaMap = L.map(mapEl).setView([cuentaDireccionPin.lat, cuentaDireccionPin.lng], 13);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    maxZoom: 19,
+                    attribution: "&copy; OpenStreetMap",
+                }).addTo(cuentaMap);
+                cuentaMarker = L.marker([cuentaDireccionPin.lat, cuentaDireccionPin.lng], { draggable: true }).addTo(cuentaMap);
+                cuentaMarker.on("dragend", () => {
+                    const p = cuentaMarker.getLatLng();
+                    cuentaDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
+                    cuentaDireccionConfirmada = false;
+                    if (cuentaMapMetaEl) cuentaMapMetaEl.textContent = "Pin movido. Debes confirmar nuevamente.";
+                });
+            } else {
+                cuentaMap.invalidateSize();
+                if (cuentaMarker) cuentaMarker.setLatLng([cuentaDireccionPin.lat, cuentaDireccionPin.lng]);
+                cuentaMap.setView([cuentaDireccionPin.lat, cuentaDireccionPin.lng], 13);
+            }
+        }
+
+        async function _buscarDireccionCuentaEnMapa() {
+            const query = String(cuentaDireccionBuscarEl?.value || "").trim();
+            if (!query) return msg("Escribe una direccion para buscar.", true);
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=cl&limit=1&q=${encodeURIComponent(query)}`;
+                const res = await fetch(`${url}&t=${Date.now()}`, { headers: { Accept: "application/json" }, cache: "no-store" });
+                const data = await res.json();
+                if (!Array.isArray(data) || !data.length) throw new Error("No se encontro la direccion.");
+                const lat = Number(data[0].lat || 0);
+                const lng = Number(data[0].lon || 0);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error("Coordenadas invalidas.");
+                cuentaDireccionPin = { lat, lng };
+                if (cuentaMap && cuentaMarker) {
+                    cuentaMarker.setLatLng([lat, lng]);
+                    cuentaMap.setView([lat, lng], 16);
+                }
+                const displayName = String(data[0].display_name || query).trim();
+                if (cuentaDireccionBuscarEl) cuentaDireccionBuscarEl.value = displayName;
+                cuentaDireccionConfirmada = false;
+                if (cuentaMapMetaEl) cuentaMapMetaEl.textContent = "Direccion encontrada. Confirma el pin.";
+            } catch (e) {
+                msg(e.message || "No se pudo buscar direccion.", true);
+            }
+        }
+
+        async function _confirmarPinCuenta() {
+            if (!cuentaMap || !cuentaMarker) return msg("Mapa no listo.", true);
+            const p = cuentaMarker.getLatLng();
+            cuentaDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
+            const direccionPin = await _reverseGeocodeAgendaPin(cuentaDireccionPin.lat, cuentaDireccionPin.lng);
+            if (direccionPin && cuentaDireccionBuscarEl) cuentaDireccionBuscarEl.value = direccionPin;
+            cuentaDireccionConfirmada = true;
+            if (cuentaMapMetaEl) cuentaMapMetaEl.textContent = `Pin confirmado: ${cuentaDireccionPin.lat.toFixed(6)}, ${cuentaDireccionPin.lng.toFixed(6)}`;
+        }
+
+        async function guardarDireccionCuentaCliente() {
+            if (!clienteRegistrado) return msg("Primero inicia sesion en Mi cuenta.", true);
+            if (!cuentaDireccionConfirmada) return msg("Confirma el pin para guardar direccion.", true);
+            try {
+                const res = await fetch("/api/tienda/clientes/actualizar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: clienteRegistrado.email,
+                        telefono: clienteRegistrado.telefono,
+                        nombre: clienteRegistrado.nombre,
+                        fecha_nacimiento: clienteRegistrado.fecha_nacimiento || "",
+                        direccion_default: String(cuentaDireccionBuscarEl?.value || "").trim(),
+                        direccion_lat: Number(cuentaDireccionPin.lat || 0),
+                        direccion_lng: Number(cuentaDireccionPin.lng || 0),
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar direccion");
+                const cli = data.cliente || {};
+                clienteRegistrado.direccion_default = String(cli.direccion_default || cuentaDireccionBuscarEl?.value || "");
+                clienteRegistrado.direccion_lat = (cli.direccion_lat ?? Number(cuentaDireccionPin.lat || 0));
+                clienteRegistrado.direccion_lng = (cli.direccion_lng ?? Number(cuentaDireccionPin.lng || 0));
+                guardarClienteLocal(clienteRegistrado);
+                renderEstadoCuenta();
+                msg("Direccion guardada en tu cuenta.");
+            } catch (e) {
+                msg(e.message || "No se pudo guardar direccion", true);
+            }
+        }
+
         function _initAgendaMap() {
             if (!agendaDespachoWrapEl || !agendaDespachoWrapEl.classList.contains("active")) return;
             const mapEl = document.getElementById("agenda-map");
@@ -5642,10 +5795,19 @@
         }
 
         function abrirModalCuenta() {
+            if (cuentaNombreEl) cuentaNombreEl.value = clienteRegistrado?.nombre || "";
+            if (cuentaFechaNacimientoEl) cuentaFechaNacimientoEl.value = String(clienteRegistrado?.fecha_nacimiento || "");
             if (cuentaEmailEl) cuentaEmailEl.value = clienteRegistrado?.email || "";
+            if (cuentaEmailConfirmEl) cuentaEmailConfirmEl.value = clienteRegistrado?.email || "";
             if (cuentaTelefonoEl) cuentaTelefonoEl.value = clienteRegistrado?.telefono_digitos || normalizarTelefono8(clienteRegistrado?.telefono || "");
+            if (cuentaDireccionBuscarEl) cuentaDireccionBuscarEl.value = String(clienteRegistrado?.direccion_default || "");
+            if (clienteRegistrado?.direccion_lat && clienteRegistrado?.direccion_lng) {
+                cuentaDireccionPin = { lat: Number(clienteRegistrado.direccion_lat), lng: Number(clienteRegistrado.direccion_lng) };
+                cuentaDireccionConfirmada = true;
+            }
             renderEstadoCuenta();
             modalCuentaEl?.classList.add("active");
+            _initCuentaMap();
             if (clienteRegistrado) {
                 cargarHistorialCliente();
                 _startHistorialEstadoPoll();
@@ -5690,10 +5852,36 @@
             }).join("");
         }
 
+        function renderHistorialAgendaCliente(reservas) {
+            if (!cuentaHistorialAgendaEl) return;
+            const items = Array.isArray(reservas) ? reservas : [];
+            if (!items.length) {
+                cuentaHistorialAgendaEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay reservas registradas.</div>`;
+                return;
+            }
+            cuentaHistorialAgendaEl.innerHTML = items.map((r) => `
+                <div style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:4px;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;">
+                        <strong>Reserva #${Number(r.id || 0)}</strong>
+                        <span style="font-size:.82rem;color:#334155;">${esc(String(r.estado || "pendiente"))}</span>
+                    </div>
+                    <div style="font-size:.82rem;color:#64748b;">${esc(String(r.fecha || ""))} ${esc(String(r.hora_inicio || ""))}</div>
+                    <div style="font-size:.84rem;color:#334155;">${esc(String(r.tipo || ""))} · ${Number(r.es_envio || 0) ? "Despacho" : "Retiro"}</div>
+                    ${String(r.direccion || "").trim() ? `<div style="font-size:.78rem;color:#475569;">${esc(String(r.direccion || ""))}</div>` : ""}
+                </div>
+            `).join("");
+        }
+
         async function registrarCuentaCliente() {
             const email = normalizarEmailCliente(cuentaEmailEl?.value);
+            const emailConfirm = normalizarEmailCliente(cuentaEmailConfirmEl?.value);
             const tel8 = normalizarTelefono8(cuentaTelefonoEl?.value);
+            const nombre = String(cuentaNombreEl?.value || "").trim();
+            const fechaNacimiento = String(cuentaFechaNacimientoEl?.value || "").trim();
+            if (nombre.length < 2) return msg("Ingresa tu nombre completo.", true);
+            if (!fechaNacimiento) return msg("Selecciona tu fecha de nacimiento.", true);
             if (!email) return msg("Correo invalido para registro.", true);
+            if (!emailConfirm || emailConfirm !== email) return msg("Debes confirmar el correo correctamente.", true);
             if (!tel8) return msg("Telefono invalido. Debe tener 8 digitos.", true);
             try {
                 const res = await fetch("/api/tienda/clientes/registrar", {
@@ -5701,17 +5889,30 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         email,
+                        email_confirm: emailConfirm,
                         telefono: `+569${tel8}`,
-                        nombre: nombreDesdeEmail(email),
+                        nombre: nombre || nombreDesdeEmail(email),
+                        fecha_nacimiento: fechaNacimiento,
+                        direccion_default: String(cuentaDireccionBuscarEl?.value || "").trim(),
+                        direccion_lat: cuentaDireccionConfirmada ? Number(cuentaDireccionPin.lat || 0) : null,
+                        direccion_lng: cuentaDireccionConfirmada ? Number(cuentaDireccionPin.lng || 0) : null,
                     }),
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo registrar cliente");
+                const cli = (data.cliente || {});
                 clienteRegistrado = {
-                    nombre: String((data.cliente || {}).nombre || nombreDesdeEmail(email)).trim() || nombreDesdeEmail(email),
+                    nombre: String(cli.nombre || nombre || nombreDesdeEmail(email)).trim() || nombreDesdeEmail(email),
                     email,
                     telefono: `+569${tel8}`,
                     telefono_digitos: tel8,
+                    fecha_nacimiento: String(cli.fecha_nacimiento || fechaNacimiento || ""),
+                    puntos_total: Number(cli.puntos_total || 0),
+                    puntos_actual: Number(cli.puntos_actual || 0),
+                    nivel: cli.nivel && typeof cli.nivel === "object" ? cli.nivel : null,
+                    direccion_default: String(cli.direccion_default || cuentaDireccionBuscarEl?.value || ""),
+                    direccion_lat: (cli.direccion_lat ?? (cuentaDireccionConfirmada ? Number(cuentaDireccionPin.lat || 0) : null)),
+                    direccion_lng: (cli.direccion_lng ?? (cuentaDireccionConfirmada ? Number(cuentaDireccionPin.lng || 0) : null)),
                 };
                 guardarClienteLocal(clienteRegistrado);
                 renderEstadoCuenta();
@@ -5725,6 +5926,7 @@
         async function cargarHistorialCliente() {
             if (!clienteRegistrado) {
                 renderHistorialCliente([]);
+                renderHistorialAgendaCliente([]);
                 return;
             }
             try {
@@ -5738,12 +5940,27 @@
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar historial");
+                const cli = data.cliente || {};
+                if (clienteRegistrado) {
+                    clienteRegistrado.nombre = String(cli.nombre || clienteRegistrado.nombre || "");
+                    clienteRegistrado.fecha_nacimiento = String(cli.fecha_nacimiento || clienteRegistrado.fecha_nacimiento || "");
+                    clienteRegistrado.puntos_total = Number(cli.puntos_total || clienteRegistrado.puntos_total || 0);
+                    clienteRegistrado.puntos_actual = Number(cli.puntos_actual || clienteRegistrado.puntos_actual || 0);
+                    clienteRegistrado.nivel = cli.nivel && typeof cli.nivel === "object" ? cli.nivel : (clienteRegistrado.nivel || null);
+                    clienteRegistrado.direccion_default = String(cli.direccion_default || clienteRegistrado.direccion_default || "");
+                    clienteRegistrado.direccion_lat = (cli.direccion_lat ?? clienteRegistrado.direccion_lat ?? null);
+                    clienteRegistrado.direccion_lng = (cli.direccion_lng ?? clienteRegistrado.direccion_lng ?? null);
+                    guardarClienteLocal(clienteRegistrado);
+                    renderEstadoCuenta();
+                }
                 historialComprasCliente = Array.isArray(data.ventas) ? data.ventas : [];
                 renderHistorialCliente(historialComprasCliente);
+                renderHistorialAgendaCliente(Array.isArray(data.agenda_reservas) ? data.agenda_reservas : []);
                 _sincronizarPedidoActivoDesdeHistorial();
             } catch (e) {
                 historialComprasCliente = [];
                 renderHistorialCliente([]);
+                renderHistorialAgendaCliente([]);
                 msg(e.message || "No se pudo cargar historial", true);
             }
         }
@@ -6273,6 +6490,9 @@
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
         document.getElementById("modal-cuenta-cerrar")?.addEventListener("click", cerrarModalCuenta);
         document.getElementById("cuenta-guardar")?.addEventListener("click", registrarCuentaCliente);
+        cuentaBuscarMapaEl?.addEventListener("click", _buscarDireccionCuentaEnMapa);
+        cuentaConfirmarPinEl?.addEventListener("click", _confirmarPinCuenta);
+        cuentaGuardarDireccionEl?.addEventListener("click", guardarDireccionCuentaCliente);
         btnCuentaEl?.addEventListener("click", abrirModalCuenta);
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });

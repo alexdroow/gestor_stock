@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes Tienda</title>
+    <style>
+        body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: #f8fafc; color: #0f172a; }
+        .wrap { width: min(1300px, 100%); margin: 0 auto; padding: 22px; display: grid; gap: 12px; }
+        .top { border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .top h1 { margin: 0; font-size: 1.2rem; }
+        .top a { text-decoration: none; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 10px; background: #fff; font-weight: 700; }
+        .grid { display: grid; grid-template-columns: 380px 1fr; gap: 12px; align-items: start; }
+        .panel { border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
+        .fields { display: grid; gap: 8px; }
+        input, textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font: inherit; }
+        textarea { min-height: 56px; resize: vertical; }
+        button { border: 0; border-radius: 8px; padding: 8px 10px; font-weight: 800; cursor: pointer; }
+        .btn-primary { background: #ea580c; color: #fff; }
+        .btn-muted { background: #e2e8f0; color: #334155; }
+        .msg { font-size: .88rem; color: #475569; min-height: 18px; }
+        .list { max-height: 65vh; overflow: auto; display: grid; gap: 8px; }
+        .item { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; display: grid; gap: 5px; cursor: pointer; }
+        .item.active { border-color: #ea580c; box-shadow: 0 0 0 1px #fdba74; }
+        .muted { color: #64748b; font-size: .84rem; }
+        .pill { display: inline-flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 999px; padding: 2px 8px; font-size: .75rem; font-weight: 800; color: #334155; background: #f8fafc; }
+        .lvl-row { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; display: grid; gap: 6px; }
+        .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .detail-box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; max-height: 210px; overflow: auto; display: grid; gap: 7px; }
+        @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } .two { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<main class="wrap">
+    <section class="top">
+        <h1>Clientes de Tienda</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="/ventas/admin-personalizacion">Personalizacion</a>
+            <a href="/ventas/admin-catalogo-torta">Catalogo torta</a>
+            <a href="/ventas">Ventas</a>
+            <a href="/tienda" target="_blank" rel="noopener">Abrir tienda</a>
+        </div>
+    </section>
+
+    <section class="grid">
+        <article class="panel">
+            <h2 style="margin:0;font-size:1rem;">Programa de niveles</h2>
+            <div class="fields">
+                <label class="muted">Regla compra: por cada monto base sumar puntos</label>
+                <div class="two">
+                    <input id="purchase_amount_base" type="number" min="500" step="500" placeholder="Monto base">
+                    <input id="purchase_points" type="number" min="0" step="1" placeholder="Puntos por bloque">
+                </div>
+                <label class="muted">Puntos por reserva de agenda</label>
+                <input id="agenda_points" type="number" min="0" step="1" placeholder="Puntos agenda">
+            </div>
+            <div class="fields">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong>Niveles</strong>
+                    <button type="button" class="btn-muted" id="btn-add-level">Agregar nivel</button>
+                </div>
+                <div id="levels-list" class="fields"></div>
+                <button type="button" class="btn-primary" id="btn-save-program">Guardar programa y niveles</button>
+                <div class="msg" id="program-msg"></div>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input id="q" type="text" placeholder="Buscar por nombre, correo, telefono..." style="max-width:380px;">
+                <button type="button" class="btn-muted" id="btn-refresh">Recargar</button>
+            </div>
+            <div class="list" id="clients-list"></div>
+            <div class="msg" id="clients-msg"></div>
+        </article>
+    </section>
+
+    <section class="panel">
+        <h2 style="margin:0;font-size:1rem;">Detalle cliente</h2>
+        <div id="detail-head" class="muted">Selecciona un cliente para ver compras, reservas y puntos.</div>
+        <div class="two">
+            <div>
+                <strong>Compras</strong>
+                <div id="detail-sales" class="detail-box"></div>
+            </div>
+            <div>
+                <strong>Reservas agenda</strong>
+                <div id="detail-agenda" class="detail-box"></div>
+            </div>
+        </div>
+        <div>
+            <strong>Movimientos de puntos</strong>
+            <div id="detail-points" class="detail-box"></div>
+        </div>
+    </section>
+</main>
+
+<script>
+let niveles = [];
+let clientes = [];
+let selectedClientId = 0;
+
+const levelsListEl = document.getElementById("levels-list");
+const clientsListEl = document.getElementById("clients-list");
+const programMsgEl = document.getElementById("program-msg");
+const clientsMsgEl = document.getElementById("clients-msg");
+const detailHeadEl = document.getElementById("detail-head");
+const detailSalesEl = document.getElementById("detail-sales");
+const detailAgendaEl = document.getElementById("detail-agenda");
+const detailPointsEl = document.getElementById("detail-points");
+
+function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");}
+function money(v){try{return new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(Number(v||0));}catch(_){return `$${Number(v||0)}`;}}
+function msgProgram(t,e=false){programMsgEl.textContent=t||"";programMsgEl.style.color=e?"#b91c1c":"#166534";}
+function msgClients(t,e=false){clientsMsgEl.textContent=t||"";clientsMsgEl.style.color=e?"#b91c1c":"#334155";}
+
+function renderLevels(){
+    levelsListEl.innerHTML = (niveles||[]).map((n,idx)=>`
+        <div class="lvl-row" data-lidx="${idx}">
+            <div class="two">
+                <input type="text" data-k="nombre" value="${esc(n.nombre||"")}" placeholder="Nombre nivel">
+                <input type="number" data-k="orden" value="${Number(n.orden||idx+1)}" min="0" step="1" placeholder="Orden">
+            </div>
+            <div class="two">
+                <input type="number" data-k="puntos_minimos" value="${Number(n.puntos_minimos||0)}" min="0" step="1" placeholder="Puntos minimos">
+                <input type="number" data-k="descuento_pct" value="${Number(n.descuento_pct||0)}" min="0" max="100" step="0.1" placeholder="% descuento">
+            </div>
+            <textarea data-k="beneficios_text" placeholder="Beneficios (uno por linea)">${esc((n.beneficios&&Array.isArray(n.beneficios.beneficios)?n.beneficios.beneficios:[]).join("\n"))}</textarea>
+            <div style="display:flex;justify-content:flex-end;gap:6px;">
+                <button type="button" class="btn-muted" onclick="removeLevel(${idx})">Eliminar</button>
+            </div>
+        </div>
+    `).join("");
+}
+
+function readLevelsFromUI(){
+    const rows = [...levelsListEl.querySelectorAll(".lvl-row")];
+    return rows.map((row, idx)=>{
+        const get=(k)=>row.querySelector(`[data-k="${k}"]`)?.value ?? "";
+        const beneficios = String(get("beneficios_text")||"").split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+        return {
+            id: 0,
+            nombre: String(get("nombre")||"").trim() || `Nivel ${idx+1}`,
+            slug: "",
+            orden: Number(get("orden")||idx+1),
+            puntos_minimos: Number(get("puntos_minimos")||0),
+            descuento_pct: Number(get("descuento_pct")||0),
+            activo: true,
+            beneficios: { beneficios }
+        };
+    });
+}
+
+function addLevel(){
+    niveles.push({nombre:`Nivel ${niveles.length+1}`,orden:niveles.length+1,puntos_minimos:0,descuento_pct:0,activo:true,beneficios:{beneficios:[]}});
+    renderLevels();
+}
+function removeLevel(idx){ niveles = (niveles||[]).filter((_,i)=>i!==idx); renderLevels(); }
+window.removeLevel = removeLevel;
+
+async function loadPrograma(){
+    try{
+        const [rProg, rNiv] = await Promise.all([
+            fetch("/api/tienda/admin/clientes/programa"),
+            fetch("/api/tienda/admin/clientes/niveles"),
+        ]);
+        const jProg = await rProg.json();
+        const jNiv = await rNiv.json();
+        if(!rProg.ok || !jProg.success) throw new Error(jProg.error||"No se pudo cargar programa");
+        if(!rNiv.ok || !jNiv.success) throw new Error(jNiv.error||"No se pudo cargar niveles");
+        document.getElementById("purchase_amount_base").value = Number((jProg.programa||{}).purchase_amount_base||1000);
+        document.getElementById("purchase_points").value = Number((jProg.programa||{}).purchase_points||10);
+        document.getElementById("agenda_points").value = Number((jProg.programa||{}).agenda_points||20);
+        niveles = Array.isArray(jNiv.niveles)?jNiv.niveles:[];
+        renderLevels();
+        msgProgram("");
+    }catch(e){ msgProgram(e.message||"Error cargando programa", true); }
+}
+
+function renderClients(){
+    const q = String(document.getElementById("q").value||"").trim().toLowerCase();
+    const rows = (clientes||[]).filter(c=>{
+        if(!q) return true;
+        return [c.nombre,c.email,c.telefono,c.nivel_nombre].join(" ").toLowerCase().includes(q);
+    });
+    if(!rows.length){
+        clientsListEl.innerHTML = `<div class="muted">Sin clientes para mostrar.</div>`;
+        return;
+    }
+    clientsListEl.innerHTML = rows.map(c=>`
+        <div class="item ${Number(c.id)===Number(selectedClientId)?"active":""}" onclick="openClient(${Number(c.id)})">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <strong>${esc(c.nombre||"Cliente")}</strong>
+                <span class="pill">${esc(c.nivel_nombre||"Sin nivel")}</span>
+            </div>
+            <div class="muted">${esc(c.email||"")} · ${esc(c.telefono||"")}</div>
+            <div class="muted">Compras: ${Number(c.compras_total||0)} · Reservas: ${Number(c.reservas_total||0)} · Puntos: ${Number(c.puntos_total||0)}</div>
+        </div>
+    `).join("");
+}
+window.openClient = async function(id){
+    selectedClientId = Number(id||0);
+    renderClients();
+    if(!selectedClientId) return;
+    try{
+        const res = await fetch(`/api/tienda/admin/clientes/${selectedClientId}`);
+        const data = await res.json();
+        if(!res.ok || !data.success) throw new Error(data.error||"No se pudo cargar detalle");
+        const c = data.cliente||{};
+        detailHeadEl.innerHTML = `<strong>${esc(c.nombre||"Cliente")}</strong> · ${esc(c.email||"")} · ${esc(c.telefono||"")} · Nivel: ${esc(c.nivel_nombre||"Sin nivel")} · Puntos: ${Number(c.puntos_total||0)}`;
+        detailSalesEl.innerHTML = (Array.isArray(data.ventas)&&data.ventas.length)
+            ? data.ventas.map(v=>`<div><strong>#${Number(v.id||0)}</strong> · ${esc(v.fecha_hora||"")} · ${money(v.total_monto||0)} · ${esc(v.pedido_estado||"recibido")}</div>`).join("")
+            : `<div class="muted">Sin compras.</div>`;
+        detailAgendaEl.innerHTML = (Array.isArray(data.reservas)&&data.reservas.length)
+            ? data.reservas.map(r=>`<div><strong>#${Number(r.id||0)}</strong> · ${esc(r.fecha||"")} ${esc(r.hora_inicio||"")} · ${esc(r.tipo||"")} · ${esc(r.estado||"pendiente")}</div>`).join("")
+            : `<div class="muted">Sin reservas.</div>`;
+        detailPointsEl.innerHTML = (Array.isArray(data.movimientos)&&data.movimientos.length)
+            ? data.movimientos.map(m=>`<div><strong>${Number(m.puntos||0)>0?"+":""}${Number(m.puntos||0)}</strong> · ${esc(m.tipo||"")} · ${esc(m.detalle||"")} · ${esc(m.creado_en||"")}</div>`).join("")
+            : `<div class="muted">Sin movimientos de puntos.</div>`;
+    }catch(e){
+        detailHeadEl.textContent = e.message||"No se pudo cargar detalle";
+    }
+};
+
+async function loadClientes(){
+    try{
+        msgClients("Cargando clientes...");
+        const res = await fetch("/api/tienda/admin/clientes");
+        const data = await res.json();
+        if(!res.ok || !data.success) throw new Error(data.error||"No se pudo cargar clientes");
+        clientes = Array.isArray(data.clientes)?data.clientes:[];
+        renderClients();
+        msgClients(`Clientes cargados: ${clientes.length}`);
+    }catch(e){
+        clientes = [];
+        renderClients();
+        msgClients(e.message||"Error cargando clientes", true);
+    }
+}
+
+async function savePrograma(){
+    try{
+        const payload = {
+            programa: {
+                purchase_amount_base: Number(document.getElementById("purchase_amount_base").value||1000),
+                purchase_points: Number(document.getElementById("purchase_points").value||10),
+                agenda_points: Number(document.getElementById("agenda_points").value||20),
+                enabled: true,
+            },
+            niveles: readLevelsFromUI(),
+        };
+        const [rProg, rNiv] = await Promise.all([
+            fetch("/api/tienda/admin/clientes/programa", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({programa:payload.programa})}),
+            fetch("/api/tienda/admin/clientes/niveles", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({niveles:payload.niveles})}),
+        ]);
+        const jProg = await rProg.json();
+        const jNiv = await rNiv.json();
+        if(!rProg.ok || !jProg.success) throw new Error(jProg.error||"No se pudo guardar programa");
+        if(!rNiv.ok || !jNiv.success) throw new Error(jNiv.error||"No se pudo guardar niveles");
+        niveles = Array.isArray(jNiv.niveles)?jNiv.niveles:[];
+        renderLevels();
+        msgProgram("Programa guardado correctamente.");
+        await loadClientes();
+    }catch(e){
+        msgProgram(e.message||"No se pudo guardar", true);
+    }
+}
+
+document.getElementById("btn-add-level").addEventListener("click", addLevel);
+document.getElementById("btn-save-program").addEventListener("click", savePrograma);
+document.getElementById("btn-refresh").addEventListener("click", loadClientes);
+document.getElementById("q").addEventListener("input", renderClients);
+
+loadPrograma();
+loadClientes();
+</script>
+</body>
+</html>
