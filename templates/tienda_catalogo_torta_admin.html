@@ -402,6 +402,7 @@ let catCropState = {
     open: false,
     idx: -1,
     catId: "",
+    catKey: "",
     file: null,
     objectUrl: "",
     posX: 50,
@@ -437,14 +438,26 @@ function _slugOrFallback(v, fallback = "item") {
     const s = slug(v);
     return s || slug(fallback) || "item";
 }
+function _newCategoryKey() {
+    return `cat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
 function ensureUniqueCategoryIds() {
     const used = new Set();
+    const usedKeys = new Set();
     (Array.isArray(state.categorias) ? state.categorias : []).forEach((cat, idx) => {
+        let key = String(cat?.key || "").trim().toLowerCase().replace(/[^a-z0-9_\-]+/g, "").slice(0, 40);
+        if (!key) key = _newCategoryKey();
+        while (usedKeys.has(key)) key = _newCategoryKey();
+        usedKeys.add(key);
+        cat.key = key;
         const base = _slugOrFallback(cat?.id || cat?.nombre || `categoria-${idx + 1}`, `categoria-${idx + 1}`);
         let candidate = base;
+        if (used.has(candidate)) {
+            candidate = `${base}-${key.slice(-4)}`.slice(0, 60);
+        }
         let nDup = 2;
         while (used.has(candidate)) {
-            candidate = `${base}-${nDup}`;
+            candidate = `${base}-${key.slice(-4)}-${nDup}`.slice(0, 60);
             nDup += 1;
         }
         used.add(candidate);
@@ -490,7 +503,7 @@ function rowHtmlCategory(item, idx) {
             </label>
         `).join("");
     };
-    const rowKey = String(item.id || `cat-${idx}`);
+    const rowKey = String(item.key || item.id || `cat-${idx}`);
     const abierto = Boolean(categoriaPanelAbierto[rowKey]);
     return `
         <div class="row cat" data-idx="${idx}">
@@ -642,19 +655,19 @@ function bindListInputs(key) {
             row.querySelectorAll("[data-cat-pick]").forEach((btnPick) => {
                 btnPick.addEventListener("click", () => {
                     const cid = String(btnPick.getAttribute("data-cat-pick") || "");
-                    pickCategoriaFotoById(cid);
+                    pickCategoriaFotoByKey(cid);
                 });
             });
             row.querySelectorAll("[data-cat-remove]").forEach((btnDel) => {
                 btnDel.addEventListener("click", () => {
                     const cid = String(btnDel.getAttribute("data-cat-remove") || "");
-                    eliminarCategoriaImagenById(cid);
+                    eliminarCategoriaImagenByKey(cid);
                 });
             });
             row.querySelectorAll("[data-cat-direct]").forEach((btnDirect) => {
                 btnDirect.addEventListener("click", () => {
                     const cid = String(btnDirect.getAttribute("data-cat-direct") || "");
-                    cambiarCategoriaFotoDirectoById(cid);
+                    cambiarCategoriaFotoDirectoByKey(cid);
                 });
             });
         }
@@ -669,7 +682,7 @@ function removeRow(key, idx) {
     if (!Array.isArray(state[key])) return;
     if (key === "categorias") {
         const row = state[key][Number(idx || 0)];
-        const rowKey = String(row?.id || "");
+        const rowKey = String(row?.key || row?.id || "");
         if (rowKey && Object.prototype.hasOwnProperty.call(categoriaPanelAbierto, rowKey)) {
             delete categoriaPanelAbierto[rowKey];
         }
@@ -682,6 +695,11 @@ function _findCategoriaIndexById(catId) {
     const id = String(catId || "").trim();
     if (!id) return -1;
     return (Array.isArray(state.categorias) ? state.categorias : []).findIndex((c) => String(c?.id || "") === id);
+}
+function _findCategoriaIndexByKey(catKey) {
+    const key = String(catKey || "").trim();
+    if (!key) return -1;
+    return (Array.isArray(state.categorias) ? state.categorias : []).findIndex((c) => String(c?.key || "") === key);
 }
 async function uploadCategoriaImagenArchivo(idx, file) {
     const i = Number(idx || -1);
@@ -717,16 +735,30 @@ async function uploadCategoriaImagenDirectaPorId(catId, file) {
         const fd = new FormData();
         fd.append("foto", file);
         fd.append("categoria_id", id);
+        fd.append("categoria_key", String(state.categorias?.[i]?.key || ""));
         const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
         state.categorias[i].imagen_url = String(data.url || "");
-        categoriasImagenEliminada.delete(id);
+        categoriasImagenEliminada.delete(String(state.categorias?.[i]?.key || id));
         render();
         setMsg("Imagen actualizada con modo directo.", "ok");
     } catch (err) {
         setMsg(err.message || "No se pudo subir imagen en modo directo.", "err");
     }
+}
+async function uploadCategoriaImagenDirectaPorKey(catKey, file) {
+    const i = _findCategoriaIndexByKey(catKey);
+    if (i < 0) {
+        setMsg("No se encontro la categoria seleccionada.", "err");
+        return;
+    }
+    const id = String(state.categorias?.[i]?.id || "").trim();
+    if (!id) {
+        setMsg("Categoria sin id valido.", "err");
+        return;
+    }
+    await uploadCategoriaImagenDirectaPorId(id, file);
 }
 async function uploadCategoriaImagen(idx) {
     const i = Number(idx || -1);
@@ -761,6 +793,14 @@ function pickCategoriaFotoById(catId) {
     picker.click();
 }
 window.pickCategoriaFotoById = pickCategoriaFotoById;
+function pickCategoriaFotoByKey(catKey) {
+    const i = _findCategoriaIndexByKey(catKey);
+    if (i < 0 || !state.categorias?.[i]) return;
+    const id = String(state.categorias?.[i]?.id || "").trim();
+    if (!id) return;
+    pickCategoriaFotoById(id);
+}
+window.pickCategoriaFotoByKey = pickCategoriaFotoByKey;
 function pickCategoriaFoto(idx) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i]) return;
@@ -789,6 +829,14 @@ function cambiarCategoriaFotoDirectoById(catId) {
     picker.click();
 }
 window.cambiarCategoriaFotoDirectoById = cambiarCategoriaFotoDirectoById;
+function cambiarCategoriaFotoDirectoByKey(catKey) {
+    const i = _findCategoriaIndexByKey(catKey);
+    if (i < 0 || !state.categorias?.[i]) return;
+    const id = String(state.categorias?.[i]?.id || "").trim();
+    if (!id) return;
+    cambiarCategoriaFotoDirectoById(id);
+}
+window.cambiarCategoriaFotoDirectoByKey = cambiarCategoriaFotoDirectoByKey;
 
 async function _persistCatalogoImagenes() {
     const body = payload();
@@ -804,7 +852,7 @@ async function _persistCatalogoImagenes() {
 async function eliminarCategoriaImagen(idx) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i]) return;
-    const cid = String(state.categorias[i].id || "").trim();
+    const cid = String(state.categorias[i].key || state.categorias[i].id || "").trim();
     state.categorias[i].imagen_url = "";
     if (cid) categoriasImagenEliminada.add(cid);
     render();
@@ -823,6 +871,12 @@ async function eliminarCategoriaImagenById(catId) {
     await eliminarCategoriaImagen(i);
 }
 window.eliminarCategoriaImagenById = eliminarCategoriaImagenById;
+async function eliminarCategoriaImagenByKey(catKey) {
+    const i = _findCategoriaIndexByKey(catKey);
+    if (i < 0) return;
+    await eliminarCategoriaImagen(i);
+}
+window.eliminarCategoriaImagenByKey = eliminarCategoriaImagenByKey;
 
 function _setCatCropValues(posX, posY, zoom) {
     catCropState.posX = Math.max(0, Math.min(100, Number(posX || 50)));
@@ -852,6 +906,7 @@ function cerrarRecorteCategoria() {
     catCropState.file = null;
     catCropState.idx = -1;
     catCropState.catId = "";
+    catCropState.catKey = "";
 }
 
 function abrirRecorteCategoria(idx, file) {
@@ -859,8 +914,9 @@ function abrirRecorteCategoria(idx, file) {
     if (!file) return;
     ensureUniqueCategoryIds();
     const i = Number(idx || -1);
+    const catKey = String(state.categorias?.[i]?.key || "").trim();
     const catId = String(state.categorias?.[i]?.id || "").trim();
-    if (!catId) {
+    if (!catKey || !catId) {
         setMsg("No se pudo identificar la categoria para la imagen.", "err");
         return;
     }
@@ -869,6 +925,7 @@ function abrirRecorteCategoria(idx, file) {
     catCropState.file = file;
     catCropState.idx = i;
     catCropState.catId = catId;
+    catCropState.catKey = catKey;
     catCropState.open = true;
     catCropImageEl.src = catCropState.objectUrl;
     _setCatCropValues(50, 50, 100);
@@ -935,6 +992,7 @@ async function _generarBlobRecorteCategoria(file, posX, posY, zoom) {
 async function subirRecorteCategoria() {
     if (!catCropState.open || !catCropState.file) return;
     const catId = String(catCropState.catId || "").trim();
+    const catKey = String(catCropState.catKey || "").trim();
     if (!catId) {
         setMsg("No se pudo identificar la categoria destino.", "err");
         return;
@@ -950,12 +1008,13 @@ async function subirRecorteCategoria() {
         const baseName = String(catCropState.file.name || "categoria").replace(/\.[^.]+$/, "");
         fd.append("foto", blob, `${baseName}_square.jpg`);
         fd.append("categoria_id", catId);
+        fd.append("categoria_key", catKey);
         const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
-        const i = (Array.isArray(state.categorias) ? state.categorias : []).findIndex((c) => String(c?.id || "") === catId);
+        const i = _findCategoriaIndexByKey(catKey);
         if (i >= 0) state.categorias[i].imagen_url = String(data.url || "");
-        categoriasImagenEliminada.delete(catId);
+        categoriasImagenEliminada.delete(catKey || catId);
         render();
         setMsg("Imagen cargada, ajustada y guardada en la categoria correcta.", "ok");
         cerrarRecorteCategoria();
@@ -1017,7 +1076,7 @@ catCropStageEl.addEventListener("wheel", (ev) => {
 }, { passive: false });
 
 function newItem(base) {
-    return { ...base, id: slug(base.nombre || "item") };
+    return { ...base, key: String(base?.key || _newCategoryKey()), id: slug(base.nombre || "item") };
 }
 
 async function load() {
@@ -1047,6 +1106,7 @@ function payload() {
         max_extra_items: Math.max(1, Math.min(20, n(document.getElementById("max_extra_items").value, 8))),
         max_reference_images: Math.max(0, Math.min(10, n(document.getElementById("max_reference_images").value, 3))),
         categorias: state.categorias.map((x) => ({
+            key: String(x.key || "").trim().toLowerCase().replace(/[^a-z0-9_\-]+/g, "").slice(0, 40),
             id: _slugOrFallback(x.id || x.nombre, "categoria"),
             nombre: String(x.nombre || "").trim(),
             activo: Boolean(x.activo),
@@ -1059,7 +1119,7 @@ function payload() {
             extras_ids: parseIdList(x.extras_ids).map((v) => slug(v)),
             toppers_ids: parseIdList(x.toppers_ids).map((v) => slug(v)),
         })).filter((x) => x.nombre),
-        clear_image_category_ids: Array.from(categoriasImagenEliminada),
+        clear_image_category_keys: Array.from(categoriasImagenEliminada),
         sizes: state.sizes.map((x) => {
             const catRaw = _slugOrFallback(x.categoria_id || "", "general");
             const catFixed = catIdMap.get(catRaw) || catRaw;

@@ -2270,8 +2270,15 @@ def _normalizar_catalogo_torta_cfg(raw):
     if not isinstance(cats_in, list):
         cats_in = list(base.get("categorias") or [])
     used_cat_ids = set()
+    used_cat_keys = set()
     for item in cats_in:
         cat = dict(item or {})
+        cat_key = re.sub(r"[^a-z0-9_\-]+", "-", str(cat.get("key") or "").strip().lower()).strip("-_")[:40]
+        if not cat_key:
+            cat_key = f"cat-{uuid.uuid4().hex[:12]}"
+        while cat_key in used_cat_keys:
+            cat_key = f"cat-{uuid.uuid4().hex[:12]}"
+        used_cat_keys.add(cat_key)
         cid_base = re.sub(r"[^a-z0-9\-]+", "-", str(cat.get("id") or "").strip().lower()).strip("-")[:60] or _slug_simple(cat.get("nombre") or "categoria")
         cid = cid_base
         n_dup = 2
@@ -2307,6 +2314,7 @@ def _normalizar_catalogo_torta_cfg(raw):
         ]
         out["categorias"].append(
             {
+                "key": cat_key,
                 "id": cid,
                 "nombre": nombre,
                 "activo": bool(cat.get("activo", True)),
@@ -3314,35 +3322,42 @@ def api_tienda_admin_catalogo_torta():
         data = request.get_json(silent=True) or {}
         payload = data.get("catalogo") if isinstance(data.get("catalogo"), dict) else data
         payload = dict(payload or {})
-        clear_raw = payload.pop("clear_image_category_ids", []) if isinstance(payload.get("clear_image_category_ids"), list) else []
+        clear_raw = payload.pop("clear_image_category_keys", []) if isinstance(payload.get("clear_image_category_keys"), list) else []
+        if not clear_raw and isinstance(payload.get("clear_image_category_ids"), list):
+            clear_raw = payload.pop("clear_image_category_ids", [])
         clear_ids = {
-            re.sub(r"[^a-z0-9\-]+", "-", str(x or "").strip().lower()).strip("-")[:60]
+            re.sub(r"[^a-z0-9_\-]+", "-", str(x or "").strip().lower()).strip("-_")[:40]
             for x in clear_raw
             if str(x or "").strip()
         }
         prev_cfg = _obtener_tienda_personalizacion(apply_programacion=False)
         prev_cat = _normalizar_catalogo_torta_cfg((prev_cfg or {}).get("catalogo_torta") or {})
+        prev_by_key = {}
         prev_by_id = {}
         prev_by_name = {}
         for c in (prev_cat.get("categorias") or []):
+            ckey = re.sub(r"[^a-z0-9_\-]+", "-", str(c.get("key") or "").strip().lower()).strip("-_")[:40]
             cid = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("id") or "").strip().lower()).strip("-")[:60]
             nm = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("nombre") or "").strip().lower()).strip("-")[:60]
             img = _normalizar_url_personalizacion(c.get("imagen_url"))
+            if ckey and img:
+                prev_by_key[ckey] = img
             if cid and img:
                 prev_by_id[cid] = img
             if nm and img:
                 prev_by_name[nm] = img
         payload_norm = _normalizar_catalogo_torta_cfg(payload)
         for c in (payload_norm.get("categorias") or []):
+            ckey = re.sub(r"[^a-z0-9_\-]+", "-", str(c.get("key") or "").strip().lower()).strip("-_")[:40]
             cid = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("id") or "").strip().lower()).strip("-")[:60]
             nm = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("nombre") or "").strip().lower()).strip("-")[:60]
             img = _normalizar_url_personalizacion(c.get("imagen_url"))
-            if cid in clear_ids:
+            if ckey in clear_ids:
                 c["imagen_url"] = ""
                 continue
             if img:
                 continue
-            c["imagen_url"] = prev_by_id.get(cid) or prev_by_name.get(nm) or ""
+            c["imagen_url"] = prev_by_key.get(ckey) or prev_by_id.get(cid) or prev_by_name.get(nm) or ""
         cfg = _guardar_tienda_personalizacion({"catalogo_torta": payload_norm})
         crear_backup()
         return jsonify({"success": True, "catalogo": _normalizar_catalogo_torta_cfg(cfg.get("catalogo_torta"))})
@@ -3422,18 +3437,25 @@ def api_tienda_admin_catalogo_torta_categoria_foto():
                 pass
             return jsonify({"success": False, "error": "Imagen supera 5MB"}), 400
         url_img = f"/static/agenda_categorias_torta/{unique_name}"
+        categoria_key = re.sub(
+            r"[^a-z0-9_\-]+",
+            "-",
+            str(request.form.get("categoria_key") or "").strip().lower(),
+        ).strip("-_")[:40]
         categoria_id = re.sub(
             r"[^a-z0-9\-]+",
             "-",
             str(request.form.get("categoria_id") or "").strip().lower(),
         ).strip("-")[:60]
-        if categoria_id:
+        if categoria_key or categoria_id:
             try:
                 cfg = _obtener_tienda_personalizacion()
                 cat_cfg = _normalizar_catalogo_torta_cfg((cfg or {}).get("catalogo_torta") or {})
                 actualizado = False
                 for row in (cat_cfg.get("categorias") or []):
-                    if str(row.get("id") or "").strip().lower() == categoria_id:
+                    row_key = re.sub(r"[^a-z0-9_\-]+", "-", str(row.get("key") or "").strip().lower()).strip("-_")[:40]
+                    row_id = re.sub(r"[^a-z0-9\-]+", "-", str(row.get("id") or "").strip().lower()).strip("-")[:60]
+                    if (categoria_key and row_key == categoria_key) or (categoria_id and row_id == categoria_id):
                         row["imagen_url"] = url_img
                         actualizado = True
                         break
