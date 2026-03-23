@@ -1481,6 +1481,11 @@
         #agenda-confirmar-aceptar-enviar:hover {
             background: #1ebe5d;
         }
+        #modal-agenda-cake-cart .modal-actions .btn-muted,
+        #modal-agenda-cake-cart .modal-actions .btn-primary {
+            font-size: 0.72rem;
+            padding: 5px 7px;
+        }
         .mobile-overlay {
             display: none;
             position: fixed;
@@ -2592,6 +2597,7 @@
             </aside>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="agenda-cake-close-cart">Cerrar</button>
+                <button class="btn-muted" type="button" id="agenda-cake-clear-quote">Borrar cotizacion</button>
                 <button class="btn-primary" type="button" id="agenda-cake-go-schedule">Selecciona horario</button>
             </div>
         </div>
@@ -2739,6 +2745,7 @@
         const agendaCakeCloseBuilderEl = document.getElementById("agenda-cake-close-builder");
         const agendaCakeOpenCart2El = document.getElementById("agenda-cake-open-cart-2");
         const agendaCakeCloseCartEl = document.getElementById("agenda-cake-close-cart");
+        const agendaCakeClearQuoteEl = document.getElementById("agenda-cake-clear-quote");
         const agendaCakeGoScheduleEl = document.getElementById("agenda-cake-go-schedule");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
@@ -3907,6 +3914,15 @@
                     target.scrollIntoView({ behavior: "smooth", block: "start" });
                 } catch (_) {}
             }, 90);
+        }
+
+        function _agendaBorrarCotizacion() {
+            _resetAgendaCakeSelection();
+            _renderAgendaCakeBuilder();
+            _renderAgendaCakeSummary();
+            _cerrarModalAgendaCakeCart();
+            _abrirModalAgendaCakeBuilder();
+            _agendaMsg("Cotizacion borrada.", "ok");
         }
 
         function _cakePlaceholderByName(nombre) {
@@ -6269,6 +6285,7 @@
         });
         agendaCakeCloseBuilderEl?.addEventListener("click", _cerrarModalAgendaCakeBuilder);
         agendaCakeCloseCartEl?.addEventListener("click", _cerrarModalAgendaCakeCart);
+        agendaCakeClearQuoteEl?.addEventListener("click", _agendaBorrarCotizacion);
         agendaCakeGoScheduleEl?.addEventListener("click", _agendaIrASeleccionHorario);
         modalAgendaCakeBuilderEl?.addEventListener("click", (ev) => {
             if (ev.target === modalAgendaCakeBuilderEl) _cerrarModalAgendaCakeBuilder();
