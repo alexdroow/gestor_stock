@@ -188,6 +188,7 @@ from database import (
     registrar_historial_cambio, listar_historial_cambios, eliminar_historial_cambio,
     descartar_insumos_masivo,
     obtener_evento_agenda_por_id, actualizar_estado_evento_agenda,
+    eliminar_eventos_agenda_pasados,
     obtener_notas_agenda, guardar_nota_agenda, eliminar_nota_agenda,
     guardar_factura_archivo, obtener_facturas_archivadas, obtener_factura_archivo,
     eliminar_factura_archivo, actualizar_factura_archivo, obtener_filtros_facturas, obtener_auditoria_factura,
@@ -12352,6 +12353,21 @@ def api_agenda_eliminar(id):
         msg = str(resultado.get('error') or '').lower()
         status = 404 if 'no encontrado' in msg else 400
         return jsonify(resultado), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agenda/eventos/pasados/eliminar', methods=['POST'])
+def api_agenda_eliminar_pasados():
+    """Elimina eventos de agenda anteriores a hoy (o a fecha_hasta si se envía)."""
+    try:
+        data = request.get_json(silent=True) or {}
+        fecha_hasta = str(data.get('fecha_hasta') or '').strip() or None
+        resultado = eliminar_eventos_agenda_pasados(fecha_hasta=fecha_hasta)
+        if resultado.get('success'):
+            crear_backup()
+            return jsonify(resultado)
+        return jsonify(resultado), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

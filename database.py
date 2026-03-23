@@ -11420,6 +11420,56 @@ def eliminar_evento_agenda(evento_id):
     finally:
         conn.close()
 
+
+def eliminar_eventos_agenda_pasados(fecha_hasta=None):
+    """Elimina eventos de agenda con fecha anterior a `fecha_hasta` (YYYY-MM-DD)."""
+    fecha_ref = str(fecha_hasta or "").strip()
+    if not fecha_ref:
+        fecha_ref = datetime.now().strftime("%Y-%m-%d")
+
+    # Validar formato esperado YYYY-MM-DD.
+    try:
+        datetime.strptime(fecha_ref, "%Y-%m-%d")
+    except ValueError:
+        return {"success": False, "error": "Fecha de referencia invalida"}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Soporta datos en formato YYYY-MM-DD y legado DD-MM-YYYY.
+        cursor.execute(
+            """
+            DELETE FROM agenda_eventos
+            WHERE (
+                length(fecha) = 10
+                AND substr(fecha, 5, 1) = '-'
+                AND fecha < ?
+            ) OR (
+                length(fecha) = 10
+                AND substr(fecha, 3, 1) = '-'
+                AND (substr(fecha, 7, 4) || '-' || substr(fecha, 4, 2) || '-' || substr(fecha, 1, 2)) < ?
+            )
+            """,
+            (fecha_ref, fecha_ref),
+        )
+        eliminados = int(cursor.rowcount or 0)
+
+        # Limpia recordatorios huérfanos.
+        cursor.execute(
+            """
+            DELETE FROM agenda_recordatorios_descartados
+            WHERE evento_id NOT IN (SELECT id FROM agenda_eventos)
+            """
+        )
+
+        conn.commit()
+        return {"success": True, "eliminados": eliminados, "fecha_hasta": fecha_ref}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
 def obtener_eventos_proximos_agenda(dias=30):
     """Obtiene eventos próximos para notificaciones"""
     conn = get_db()

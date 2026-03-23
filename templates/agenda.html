@@ -363,6 +363,25 @@
             align-items: center;
             gap: 8px;
         }
+        .header-action-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .btn-danger-soft {
+            background: #fff1f2;
+            color: #b91c1c;
+            border: 1px solid #fecdd3;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-danger-soft:hover {
+            background: #ffe4e6;
+            border-color: #fda4af;
+        }
         
         .calendar-grid {
             flex: 1;
@@ -1590,9 +1609,14 @@
                                 <h2 id="mes-actual">Noviembre 2025</h2>
                                 <button onclick="cambiarMes(1)" class="btn-icon">-></button>
                             </div>
-                            <button onclick="nuevoEvento()" class="btn-primary">
-                                + Nuevo Evento
-                            </button>
+                            <div class="header-action-buttons">
+                                <button onclick="eliminarEventosPasados()" class="btn-danger-soft" title="Eliminar eventos anteriores al día actual">
+                                    🗑 Limpiar pasados
+                                </button>
+                                <button onclick="nuevoEvento()" class="btn-primary">
+                                    + Nuevo Evento
+                                </button>
+                            </div>
                         </div>
                         <div class="calendar-grid" id="calendario">
                             <!-- Se genera con JS -->
@@ -2400,6 +2424,30 @@
             } catch (error) {
                 console.error('Error:', error);
                 alert('[ERROR] Error de conexión al eliminar');
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
+        async function eliminarEventosPasados() {
+            const hoy = formatearFecha(new Date());
+            if (!confirm(`¿Eliminar eventos anteriores al ${hoy}? Esta acción no se puede deshacer.`)) return;
+
+            mostrarLoading(true);
+            try {
+                const response = await fetch('/api/agenda/eventos/pasados/eliminar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fecha_hasta: hoy })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudieron eliminar eventos pasados');
+                }
+                await cargarEventos();
+                alert(`✅ Limpieza completada. Eventos eliminados: ${Number(data.eliminados || 0)}.`);
+            } catch (error) {
+                alert('[ERROR] ' + String(error.message || error));
             } finally {
                 mostrarLoading(false);
             }
