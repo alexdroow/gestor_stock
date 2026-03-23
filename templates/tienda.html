@@ -32,7 +32,8 @@
             --mobile-top-btn-font: 1.25rem;
             --mobile-top-btn-pad: 12px 16px;
             --mobile-wa-size: 88px;
-            --mobile-wa-bottom: 128px;
+            --mobile-wa-bottom: 206px;
+            --mobile-agenda-summary-bottom: 128px;
             --mobile-reserve-pad: 220px;
             --mobile-reserve-scroll-margin: 240px;
             --mobile-cats-bubble-bottom: 112px;
@@ -275,6 +276,15 @@
             font-size: .82rem;
             color: #64748b;
             min-height: 30px;
+        }
+        .agenda-cake-cat-bullets {
+            margin: 0;
+            padding-left: 15px;
+            display: grid;
+            gap: 3px;
+            font-size: .73rem;
+            color: #64748b;
+            line-height: 1.2;
         }
         .agenda-cake-cat-badge {
             display: inline-flex;
@@ -1523,6 +1533,22 @@
             box-shadow: 0 10px 24px rgba(0,0,0,.28);
             cursor: pointer;
         }
+        .mobile-agenda-summary-fab {
+            display: none;
+            position: fixed;
+            right: 14px;
+            bottom: var(--mobile-agenda-summary-bottom);
+            z-index: 56;
+            border: 0;
+            border-radius: 999px;
+            background: #111827;
+            color: #fff;
+            padding: 20px 26px;
+            font-weight: 800;
+            font-size: 1.55rem;
+            box-shadow: 0 10px 24px rgba(0,0,0,.28);
+            cursor: pointer;
+        }
         .wa-fab {
             position: fixed;
             right: 16px;
@@ -1578,13 +1604,31 @@
             grid-template-columns: 1fr;
         }
         body.mobile-ui .agenda-cake-catalog-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
         }
         body.mobile-ui .agenda-cake-cat-name {
-            font-size: 1.08rem;
+            font-size: .92rem;
+            line-height: 1.2;
+            min-height: 30px;
         }
         body.mobile-ui .agenda-cake-cat-desc {
-            font-size: .9rem;
+            font-size: .78rem;
+            min-height: 0;
+        }
+        body.mobile-ui .agenda-cake-cat-card img {
+            height: 92px;
+        }
+        body.mobile-ui .agenda-cake-cat-body {
+            padding: 8px;
+            gap: 5px;
+        }
+        body.mobile-ui .agenda-cake-cat-badge {
+            font-size: .66rem;
+            padding: 2px 7px;
+        }
+        body.mobile-ui #agenda-cake-open-cart {
+            display: none !important;
         }
         body.mobile-ui .agenda-cake-builder,
         body.mobile-ui .agenda-cake-cart {
@@ -1684,6 +1728,10 @@
             align-items: center;
         }
         body.mobile-ui .mobile-menu-fab {
+            display: inline-flex;
+            align-items: center;
+        }
+        body.mobile-ui .mobile-agenda-summary-fab.active {
             display: inline-flex;
             align-items: center;
         }
@@ -2283,6 +2331,7 @@
     <a class="wa-fab" id="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
         <img id="wa-fab-icon" src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
     </a>
+    <button type="button" class="mobile-agenda-summary-fab" id="mobile-agenda-summary-fab" aria-hidden="true">Resumen</button>
     <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirCategoriasMobile()">Categorias</button>
     <div class="mobile-cats-bubble" id="mobile-cats-bubble" aria-hidden="true">
         <div class="mobile-cats-bubble-head">
@@ -2536,6 +2585,7 @@
         const cartPanelEl = document.querySelector(".cart-panel");
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
         const mobileMenuFabEl = document.getElementById("mobile-menu-fab");
+        const mobileAgendaSummaryFabEl = document.getElementById("mobile-agenda-summary-fab");
         const mobileCatsBubbleEl = document.getElementById("mobile-cats-bubble");
         const mobileCatsBubbleListEl = document.getElementById("mobile-cats-bubble-list");
         const mobileCatsBubbleCloseEl = document.getElementById("mobile-cats-bubble-close");
@@ -2728,7 +2778,8 @@
             const reserveScrollMargin = reservePad + 24;
             const fabBottom = 12 + browserInsetBottom;
             const menuFabHeight = Math.round(66 * scale);
-            const waBottom = Math.round(118 * scale) + browserInsetBottom;
+            const summaryBottom = fabBottom + menuFabHeight + 12;
+            const waBottom = summaryBottom + Math.round(86 * scale);
             const catsBottom = fabBottom + menuFabHeight + 16;
             const root = document.documentElement;
             root.style.setProperty("--mobile-fab-bottom", `${fabBottom}px`);
@@ -2741,6 +2792,7 @@
             root.style.setProperty("--mobile-top-btn-font", `${(1.05 * scale).toFixed(2)}rem`);
             root.style.setProperty("--mobile-top-btn-pad", `${Math.round(10 * scale)}px ${Math.round(14 * scale)}px`);
             root.style.setProperty("--mobile-wa-size", `${Math.round(82 * scale)}px`);
+            root.style.setProperty("--mobile-agenda-summary-bottom", `${summaryBottom}px`);
             root.style.setProperty("--mobile-wa-bottom", `${waBottom}px`);
             root.style.setProperty("--mobile-reserve-pad", `${reservePad}px`);
             root.style.setProperty("--mobile-reserve-scroll-margin", `${reserveScrollMargin}px`);
@@ -3558,6 +3610,15 @@
             return max;
         }
 
+        function _toggleMobileAgendaSummaryFab() {
+            if (!mobileAgendaSummaryFabEl) return;
+            const show = document.body.classList.contains("mobile-ui")
+                && categoriaActiva === "AGENDA"
+                && String(agendaTipoActual || "").trim().toLowerCase() === "torta";
+            mobileAgendaSummaryFabEl.classList.toggle("active", show);
+            mobileAgendaSummaryFabEl.setAttribute("aria-hidden", show ? "false" : "true");
+        }
+
         function _agendaApplyMobileWizard(autoAdvance = false) {
             if (!_agendaIsMobileWizardEnabled()) {
                 if (agendaMobileStepsEl) agendaMobileStepsEl.style.display = "none";
@@ -3635,6 +3696,7 @@
             }
             _agendaApplyMobileWizard(true);
             _actualizarDebugCatalogo("seleccion");
+            _toggleMobileAgendaSummaryFab();
         }
 
         function _isAgendaCakeVisible() {
@@ -3739,8 +3801,7 @@
         }
 
         function _cakePlaceholderByName(nombre) {
-            const n = String(nombre || "").trim() || "Categoria";
-            return `https://placehold.co/600x360/f8fafc/334155?text=${encodeURIComponent(n)}`;
+            return "https://placehold.co/600x360/f8fafc/334155?text=Torta";
         }
 
         function _renderAgendaCakeCatalogCards() {
@@ -3756,6 +3817,10 @@
                 const img = String(c.imagen_url || "").trim();
                 const badge = String(c.badge || "").trim();
                 const desc = String(c.descripcion || "").trim() || "Selecciona para configurar tamano, sabores y extras.";
+                const bullets = [
+                    "Tamano a eleccion",
+                    "Sabores y extras",
+                ];
                 return `
                     <article class="agenda-cake-cat-card ${active ? "active" : ""}" data-cake-card="${esc(cid)}">
                         <img src="${esc(img || _cakePlaceholderByName(c.nombre))}" alt="${esc(String(c.nombre || cid))}" loading="lazy">
@@ -3763,6 +3828,7 @@
                             ${badge ? `<span class="agenda-cake-cat-badge">${esc(badge)}</span>` : ""}
                             <div class="agenda-cake-cat-name">${esc(String(c.nombre || cid))}</div>
                             <div class="agenda-cake-cat-desc">${esc(desc)}</div>
+                            <ul class="agenda-cake-cat-bullets">${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
                         </div>
                     </article>
                 `;
@@ -5208,11 +5274,13 @@
                     setTimeout(() => _initAgendaMap(), 50);
                 }
                 _agendaApplyMobileWizard(false);
+                _toggleMobileAgendaSummaryFab();
                 return;
             }
             agendaPastelCerrarCatalogo();
             _cerrarModalAgendaCakeBuilder();
             _cerrarModalAgendaCakeCart();
+            _toggleMobileAgendaSummaryFab();
             const visibles = productos.filter((p) => productoFiltrado(p));
 
             const destacados = visibles
@@ -6066,6 +6134,7 @@
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
         agendaCakeOpenCartEl?.addEventListener("click", _abrirModalAgendaCakeCart);
+        mobileAgendaSummaryFabEl?.addEventListener("click", _abrirModalAgendaCakeCart);
         agendaCakeOpenCart2El?.addEventListener("click", () => {
             _cerrarModalAgendaCakeBuilder();
             _abrirModalAgendaCakeCart();
@@ -6272,6 +6341,7 @@
         _agendaApplyMobileWizard(false);
         _aplicarEscalaMovilDinamica();
         renderCart();
+        _toggleMobileAgendaSummaryFab();
         cargarProductos();
         _trackTienda("view");
         setInterval(() => _trackTienda("heartbeat"), 5000);
