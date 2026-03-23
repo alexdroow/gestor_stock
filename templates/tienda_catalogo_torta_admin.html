@@ -69,11 +69,11 @@
         }
         .row.extras { grid-template-columns: 1.2fr .6fr .5fr .4fr auto; }
         .row.cat {
-            grid-template-columns: 1fr .3fr .35fr .3fr auto;
+            grid-template-columns: 1.1fr .45fr .45fr .45fr .3fr auto;
             align-items: start;
         }
         .cat-grid {
-            grid-column: 1 / span 4;
+            grid-column: 1 / span 5;
             display: grid;
             gap: 6px;
             padding: 8px;
@@ -82,12 +82,26 @@
             background: #fff;
         }
         .cat-tools {
-            grid-column: 1 / span 4;
+            grid-column: 1 / span 5;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
+        }
+        .cat-cover {
+            display: grid;
+            grid-template-columns: 72px 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .cat-cover img {
+            width: 72px;
+            height: 72px;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            object-fit: cover;
+            background: #f1f5f9;
         }
         .btn-sm {
             padding: 6px 9px;
@@ -145,6 +159,9 @@
         @media (max-width: 980px) {
             .grid { grid-template-columns: 1fr; }
             .row, .row.extras { grid-template-columns: 1fr; }
+            .row.cat { grid-template-columns: 1fr; }
+            .cat-grid, .cat-tools { grid-column: auto; }
+            .cat-cover { grid-template-columns: 1fr; }
         }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
@@ -241,6 +258,7 @@
 
 <script>
 const ENDPOINT = "/api/tienda/admin/catalogo-torta";
+const ENDPOINT_UPLOAD_CAT = "/api/tienda/admin/catalogo-torta/categoria-foto";
 const msgEl = document.getElementById("msg");
 let state = {
     enabled: true,
@@ -323,6 +341,12 @@ function rowHtmlCategory(item, idx) {
             <label>Min horas agenda
                 <input data-k="min_lead_hours" type="number" min="1" max="336" step="1" value="${Math.max(1, n(item.min_lead_hours, 48))}">
             </label>
+            <label>Texto breve tarjeta
+                <input data-k="descripcion" maxlength="180" value="${esc(item.descripcion || "")}" placeholder="Ej: Bizcocho clasico y rellenos premium">
+            </label>
+            <label>Badge tarjeta
+                <input data-k="badge" maxlength="32" value="${esc(item.badge || "")}" placeholder="Ej: Mas vendido">
+            </label>
             <label><input data-k="use_category_ingredients" type="checkbox" ${item.use_category_ingredients ? "checked" : ""}> Ingredientes exclusivos</label>
             <label><input data-k="activo" type="checkbox" ${item.activo ? "checked" : ""}> Activa</label>
             <button class="btn btn-del" type="button" onclick="removeRow('categorias', ${idx})">X</button>
@@ -331,6 +355,15 @@ function rowHtmlCategory(item, idx) {
                     ${abierto ? "Ocultar opciones" : "Configurar ingredientes"}
                 </button>
                 <span class="muted">${item.use_category_ingredients ? "Modo exclusivo activo" : "Usa ingredientes generales"}</span>
+            </div>
+            <div class="cat-grid">
+                <div class="cat-cover">
+                    <img src="${esc(item.imagen_url || "")}" alt="Categoria" onerror="this.style.opacity='.25';this.src='';">
+                    <label>Imagen categoria (URL /static/... o https://)
+                        <input data-k="imagen_url" value="${esc(item.imagen_url || "")}" placeholder="/static/agenda_categorias_torta/cat_x.png">
+                    </label>
+                    <button type="button" class="btn btn-out btn-sm" onclick="uploadCategoriaImagen(${idx})">Subir imagen</button>
+                </div>
             </div>
             <div class="cat-grid" style="${abierto ? "" : "display:none;"} ${item.use_category_ingredients ? "" : "opacity:.65;"}">
                 <div class="muted"><strong>Ingredientes por categoria</strong> (si se activa, reemplaza lista general).</div>
@@ -455,6 +488,32 @@ function removeRow(key, idx) {
     render();
 }
 window.removeRow = removeRow;
+async function uploadCategoriaImagen(idx) {
+    const i = Number(idx || -1);
+    if (i < 0 || !state.categorias?.[i]) return;
+    const pick = document.createElement("input");
+    pick.type = "file";
+    pick.accept = ".jpg,.jpeg,.png,.webp";
+    pick.onchange = async () => {
+        const file = pick.files && pick.files[0] ? pick.files[0] : null;
+        if (!file) return;
+        try {
+            setMsg("Subiendo imagen...", "");
+            const fd = new FormData();
+            fd.append("foto", file);
+            const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
+            state.categorias[i].imagen_url = String(data.url || "");
+            render();
+            setMsg("Imagen cargada correctamente.", "ok");
+        } catch (err) {
+            setMsg(err.message || "No se pudo subir imagen.", "err");
+        }
+    };
+    pick.click();
+}
+window.uploadCategoriaImagen = uploadCategoriaImagen;
 function toggleCategoriaPanel(rowKey) {
     const key = String(rowKey || "").trim();
     if (!key) return;
@@ -490,6 +549,9 @@ function payload() {
             id: slug(x.id || x.nombre),
             nombre: String(x.nombre || "").trim(),
             activo: Boolean(x.activo),
+            descripcion: String(x.descripcion || "").trim().slice(0, 180),
+            badge: String(x.badge || "").trim().slice(0, 32),
+            imagen_url: String(x.imagen_url || "").trim().slice(0, 280),
             min_lead_hours: Math.max(1, Math.min(336, n(x.min_lead_hours, 48))),
             use_category_ingredients: Boolean(x.use_category_ingredients),
             sabores_ids: parseIdList(x.sabores_ids).map((v) => slug(v)),
@@ -532,6 +594,9 @@ document.getElementById("add-category").addEventListener("click", () => {
     state.categorias.push(newItem({
         nombre: "Nueva categoria",
         activo: true,
+        descripcion: "",
+        badge: "",
+        imagen_url: "",
         min_lead_hours: 48,
         use_category_ingredients: false,
         sabores_ids: [],

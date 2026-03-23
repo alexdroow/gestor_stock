@@ -1848,6 +1848,9 @@ def _default_tienda_personalizacion():
                 "id": "bizcocho",
                 "nombre": "Tortas Bizcocho",
                 "activo": True,
+                "descripcion": "",
+                "badge": "",
+                "imagen_url": "",
                 "min_lead_hours": 48,
                 "use_category_ingredients": False,
                 "sabores_ids": [],
@@ -1858,6 +1861,9 @@ def _default_tienda_personalizacion():
                 "id": "panqueque",
                 "nombre": "Tortas Panqueque",
                 "activo": True,
+                "descripcion": "",
+                "badge": "",
+                "imagen_url": "",
                 "min_lead_hours": 48,
                 "use_category_ingredients": False,
                 "sabores_ids": [],
@@ -2267,6 +2273,9 @@ def _normalizar_catalogo_torta_cfg(raw):
         cat = dict(item or {})
         cid = re.sub(r"[^a-z0-9\-]+", "-", str(cat.get("id") or "").strip().lower()).strip("-")[:60] or _slug_simple(cat.get("nombre") or "categoria")
         nombre = str(cat.get("nombre") or "").strip()[:80] or "Categoria"
+        descripcion = str(cat.get("descripcion") or "").strip()[:180]
+        badge = str(cat.get("badge") or "").strip()[:32]
+        imagen_url = _normalizar_url_personalizacion(cat.get("imagen_url"))
         try:
             min_lead_hours = int(cat.get("min_lead_hours") if cat.get("min_lead_hours") is not None else 48)
         except (TypeError, ValueError):
@@ -2293,6 +2302,9 @@ def _normalizar_catalogo_torta_cfg(raw):
                 "id": cid,
                 "nombre": nombre,
                 "activo": bool(cat.get("activo", True)),
+                "descripcion": descripcion,
+                "badge": badge,
+                "imagen_url": imagen_url,
                 "min_lead_hours": min_lead_hours,
                 "use_category_ingredients": use_category_ingredients,
                 "sabores_ids": list(dict.fromkeys(sabores_ids)),
@@ -3338,6 +3350,40 @@ def api_tienda_agenda_referencia_foto():
                 pass
             return jsonify({"success": False, "error": "Imagen supera 4MB"}), 400
         return jsonify({"success": True, "url": f"/static/agenda_referencias/{unique_name}"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/admin/catalogo-torta/categoria-foto', methods=['POST'])
+def api_tienda_admin_catalogo_torta_categoria_foto():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        archivo = request.files.get("foto")
+        if not archivo or not getattr(archivo, "filename", ""):
+            return jsonify({"success": False, "error": "Archivo no recibido"}), 400
+        nombre_seguro = secure_filename(archivo.filename)
+        ext = os.path.splitext(nombre_seguro)[1].lower()
+        permitidas = {".jpg", ".jpeg", ".png", ".webp"}
+        if ext not in permitidas:
+            return jsonify({"success": False, "error": "Formato no permitido. Usa JPG, PNG o WEBP"}), 400
+
+        base_dir = os.path.join(static_dir, "agenda_categorias_torta")
+        os.makedirs(base_dir, exist_ok=True)
+        unique_name = f"cat_{int(time.time())}_{uuid.uuid4().hex[:8]}{ext}"
+        abs_path = os.path.join(base_dir, unique_name)
+        archivo.save(abs_path)
+        try:
+            size_bytes = os.path.getsize(abs_path)
+        except Exception:
+            size_bytes = 0
+        if size_bytes > 5 * 1024 * 1024:
+            try:
+                os.remove(abs_path)
+            except Exception:
+                pass
+            return jsonify({"success": False, "error": "Imagen supera 5MB"}), 400
+        return jsonify({"success": True, "url": f"/static/agenda_categorias_torta/{unique_name}"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

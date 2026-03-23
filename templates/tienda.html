@@ -226,8 +226,71 @@
             padding: 10px;
             background: #fff;
             display: grid;
-            grid-template-columns: 1.2fr .8fr;
+            grid-template-columns: 1fr;
             gap: 10px;
+        }
+        .agenda-cake-catalog-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 10px;
+        }
+        .agenda-cake-cat-card {
+            border: 1px solid #f4c7a1;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, .06);
+            display: grid;
+            align-content: start;
+            cursor: pointer;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .agenda-cake-cat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, .1);
+        }
+        .agenda-cake-cat-card.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(244, 93, 8, .18);
+        }
+        .agenda-cake-cat-card img {
+            width: 100%;
+            height: 132px;
+            object-fit: cover;
+            background: #f1f5f9;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .agenda-cake-cat-body {
+            padding: 10px;
+            display: grid;
+            gap: 6px;
+        }
+        .agenda-cake-cat-name {
+            font-size: .95rem;
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+        .agenda-cake-cat-desc {
+            font-size: .82rem;
+            color: #64748b;
+            min-height: 30px;
+        }
+        .agenda-cake-cat-badge {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: .75rem;
+            font-weight: 800;
+            background: #ffedd5;
+            color: #9a3412;
+            border: 1px solid #fdba74;
+        }
+        .agenda-cake-catalog-actions {
+            display: flex;
+            justify-content: flex-end;
         }
         .agenda-cake-builder, .agenda-cake-cart {
             border: 1px solid #e2e8f0;
@@ -1289,6 +1352,9 @@
             padding: 14px;
         }
         .modal-overlay.active { display: flex; }
+        .agenda-cake-modal .modal {
+            width: min(960px, 96vw);
+        }
         body.agenda-confirm-open #agenda-map,
         body.agenda-confirm-open #agenda-map * {
             pointer-events: none !important;
@@ -1465,6 +1531,15 @@
             grid-template-columns: 1fr;
             gap: 12px;
             padding: 12px;
+        }
+        body.mobile-ui .agenda-cake-catalog-grid {
+            grid-template-columns: 1fr;
+        }
+        body.mobile-ui .agenda-cake-cat-name {
+            font-size: 1.08rem;
+        }
+        body.mobile-ui .agenda-cake-cat-desc {
+            font-size: .9rem;
         }
         body.mobile-ui .agenda-cake-builder,
         body.mobile-ui .agenda-cake-cart {
@@ -1965,6 +2040,7 @@
             .ofertas-track .item-card { flex: 0 0 min(240px, 78vw); width: min(240px, 78vw); }
             .agenda-form .grid2 { grid-template-columns: 1fr; }
             .agenda-cake-wrap { grid-template-columns: 1fr; }
+            .agenda-cake-catalog-grid { grid-template-columns: 1fr 1fr; }
             .agenda-cake-pills { gap: 8px; }
             .agenda-cake-pill { width: 100%; justify-content: flex-start; }
             .agenda-pastel-modes { grid-template-columns: 1fr; }
@@ -1977,6 +2053,9 @@
             .mobile-menu-fab {
                 display: inline-flex;
                 align-items: center;
+            }
+            .agenda-cake-modal .modal {
+                width: min(96vw, 96vw);
             }
         }
     </style>
@@ -2049,48 +2128,11 @@
                     <button type="button" class="agenda-mobile-step-btn" data-step="4">4. Datos</button>
                 </div>
                 <div class="agenda-cake-wrap" id="agenda-cake-wrap" style="display:none;">
-                    <div class="agenda-cake-builder">
-                        <div class="agenda-cake-head">
-                            <span id="agenda-cake-builder-title">Arma tu torta</span>
-                            <span id="agenda-cake-price-visibility"></span>
-                        </div>
-                        <div class="agenda-cake-empty" id="agenda-cake-debug" style="display:none;"></div>
-                        <div class="agenda-cake-cat-toolbar" id="agenda-cake-cat-toolbar">
-                            <div class="agenda-cake-cat-groups" id="agenda-cake-cat-groups"></div>
-                            <div class="agenda-cake-cat-search-wrap">
-                                <input id="agenda-cake-cat-search" class="agenda-cake-cat-search" type="search" placeholder="Buscar categoria...">
-                                <button type="button" class="btn btn-out" id="agenda-cake-cat-toggle">Ver mas</button>
-                            </div>
-                        </div>
-                        <div class="agenda-cake-categories" id="agenda-cake-categories"></div>
-                        <label>Tamano</label>
-                        <div class="agenda-cake-pills" id="agenda-cake-size-cards"></div>
-                        <div>
-                            <div class="agenda-mini-title">Sabores (maximo segun tamano)</div>
-                            <div class="agenda-cake-list" id="agenda-cake-flavors"></div>
-                        </div>
-                        <div>
-                            <div class="agenda-mini-title">Extras</div>
-                            <div class="agenda-cake-list" id="agenda-cake-extras"></div>
-                        </div>
-                        <label>Topper</label>
-                        <div class="agenda-cake-pills" id="agenda-cake-topper-cards"></div>
-                        <label>Fotos referenciales
-                            <input id="agenda-cake-file" type="file" accept=".jpg,.jpeg,.png,.webp">
-                        </label>
-                        <div class="agenda-cake-files" id="agenda-cake-files"></div>
-                        <label>Indicaciones para decoracion
-                            <textarea id="agenda-cake-note" maxlength="500" placeholder="Colores, estilo, texto del topper, etc."></textarea>
-                        </label>
+                    <div class="agenda-cake-catalog-grid" id="agenda-cake-grid"></div>
+                    <div class="agenda-cake-catalog-actions">
+                        <button type="button" class="btn-primary" id="agenda-cake-open-cart">Ver resumen de cotizacion</button>
                     </div>
-                    <aside class="agenda-cake-cart">
-                        <div id="agenda-cake-summary-title" style="font-size:.9rem;font-weight:900;color:#0f172a;">Resumen de cotizacion</div>
-                        <ul id="agenda-cake-summary"></ul>
-                        <div class="agenda-cake-total">
-                            <span id="agenda-cake-total-label">Total estimado</span>
-                            <span id="agenda-cake-total">$0</span>
-                        </div>
-                    </aside>
+                    <div class="agenda-cake-empty" id="agenda-cake-debug" style="display:none;"></div>
                 </div>
                 <div class="agenda-pastel-wrap" id="agenda-pastel-wrap" style="display:none;">
                     <div class="agenda-pastel-head">
@@ -2330,6 +2372,65 @@
         </div>
     </div>
 
+    <div class="modal-overlay agenda-cake-modal" id="modal-agenda-cake-builder">
+        <div class="modal">
+            <h3 id="agenda-cake-builder-title">Arma tu torta</h3>
+            <div class="agenda-cake-builder">
+                <div class="agenda-cake-head">
+                    <span id="agenda-cake-selected-cat-title"></span>
+                    <span id="agenda-cake-price-visibility"></span>
+                </div>
+                <div class="agenda-cake-cat-toolbar" id="agenda-cake-cat-toolbar" style="display:none;">
+                    <div class="agenda-cake-cat-groups" id="agenda-cake-cat-groups"></div>
+                    <div class="agenda-cake-cat-search-wrap">
+                        <input id="agenda-cake-cat-search" class="agenda-cake-cat-search" type="search" placeholder="Buscar categoria...">
+                        <button type="button" class="btn btn-out" id="agenda-cake-cat-toggle">Ver mas</button>
+                    </div>
+                </div>
+                <div class="agenda-cake-categories" id="agenda-cake-categories" style="display:none;"></div>
+                <label>Tamano</label>
+                <div class="agenda-cake-pills" id="agenda-cake-size-cards"></div>
+                <div>
+                    <div class="agenda-mini-title">Sabores (maximo segun tamano)</div>
+                    <div class="agenda-cake-list" id="agenda-cake-flavors"></div>
+                </div>
+                <div>
+                    <div class="agenda-mini-title">Extras</div>
+                    <div class="agenda-cake-list" id="agenda-cake-extras"></div>
+                </div>
+                <label>Topper</label>
+                <div class="agenda-cake-pills" id="agenda-cake-topper-cards"></div>
+                <label>Fotos referenciales
+                    <input id="agenda-cake-file" type="file" accept=".jpg,.jpeg,.png,.webp">
+                </label>
+                <div class="agenda-cake-files" id="agenda-cake-files"></div>
+                <label>Indicaciones para decoracion
+                    <textarea id="agenda-cake-note" maxlength="500" placeholder="Colores, estilo, texto del topper, etc."></textarea>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="agenda-cake-close-builder">Cerrar</button>
+                <button class="btn-primary" type="button" id="agenda-cake-open-cart-2">Ver resumen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay agenda-cake-modal" id="modal-agenda-cake-cart">
+        <div class="modal">
+            <h3 id="agenda-cake-summary-title">Resumen de cotizacion</h3>
+            <aside class="agenda-cake-cart" style="border:0;padding:0;background:transparent;">
+                <ul id="agenda-cake-summary"></ul>
+                <div class="agenda-cake-total">
+                    <span id="agenda-cake-total-label">Total estimado</span>
+                    <span id="agenda-cake-total">$0</span>
+                </div>
+            </aside>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="agenda-cake-close-cart">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
         const catListEl = document.getElementById("cat-list");
@@ -2423,6 +2524,8 @@
         const agendaSubtitleToggleEl = document.getElementById("agenda-subtitle-toggle");
         const agendaMobileStepsEl = document.getElementById("agenda-mobile-steps");
         const agendaCakeWrapEl = document.getElementById("agenda-cake-wrap");
+        const agendaCakeGridEl = document.getElementById("agenda-cake-grid");
+        const agendaCakeOpenCartEl = document.getElementById("agenda-cake-open-cart");
         const agendaPastelWrapEl = document.getElementById("agenda-pastel-wrap");
         const agendaPastelCatalogTitleEl = document.getElementById("agenda-pastel-catalog-title");
         const agendaPastelOpenCatalogEl = document.getElementById("agenda-pastel-open-catalog");
@@ -2459,8 +2562,14 @@
         const agendaCakeTotalEl = document.getElementById("agenda-cake-total");
         const agendaCakePriceVisibilityEl = document.getElementById("agenda-cake-price-visibility");
         const agendaCakeBuilderTitleEl = document.getElementById("agenda-cake-builder-title");
+        const agendaCakeSelectedCatTitleEl = document.getElementById("agenda-cake-selected-cat-title");
         const agendaCakeSummaryTitleEl = document.getElementById("agenda-cake-summary-title");
         const agendaCakeTotalLabelEl = document.getElementById("agenda-cake-total-label");
+        const modalAgendaCakeBuilderEl = document.getElementById("modal-agenda-cake-builder");
+        const modalAgendaCakeCartEl = document.getElementById("modal-agenda-cake-cart");
+        const agendaCakeCloseBuilderEl = document.getElementById("agenda-cake-close-builder");
+        const agendaCakeOpenCart2El = document.getElementById("agenda-cake-open-cart-2");
+        const agendaCakeCloseCartEl = document.getElementById("agenda-cake-close-cart");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
         const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
@@ -3493,6 +3602,9 @@
                 id: String(c?.id || "").trim().toLowerCase() || `cat-${idx + 1}`,
                 nombre: String(c?.nombre || c?.id || `Categoria ${idx + 1}`).trim(),
                 activo: c?.activo !== false,
+                descripcion: String(c?.descripcion || "").trim(),
+                badge: String(c?.badge || "").trim(),
+                imagen_url: String(c?.imagen_url || "").trim(),
                 min_lead_hours: Math.max(1, Number(c?.min_lead_hours || 48)),
                 use_category_ingredients: Boolean(c?.use_category_ingredients),
                 sabores_ids: Array.isArray(c?.sabores_ids) ? c.sabores_ids.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean) : [],
@@ -3555,6 +3667,62 @@
         function _toggleAgendaCakeBuilder() {
             if (!agendaCakeWrapEl) return;
             agendaCakeWrapEl.style.display = _isAgendaCakeVisible() ? "" : "none";
+        }
+
+        function _abrirModalAgendaCakeBuilder() {
+            if (!modalAgendaCakeBuilderEl) return;
+            modalAgendaCakeBuilderEl.classList.add("active");
+        }
+
+        function _cerrarModalAgendaCakeBuilder() {
+            modalAgendaCakeBuilderEl?.classList.remove("active");
+        }
+
+        function _abrirModalAgendaCakeCart() {
+            if (!modalAgendaCakeCartEl) return;
+            _renderAgendaCakeSummary();
+            modalAgendaCakeCartEl.classList.add("active");
+        }
+
+        function _cerrarModalAgendaCakeCart() {
+            modalAgendaCakeCartEl?.classList.remove("active");
+        }
+
+        function _cakePlaceholderByName(nombre) {
+            const n = String(nombre || "").trim() || "Categoria";
+            return `https://placehold.co/600x360/f8fafc/334155?text=${encodeURIComponent(n)}`;
+        }
+
+        function _renderAgendaCakeCatalogCards() {
+            if (!agendaCakeGridEl) return;
+            const categorias = _catalogCategoriasActivas();
+            if (!categorias.length) {
+                agendaCakeGridEl.innerHTML = `<div class="agenda-cake-empty">No hay categorias de torta configuradas.</div>`;
+                return;
+            }
+            agendaCakeGridEl.innerHTML = categorias.map((c) => {
+                const cid = String(c.id || "");
+                const active = cid === String(agendaCakeCategoriaActiva || "");
+                const img = String(c.imagen_url || "").trim();
+                const badge = String(c.badge || "").trim();
+                const desc = String(c.descripcion || "").trim() || "Selecciona para configurar tamano, sabores y extras.";
+                return `
+                    <article class="agenda-cake-cat-card ${active ? "active" : ""}" data-cake-card="${esc(cid)}">
+                        <img src="${esc(img || _cakePlaceholderByName(c.nombre))}" alt="${esc(String(c.nombre || cid))}" loading="lazy">
+                        <div class="agenda-cake-cat-body">
+                            ${badge ? `<span class="agenda-cake-cat-badge">${esc(badge)}</span>` : ""}
+                            <div class="agenda-cake-cat-name">${esc(String(c.nombre || cid))}</div>
+                            <div class="agenda-cake-cat-desc">${esc(desc)}</div>
+                        </div>
+                    </article>
+                `;
+            }).join("");
+            agendaCakeGridEl.querySelectorAll("[data-cake-card]").forEach((el) => {
+                el.addEventListener("click", () => {
+                    const cid = String(el.getAttribute("data-cake-card") || "");
+                    agendaCakeSelectCategory(cid, { openModal: true });
+                });
+            });
         }
 
         function _isAgendaPastelVisible() {
@@ -3944,6 +4112,11 @@
                 if (!agendaCakeCategoriaActiva || !categorias.some((c) => String(c.id || "") === agendaCakeCategoriaActiva)) {
                     agendaCakeCategoriaActiva = String((categorias[0] && categorias[0].id) || "");
                 }
+                _renderAgendaCakeCatalogCards();
+                const catSel = categorias.find((c) => String(c.id || "") === String(agendaCakeCategoriaActiva || ""));
+                if (agendaCakeSelectedCatTitleEl) {
+                    agendaCakeSelectedCatTitleEl.textContent = catSel ? `Categoria: ${String(catSel.nombre || catSel.id)}` : "";
+                }
                 const gruposCfg = [
                     { id: "all", label: "Todas" },
                     { id: "bizcocho", label: "Bizcocho" },
@@ -4178,13 +4351,16 @@
             _agendaApplyMobileWizard(true);
         }
 
-        function agendaCakeSelectCategory(catId) {
+        function agendaCakeSelectCategory(catId, opts = null) {
             agendaCakeCategoriaActiva = String(catId || "");
             agendaCakeSelection.size_id = "";
             agendaCakeSelection.sabor_ids = [];
             agendaCakeSelection.extra_items = [];
             agendaCakeSelection.topper_id = "";
             _renderAgendaCakeBuilder();
+            if (!opts || opts.openModal !== false) {
+                _abrirModalAgendaCakeBuilder();
+            }
             agendaFechaActiva = "";
             agendaHoraActiva = "";
             cargarAgendaDisponibilidad(true);
@@ -5033,6 +5209,8 @@
                 return;
             }
             agendaPastelCerrarCatalogo();
+            _cerrarModalAgendaCakeBuilder();
+            _cerrarModalAgendaCakeCart();
             const visibles = productos.filter((p) => productoFiltrado(p));
 
             const destacados = visibles
@@ -5885,6 +6063,19 @@
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
+        agendaCakeOpenCartEl?.addEventListener("click", _abrirModalAgendaCakeCart);
+        agendaCakeOpenCart2El?.addEventListener("click", () => {
+            _cerrarModalAgendaCakeBuilder();
+            _abrirModalAgendaCakeCart();
+        });
+        agendaCakeCloseBuilderEl?.addEventListener("click", _cerrarModalAgendaCakeBuilder);
+        agendaCakeCloseCartEl?.addEventListener("click", _cerrarModalAgendaCakeCart);
+        modalAgendaCakeBuilderEl?.addEventListener("click", (ev) => {
+            if (ev.target === modalAgendaCakeBuilderEl) _cerrarModalAgendaCakeBuilder();
+        });
+        modalAgendaCakeCartEl?.addEventListener("click", (ev) => {
+            if (ev.target === modalAgendaCakeCartEl) _cerrarModalAgendaCakeCart();
+        });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
         if (mobileCatsBubbleCloseEl) {
             mobileCatsBubbleCloseEl.addEventListener("click", () => {
