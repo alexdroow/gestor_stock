@@ -3391,7 +3391,27 @@ def api_tienda_admin_catalogo_torta_categoria_foto():
             except Exception:
                 pass
             return jsonify({"success": False, "error": "Imagen supera 5MB"}), 400
-        return jsonify({"success": True, "url": f"/static/agenda_categorias_torta/{unique_name}"})
+        url_img = f"/static/agenda_categorias_torta/{unique_name}"
+        categoria_id = re.sub(
+            r"[^a-z0-9\-]+",
+            "-",
+            str(request.form.get("categoria_id") or "").strip().lower(),
+        ).strip("-")[:60]
+        if categoria_id:
+            try:
+                cfg = _obtener_tienda_personalizacion()
+                cat_cfg = _normalizar_catalogo_torta_cfg((cfg or {}).get("catalogo_torta") or {})
+                actualizado = False
+                for row in (cat_cfg.get("categorias") or []):
+                    if str(row.get("id") or "").strip().lower() == categoria_id:
+                        row["imagen_url"] = url_img
+                        actualizado = True
+                        break
+                if actualizado:
+                    _guardar_tienda_personalizacion({"catalogo_torta": cat_cfg})
+            except Exception:
+                pass
+        return jsonify({"success": True, "url": url_img})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

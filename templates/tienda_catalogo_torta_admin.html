@@ -400,6 +400,7 @@ const catCropZoomLabelEl = document.getElementById("cat-crop-zoom-label");
 let catCropState = {
     open: false,
     idx: -1,
+    catId: "",
     file: null,
     objectUrl: "",
     posX: 50,
@@ -708,14 +709,23 @@ function cerrarRecorteCategoria() {
     catCropImageEl.removeAttribute("src");
     catCropState.file = null;
     catCropState.idx = -1;
+    catCropState.catId = "";
 }
 
 function abrirRecorteCategoria(idx, file) {
     if (!file) return;
+    ensureUniqueCategoryIds();
+    const i = Number(idx || -1);
+    const catId = String(state.categorias?.[i]?.id || "").trim();
+    if (!catId) {
+        setMsg("No se pudo identificar la categoria para la imagen.", "err");
+        return;
+    }
     if (catCropState.objectUrl) URL.revokeObjectURL(catCropState.objectUrl);
     catCropState.objectUrl = URL.createObjectURL(file);
     catCropState.file = file;
-    catCropState.idx = Number(idx || -1);
+    catCropState.idx = i;
+    catCropState.catId = catId;
     catCropState.open = true;
     catCropImageEl.src = catCropState.objectUrl;
     _setCatCropValues(50, 50, 100);
@@ -780,7 +790,12 @@ async function _generarBlobRecorteCategoria(file, posX, posY, zoom) {
 }
 
 async function subirRecorteCategoria() {
-    if (!catCropState.open || catCropState.idx < 0 || !catCropState.file) return;
+    if (!catCropState.open || !catCropState.file) return;
+    const catId = String(catCropState.catId || "").trim();
+    if (!catId) {
+        setMsg("No se pudo identificar la categoria destino.", "err");
+        return;
+    }
     const applyBtn = document.getElementById("cat-crop-apply");
     const prev = applyBtn.textContent;
     applyBtn.disabled = true;
@@ -791,12 +806,14 @@ async function subirRecorteCategoria() {
         const fd = new FormData();
         const baseName = String(catCropState.file.name || "categoria").replace(/\.[^.]+$/, "");
         fd.append("foto", blob, `${baseName}_square.jpg`);
+        fd.append("categoria_id", catId);
         const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
-        state.categorias[catCropState.idx].imagen_url = String(data.url || "");
+        const i = (Array.isArray(state.categorias) ? state.categorias : []).findIndex((c) => String(c?.id || "") === catId);
+        if (i >= 0) state.categorias[i].imagen_url = String(data.url || "");
         render();
-        setMsg("Imagen cargada y ajustada correctamente.", "ok");
+        setMsg("Imagen cargada, ajustada y guardada en la categoria correcta.", "ok");
         cerrarRecorteCategoria();
     } catch (err) {
         setMsg(err.message || "No se pudo subir imagen.", "err");
