@@ -2727,9 +2727,15 @@
         let categoriasDisponibles = [];
         let carrito = [];
         const CAT_STORAGE_KEY = "tienda_categoria_activa";
+        const _agendaUrlParamsInit = new URLSearchParams(window.location.search);
+        const _forceAgendaFromServer = {{ 'true' if force_agenda else 'false' }};
+        const _forceAgendaFromQueryInit = ["agenda", "agendar", "reservas"].includes(String(_agendaUrlParamsInit.get("seccion") || "").trim().toLowerCase());
+        const _forceAgendaFromHashInit = ["#agenda", "#agendar", "#reservas"].includes(String(window.location.hash || "").trim().toLowerCase());
+        const _forceAgendaFromPathInit = String(window.location.pathname || "").toLowerCase().startsWith("/tienda/agendar");
+        const _forceAgendaModeInit = Boolean(_forceAgendaFromServer || _forceAgendaFromQueryInit || _forceAgendaFromHashInit || _forceAgendaFromPathInit);
         const categoriaInicialGuardada = String(localStorage.getItem(CAT_STORAGE_KEY) || "TODOS");
-        let categoriaActiva = categoriaInicialGuardada === "AGENDA" ? "TODOS" : categoriaInicialGuardada;
-        if (categoriaInicialGuardada === "AGENDA") {
+        let categoriaActiva = _forceAgendaModeInit ? "AGENDA" : (categoriaInicialGuardada === "AGENDA" ? "TODOS" : categoriaInicialGuardada);
+        if (!_forceAgendaModeInit && categoriaInicialGuardada === "AGENDA") {
             localStorage.setItem(CAT_STORAGE_KEY, "TODOS");
         }
         let cuponAplicado = { codigo: "", descuento_monto: 0 };
@@ -5484,6 +5490,7 @@
         function cambiarCategoria(cat) {
             categoriaActiva = cat;
             localStorage.setItem(CAT_STORAGE_KEY, categoriaActiva);
+            _actualizarUrlCategoria(categoriaActiva);
             if (categoriaActiva === "AGENDA") {
                 agendaMobileStep = 1;
                 _syncCatalogoTortaDesdeProductos();
@@ -5493,6 +5500,24 @@
             renderCategoriasMenu();
             renderSecciones();
             _agendaApplyMobileWizard(false);
+        }
+
+        function _actualizarUrlCategoria(cat) {
+            try {
+                const url = new URL(window.location.href);
+                const isAgenda = String(cat || "").trim().toUpperCase() === "AGENDA";
+                if (isAgenda) {
+                    url.pathname = "/tienda/agendar";
+                    url.searchParams.delete("seccion");
+                } else {
+                    url.pathname = "/tienda";
+                    url.searchParams.delete("seccion");
+                }
+                url.hash = "";
+                const next = `${url.pathname}${url.search}${url.hash}`;
+                const curr = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+                if (next !== curr) history.replaceState({}, "", next);
+            } catch (_e) {}
         }
 
         async function cargarProductos() {

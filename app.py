@@ -827,7 +827,16 @@ def tienda_publica():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion)
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False)
+
+
+@app.route('/tienda/agendar')
+def tienda_publica_agendar():
+    try:
+        personalizacion = _obtener_tienda_personalizacion()
+    except Exception:
+        personalizacion = _default_tienda_personalizacion()
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True)
 
 
 def _parse_fecha_yyyy_mm_dd(valor):
