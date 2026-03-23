@@ -519,9 +519,9 @@ function rowHtmlCategory(item, idx) {
                         <input data-k="imagen_url" value="${esc(item.imagen_url || "")}" placeholder="/static/agenda_categorias_torta/cat_x.png">
                     </label>
                     <div class="cat-cover-tools">
-                        <input type="file" accept=".jpg,.jpeg,.png,.webp" data-cat-upload="${idx}">
-                        <button type="button" class="btn btn-out btn-sm" onclick="pickCategoriaFoto(${idx})">Subir desde computador</button>
-                        <button type="button" class="btn btn-alt btn-sm" onclick="eliminarCategoriaImagen(${idx})">Eliminar foto</button>
+                        <input type="file" accept=".jpg,.jpeg,.png,.webp" data-cat-upload="${idx}" style="display:none;">
+                        <button type="button" class="btn btn-out btn-sm" onclick="pickCategoriaFotoById('${esc(rowKey)}')">Subir desde computador</button>
+                        <button type="button" class="btn btn-alt btn-sm" onclick="eliminarCategoriaImagenById('${esc(rowKey)}')">Eliminar foto</button>
                     </div>
                 </div>
             </div>
@@ -658,6 +658,11 @@ function removeRow(key, idx) {
     render();
 }
 window.removeRow = removeRow;
+function _findCategoriaIndexById(catId) {
+    const id = String(catId || "").trim();
+    if (!id) return -1;
+    return (Array.isArray(state.categorias) ? state.categorias : []).findIndex((c) => String(c?.id || "") === id);
+}
 async function uploadCategoriaImagenArchivo(idx, file) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i] || !file) return;
@@ -667,6 +672,14 @@ async function uploadCategoriaImagenArchivo(idx, file) {
     }
     setMsg("Ajusta la imagen y presiona 'Usar esta imagen'.", "");
     abrirRecorteCategoria(i, file);
+}
+async function uploadCategoriaImagenPorId(catId, file) {
+    const i = _findCategoriaIndexById(catId);
+    if (i < 0) {
+        setMsg("No se encontro la categoria seleccionada.", "err");
+        return;
+    }
+    await uploadCategoriaImagenArchivo(i, file);
 }
 async function uploadCategoriaImagen(idx) {
     const i = Number(idx || -1);
@@ -682,16 +695,26 @@ async function uploadCategoriaImagen(idx) {
     pick.click();
 }
 window.uploadCategoriaImagen = uploadCategoriaImagen;
+function pickCategoriaFotoById(catId) {
+    const i = _findCategoriaIndexById(catId);
+    if (i < 0 || !state.categorias?.[i]) return;
+    const picker = document.createElement("input");
+    picker.type = "file";
+    picker.accept = ".jpg,.jpeg,.png,.webp";
+    picker.onchange = async () => {
+        const file = picker.files && picker.files[0] ? picker.files[0] : null;
+        if (!file) return;
+        await uploadCategoriaImagenPorId(catId, file);
+    };
+    picker.click();
+}
+window.pickCategoriaFotoById = pickCategoriaFotoById;
 function pickCategoriaFoto(idx) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i]) return;
-    const inp = document.querySelector(`[data-cat-upload="${i}"]`);
-    if (inp) {
-        inp.value = "";
-        inp.click();
-        return;
-    }
-    uploadCategoriaImagen(i);
+    const catId = String(state.categorias?.[i]?.id || "").trim();
+    if (!catId) return;
+    pickCategoriaFotoById(catId);
 }
 window.pickCategoriaFoto = pickCategoriaFoto;
 
@@ -720,6 +743,12 @@ async function eliminarCategoriaImagen(idx) {
     }
 }
 window.eliminarCategoriaImagen = eliminarCategoriaImagen;
+async function eliminarCategoriaImagenById(catId) {
+    const i = _findCategoriaIndexById(catId);
+    if (i < 0) return;
+    await eliminarCategoriaImagen(i);
+}
+window.eliminarCategoriaImagenById = eliminarCategoriaImagenById;
 
 function _setCatCropValues(posX, posY, zoom) {
     catCropState.posX = Math.max(0, Math.min(100, Number(posX || 50)));
