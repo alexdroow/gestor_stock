@@ -161,12 +161,92 @@
             gap: 8px;
             font-size: .86rem;
         }
+        .crop-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            background: rgba(15, 23, 42, .58);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .crop-modal.active { display: flex; }
+        .crop-panel {
+            width: min(760px, 100%);
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            background: #fff;
+            box-shadow: 0 16px 40px rgba(2, 6, 23, .35);
+            display: grid;
+            gap: 10px;
+            padding: 12px;
+        }
+        .crop-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .crop-title {
+            margin: 0;
+            font-size: 1.02rem;
+            color: #0f172a;
+        }
+        .crop-stage-wrap {
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            background: #f8fafc;
+            padding: 10px;
+        }
+        .crop-stage {
+            position: relative;
+            width: min(560px, 100%);
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+            overflow: hidden;
+            border-radius: 10px;
+            border: 1px solid #dbe3ef;
+            background: #eef2f7;
+            cursor: grab;
+        }
+        .crop-stage.dragging { cursor: grabbing; }
+        .crop-stage img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: 50% 50%;
+            transform: scale(1);
+            transform-origin: 50% 50%;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        .crop-controls {
+            display: grid;
+            gap: 8px;
+        }
+        .crop-range {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .crop-range input[type="range"] { width: 100%; }
+        .crop-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
         @media (max-width: 980px) {
             .grid { grid-template-columns: 1fr; }
             .row, .row.extras { grid-template-columns: 1fr; }
             .row.cat { grid-template-columns: 1fr; }
             .cat-grid, .cat-tools { grid-column: auto; }
             .cat-cover { grid-template-columns: 1fr; }
+            .crop-panel { padding: 10px; }
         }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
@@ -260,6 +340,37 @@
             </aside>
         </div>
     </main>
+    <div class="crop-modal" id="cat-crop-modal">
+        <div class="crop-panel">
+            <div class="crop-head">
+                <h3 class="crop-title">Ajustar imagen de categoria (1:1)</h3>
+                <button type="button" class="btn btn-out btn-sm" id="cat-crop-reset">Reiniciar</button>
+            </div>
+            <div class="crop-stage-wrap">
+                <div class="crop-stage" id="cat-crop-stage">
+                    <img id="cat-crop-image" alt="Preview recorte categoria">
+                </div>
+            </div>
+            <div class="crop-controls">
+                <label class="crop-range">Posicion X
+                    <input type="range" id="cat-crop-pos-x" min="0" max="100" step="1" value="50">
+                    <span><span id="cat-crop-pos-x-label">50</span>%</span>
+                </label>
+                <label class="crop-range">Posicion Y
+                    <input type="range" id="cat-crop-pos-y" min="0" max="100" step="1" value="50">
+                    <span><span id="cat-crop-pos-y-label">50</span>%</span>
+                </label>
+                <label class="crop-range">Zoom
+                    <input type="range" id="cat-crop-zoom" min="60" max="220" step="1" value="100">
+                    <span><span id="cat-crop-zoom-label">100</span>%</span>
+                </label>
+            </div>
+            <div class="crop-actions">
+                <button type="button" class="btn btn-alt" id="cat-crop-cancel">Cancelar</button>
+                <button type="button" class="btn btn-main" id="cat-crop-apply">Usar esta imagen</button>
+            </div>
+        </div>
+    </div>
 
 <script>
 const ENDPOINT = "/api/tienda/admin/catalogo-torta";
@@ -277,6 +388,27 @@ let state = {
     toppers: [],
 };
 let categoriaPanelAbierto = {};
+const catCropModalEl = document.getElementById("cat-crop-modal");
+const catCropStageEl = document.getElementById("cat-crop-stage");
+const catCropImageEl = document.getElementById("cat-crop-image");
+const catCropPosXEl = document.getElementById("cat-crop-pos-x");
+const catCropPosYEl = document.getElementById("cat-crop-pos-y");
+const catCropZoomEl = document.getElementById("cat-crop-zoom");
+const catCropPosXLabelEl = document.getElementById("cat-crop-pos-x-label");
+const catCropPosYLabelEl = document.getElementById("cat-crop-pos-y-label");
+const catCropZoomLabelEl = document.getElementById("cat-crop-zoom-label");
+let catCropState = {
+    open: false,
+    idx: -1,
+    file: null,
+    objectUrl: "",
+    posX: 50,
+    posY: 50,
+    zoom: 100,
+    dragging: false,
+    dragLastX: 0,
+    dragLastY: 0,
+};
 
 function setMsg(text, type = "") {
     msgEl.textContent = text || "";
@@ -506,19 +638,7 @@ window.removeRow = removeRow;
 async function uploadCategoriaImagenArchivo(idx, file) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i] || !file) return;
-    try {
-        setMsg("Subiendo imagen...", "");
-        const fd = new FormData();
-        fd.append("foto", file);
-        const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
-        state.categorias[i].imagen_url = String(data.url || "");
-        render();
-        setMsg("Imagen cargada correctamente desde tu equipo.", "ok");
-    } catch (err) {
-        setMsg(err.message || "No se pudo subir imagen.", "err");
-    }
+    abrirRecorteCategoria(i, file);
 }
 async function uploadCategoriaImagen(idx) {
     const i = Number(idx || -1);
@@ -534,6 +654,104 @@ async function uploadCategoriaImagen(idx) {
     pick.click();
 }
 window.uploadCategoriaImagen = uploadCategoriaImagen;
+
+function _setCatCropValues(posX, posY, zoom) {
+    catCropState.posX = Math.max(0, Math.min(100, Number(posX || 50)));
+    catCropState.posY = Math.max(0, Math.min(100, Number(posY || 50)));
+    catCropState.zoom = Math.max(60, Math.min(220, Number(zoom || 100)));
+    catCropPosXEl.value = String(Math.round(catCropState.posX));
+    catCropPosYEl.value = String(Math.round(catCropState.posY));
+    catCropZoomEl.value = String(Math.round(catCropState.zoom));
+    catCropPosXLabelEl.textContent = String(Math.round(catCropState.posX));
+    catCropPosYLabelEl.textContent = String(Math.round(catCropState.posY));
+    catCropZoomLabelEl.textContent = String(Math.round(catCropState.zoom));
+    catCropImageEl.style.objectPosition = `${catCropState.posX}% ${catCropState.posY}%`;
+    catCropImageEl.style.transform = `scale(${catCropState.zoom / 100})`;
+    catCropImageEl.style.transformOrigin = `${catCropState.posX}% ${catCropState.posY}%`;
+}
+
+function cerrarRecorteCategoria() {
+    catCropState.open = false;
+    catCropState.dragging = false;
+    catCropModalEl.classList.remove("active");
+    catCropStageEl.classList.remove("dragging");
+    if (catCropState.objectUrl) {
+        URL.revokeObjectURL(catCropState.objectUrl);
+        catCropState.objectUrl = "";
+    }
+    catCropImageEl.removeAttribute("src");
+    catCropState.file = null;
+    catCropState.idx = -1;
+}
+
+function abrirRecorteCategoria(idx, file) {
+    if (!file) return;
+    if (catCropState.objectUrl) URL.revokeObjectURL(catCropState.objectUrl);
+    catCropState.objectUrl = URL.createObjectURL(file);
+    catCropState.file = file;
+    catCropState.idx = Number(idx || -1);
+    catCropState.open = true;
+    catCropImageEl.src = catCropState.objectUrl;
+    _setCatCropValues(50, 50, 100);
+    catCropModalEl.classList.add("active");
+}
+
+async function _generarBlobRecorteCategoria(file, posX, posY, zoom) {
+    const bmp = await createImageBitmap(file);
+    const out = 1200;
+    const canvas = document.createElement("canvas");
+    canvas.width = out;
+    canvas.height = out;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No se pudo preparar canvas");
+
+    const baseScale = Math.max(out / bmp.width, out / bmp.height);
+    const scale = baseScale * (Math.max(60, Math.min(220, Number(zoom || 100))) / 100);
+    const drawW = bmp.width * scale;
+    const drawH = bmp.height * scale;
+    const rangeX = Math.max(0, drawW - out);
+    const rangeY = Math.max(0, drawH - out);
+    const pX = Math.max(0, Math.min(100, Number(posX || 50))) / 100;
+    const pY = Math.max(0, Math.min(100, Number(posY || 50))) / 100;
+    const sx = -rangeX * pX;
+    const sy = -rangeY * pY;
+
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(0, 0, out, out);
+    ctx.drawImage(bmp, sx, sy, drawW, drawH);
+    bmp.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+    if (!blob) throw new Error("No se pudo generar la imagen recortada");
+    return blob;
+}
+
+async function subirRecorteCategoria() {
+    if (!catCropState.open || catCropState.idx < 0 || !catCropState.file) return;
+    const applyBtn = document.getElementById("cat-crop-apply");
+    const prev = applyBtn.textContent;
+    applyBtn.disabled = true;
+    applyBtn.textContent = "Subiendo...";
+    try {
+        setMsg("Subiendo imagen...", "");
+        const blob = await _generarBlobRecorteCategoria(catCropState.file, catCropState.posX, catCropState.posY, catCropState.zoom);
+        const fd = new FormData();
+        const baseName = String(catCropState.file.name || "categoria").replace(/\.[^.]+$/, "");
+        fd.append("foto", blob, `${baseName}_square.jpg`);
+        const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
+        state.categorias[catCropState.idx].imagen_url = String(data.url || "");
+        render();
+        setMsg("Imagen cargada y ajustada correctamente.", "ok");
+        cerrarRecorteCategoria();
+    } catch (err) {
+        setMsg(err.message || "No se pudo subir imagen.", "err");
+    } finally {
+        applyBtn.disabled = false;
+        applyBtn.textContent = prev;
+    }
+}
+
 function toggleCategoriaPanel(rowKey) {
     const key = String(rowKey || "").trim();
     if (!key) return;
@@ -541,6 +759,47 @@ function toggleCategoriaPanel(rowKey) {
     render();
 }
 window.toggleCategoriaPanel = toggleCategoriaPanel;
+
+catCropPosXEl.addEventListener("input", () => _setCatCropValues(catCropPosXEl.value, catCropPosYEl.value, catCropZoomEl.value));
+catCropPosYEl.addEventListener("input", () => _setCatCropValues(catCropPosXEl.value, catCropPosYEl.value, catCropZoomEl.value));
+catCropZoomEl.addEventListener("input", () => _setCatCropValues(catCropPosXEl.value, catCropPosYEl.value, catCropZoomEl.value));
+document.getElementById("cat-crop-cancel").addEventListener("click", cerrarRecorteCategoria);
+document.getElementById("cat-crop-apply").addEventListener("click", subirRecorteCategoria);
+document.getElementById("cat-crop-reset").addEventListener("click", () => _setCatCropValues(50, 50, 100));
+catCropModalEl.addEventListener("click", (ev) => {
+    if (ev.target === catCropModalEl) cerrarRecorteCategoria();
+});
+catCropStageEl.addEventListener("pointerdown", (ev) => {
+    if (!catCropState.open) return;
+    catCropState.dragging = true;
+    catCropState.dragLastX = ev.clientX;
+    catCropState.dragLastY = ev.clientY;
+    catCropStageEl.classList.add("dragging");
+    catCropStageEl.setPointerCapture(ev.pointerId);
+});
+catCropStageEl.addEventListener("pointermove", (ev) => {
+    if (!catCropState.dragging) return;
+    const rect = catCropStageEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const dx = ev.clientX - catCropState.dragLastX;
+    const dy = ev.clientY - catCropState.dragLastY;
+    catCropState.dragLastX = ev.clientX;
+    catCropState.dragLastY = ev.clientY;
+    const sensibilidad = 100 / Math.max(rect.width, rect.height);
+    _setCatCropValues(catCropState.posX - (dx * sensibilidad), catCropState.posY - (dy * sensibilidad), catCropState.zoom);
+});
+function _finCatCropDrag() {
+    catCropState.dragging = false;
+    catCropStageEl.classList.remove("dragging");
+}
+catCropStageEl.addEventListener("pointerup", _finCatCropDrag);
+catCropStageEl.addEventListener("pointercancel", _finCatCropDrag);
+catCropStageEl.addEventListener("wheel", (ev) => {
+    if (!catCropState.open) return;
+    ev.preventDefault();
+    const delta = ev.deltaY > 0 ? -5 : 5;
+    _setCatCropValues(catCropState.posX, catCropState.posY, catCropState.zoom + delta);
+}, { passive: false });
 
 function newItem(base) {
     return { ...base, id: slug(base.nombre || "item") };
