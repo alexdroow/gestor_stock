@@ -520,7 +520,8 @@ function rowHtmlCategory(item, idx) {
                     </label>
                     <div class="cat-cover-tools">
                         <input type="file" accept=".jpg,.jpeg,.png,.webp" data-cat-upload="${idx}">
-                        <button type="button" class="btn btn-out btn-sm" onclick="uploadCategoriaImagen(${idx})">Subir desde computador</button>
+                        <button type="button" class="btn btn-out btn-sm" onclick="pickCategoriaFoto(${idx})">Subir desde computador</button>
+                        <button type="button" class="btn btn-alt btn-sm" onclick="eliminarCategoriaImagen(${idx})">Eliminar foto</button>
                     </div>
                 </div>
             </div>
@@ -681,6 +682,44 @@ async function uploadCategoriaImagen(idx) {
     pick.click();
 }
 window.uploadCategoriaImagen = uploadCategoriaImagen;
+function pickCategoriaFoto(idx) {
+    const i = Number(idx || -1);
+    if (i < 0 || !state.categorias?.[i]) return;
+    const inp = document.querySelector(`[data-cat-upload="${i}"]`);
+    if (inp) {
+        inp.value = "";
+        inp.click();
+        return;
+    }
+    uploadCategoriaImagen(i);
+}
+window.pickCategoriaFoto = pickCategoriaFoto;
+
+async function _persistCatalogoImagenes() {
+    const body = payload();
+    const res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ catalogo: body }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
+    state = { ...state, ...(data.catalogo || {}) };
+}
+async function eliminarCategoriaImagen(idx) {
+    const i = Number(idx || -1);
+    if (i < 0 || !state.categorias?.[i]) return;
+    state.categorias[i].imagen_url = "";
+    render();
+    try {
+        await _persistCatalogoImagenes();
+        render();
+        setMsg("Foto de categoria eliminada correctamente.", "ok");
+    } catch (err) {
+        setMsg(`Se elimino localmente, pero no se pudo guardar en servidor: ${err.message || "error"}`, "err");
+    }
+}
+window.eliminarCategoriaImagen = eliminarCategoriaImagen;
 
 function _setCatCropValues(posX, posY, zoom) {
     catCropState.posX = Math.max(0, Math.min(100, Number(posX || 50)));
@@ -713,6 +752,7 @@ function cerrarRecorteCategoria() {
 }
 
 function abrirRecorteCategoria(idx, file) {
+    if (catCropState.open) cerrarRecorteCategoria();
     if (!file) return;
     ensureUniqueCategoryIds();
     const i = Number(idx || -1);
