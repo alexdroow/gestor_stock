@@ -894,6 +894,15 @@
             border-radius: 9px;
             border: 1px solid #cbd5e1;
             overflow: hidden;
+            position: relative;
+            z-index: 1;
+            isolation: isolate;
+        }
+        #agenda-map .leaflet-pane,
+        #agenda-map .leaflet-control-container,
+        #agenda-map .leaflet-top,
+        #agenda-map .leaflet-bottom {
+            z-index: 1 !important;
         }
         .agenda-map-actions {
             display: grid;
@@ -1868,7 +1877,7 @@
         .mobile-cart-modal {
             position: fixed;
             inset: 0;
-            z-index: 62;
+            z-index: 5200;
             display: none;
             align-items: flex-end;
             justify-content: center;
@@ -2000,11 +2009,15 @@
         .mobile-menu-modal {
             position: fixed;
             inset: 0;
-            z-index: 64;
+            z-index: 5100;
             display: none;
             align-items: flex-end;
             justify-content: center;
             background: rgba(15, 23, 42, .58);
+        }
+        body.mobile-ui.cart-open #agenda-map,
+        body.mobile-ui.cart-open #agenda-map * {
+            pointer-events: none !important;
         }
         .mobile-menu-modal.active {
             display: flex;
@@ -6157,6 +6170,7 @@
             if (!tiendaAbierta) return msg("La tienda esta cerrada por el momento.", true);
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
+            document.body.classList.remove("cart-open");
             if (clienteRegistrado && normalizarEmailCliente(clienteRegistrado.email) && /^\+569\d{8}$/.test(String(clienteRegistrado.telefono || ""))) {
                 return enviarCheckoutCliente(clienteRegistrado);
             }
@@ -6365,12 +6379,14 @@
         function abrirCarritoMobile() {
             if (!mobileCartModalEl) return;
             mobileCartModalEl.classList.add("active");
+            document.body.classList.add("cart-open");
         }
 
         function cerrarPanelesMobile() {
             if (leftNavEl) leftNavEl.classList.remove("mobile-open");
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
             if (mobileMenuModalEl) mobileMenuModalEl.classList.remove("active");
+            document.body.classList.remove("cart-open");
             if (mobileCatsBubbleEl) {
                 mobileCatsBubbleEl.classList.remove("active");
                 mobileCatsBubbleEl.setAttribute("aria-hidden", "true");
@@ -6479,6 +6495,7 @@
         document.getElementById("mobile-btn-clear-cart")?.addEventListener("click", () => window.vaciarCarrito());
         document.getElementById("mobile-cart-close")?.addEventListener("click", () => {
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
+            document.body.classList.remove("cart-open");
         });
         document.getElementById("mobile-menu-close")?.addEventListener("click", () => {
             if (mobileMenuModalEl) mobileMenuModalEl.classList.remove("active");
@@ -6529,7 +6546,10 @@
         if (mobileOverlayEl) mobileOverlayEl.addEventListener("click", cerrarPanelesMobile);
         if (mobileCartModalEl) {
             mobileCartModalEl.addEventListener("click", (ev) => {
-                if (ev.target === mobileCartModalEl) mobileCartModalEl.classList.remove("active");
+                if (ev.target === mobileCartModalEl) {
+                    mobileCartModalEl.classList.remove("active");
+                    document.body.classList.remove("cart-open");
+                }
             });
         }
         if (mobileMenuModalEl) {
