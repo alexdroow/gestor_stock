@@ -103,6 +103,11 @@
             object-fit: cover;
             background: #f1f5f9;
         }
+        .cat-cover-tools {
+            display: grid;
+            gap: 6px;
+            align-content: start;
+        }
         .btn-sm {
             padding: 6px 9px;
             font-size: .78rem;
@@ -362,7 +367,10 @@ function rowHtmlCategory(item, idx) {
                     <label>Imagen categoria (URL /static/... o https://)
                         <input data-k="imagen_url" value="${esc(item.imagen_url || "")}" placeholder="/static/agenda_categorias_torta/cat_x.png">
                     </label>
-                    <button type="button" class="btn btn-out btn-sm" onclick="uploadCategoriaImagen(${idx})">Subir imagen</button>
+                    <div class="cat-cover-tools">
+                        <input type="file" accept=".jpg,.jpeg,.png,.webp" data-cat-upload="${idx}">
+                        <button type="button" class="btn btn-out btn-sm" onclick="uploadCategoriaImagen(${idx})">Subir desde computador</button>
+                    </div>
                 </div>
             </div>
             <div class="cat-grid" style="${abierto ? "" : "display:none;"} ${item.use_category_ingredients ? "" : "opacity:.65;"}">
@@ -467,6 +475,13 @@ function bindListInputs(key) {
                     state[key][idx][listKey] = Array.from(curr);
                 });
             });
+            row.querySelectorAll("[data-cat-upload]").forEach((fileInp) => {
+                fileInp.addEventListener("change", async () => {
+                    const file = fileInp.files && fileInp.files[0] ? fileInp.files[0] : null;
+                    if (!file) return;
+                    await uploadCategoriaImagenArchivo(idx, file);
+                });
+            });
         }
         if (key === "sizes") {
             const catSel = row.querySelector('select[data-k="categoria_id"]');
@@ -488,6 +503,23 @@ function removeRow(key, idx) {
     render();
 }
 window.removeRow = removeRow;
+async function uploadCategoriaImagenArchivo(idx, file) {
+    const i = Number(idx || -1);
+    if (i < 0 || !state.categorias?.[i] || !file) return;
+    try {
+        setMsg("Subiendo imagen...", "");
+        const fd = new FormData();
+        fd.append("foto", file);
+        const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
+        state.categorias[i].imagen_url = String(data.url || "");
+        render();
+        setMsg("Imagen cargada correctamente desde tu equipo.", "ok");
+    } catch (err) {
+        setMsg(err.message || "No se pudo subir imagen.", "err");
+    }
+}
 async function uploadCategoriaImagen(idx) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i]) return;
@@ -497,19 +529,7 @@ async function uploadCategoriaImagen(idx) {
     pick.onchange = async () => {
         const file = pick.files && pick.files[0] ? pick.files[0] : null;
         if (!file) return;
-        try {
-            setMsg("Subiendo imagen...", "");
-            const fd = new FormData();
-            fd.append("foto", file);
-            const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
-            state.categorias[i].imagen_url = String(data.url || "");
-            render();
-            setMsg("Imagen cargada correctamente.", "ok");
-        } catch (err) {
-            setMsg(err.message || "No se pudo subir imagen.", "err");
-        }
+        await uploadCategoriaImagenArchivo(i, file);
     };
     pick.click();
 }
