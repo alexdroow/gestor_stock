@@ -758,6 +758,39 @@
             background: #d1fae5;
             color: #065f46;
         }
+        .event-item-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn-mini-danger {
+            border: 1px solid #fecaca;
+            background: #fff1f2;
+            color: #b91c1c;
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-mini-danger:hover {
+            background: #ffe4e6;
+            border-color: #fda4af;
+        }
+        .btn-mini-outline {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-mini-outline:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+        }
         
         /* NOTIFICACIONES */
         .notif-card {
@@ -1677,6 +1710,16 @@
                             </p>
                         </div>
                     </div>
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            🗂 Eventos pasados
+                        </div>
+                        <div class="panel-body" id="eventos-pasados">
+                            <p style="color: #64748b; text-align: center; padding: 12px;">
+                                Sin eventos pasados.
+                            </p>
+                        </div>
+                    </div>
 
                     <div class="panel-card">
                         <div class="panel-header">
@@ -2284,6 +2327,7 @@
                     renderizarCalendario();
                     renderizarDetalleHorarioDia();
                     renderizarProximos();
+                    renderizarEventosPasados();
                     renderizarBloqueosActivos();
                     verificarNotificaciones();
                     actualizarAlertaReservasPendientes();
@@ -3563,6 +3607,85 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function esEventoPasado(e) {
+            if (!e || String(e.tipo || '').trim().toLowerCase() === 'bloqueo') return false;
+            const fecha = parseFechaISO(e.fecha);
+            if (!fecha) return false;
+            const minutos = horaAMinutos(e.hora_inicio, 0) || 0;
+            const dt = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), Math.floor(minutos / 60), minutos % 60, 0, 0);
+            return dt.getTime() < Date.now();
+        }
+
+        function renderizarEventosPasados() {
+            const contenedor = document.getElementById('eventos-pasados');
+            if (!contenedor) return;
+
+            const pasados = eventos
+                .filter(e => esEventoPasado(e))
+                .sort((a, b) => {
+                    const fechaA = parseFechaISO(a.fecha);
+                    const fechaB = parseFechaISO(b.fecha);
+                    const minutosA = horaAMinutos(a.hora_inicio, 0) || 0;
+                    const minutosB = horaAMinutos(b.hora_inicio, 0) || 0;
+                    const keyA = (fechaA ? fechaA.getTime() : 0) + (minutosA * 60000);
+                    const keyB = (fechaB ? fechaB.getTime() : 0) + (minutosB * 60000);
+                    return keyB - keyA;
+                })
+                .slice(0, 20);
+
+            if (!pasados.length) {
+                contenedor.innerHTML = `
+                    <p style="color: #64748b; text-align: center; padding: 12px;">
+                        Sin eventos pasados.
+                    </p>
+                `;
+                return;
+            }
+
+            const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+            const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+            contenedor.innerHTML = pasados.map(e => {
+                const fecha = parseFechaISO(e.fecha);
+                const fechaStr = fecha
+                    ? `${dias[fecha.getDay()]} ${fecha.getDate()} ${meses[fecha.getMonth()]}`
+                    : (e.fecha || '-');
+                const horaStr = e.hora_inicio ? e.hora_inicio.substring(0, 5) : '';
+
+                return `
+                    <div class="event-item ${e.tipo}" style="cursor:default;">
+                        <div class="event-time">${fechaStr} ${horaStr}</div>
+                        <div class="event-title">${escapeHtml(e.titulo || 'Sin título')}</div>
+                        <div class="event-client">${escapeHtml(e.cliente || 'Sin cliente')}</div>
+                        <div class="event-item-actions">
+                            <button class="btn-mini-outline" onclick="editarEvento(${Number(e.id || 0)})">Editar</button>
+                            <button class="btn-mini-danger" onclick="eliminarEventoDirecto(${Number(e.id || 0)})">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function eliminarEventoDirecto(id) {
+            const idNum = Number(id || 0);
+            if (!idNum) return;
+            if (!confirm('¿Eliminar este evento pasado?')) return;
+
+            try {
+                mostrarLoading(true);
+                const response = await fetch(`/api/agenda/evento/${idNum}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo eliminar el evento');
+                }
+                await cargarEventos();
+            } catch (error) {
+                alert('[ERROR] ' + String(error.message || error));
+            } finally {
+                mostrarLoading(false);
+            }
         }
 
         function renderizarBloqueosActivos() {
