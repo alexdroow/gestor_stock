@@ -3827,9 +3827,11 @@ def api_tienda_admin_clientes():
                     continue
             cid = int(item.get("id") or 0)
             cursor.execute("SELECT COUNT(*) AS total FROM ventas WHERE canal_venta='tienda_online' AND LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (item.get("email"), item.get("telefono")))
-            compras = int((cursor.fetchone() or {}).get("total") or 0)
+            row_compras = cursor.fetchone()
+            compras = int((dict(row_compras).get("total") if row_compras else 0) or 0)
             cursor.execute("SELECT COUNT(*) AS total FROM agenda_eventos WHERE LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (item.get("email"), item.get("telefono")))
-            reservas = int((cursor.fetchone() or {}).get("total") or 0)
+            row_reservas = cursor.fetchone()
+            reservas = int((dict(row_reservas).get("total") if row_reservas else 0) or 0)
             item["compras_total"] = compras
             item["reservas_total"] = reservas
             item["id"] = cid
