@@ -609,9 +609,11 @@ function bindListInputs(key) {
             });
             row.querySelectorAll("[data-cat-upload]").forEach((fileInp) => {
                 fileInp.addEventListener("change", async () => {
+                    const idxAttr = Number(fileInp.getAttribute("data-cat-upload") || idx);
                     const file = fileInp.files && fileInp.files[0] ? fileInp.files[0] : null;
                     if (!file) return;
-                    await uploadCategoriaImagenArchivo(idx, file);
+                    await uploadCategoriaImagenArchivo(idxAttr, file);
+                    fileInp.value = "";
                 });
             });
         }
@@ -638,6 +640,11 @@ window.removeRow = removeRow;
 async function uploadCategoriaImagenArchivo(idx, file) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i] || !file) return;
+    if (!/^image\//i.test(String(file.type || ""))) {
+        setMsg("Archivo invalido. Usa JPG, PNG o WEBP.", "err");
+        return;
+    }
+    setMsg("Ajusta la imagen y presiona 'Usar esta imagen'.", "");
     abrirRecorteCategoria(i, file);
 }
 async function uploadCategoriaImagen(idx) {
@@ -697,7 +704,34 @@ function abrirRecorteCategoria(idx, file) {
 }
 
 async function _generarBlobRecorteCategoria(file, posX, posY, zoom) {
-    const bmp = await createImageBitmap(file);
+    let bmp = null;
+    if (typeof createImageBitmap === "function") {
+        try {
+            bmp = await createImageBitmap(file);
+        } catch (_err) {
+            bmp = null;
+        }
+    }
+    if (!bmp) {
+        bmp = await new Promise((resolve, reject) => {
+            const img = new Image();
+            const objUrl = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(objUrl);
+                resolve({
+                    width: img.naturalWidth || img.width,
+                    height: img.naturalHeight || img.height,
+                    _img: img,
+                    close: () => {},
+                });
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(objUrl);
+                reject(new Error("No se pudo leer la imagen seleccionada"));
+            };
+            img.src = objUrl;
+        });
+    }
     const out = 1200;
     const canvas = document.createElement("canvas");
     canvas.width = out;
@@ -718,7 +752,8 @@ async function _generarBlobRecorteCategoria(file, posX, posY, zoom) {
 
     ctx.fillStyle = "#f1f5f9";
     ctx.fillRect(0, 0, out, out);
-    ctx.drawImage(bmp, sx, sy, drawW, drawH);
+    const drawSource = bmp._img || bmp;
+    ctx.drawImage(drawSource, sx, sy, drawW, drawH);
     bmp.close();
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
     if (!blob) throw new Error("No se pudo generar la imagen recortada");
