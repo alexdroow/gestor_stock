@@ -37,6 +37,7 @@
             --mobile-reserve-pad: 220px;
             --mobile-reserve-scroll-margin: 240px;
             --mobile-cats-bubble-bottom: 112px;
+            --mobile-ui-font-size: 100%;
         }
         * { box-sizing: border-box; }
         body {
@@ -1580,7 +1581,7 @@
         }
         body.mobile-ui .left-nav { display: none; }
         body.mobile-ui .cart-panel { display: none; }
-        body.mobile-ui { font-size: 100%; }
+        body.mobile-ui { font-size: var(--mobile-ui-font-size); }
         body.mobile-ui .layout {
             width: 100%;
             max-width: 100%;
@@ -2803,12 +2804,29 @@
             const viewportHeight = Math.max(480, Math.round((vv && vv.height) || window.innerHeight || 780));
             const shortSide = Math.max(320, Math.min(viewportWidth, viewportHeight));
             let scale = 1;
-            if (shortSide <= 350) scale *= 0.97;
-            else if (shortSide <= 380) scale *= 0.99;
-            else if (shortSide >= 430) scale *= 1.02;
-            if (viewportHeight <= 700) scale *= 0.97;
-            else if (viewportHeight >= 940) scale *= 1.02;
-            scale = Math.max(0.94, Math.min(1.06, scale));
+            let fontScale = 1;
+            if (shortSide <= 360) {
+                scale = 0.93;
+                fontScale = 0.92;
+            } else if (shortSide <= 390) {
+                scale = 0.98;
+                fontScale = 0.97;
+            } else if (shortSide <= 430) {
+                scale = 1.02;
+                fontScale = 1.00;
+            } else {
+                scale = 1.05;
+                fontScale = 1.03;
+            }
+            if (viewportHeight <= 700) {
+                scale *= 0.97;
+                fontScale *= 0.96;
+            } else if (viewportHeight >= 940) {
+                scale *= 1.02;
+                fontScale *= 1.01;
+            }
+            scale = Math.max(0.90, Math.min(1.08, scale));
+            fontScale = Math.max(0.90, Math.min(1.05, fontScale));
             const browserInsetBottom = Math.max(0, Math.round((window.innerHeight || viewportHeight) - viewportHeight));
             const reservePad = Math.round(210 * scale) + browserInsetBottom + 14;
             const reserveScrollMargin = reservePad + 24;
@@ -2833,6 +2851,7 @@
             root.style.setProperty("--mobile-reserve-pad", `${reservePad}px`);
             root.style.setProperty("--mobile-reserve-scroll-margin", `${reserveScrollMargin}px`);
             root.style.setProperty("--mobile-cats-bubble-bottom", `${catsBottom}px`);
+            root.style.setProperty("--mobile-ui-font-size", `${Math.round(fontScale * 100)}%`);
         }
         const TIENDA_UI_DEFAULTS = {
             brand_text: "Tienda en linea",
