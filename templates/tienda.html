@@ -2592,6 +2592,7 @@
             </aside>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="agenda-cake-close-cart">Cerrar</button>
+                <button class="btn-primary" type="button" id="agenda-cake-go-schedule">Selecciona horario</button>
             </div>
         </div>
     </div>
@@ -2738,6 +2739,7 @@
         const agendaCakeCloseBuilderEl = document.getElementById("agenda-cake-close-builder");
         const agendaCakeOpenCart2El = document.getElementById("agenda-cake-open-cart-2");
         const agendaCakeCloseCartEl = document.getElementById("agenda-cake-close-cart");
+        const agendaCakeGoScheduleEl = document.getElementById("agenda-cake-go-schedule");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
         const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
@@ -3890,6 +3892,21 @@
 
         function _cerrarModalAgendaCakeCart() {
             modalAgendaCakeCartEl?.classList.remove("active");
+        }
+
+        function _agendaIrASeleccionHorario() {
+            _cerrarModalAgendaCakeCart();
+            if (_agendaIsMobileWizardEnabled()) {
+                agendaMobileStep = Math.max(3, agendaMobileStep || 1);
+                _agendaApplyMobileWizard(false);
+            }
+            const target = agendaDaysListEl || agendaHoursListEl || secAgendaReservasEl;
+            if (!target) return;
+            window.setTimeout(() => {
+                try {
+                    target.scrollIntoView({ behavior: "smooth", block: "start" });
+                } catch (_) {}
+            }, 90);
         }
 
         function _cakePlaceholderByName(nombre) {
@@ -6252,6 +6269,7 @@
         });
         agendaCakeCloseBuilderEl?.addEventListener("click", _cerrarModalAgendaCakeBuilder);
         agendaCakeCloseCartEl?.addEventListener("click", _cerrarModalAgendaCakeCart);
+        agendaCakeGoScheduleEl?.addEventListener("click", _agendaIrASeleccionHorario);
         modalAgendaCakeBuilderEl?.addEventListener("click", (ev) => {
             if (ev.target === modalAgendaCakeBuilderEl) _cerrarModalAgendaCakeBuilder();
         });
