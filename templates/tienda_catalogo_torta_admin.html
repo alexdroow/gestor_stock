@@ -520,8 +520,8 @@ function rowHtmlCategory(item, idx) {
                     </label>
                     <div class="cat-cover-tools">
                         <input type="file" accept=".jpg,.jpeg,.png,.webp" data-cat-upload="${idx}" style="display:none;">
-                        <button type="button" class="btn btn-out btn-sm" onclick="pickCategoriaFotoById('${esc(rowKey)}')">Subir desde computador</button>
-                        <button type="button" class="btn btn-alt btn-sm" onclick="eliminarCategoriaImagenById('${esc(rowKey)}')">Eliminar foto</button>
+                        <button type="button" class="btn btn-out btn-sm" data-cat-pick="${esc(rowKey)}">Subir desde computador</button>
+                        <button type="button" class="btn btn-alt btn-sm" data-cat-remove="${esc(rowKey)}">Eliminar foto</button>
                     </div>
                 </div>
             </div>
@@ -637,6 +637,18 @@ function bindListInputs(key) {
                     fileInp.value = "";
                 });
             });
+            row.querySelectorAll("[data-cat-pick]").forEach((btnPick) => {
+                btnPick.addEventListener("click", () => {
+                    const cid = String(btnPick.getAttribute("data-cat-pick") || "");
+                    pickCategoriaFotoById(cid);
+                });
+            });
+            row.querySelectorAll("[data-cat-remove]").forEach((btnDel) => {
+                btnDel.addEventListener("click", () => {
+                    const cid = String(btnDel.getAttribute("data-cat-remove") || "");
+                    eliminarCategoriaImagenById(cid);
+                });
+            });
         }
         if (key === "sizes") {
             const catSel = row.querySelector('select[data-k="categoria_id"]');
@@ -701,11 +713,16 @@ function pickCategoriaFotoById(catId) {
     const picker = document.createElement("input");
     picker.type = "file";
     picker.accept = ".jpg,.jpeg,.png,.webp";
+    picker.style.position = "fixed";
+    picker.style.left = "-9999px";
+    document.body.appendChild(picker);
     picker.onchange = async () => {
         const file = picker.files && picker.files[0] ? picker.files[0] : null;
+        try { picker.remove(); } catch (_e) {}
         if (!file) return;
         await uploadCategoriaImagenPorId(catId, file);
     };
+    picker.oncancel = () => { try { picker.remove(); } catch (_e) {} };
     picker.click();
 }
 window.pickCategoriaFotoById = pickCategoriaFotoById;
