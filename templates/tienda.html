@@ -347,6 +347,46 @@
             color: #475569;
             font-weight: 700;
         }
+        .agenda-cake-top {
+            display: grid;
+            grid-template-columns: 1.1fr .9fr;
+            gap: 10px;
+            align-items: stretch;
+        }
+        .agenda-cake-media {
+            border: 1px solid #dbe3ef;
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: 170px auto;
+        }
+        .agenda-cake-media img {
+            width: 100%;
+            height: 170px;
+            object-fit: cover;
+            background: #f1f5f9;
+        }
+        .agenda-cake-media-body {
+            padding: 10px;
+            display: grid;
+            gap: 6px;
+        }
+        .agenda-cake-size-panel {
+            border: 1px solid #dbe3ef;
+            border-radius: 10px;
+            background: #fff;
+            padding: 10px;
+            display: grid;
+            gap: 8px;
+            align-content: start;
+        }
+        .agenda-cake-size-grid {
+            display: grid;
+            gap: 7px;
+            max-height: 250px;
+            overflow: auto;
+        }
         .agenda-cake-list {
             display: grid;
             gap: 6px;
@@ -1354,6 +1394,8 @@
         .modal-overlay.active { display: flex; }
         .agenda-cake-modal .modal {
             width: min(960px, 96vw);
+            max-height: 88vh;
+            overflow: auto;
         }
         body.agenda-confirm-open #agenda-map,
         body.agenda-confirm-open #agenda-map * {
@@ -1531,6 +1573,9 @@
             grid-template-columns: 1fr;
             gap: 12px;
             padding: 12px;
+        }
+        body.mobile-ui .agenda-cake-top {
+            grid-template-columns: 1fr;
         }
         body.mobile-ui .agenda-cake-catalog-grid {
             grid-template-columns: 1fr;
@@ -2380,16 +2425,19 @@
                     <span id="agenda-cake-selected-cat-title"></span>
                     <span id="agenda-cake-price-visibility"></span>
                 </div>
-                <div class="agenda-cake-cat-toolbar" id="agenda-cake-cat-toolbar" style="display:none;">
-                    <div class="agenda-cake-cat-groups" id="agenda-cake-cat-groups"></div>
-                    <div class="agenda-cake-cat-search-wrap">
-                        <input id="agenda-cake-cat-search" class="agenda-cake-cat-search" type="search" placeholder="Buscar categoria...">
-                        <button type="button" class="btn btn-out" id="agenda-cake-cat-toggle">Ver mas</button>
+                <div class="agenda-cake-top">
+                    <div class="agenda-cake-media">
+                        <img id="agenda-cake-selected-cat-image" src="" alt="Categoria torta">
+                        <div class="agenda-cake-media-body">
+                            <div class="agenda-mini-title">Descripcion</div>
+                            <div id="agenda-cake-selected-cat-desc" style="font-size:.88rem;color:#475569;line-height:1.35;"></div>
+                        </div>
+                    </div>
+                    <div class="agenda-cake-size-panel">
+                        <div class="agenda-mini-title">Tamanos disponibles</div>
+                        <div class="agenda-cake-size-grid" id="agenda-cake-size-cards"></div>
                     </div>
                 </div>
-                <div class="agenda-cake-categories" id="agenda-cake-categories" style="display:none;"></div>
-                <label>Tamano</label>
-                <div class="agenda-cake-pills" id="agenda-cake-size-cards"></div>
                 <div>
                     <div class="agenda-mini-title">Sabores (maximo segun tamano)</div>
                     <div class="agenda-cake-list" id="agenda-cake-flavors"></div>
@@ -2563,6 +2611,8 @@
         const agendaCakePriceVisibilityEl = document.getElementById("agenda-cake-price-visibility");
         const agendaCakeBuilderTitleEl = document.getElementById("agenda-cake-builder-title");
         const agendaCakeSelectedCatTitleEl = document.getElementById("agenda-cake-selected-cat-title");
+        const agendaCakeSelectedCatImageEl = document.getElementById("agenda-cake-selected-cat-image");
+        const agendaCakeSelectedCatDescEl = document.getElementById("agenda-cake-selected-cat-desc");
         const agendaCakeSummaryTitleEl = document.getElementById("agenda-cake-summary-title");
         const agendaCakeTotalLabelEl = document.getElementById("agenda-cake-total-label");
         const modalAgendaCakeBuilderEl = document.getElementById("modal-agenda-cake-builder");
@@ -4117,45 +4167,13 @@
                 if (agendaCakeSelectedCatTitleEl) {
                     agendaCakeSelectedCatTitleEl.textContent = catSel ? `Categoria: ${String(catSel.nombre || catSel.id)}` : "";
                 }
-                const gruposCfg = [
-                    { id: "all", label: "Todas" },
-                    { id: "bizcocho", label: "Bizcocho" },
-                    { id: "panqueque", label: "Panqueque" },
-                    { id: "especiales", label: "Especiales" },
-                ];
-                const categoriasFiltradas = categorias.filter((c) => {
-                    const okGroup = agendaCakeCategoryGroup === "all" ? true : _groupCategoriaTorta(c) === agendaCakeCategoryGroup;
-                    return okGroup && _categoriaCoincideFiltro(c, agendaCakeCategorySearch);
-                });
-                if (categoriasFiltradas.length && !categoriasFiltradas.some((c) => String(c.id || "") === agendaCakeCategoriaActiva)) {
-                    agendaCakeCategoriaActiva = String((categoriasFiltradas[0] && categoriasFiltradas[0].id) || "");
+                if (agendaCakeSelectedCatImageEl) {
+                    const img = String(catSel?.imagen_url || "").trim();
+                    agendaCakeSelectedCatImageEl.src = img || _cakePlaceholderByName(catSel?.nombre || "Torta");
                 }
-                if (agendaCakeCategoriesEl) {
-                    const baseStyle = "display:inline-block;padding:7px 10px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;color:#334155;font-weight:800;font-size:.78rem;margin:0 6px 6px 0;cursor:pointer;pointer-events:auto;";
-                    const activeStyle = "border-color:#f45d08;background:#ffedd5;color:#9a3412;";
-                    const visibles = agendaCakeCategoryExpanded ? categoriasFiltradas : categoriasFiltradas.slice(0, AGENDA_CAKE_CATS_COLLAPSED);
-                    agendaCakeCategoriesEl.innerHTML = categoriasFiltradas.length
-                        ? visibles.map((c) => {
-                            const cid = String(c.id || "");
-                            const active = cid === agendaCakeCategoriaActiva;
-                            return `<button type="button" data-cake-cat="${esc(cid)}" style="${baseStyle}${active ? activeStyle : ""}">${esc(String(c.nombre || cid))}</button>`;
-                        }).join("")
-                        : `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">No hay categorias para ese filtro.</div>`;
-                    if (agendaCakeCatGroupsEl) {
-                        agendaCakeCatGroupsEl.innerHTML = gruposCfg.map((g) => {
-                            const active = g.id === agendaCakeCategoryGroup;
-                            return `<button type="button" class="agenda-cake-cat-group-btn ${active ? "active" : ""}" data-cake-group="${esc(g.id)}">${esc(g.label)}</button>`;
-                        }).join("");
-                    }
-                    if (agendaCakeCatSearchEl && document.activeElement !== agendaCakeCatSearchEl) {
-                        agendaCakeCatSearchEl.value = agendaCakeCategorySearch;
-                    }
-                    if (agendaCakeCatToggleEl) {
-                        const needsToggle = categoriasFiltradas.length > AGENDA_CAKE_CATS_COLLAPSED;
-                        agendaCakeCatToggleEl.style.display = needsToggle ? "" : "none";
-                        agendaCakeCatToggleEl.textContent = agendaCakeCategoryExpanded ? "Ver menos" : "Ver mas";
-                    }
-                    if (agendaCakeCatToolbarEl) agendaCakeCatToolbarEl.style.display = categorias.length ? "" : "none";
+                if (agendaCakeSelectedCatDescEl) {
+                    const desc = String(catSel?.descripcion || "").trim();
+                    agendaCakeSelectedCatDescEl.textContent = desc || "Personaliza tu pedido seleccionando tamano, sabores, extras y topper.";
                 }
 
                 const sizesAll = _catalogList("sizes");
@@ -4177,22 +4195,16 @@
                     if (!sizesRender.length) {
                         agendaCakeSizeCardsEl.innerHTML = `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">Sin tamanos configurados.</div>`;
                     } else {
-                        const select = document.createElement("select");
-                        select.style.width = "100%";
-                        select.style.border = "1px solid #cbd5e1";
-                        select.style.borderRadius = "8px";
-                        select.style.padding = "8px 9px";
                         sizesRender.forEach((s) => {
                             const sid = String(s.id || "");
                             const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(s.precio || 0))}` : ""}`;
-                            const opt = document.createElement("option");
-                            opt.value = sid;
-                            opt.textContent = label;
-                            if (sid === String(agendaCakeSelection.size_id || "")) opt.selected = true;
-                            select.appendChild(opt);
+                            const btn = document.createElement("button");
+                            btn.type = "button";
+                            btn.className = `agenda-cake-card ${sid === String(agendaCakeSelection.size_id || "") ? "active" : ""}`;
+                            btn.textContent = label;
+                            btn.addEventListener("click", () => agendaCakeSelectSize(sid));
+                            agendaCakeSizeCardsEl.appendChild(btn);
                         });
-                        select.addEventListener("change", () => agendaCakeSelectSize(String(select.value || "")));
-                        agendaCakeSizeCardsEl.appendChild(select);
                     }
                 }
 
@@ -4325,16 +4337,6 @@
                 }
                 _actualizarDebugCatalogo(`seleccion | render s:${sizeNodes} f:${flavorNodes}`);
 
-                agendaCakeCategoriesEl?.querySelectorAll("[data-cake-cat]").forEach((el) => {
-                    el.addEventListener("click", () => agendaCakeSelectCategory(String(el.getAttribute("data-cake-cat") || "")));
-                });
-                agendaCakeCatGroupsEl?.querySelectorAll("[data-cake-group]").forEach((el) => {
-                    el.addEventListener("click", () => {
-                        agendaCakeCategoryGroup = String(el.getAttribute("data-cake-group") || "all");
-                        agendaCakeCategoryExpanded = false;
-                        _renderAgendaCakeBuilder();
-                    });
-                });
             } catch (err) {
                 if (agendaCakeSizeCardsEl) {
                     const sizesFallback = _catalogList("sizes");
