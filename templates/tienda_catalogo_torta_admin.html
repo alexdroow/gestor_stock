@@ -388,6 +388,7 @@ let state = {
     toppers: [],
 };
 let categoriaPanelAbierto = {};
+let categoriasImagenEliminada = new Set();
 const catCropModalEl = document.getElementById("cat-crop-modal");
 const catCropStageEl = document.getElementById("cat-crop-stage");
 const catCropImageEl = document.getElementById("cat-crop-image");
@@ -720,6 +721,7 @@ async function uploadCategoriaImagenDirectaPorId(catId, file) {
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
         state.categorias[i].imagen_url = String(data.url || "");
+        categoriasImagenEliminada.delete(id);
         render();
         setMsg("Imagen actualizada con modo directo.", "ok");
     } catch (err) {
@@ -802,7 +804,9 @@ async function _persistCatalogoImagenes() {
 async function eliminarCategoriaImagen(idx) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i]) return;
+    const cid = String(state.categorias[i].id || "").trim();
     state.categorias[i].imagen_url = "";
+    if (cid) categoriasImagenEliminada.add(cid);
     render();
     try {
         await _persistCatalogoImagenes();
@@ -951,6 +955,7 @@ async function subirRecorteCategoria() {
         if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
         const i = (Array.isArray(state.categorias) ? state.categorias : []).findIndex((c) => String(c?.id || "") === catId);
         if (i >= 0) state.categorias[i].imagen_url = String(data.url || "");
+        categoriasImagenEliminada.delete(catId);
         render();
         setMsg("Imagen cargada, ajustada y guardada en la categoria correcta.", "ok");
         cerrarRecorteCategoria();
@@ -1054,6 +1059,7 @@ function payload() {
             extras_ids: parseIdList(x.extras_ids).map((v) => slug(v)),
             toppers_ids: parseIdList(x.toppers_ids).map((v) => slug(v)),
         })).filter((x) => x.nombre),
+        clear_image_category_ids: Array.from(categoriasImagenEliminada),
         sizes: state.sizes.map((x) => {
             const catRaw = _slugOrFallback(x.categoria_id || "", "general");
             const catFixed = catIdMap.get(catRaw) || catRaw;
@@ -1079,6 +1085,7 @@ async function save() {
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
         state = { ...state, ...(data.catalogo || {}) };
+        categoriasImagenEliminada = new Set();
         render();
         setMsg("Catalogo torta guardado correctamente.", "ok");
     } catch (err) {

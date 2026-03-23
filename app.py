@@ -3313,7 +3313,37 @@ def api_tienda_admin_catalogo_torta():
             return jsonify({"success": True, "catalogo": cat})
         data = request.get_json(silent=True) or {}
         payload = data.get("catalogo") if isinstance(data.get("catalogo"), dict) else data
-        cfg = _guardar_tienda_personalizacion({"catalogo_torta": payload})
+        payload = dict(payload or {})
+        clear_raw = payload.pop("clear_image_category_ids", []) if isinstance(payload.get("clear_image_category_ids"), list) else []
+        clear_ids = {
+            re.sub(r"[^a-z0-9\-]+", "-", str(x or "").strip().lower()).strip("-")[:60]
+            for x in clear_raw
+            if str(x or "").strip()
+        }
+        prev_cfg = _obtener_tienda_personalizacion(apply_programacion=False)
+        prev_cat = _normalizar_catalogo_torta_cfg((prev_cfg or {}).get("catalogo_torta") or {})
+        prev_by_id = {}
+        prev_by_name = {}
+        for c in (prev_cat.get("categorias") or []):
+            cid = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("id") or "").strip().lower()).strip("-")[:60]
+            nm = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("nombre") or "").strip().lower()).strip("-")[:60]
+            img = _normalizar_url_personalizacion(c.get("imagen_url"))
+            if cid and img:
+                prev_by_id[cid] = img
+            if nm and img:
+                prev_by_name[nm] = img
+        payload_norm = _normalizar_catalogo_torta_cfg(payload)
+        for c in (payload_norm.get("categorias") or []):
+            cid = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("id") or "").strip().lower()).strip("-")[:60]
+            nm = re.sub(r"[^a-z0-9\-]+", "-", str(c.get("nombre") or "").strip().lower()).strip("-")[:60]
+            img = _normalizar_url_personalizacion(c.get("imagen_url"))
+            if cid in clear_ids:
+                c["imagen_url"] = ""
+                continue
+            if img:
+                continue
+            c["imagen_url"] = prev_by_id.get(cid) or prev_by_name.get(nm) or ""
+        cfg = _guardar_tienda_personalizacion({"catalogo_torta": payload_norm})
         crear_backup()
         return jsonify({"success": True, "catalogo": _normalizar_catalogo_torta_cfg(cfg.get("catalogo_torta"))})
     except Exception as e:
