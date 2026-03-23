@@ -521,6 +521,7 @@ function rowHtmlCategory(item, idx) {
                     <div class="cat-cover-tools">
                         <input type="file" accept=".jpg,.jpeg,.png,.webp" data-cat-upload="${idx}" style="display:none;">
                         <button type="button" class="btn btn-out btn-sm" data-cat-pick="${esc(rowKey)}">Subir desde computador</button>
+                        <button type="button" class="btn btn-out btn-sm" data-cat-direct="${esc(rowKey)}">Cambiar foto (modo directo)</button>
                         <button type="button" class="btn btn-alt btn-sm" data-cat-remove="${esc(rowKey)}">Eliminar foto</button>
                     </div>
                 </div>
@@ -649,6 +650,12 @@ function bindListInputs(key) {
                     eliminarCategoriaImagenById(cid);
                 });
             });
+            row.querySelectorAll("[data-cat-direct]").forEach((btnDirect) => {
+                btnDirect.addEventListener("click", () => {
+                    const cid = String(btnDirect.getAttribute("data-cat-direct") || "");
+                    cambiarCategoriaFotoDirectoById(cid);
+                });
+            });
         }
         if (key === "sizes") {
             const catSel = row.querySelector('select[data-k="categoria_id"]');
@@ -693,6 +700,32 @@ async function uploadCategoriaImagenPorId(catId, file) {
     }
     await uploadCategoriaImagenArchivo(i, file);
 }
+async function uploadCategoriaImagenDirectaPorId(catId, file) {
+    const id = String(catId || "").trim();
+    const i = _findCategoriaIndexById(id);
+    if (!id || i < 0 || !file) {
+        setMsg("No se encontro la categoria seleccionada.", "err");
+        return;
+    }
+    if (!/^image\//i.test(String(file.type || ""))) {
+        setMsg("Archivo invalido. Usa JPG, PNG o WEBP.", "err");
+        return;
+    }
+    try {
+        setMsg("Subiendo imagen en modo directo...", "");
+        const fd = new FormData();
+        fd.append("foto", file);
+        fd.append("categoria_id", id);
+        const res = await fetch(ENDPOINT_UPLOAD_CAT, { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "No se pudo subir imagen");
+        state.categorias[i].imagen_url = String(data.url || "");
+        render();
+        setMsg("Imagen actualizada con modo directo.", "ok");
+    } catch (err) {
+        setMsg(err.message || "No se pudo subir imagen en modo directo.", "err");
+    }
+}
 async function uploadCategoriaImagen(idx) {
     const i = Number(idx || -1);
     if (i < 0 || !state.categorias?.[i]) return;
@@ -734,6 +767,26 @@ function pickCategoriaFoto(idx) {
     pickCategoriaFotoById(catId);
 }
 window.pickCategoriaFoto = pickCategoriaFoto;
+function cambiarCategoriaFotoDirectoById(catId) {
+    const id = String(catId || "").trim();
+    const i = _findCategoriaIndexById(id);
+    if (!id || i < 0 || !state.categorias?.[i]) return;
+    const picker = document.createElement("input");
+    picker.type = "file";
+    picker.accept = ".jpg,.jpeg,.png,.webp";
+    picker.style.position = "fixed";
+    picker.style.left = "-9999px";
+    document.body.appendChild(picker);
+    picker.onchange = async () => {
+        const file = picker.files && picker.files[0] ? picker.files[0] : null;
+        try { picker.remove(); } catch (_e) {}
+        if (!file) return;
+        await uploadCategoriaImagenDirectaPorId(id, file);
+    };
+    picker.oncancel = () => { try { picker.remove(); } catch (_e) {} };
+    picker.click();
+}
+window.cambiarCategoriaFotoDirectoById = cambiarCategoriaFotoDirectoById;
 
 async function _persistCatalogoImagenes() {
     const body = payload();
