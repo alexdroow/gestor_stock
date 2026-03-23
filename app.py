@@ -2269,9 +2269,17 @@ def _normalizar_catalogo_torta_cfg(raw):
     cats_in = data.get("categorias")
     if not isinstance(cats_in, list):
         cats_in = list(base.get("categorias") or [])
+    used_cat_ids = set()
     for item in cats_in:
         cat = dict(item or {})
-        cid = re.sub(r"[^a-z0-9\-]+", "-", str(cat.get("id") or "").strip().lower()).strip("-")[:60] or _slug_simple(cat.get("nombre") or "categoria")
+        cid_base = re.sub(r"[^a-z0-9\-]+", "-", str(cat.get("id") or "").strip().lower()).strip("-")[:60] or _slug_simple(cat.get("nombre") or "categoria")
+        cid = cid_base
+        n_dup = 2
+        while cid in used_cat_ids:
+            suf = f"-{n_dup}"
+            cid = f"{cid_base[: max(1, 60 - len(suf))]}{suf}"
+            n_dup += 1
+        used_cat_ids.add(cid)
         nombre = str(cat.get("nombre") or "").strip()[:80] or "Categoria"
         descripcion = str(cat.get("descripcion") or "").strip()[:180]
         badge = str(cat.get("badge") or "").strip()[:32]

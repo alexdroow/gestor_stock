@@ -431,6 +431,24 @@ function parseIdList(v) {
     if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter(Boolean);
     return [];
 }
+function _slugOrFallback(v, fallback = "item") {
+    const s = slug(v);
+    return s || slug(fallback) || "item";
+}
+function ensureUniqueCategoryIds() {
+    const used = new Set();
+    (Array.isArray(state.categorias) ? state.categorias : []).forEach((cat, idx) => {
+        const base = _slugOrFallback(cat?.id || cat?.nombre || `categoria-${idx + 1}`, `categoria-${idx + 1}`);
+        let candidate = base;
+        let nDup = 2;
+        while (used.has(candidate)) {
+            candidate = `${base}-${nDup}`;
+            nDup += 1;
+        }
+        used.add(candidate);
+        cat.id = candidate;
+    });
+}
 
 function renderSummary() {
     document.getElementById("sum-sizes").textContent = String(activeCount(state.sizes));
@@ -552,6 +570,7 @@ function rowHtmlTopper(item, idx) {
 }
 
 function render() {
+    ensureUniqueCategoryIds();
     document.getElementById("enabled").checked = Boolean(state.enabled);
     document.getElementById("show_prices").checked = Boolean(state.show_prices);
     document.getElementById("max_extra_items").value = Math.max(1, n(state.max_extra_items, 8));
@@ -589,7 +608,7 @@ function bindListInputs(key) {
                 if (inp.type === "checkbox") state[key][idx][field] = Boolean(inp.checked);
                 else if (field === "precio" || field === "max_sabores" || field === "max_cantidad" || field === "min_lead_hours") state[key][idx][field] = n(inp.value, 0);
                 else state[key][idx][field] = String(inp.value || "");
-                if (field === "nombre") state[key][idx].id = slug(inp.value);
+                if (field === "nombre" && key !== "categorias") state[key][idx].id = slug(inp.value);
                 if (field === "categoria_id") state[key][idx].categoria_id = String(inp.value || "");
                 if (field === "use_category_ingredients") render();
                 renderSummary();
@@ -854,13 +873,20 @@ async function load() {
 }
 
 function payload() {
+    ensureUniqueCategoryIds();
+    const catIdMap = new Map();
+    (Array.isArray(state.categorias) ? state.categorias : []).forEach((x) => {
+        const idNow = _slugOrFallback(x?.id || x?.nombre, "categoria");
+        const idOld = _slugOrFallback(x?.id || "", idNow);
+        catIdMap.set(idOld, idNow);
+    });
     return {
         enabled: Boolean(document.getElementById("enabled").checked),
         show_prices: Boolean(document.getElementById("show_prices").checked),
         max_extra_items: Math.max(1, Math.min(20, n(document.getElementById("max_extra_items").value, 8))),
         max_reference_images: Math.max(0, Math.min(10, n(document.getElementById("max_reference_images").value, 3))),
         categorias: state.categorias.map((x) => ({
-            id: slug(x.id || x.nombre),
+            id: _slugOrFallback(x.id || x.nombre, "categoria"),
             nombre: String(x.nombre || "").trim(),
             activo: Boolean(x.activo),
             descripcion: String(x.descripcion || "").trim().slice(0, 180),
@@ -872,7 +898,11 @@ function payload() {
             extras_ids: parseIdList(x.extras_ids).map((v) => slug(v)),
             toppers_ids: parseIdList(x.toppers_ids).map((v) => slug(v)),
         })).filter((x) => x.nombre),
-        sizes: state.sizes.map((x) => ({ id: slug(x.id || x.nombre), categoria_id: slug(x.categoria_id || ""), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_sabores: Math.max(1, Math.min(8, n(x.max_sabores, 3))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
+        sizes: state.sizes.map((x) => {
+            const catRaw = _slugOrFallback(x.categoria_id || "", "general");
+            const catFixed = catIdMap.get(catRaw) || catRaw;
+            return { id: slug(x.id || x.nombre), categoria_id: catFixed, nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_sabores: Math.max(1, Math.min(8, n(x.max_sabores, 3))), activo: Boolean(x.activo) };
+        }).filter((x) => x.nombre),
         sabores: state.sabores.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), activo: Boolean(x.activo) })).filter((x) => x.nombre),
         extras: state.extras.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), max_cantidad: Math.max(1, Math.min(20, n(x.max_cantidad, 1))), activo: Boolean(x.activo) })).filter((x) => x.nombre),
         toppers: state.toppers.map((x) => ({ id: slug(x.id || x.nombre), nombre: String(x.nombre || "").trim(), precio: n(x.precio, 0), activo: Boolean(x.activo) })).filter((x) => x.nombre),
