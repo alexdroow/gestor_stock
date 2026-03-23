@@ -90,10 +90,10 @@ def _ruta_es_publica(path):
 def _normalizar_next_admin(destino):
     raw = str(destino or "").strip()
     if not raw:
-        return url_for("index")
+        return url_for("agenda")
     parsed = urlparse(raw)
     if parsed.scheme or parsed.netloc:
-        return url_for("index")
+        return url_for("agenda")
     path = parsed.path or "/"
     if not path.startswith("/"):
         path = f"/{path}"
@@ -794,13 +794,13 @@ def api_disponibilidad_producto(producto_id):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return redirect(url_for("tienda_publica"))
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if session.get(_ADMIN_SESSION_KEY):
-        return redirect(url_for("index"))
+        return redirect(url_for("agenda"))
 
     error = None
     if request.method == 'POST':
