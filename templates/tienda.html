@@ -1582,6 +1582,19 @@
         body.mobile-ui .left-nav { display: none; }
         body.mobile-ui .cart-panel { display: none; }
         body.mobile-ui { font-size: var(--mobile-ui-font-size); }
+        body.mobile-ui .topbar,
+        body.mobile-ui .topbar * {
+            font-size: .72rem !important;
+        }
+        body.mobile-ui .section,
+        body.mobile-ui .section * {
+            font-size: .72rem;
+        }
+        body.mobile-ui .section h1,
+        body.mobile-ui .section h2,
+        body.mobile-ui .section h3 {
+            font-size: .95rem !important;
+        }
         body.mobile-ui .layout {
             width: 100%;
             max-width: 100%;
@@ -1654,7 +1667,7 @@
         body.mobile-ui .agenda-cake-modal .agenda-mini-title,
         body.mobile-ui .agenda-cake-modal .agenda-cake-cat-desc,
         body.mobile-ui .agenda-cake-modal .agenda-cake-builder label {
-            font-size: .95em;
+            font-size: .60em;
         }
         body.mobile-ui .agenda-cake-modal .agenda-cake-builder input,
         body.mobile-ui .agenda-cake-modal .agenda-cake-builder select,
@@ -1663,7 +1676,7 @@
         body.mobile-ui .agenda-cake-modal .agenda-cake-chip,
         body.mobile-ui .agenda-cake-modal .btn-primary,
         body.mobile-ui .agenda-cake-modal .btn-muted {
-            font-size: .95em;
+            font-size: .60em;
         }
         body.mobile-ui .agenda-cake-cart ul {
             max-height: 300px;
@@ -1718,12 +1731,22 @@
         body.mobile-ui #sec-agenda-reservas select,
         body.mobile-ui #sec-agenda-reservas textarea,
         body.mobile-ui #sec-agenda-reservas button {
-            font-size: .94rem !important;
+            font-size: .56rem !important;
         }
         body.mobile-ui #sec-agenda-reservas .agenda-cake-head span:first-child,
         body.mobile-ui #sec-agenda-reservas .agenda-pastel-title,
         body.mobile-ui #sec-agenda-reservas .agenda-mini-title {
-            font-size: 1rem !important;
+            font-size: .72rem !important;
+        }
+        /* Mantener catalogo de agenda legible */
+        body.mobile-ui .agenda-cake-cat-name {
+            font-size: .84rem !important;
+        }
+        body.mobile-ui .agenda-cake-cat-desc {
+            font-size: .72rem !important;
+        }
+        body.mobile-ui .agenda-cake-cat-bullets {
+            font-size: .66rem !important;
         }
         body.mobile-ui #sec-agenda-reservas[data-mobile-step="2"] .agenda-cake-cart {
             display: none;
@@ -2806,46 +2829,46 @@
             let scale = 1;
             let fontScale = 1;
             if (shortSide <= 360) {
-                scale = 0.93;
-                fontScale = 0.92;
+                scale = 0.82;
+                fontScale = 0.68;
             } else if (shortSide <= 390) {
-                scale = 0.98;
-                fontScale = 0.97;
+                scale = 0.86;
+                fontScale = 0.72;
             } else if (shortSide <= 430) {
-                scale = 1.02;
-                fontScale = 1.00;
+                scale = 0.90;
+                fontScale = 0.76;
             } else {
-                scale = 1.05;
-                fontScale = 1.03;
+                scale = 0.94;
+                fontScale = 0.80;
             }
             if (viewportHeight <= 700) {
-                scale *= 0.97;
-                fontScale *= 0.96;
+                scale *= 0.96;
+                fontScale *= 0.95;
             } else if (viewportHeight >= 940) {
-                scale *= 1.02;
+                scale *= 1.01;
                 fontScale *= 1.01;
             }
-            scale = Math.max(0.90, Math.min(1.08, scale));
-            fontScale = Math.max(0.90, Math.min(1.05, fontScale));
+            scale = Math.max(0.78, Math.min(0.98, scale));
+            fontScale = Math.max(0.64, Math.min(0.84, fontScale));
             const browserInsetBottom = Math.max(0, Math.round((window.innerHeight || viewportHeight) - viewportHeight));
             const reservePad = Math.round(210 * scale) + browserInsetBottom + 14;
             const reserveScrollMargin = reservePad + 24;
             const fabBottom = 12 + browserInsetBottom;
-            const menuFabHeight = Math.round(66 * scale);
+            const menuFabHeight = Math.round(33 * scale);
             const summaryBottom = fabBottom + menuFabHeight + 12;
-            const waBottom = summaryBottom + Math.round(86 * scale);
+            const waBottom = summaryBottom + Math.round(43 * scale);
             const catsBottom = fabBottom + menuFabHeight + 16;
             const root = document.documentElement;
             root.style.setProperty("--mobile-fab-bottom", `${fabBottom}px`);
-            root.style.setProperty("--mobile-menu-fab-pad", `${Math.round(19 * scale)}px ${Math.round(24 * scale)}px`);
-            root.style.setProperty("--mobile-menu-fab-font", `${(1.75 * scale).toFixed(2)}rem`);
-            root.style.setProperty("--mobile-cart-fab-pad", `${Math.round(20 * scale)}px ${Math.round(36 * scale)}px`);
-            root.style.setProperty("--mobile-cart-fab-font", `${(1.9 * scale).toFixed(2)}rem`);
-            root.style.setProperty("--mobile-quick-add-size", `${Math.round(62 * scale)}px`);
-            root.style.setProperty("--mobile-quick-add-font", `${(1.9 * scale).toFixed(2)}rem`);
-            root.style.setProperty("--mobile-top-btn-font", `${(1.05 * scale).toFixed(2)}rem`);
-            root.style.setProperty("--mobile-top-btn-pad", `${Math.round(10 * scale)}px ${Math.round(14 * scale)}px`);
-            root.style.setProperty("--mobile-wa-size", `${Math.round(82 * scale)}px`);
+            root.style.setProperty("--mobile-menu-fab-pad", `${Math.round(9 * scale)}px ${Math.round(12 * scale)}px`);
+            root.style.setProperty("--mobile-menu-fab-font", `${(0.88 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-cart-fab-pad", `${Math.round(10 * scale)}px ${Math.round(18 * scale)}px`);
+            root.style.setProperty("--mobile-cart-fab-font", `${(0.95 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-quick-add-size", `${Math.round(31 * scale)}px`);
+            root.style.setProperty("--mobile-quick-add-font", `${(0.95 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-top-btn-font", `${(0.52 * scale).toFixed(2)}rem`);
+            root.style.setProperty("--mobile-top-btn-pad", `${Math.round(5 * scale)}px ${Math.round(7 * scale)}px`);
+            root.style.setProperty("--mobile-wa-size", `${Math.round(41 * scale)}px`);
             root.style.setProperty("--mobile-agenda-summary-bottom", `${summaryBottom}px`);
             root.style.setProperty("--mobile-wa-bottom", `${waBottom}px`);
             root.style.setProperty("--mobile-reserve-pad", `${reservePad}px`);
