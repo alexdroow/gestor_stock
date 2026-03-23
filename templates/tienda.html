@@ -1580,7 +1580,7 @@
         }
         body.mobile-ui .left-nav { display: none; }
         body.mobile-ui .cart-panel { display: none; }
-        body.mobile-ui { font-size: 185%; }
+        body.mobile-ui { font-size: 100%; }
         body.mobile-ui .layout {
             width: 100%;
             max-width: 100%;
@@ -1653,7 +1653,7 @@
         body.mobile-ui .agenda-cake-modal .agenda-mini-title,
         body.mobile-ui .agenda-cake-modal .agenda-cake-cat-desc,
         body.mobile-ui .agenda-cake-modal .agenda-cake-builder label {
-            font-size: 1.05em;
+            font-size: .95em;
         }
         body.mobile-ui .agenda-cake-modal .agenda-cake-builder input,
         body.mobile-ui .agenda-cake-modal .agenda-cake-builder select,
@@ -1662,7 +1662,7 @@
         body.mobile-ui .agenda-cake-modal .agenda-cake-chip,
         body.mobile-ui .agenda-cake-modal .btn-primary,
         body.mobile-ui .agenda-cake-modal .btn-muted {
-            font-size: 1.05em;
+            font-size: .95em;
         }
         body.mobile-ui .agenda-cake-cart ul {
             max-height: 300px;
@@ -1717,12 +1717,12 @@
         body.mobile-ui #sec-agenda-reservas select,
         body.mobile-ui #sec-agenda-reservas textarea,
         body.mobile-ui #sec-agenda-reservas button {
-            font-size: 1.02rem !important;
+            font-size: .94rem !important;
         }
         body.mobile-ui #sec-agenda-reservas .agenda-cake-head span:first-child,
         body.mobile-ui #sec-agenda-reservas .agenda-pastel-title,
         body.mobile-ui #sec-agenda-reservas .agenda-mini-title {
-            font-size: 1.12rem !important;
+            font-size: 1rem !important;
         }
         body.mobile-ui #sec-agenda-reservas[data-mobile-step="2"] .agenda-cake-cart {
             display: none;
@@ -2803,12 +2803,12 @@
             const viewportHeight = Math.max(480, Math.round((vv && vv.height) || window.innerHeight || 780));
             const shortSide = Math.max(320, Math.min(viewportWidth, viewportHeight));
             let scale = 1;
-            if (shortSide <= 350) scale *= 0.9;
-            else if (shortSide <= 380) scale *= 0.96;
-            else if (shortSide >= 430) scale *= 1.08;
-            if (viewportHeight <= 700) scale *= 0.9;
-            else if (viewportHeight >= 940) scale *= 1.07;
-            scale = Math.max(0.82, Math.min(1.22, scale));
+            if (shortSide <= 350) scale *= 0.97;
+            else if (shortSide <= 380) scale *= 0.99;
+            else if (shortSide >= 430) scale *= 1.02;
+            if (viewportHeight <= 700) scale *= 0.97;
+            else if (viewportHeight >= 940) scale *= 1.02;
+            scale = Math.max(0.94, Math.min(1.06, scale));
             const browserInsetBottom = Math.max(0, Math.round((window.innerHeight || viewportHeight) - viewportHeight));
             const reservePad = Math.round(210 * scale) + browserInsetBottom + 14;
             const reserveScrollMargin = reservePad + 24;
