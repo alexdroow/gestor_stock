@@ -839,6 +839,22 @@ def tienda_publica_agendar():
     return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True)
 
 
+@app.route('/tienda/preview')
+def tienda_preview_admin():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return redirect(url_for("admin_login", next=request.full_path if request.query_string else request.path))
+    mode = str(request.args.get("mode") or "live").strip().lower()
+    force_agenda = str(request.args.get("agenda") or "0").strip() in {"1", "true", "yes", "on"}
+    try:
+        if mode == "draft":
+            personalizacion = _obtener_tienda_personalizacion(apply_programacion=False, editor_mode="draft")
+        else:
+            personalizacion = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
+    except Exception:
+        personalizacion = _default_tienda_personalizacion()
+    return render_template("tienda.html", tienda_personalizacion=personalizacion, force_agenda=force_agenda)
+
+
 def _parse_fecha_yyyy_mm_dd(valor):
     raw = str(valor or "").strip()
     if not raw:
@@ -2339,6 +2355,25 @@ def _default_tienda_personalizacion():
         "agenda_slot_available_bg": "#ecfeff",
         "agenda_slot_unavailable_bg": "#e5e7eb",
         "agenda_slot_unavailable_text": "#64748b",
+        "visual_layout_max_width": 1400,
+        "visual_grid_min_desktop": 240,
+        "visual_grid_min_mobile": 190,
+        "visual_card_radius": 12,
+        "visual_card_shadow": 0,
+        "visual_spacing_scale": 100,
+        "visual_font_scale_desktop": 100,
+        "visual_font_scale_mobile": 100,
+        "visual_mobile_ui_scale": 100,
+        "visual_fab_bottom_offset_mobile": 0,
+        "visual_whatsapp_bottom_offset_mobile": 0,
+        "visual_sections_order_desktop": "ofertas,destacados,categorias,agenda",
+        "visual_sections_order_mobile": "agenda,ofertas,destacados,categorias",
+        "visual_sections_visibility": {
+            "ofertas": True,
+            "destacados": True,
+            "categorias": True,
+            "agenda": True,
+        },
         "catalogo_torta": catalogo_torta_base,
         "custom_css": "",
     }
@@ -2550,6 +2585,63 @@ def _normalizar_tienda_personalizacion(payload):
     clean["agenda_slot_available_bg"] = _normalizar_color_hex(data.get("agenda_slot_available_bg"), base["agenda_slot_available_bg"])
     clean["agenda_slot_unavailable_bg"] = _normalizar_color_hex(data.get("agenda_slot_unavailable_bg"), base["agenda_slot_unavailable_bg"])
     clean["agenda_slot_unavailable_text"] = _normalizar_color_hex(data.get("agenda_slot_unavailable_text"), base["agenda_slot_unavailable_text"])
+
+    try:
+        clean["visual_layout_max_width"] = max(960, min(1920, int(data.get("visual_layout_max_width") or base["visual_layout_max_width"])))
+    except (TypeError, ValueError):
+        clean["visual_layout_max_width"] = int(base["visual_layout_max_width"])
+    try:
+        clean["visual_grid_min_desktop"] = max(160, min(380, int(data.get("visual_grid_min_desktop") or base["visual_grid_min_desktop"])))
+    except (TypeError, ValueError):
+        clean["visual_grid_min_desktop"] = int(base["visual_grid_min_desktop"])
+    try:
+        clean["visual_grid_min_mobile"] = max(130, min(280, int(data.get("visual_grid_min_mobile") or base["visual_grid_min_mobile"])))
+    except (TypeError, ValueError):
+        clean["visual_grid_min_mobile"] = int(base["visual_grid_min_mobile"])
+    try:
+        clean["visual_card_radius"] = max(6, min(28, int(data.get("visual_card_radius") or base["visual_card_radius"])))
+    except (TypeError, ValueError):
+        clean["visual_card_radius"] = int(base["visual_card_radius"])
+    try:
+        clean["visual_card_shadow"] = max(0, min(36, int(data.get("visual_card_shadow") or base["visual_card_shadow"])))
+    except (TypeError, ValueError):
+        clean["visual_card_shadow"] = int(base["visual_card_shadow"])
+    try:
+        clean["visual_spacing_scale"] = max(80, min(140, int(data.get("visual_spacing_scale") or base["visual_spacing_scale"])))
+    except (TypeError, ValueError):
+        clean["visual_spacing_scale"] = int(base["visual_spacing_scale"])
+    try:
+        clean["visual_font_scale_desktop"] = max(80, min(140, int(data.get("visual_font_scale_desktop") or base["visual_font_scale_desktop"])))
+    except (TypeError, ValueError):
+        clean["visual_font_scale_desktop"] = int(base["visual_font_scale_desktop"])
+    try:
+        clean["visual_font_scale_mobile"] = max(70, min(130, int(data.get("visual_font_scale_mobile") or base["visual_font_scale_mobile"])))
+    except (TypeError, ValueError):
+        clean["visual_font_scale_mobile"] = int(base["visual_font_scale_mobile"])
+    try:
+        clean["visual_mobile_ui_scale"] = max(50, min(140, int(data.get("visual_mobile_ui_scale") or base["visual_mobile_ui_scale"])))
+    except (TypeError, ValueError):
+        clean["visual_mobile_ui_scale"] = int(base["visual_mobile_ui_scale"])
+    try:
+        clean["visual_fab_bottom_offset_mobile"] = max(-120, min(200, int(data.get("visual_fab_bottom_offset_mobile") or base["visual_fab_bottom_offset_mobile"])))
+    except (TypeError, ValueError):
+        clean["visual_fab_bottom_offset_mobile"] = int(base["visual_fab_bottom_offset_mobile"])
+    try:
+        clean["visual_whatsapp_bottom_offset_mobile"] = max(-120, min(220, int(data.get("visual_whatsapp_bottom_offset_mobile") or base["visual_whatsapp_bottom_offset_mobile"])))
+    except (TypeError, ValueError):
+        clean["visual_whatsapp_bottom_offset_mobile"] = int(base["visual_whatsapp_bottom_offset_mobile"])
+    clean["visual_sections_order_desktop"] = str(data.get("visual_sections_order_desktop") or base["visual_sections_order_desktop"]).strip()[:120] or base["visual_sections_order_desktop"]
+    clean["visual_sections_order_mobile"] = str(data.get("visual_sections_order_mobile") or base["visual_sections_order_mobile"]).strip()[:120] or base["visual_sections_order_mobile"]
+    vis_data = data.get("visual_sections_visibility")
+    vis_base = dict(base.get("visual_sections_visibility") or {})
+    vis_cfg = {}
+    for key in ("ofertas", "destacados", "categorias", "agenda"):
+        if isinstance(vis_data, dict) and key in vis_data:
+            vis_cfg[key] = bool(vis_data.get(key))
+        else:
+            vis_cfg[key] = bool(vis_base.get(key, True))
+    clean["visual_sections_visibility"] = vis_cfg
+
     clean["catalogo_torta"] = _normalizar_catalogo_torta_cfg(data.get("catalogo_torta") or base.get("catalogo_torta"))
 
     clean["custom_css"] = str(data.get("custom_css") or "").strip()[:5000]
@@ -2915,14 +3007,14 @@ def _validar_payload_catalogo_torta(payload, catalogo_publico):
     }
 
 
-def _obtener_tienda_personalizacion(apply_programacion=True):
+def _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live"):
     conn = None
     try:
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT config_json
+            SELECT config_json, draft_config_json
             FROM tienda_personalizacion
             WHERE id = 1
             LIMIT 1
@@ -2931,7 +3023,13 @@ def _obtener_tienda_personalizacion(apply_programacion=True):
         row = cursor.fetchone()
         if not row:
             return _default_tienda_personalizacion()
-        raw_json = str(row["config_json"] or "").strip()
+        mode = str(editor_mode or "live").strip().lower()
+        if mode == "draft":
+            raw_json = str(row["draft_config_json"] or "").strip()
+            if not raw_json:
+                raw_json = str(row["config_json"] or "").strip()
+        else:
+            raw_json = str(row["config_json"] or "").strip()
         if not raw_json:
             return _default_tienda_personalizacion()
         try:
@@ -2939,7 +3037,7 @@ def _obtener_tienda_personalizacion(apply_programacion=True):
         except Exception:
             payload = {}
         base = _normalizar_tienda_personalizacion(payload)
-        if not apply_programacion:
+        if (not apply_programacion) or mode == "draft":
             return base
         return _aplicar_programacion_personalizacion(conn, base)
     except sqlite3.OperationalError:
@@ -2953,8 +3051,11 @@ def _obtener_tienda_personalizacion(apply_programacion=True):
             conn.close()
 
 
-def _guardar_tienda_personalizacion(payload):
-    actual = _obtener_tienda_personalizacion(apply_programacion=False)
+def _guardar_tienda_personalizacion(payload, target="live", origen="manual"):
+    target_mode = str(target or "live").strip().lower()
+    if target_mode not in {"live", "draft"}:
+        target_mode = "live"
+    actual = _obtener_tienda_personalizacion(apply_programacion=False, editor_mode=target_mode)
     merged = dict(actual)
     merged.update(dict(payload or {}))
     config = _normalizar_tienda_personalizacion(merged)
@@ -2968,17 +3069,35 @@ def _guardar_tienda_personalizacion(payload):
             INSERT INTO tienda_personalizacion_versiones (origen, config_json, creado_en)
             VALUES (?, ?, CURRENT_TIMESTAMP)
             """,
-            ("manual", json.dumps(actual, ensure_ascii=False)),
+            (str(origen or "manual")[:40], json.dumps(actual, ensure_ascii=False)),
         )
         cursor.execute(
             """
-            INSERT INTO tienda_personalizacion (id, config_json, actualizado_en)
-            VALUES (1, ?, CURRENT_TIMESTAMP)
+            SELECT config_json, draft_config_json
+            FROM tienda_personalizacion
+            WHERE id = 1
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone() or {}
+        current_live = str((row.get("config_json") if isinstance(row, dict) else row["config_json"]) or "").strip() if row else ""
+        current_draft = str((row.get("draft_config_json") if isinstance(row, dict) else row["draft_config_json"]) or "").strip() if row else ""
+        if not current_live:
+            current_live = json.dumps(_default_tienda_personalizacion(), ensure_ascii=False)
+        if not current_draft:
+            current_draft = current_live
+        next_live = json.dumps(config, ensure_ascii=False) if target_mode == "live" else current_live
+        next_draft = json.dumps(config, ensure_ascii=False) if target_mode == "draft" else current_draft
+        cursor.execute(
+            """
+            INSERT INTO tienda_personalizacion (id, config_json, draft_config_json, actualizado_en)
+            VALUES (1, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(id) DO UPDATE SET
                 config_json = excluded.config_json,
+                draft_config_json = excluded.draft_config_json,
                 actualizado_en = CURRENT_TIMESTAMP
             """,
-            (json.dumps(config, ensure_ascii=False),),
+            (next_live, next_draft),
         )
         conn.commit()
         return config
@@ -3813,6 +3932,11 @@ def ventas_admin_personalizacion():
     return render_template('tienda_personalizacion_admin.html')
 
 
+@app.route('/ventas/admin-visualizador')
+def ventas_admin_visualizador():
+    return render_template('tienda_visualizador_admin.html')
+
+
 @app.route('/ventas/admin-catalogo-torta')
 def ventas_admin_catalogo_torta():
     return render_template('tienda_catalogo_torta_admin.html')
@@ -4226,6 +4350,123 @@ def api_tienda_admin_personalizacion():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@app.route('/api/tienda/admin/visualizador/state', methods=['GET'])
+def api_tienda_admin_visualizador_state():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        live_cfg = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
+        draft_cfg = _obtener_tienda_personalizacion(apply_programacion=False, editor_mode="draft")
+        conn = get_db()
+        _asegurar_presets_personalizacion(conn)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, nombre, slug, config_json, built_in, creado_en, actualizado_en
+            FROM tienda_personalizacion_presets
+            ORDER BY built_in DESC, nombre COLLATE NOCASE ASC
+            """
+        )
+        presets = [_serializar_preset_row(r) for r in cur.fetchall()]
+        cur.execute(
+            """
+            SELECT id, origen, creado_en
+            FROM tienda_personalizacion_versiones
+            ORDER BY id DESC
+            LIMIT 80
+            """
+        )
+        versiones = [dict(r) for r in cur.fetchall()]
+        return jsonify({
+            "success": True,
+            "live": live_cfg,
+            "draft": draft_cfg,
+            "presets": presets,
+            "versiones": versiones,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/visualizador/draft', methods=['POST'])
+def api_tienda_admin_visualizador_draft():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        data = request.get_json(silent=True) or {}
+        payload = data.get("config") if isinstance(data.get("config"), dict) else data
+        cfg = _guardar_tienda_personalizacion(payload, target="draft", origen="visualizer_draft")
+        return jsonify({"success": True, "draft": cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/admin/visualizador/live', methods=['POST'])
+def api_tienda_admin_visualizador_live():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        data = request.get_json(silent=True) or {}
+        payload = data.get("config") if isinstance(data.get("config"), dict) else data
+        cfg = _guardar_tienda_personalizacion(payload, target="live", origen="visualizer_live")
+        crear_backup()
+        return jsonify({"success": True, "live": cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/admin/visualizador/publish', methods=['POST'])
+def api_tienda_admin_visualizador_publish():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        draft = _obtener_tienda_personalizacion(apply_programacion=False, editor_mode="draft")
+        live = _guardar_tienda_personalizacion(draft, target="live", origen="visualizer_publish")
+        crear_backup()
+        return jsonify({"success": True, "live": live})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/admin/visualizador/preset-aplicar', methods=['POST'])
+def api_tienda_admin_visualizador_preset_aplicar():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        preset_id = int(data.get("preset_id") or 0)
+        target = str(data.get("target") or "draft").strip().lower()
+        if target not in {"draft", "live"}:
+            target = "draft"
+        if preset_id <= 0:
+            return jsonify({"success": False, "error": "Preset invalido"}), 400
+        conn = get_db()
+        _asegurar_presets_personalizacion(conn)
+        cur = conn.cursor()
+        cur.execute("SELECT config_json FROM tienda_personalizacion_presets WHERE id = ? LIMIT 1", (preset_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Preset no encontrado"}), 404
+        try:
+            cfg = json.loads(str(row["config_json"] or "{}"))
+        except Exception:
+            cfg = {}
+        saved = _guardar_tienda_personalizacion(cfg, target=target, origen=f"visualizer_preset_{target}")
+        if target == "live":
+            crear_backup()
+            return jsonify({"success": True, "live": saved})
+        return jsonify({"success": True, "draft": saved})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/tienda/admin/catalogo-torta', methods=['GET', 'POST'])
 def api_tienda_admin_catalogo_torta():

@@ -38,6 +38,14 @@
             --mobile-reserve-scroll-margin: 240px;
             --mobile-cats-bubble-bottom: 112px;
             --mobile-ui-font-size: 100%;
+            --layout-max-width: 1360px;
+            --grid-min-desktop: 240px;
+            --grid-min-mobile: 160px;
+            --visual-card-radius: 12px;
+            --visual-card-shadow: 0px;
+            --visual-spacing-scale: 1;
+            --font-scale-desktop: 100%;
+            --font-scale-mobile: 100%;
         }
         * { box-sizing: border-box; }
         body {
@@ -46,6 +54,7 @@
             background: var(--bg);
             color: var(--text);
             overflow-x: hidden;
+            font-size: var(--font-scale-desktop);
         }
         .topbar {
             position: sticky;
@@ -102,12 +111,12 @@
             padding: 9px 10px;
         }
         .layout {
-            max-width: 1360px;
+            max-width: var(--layout-max-width);
             margin: 0 auto;
             padding: 14px;
             display: grid;
             grid-template-columns: 330px 1fr 320px;
-            gap: 14px;
+            gap: calc(14px * var(--visual-spacing-scale));
         }
         .left-nav, .cart-panel {
             background: var(--panel);
@@ -1056,13 +1065,13 @@
         }
         .scroller {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(var(--grid-min-desktop), 1fr));
+            gap: calc(10px * var(--visual-spacing-scale));
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(var(--grid-min-desktop), 1fr));
+            gap: calc(10px * var(--visual-spacing-scale));
         }
         .ofertas-head {
             display: flex;
@@ -1107,12 +1116,13 @@
         }
         .item-card {
             border: 1px solid #ececec;
-            border-radius: 12px;
+            border-radius: var(--visual-card-radius);
             overflow: hidden;
             background: #fff;
             display: grid;
             grid-template-rows: auto 1fr;
             position: relative;
+            box-shadow: 0 calc(var(--visual-card-shadow) * .65) calc(var(--visual-card-shadow) * 1.9) rgba(2, 6, 23, .12);
         }
         .item-card.oferta {
             border: 1px solid var(--offer-border, #fdba74);
@@ -1122,7 +1132,7 @@
             content: "";
             position: absolute;
             inset: -1px;
-            border-radius: 12px;
+            border-radius: var(--visual-card-radius);
             pointer-events: none;
             border: 1px solid color-mix(in srgb, var(--offer-glow, #fb923c) 75%, transparent);
             box-shadow: 0 0 22px color-mix(in srgb, var(--offer-glow, #fb923c) 45%, transparent);
@@ -1612,6 +1622,7 @@
         body.mobile-ui .left-nav { display: none; }
         body.mobile-ui .cart-panel { display: none; }
         body.mobile-ui { font-size: var(--mobile-ui-font-size); }
+        body.mobile-ui { font-size: var(--font-scale-mobile); }
         body.mobile-ui .topbar,
         body.mobile-ui .topbar * {
             font-size: .72rem !important;
@@ -1829,8 +1840,8 @@
             padding: var(--mobile-menu-fab-pad);
             font-size: var(--mobile-menu-fab-font);
         }
-        body.mobile-ui .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-        body.mobile-ui .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+        body.mobile-ui .grid { grid-template-columns: repeat(2, minmax(var(--grid-min-mobile), 1fr)); gap: 9px; }
+        body.mobile-ui .scroller { grid-template-columns: repeat(2, minmax(var(--grid-min-mobile), 1fr)); gap: 9px; }
         body.mobile-ui .item-name { font-size: 1.17rem; min-height: auto; }
         body.mobile-ui .item-desc { font-size: 0.9rem; min-height: auto; }
         body.mobile-ui .item-body { padding: 10px 10px 12px; gap: 7px; }
@@ -2285,8 +2296,8 @@
             }
             .cart-panel { display: none; }
             .mobile-cat-strip { display: flex; }
-            .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-            .scroller { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+            .grid { grid-template-columns: repeat(2, minmax(var(--grid-min-mobile), 1fr)); gap: 9px; }
+            .scroller { grid-template-columns: repeat(2, minmax(var(--grid-min-mobile), 1fr)); gap: 9px; }
             .tienda-hero { grid-template-columns: 1fr; }
             .tienda-hero-media { min-height: 150px; }
             .item-name { font-size: .98rem; min-height: 32px; }
@@ -2835,6 +2846,7 @@
         const secOfertasEl = document.getElementById("sec-ofertas");
         const secDestacadosEl = document.getElementById("sec-destacados");
         const secAgendaReservasEl = document.getElementById("sec-agenda-reservas");
+        const contentMainEl = document.querySelector("main.layout .content");
         const agendaTypeLabelEl = document.getElementById("agenda-type-label");
         const agendaSectionTitleEl = document.getElementById("agenda-section-title");
         const agendaSectionSubtitleEl = document.getElementById("agenda-section-subtitle");
@@ -3037,10 +3049,13 @@
             const browserInsetBottom = Math.max(0, Math.round((window.innerHeight || viewportHeight) - viewportHeight));
             const reservePad = Math.round(210 * scale) + browserInsetBottom + 14;
             const reserveScrollMargin = reservePad + 24;
-            const fabBottom = 12 + browserInsetBottom;
+            const fabOffset = Number(tiendaUiCfg?.visual_fab_bottom_offset_mobile || TIENDA_UI_DEFAULTS.visual_fab_bottom_offset_mobile || 0);
+            const waOffset = Number(tiendaUiCfg?.visual_whatsapp_bottom_offset_mobile || TIENDA_UI_DEFAULTS.visual_whatsapp_bottom_offset_mobile || 0);
+            const uiScaleCfg = Number(tiendaUiCfg?.visual_mobile_ui_scale || TIENDA_UI_DEFAULTS.visual_mobile_ui_scale || 100) / 100;
+            const fabBottom = 12 + browserInsetBottom + fabOffset;
             const menuFabHeight = Math.round(33 * scale);
             const summaryBottom = fabBottom + menuFabHeight + 12;
-            const waBottom = Math.round((summaryBottom + Math.round(43 * scale)) * 1.10);
+            const waBottom = Math.round((summaryBottom + Math.round(43 * scale)) * 1.10) + waOffset;
             const catsBottom = fabBottom + menuFabHeight + 16;
             const root = document.documentElement;
             root.style.setProperty("--mobile-fab-bottom", `${fabBottom}px`);
@@ -3058,7 +3073,7 @@
             root.style.setProperty("--mobile-reserve-pad", `${reservePad}px`);
             root.style.setProperty("--mobile-reserve-scroll-margin", `${reserveScrollMargin}px`);
             root.style.setProperty("--mobile-cats-bubble-bottom", `${catsBottom}px`);
-            root.style.setProperty("--mobile-ui-font-size", `${Math.round(fontScale * 100)}%`);
+            root.style.setProperty("--mobile-ui-font-size", `${Math.round(fontScale * uiScaleCfg * 100)}%`);
         }
         const TIENDA_UI_DEFAULTS = {
             brand_text: "Tienda en linea",
@@ -3165,6 +3180,20 @@
             agenda_slot_available_bg: "#ecfeff",
             agenda_slot_unavailable_bg: "#e5e7eb",
             agenda_slot_unavailable_text: "#64748b",
+            visual_layout_max_width: 1360,
+            visual_grid_min_desktop: 240,
+            visual_grid_min_mobile: 160,
+            visual_card_radius: 12,
+            visual_card_shadow: 0,
+            visual_spacing_scale: 100,
+            visual_font_scale_desktop: 100,
+            visual_font_scale_mobile: 100,
+            visual_mobile_ui_scale: 100,
+            visual_fab_bottom_offset_mobile: 0,
+            visual_whatsapp_bottom_offset_mobile: 0,
+            visual_sections_order_desktop: "ofertas,destacados,categorias,agenda",
+            visual_sections_order_mobile: "agenda,ofertas,destacados,categorias",
+            visual_sections_visibility: { ofertas: true, destacados: true, categorias: true, agenda: true },
             custom_css: "",
         };
         const TIENDA_UI_INITIAL = {{ (tienda_personalizacion or {}) | tojson }};
@@ -3309,6 +3338,14 @@
             root.style.setProperty("--agenda-slot-available-bg", String(tiendaUiCfg.agenda_slot_available_bg || TIENDA_UI_DEFAULTS.agenda_slot_available_bg));
             root.style.setProperty("--agenda-slot-unavailable-bg", String(tiendaUiCfg.agenda_slot_unavailable_bg || TIENDA_UI_DEFAULTS.agenda_slot_unavailable_bg));
             root.style.setProperty("--agenda-slot-unavailable-text", String(tiendaUiCfg.agenda_slot_unavailable_text || TIENDA_UI_DEFAULTS.agenda_slot_unavailable_text));
+            root.style.setProperty("--layout-max-width", `${Math.max(960, Math.min(1920, Number(tiendaUiCfg.visual_layout_max_width || TIENDA_UI_DEFAULTS.visual_layout_max_width) || 1360))}px`);
+            root.style.setProperty("--grid-min-desktop", `${Math.max(160, Math.min(380, Number(tiendaUiCfg.visual_grid_min_desktop || TIENDA_UI_DEFAULTS.visual_grid_min_desktop) || 240))}px`);
+            root.style.setProperty("--grid-min-mobile", `${Math.max(130, Math.min(280, Number(tiendaUiCfg.visual_grid_min_mobile || TIENDA_UI_DEFAULTS.visual_grid_min_mobile) || 160))}px`);
+            root.style.setProperty("--visual-card-radius", `${Math.max(6, Math.min(28, Number(tiendaUiCfg.visual_card_radius || TIENDA_UI_DEFAULTS.visual_card_radius) || 12))}px`);
+            root.style.setProperty("--visual-card-shadow", `${Math.max(0, Math.min(36, Number(tiendaUiCfg.visual_card_shadow || TIENDA_UI_DEFAULTS.visual_card_shadow) || 0))}px`);
+            root.style.setProperty("--visual-spacing-scale", `${Math.max(.8, Math.min(1.4, (Number(tiendaUiCfg.visual_spacing_scale || TIENDA_UI_DEFAULTS.visual_spacing_scale) || 100) / 100)).toFixed(2)}`);
+            root.style.setProperty("--font-scale-desktop", `${Math.max(80, Math.min(140, Number(tiendaUiCfg.visual_font_scale_desktop || TIENDA_UI_DEFAULTS.visual_font_scale_desktop) || 100))}%`);
+            root.style.setProperty("--font-scale-mobile", `${Math.max(70, Math.min(130, Number(tiendaUiCfg.visual_font_scale_mobile || TIENDA_UI_DEFAULTS.visual_font_scale_mobile) || 100))}%`);
 
             _renderAgendaPastelResumen();
             if (tiendaCustomCssEl) tiendaCustomCssEl.textContent = String(tiendaUiCfg.custom_css || "");
@@ -3321,6 +3358,7 @@
                 const showSection = Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA";
                 secAgendaReservasEl.style.display = showSection ? "" : "none";
             }
+            _aplicarEscalaMovilDinamica();
             if (Boolean(tiendaUiCfg.agenda_enabled)) {
                 _startAgendaPoll();
             } else {
@@ -5845,6 +5883,71 @@
             }
         }
 
+        function _visualParseOrder(raw, isMobile = false) {
+            const base = isMobile
+                ? ["agenda", "ofertas", "destacados", "categorias"]
+                : ["ofertas", "destacados", "categorias", "agenda"];
+            const seen = new Set();
+            const ordered = [];
+            String(raw || "").split(",").map((x) => x.trim().toLowerCase()).forEach((k) => {
+                if (!base.includes(k) || seen.has(k)) return;
+                seen.add(k);
+                ordered.push(k);
+            });
+            base.forEach((k) => {
+                if (!seen.has(k)) ordered.push(k);
+            });
+            return ordered;
+        }
+
+        function _visualVisibilityCfg() {
+            const src = (tiendaUiCfg && typeof tiendaUiCfg.visual_sections_visibility === "object")
+                ? tiendaUiCfg.visual_sections_visibility
+                : {};
+            return {
+                ofertas: src.ofertas !== false,
+                destacados: src.destacados !== false,
+                categorias: src.categorias !== false,
+                agenda: src.agenda !== false,
+            };
+        }
+
+        function _visualApplySectionOrderAndVisibility(agendaMode = false) {
+            if (!contentMainEl) return;
+            const isMobile = document.body.classList.contains("mobile-ui");
+            const vis = _visualVisibilityCfg();
+            const order = _visualParseOrder(
+                isMobile ? tiendaUiCfg.visual_sections_order_mobile : tiendaUiCfg.visual_sections_order_desktop,
+                isMobile
+            );
+            const nodes = {
+                ofertas: secOfertasEl,
+                destacados: secDestacadosEl,
+                categorias: categoriasWrapEl,
+                agenda: secAgendaReservasEl,
+            };
+
+            // Reordena solo las secciones dinámicas sin tocar header/banner/hero.
+            let anchor = mobileCatStripEl || tiendaHeroEl || tiendaCustomBannerEl || tiendaEstadoBannerEl;
+            order.forEach((k) => {
+                const n = nodes[k];
+                if (!n) return;
+                if (anchor && anchor.parentElement === contentMainEl) {
+                    anchor.insertAdjacentElement("afterend", n);
+                } else if (contentMainEl.firstElementChild) {
+                    contentMainEl.appendChild(n);
+                }
+                anchor = n;
+            });
+
+            if (!agendaMode) {
+                if (secOfertasEl && !vis.ofertas) secOfertasEl.style.display = "none";
+                if (secDestacadosEl && !vis.destacados) secDestacadosEl.style.display = "none";
+                if (categoriasWrapEl && !vis.categorias) categoriasWrapEl.style.display = "none";
+                if (secAgendaReservasEl && !vis.agenda) secAgendaReservasEl.style.display = "none";
+            }
+        }
+
         function renderSecciones() {
             const agendaMode = categoriaActiva === "AGENDA";
             if (agendaQuickBtnEl) agendaQuickBtnEl.classList.toggle("active", agendaMode);
@@ -5856,6 +5959,7 @@
             if (secAgendaReservasEl) {
                 secAgendaReservasEl.style.display = agendaMode && Boolean(tiendaUiCfg.agenda_enabled) ? "" : "none";
             }
+            _visualApplySectionOrderAndVisibility(agendaMode);
             if (agendaMode) {
                 _renderAgendaDiaHora();
                 _actualizarDebugCatalogo("agenda");

@@ -7465,20 +7465,29 @@ def migrar_db():
             CREATE TABLE IF NOT EXISTS tienda_personalizacion (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 config_json TEXT NOT NULL DEFAULT '{}',
+                draft_config_json TEXT NOT NULL DEFAULT '{}',
                 actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        _ensure_column(conn, "tienda_personalizacion", "draft_config_json", "TEXT NOT NULL DEFAULT '{}'")
         conn.execute(
             """
-            INSERT OR IGNORE INTO tienda_personalizacion (id, config_json, actualizado_en)
-            VALUES (1, '{}', CURRENT_TIMESTAMP)
+            INSERT OR IGNORE INTO tienda_personalizacion (id, config_json, draft_config_json, actualizado_en)
+            VALUES (1, '{}', '{}', CURRENT_TIMESTAMP)
             """
         )
         conn.execute(
             """
             UPDATE tienda_personalizacion
             SET config_json = COALESCE(NULLIF(TRIM(config_json), ''), '{}')
+            WHERE id = 1
+            """
+        )
+        conn.execute(
+            """
+            UPDATE tienda_personalizacion
+            SET draft_config_json = COALESCE(NULLIF(TRIM(draft_config_json), ''), config_json, '{}')
             WHERE id = 1
             """
         )
