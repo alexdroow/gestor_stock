@@ -5759,6 +5759,7 @@
         function renderSecciones() {
             const agendaMode = categoriaActiva === "AGENDA";
             if (agendaQuickBtnEl) agendaQuickBtnEl.classList.toggle("active", agendaMode);
+            if (mobileCatStripEl) mobileCatStripEl.style.display = agendaMode ? "none" : "";
             if (secOfertasEl) secOfertasEl.style.display = agendaMode ? "none" : "";
             if (secDestacadosEl) secDestacadosEl.style.display = agendaMode ? "none" : "";
             if (categoriasWrapEl) categoriasWrapEl.style.display = agendaMode ? "none" : "";
