@@ -175,6 +175,7 @@
                 </div>
             </div>
             <div class="hint" id="inspector-state">Inspector: OFF. Activalo y haz doble click sobre botones, titulos o textos en la preview.</div>
+            <div class="hint" id="selector-debug">Selector: -</div>
 
             <div class="frame-box" id="frame-box-stage">
                 <div class="frame-head">
@@ -274,6 +275,7 @@ let previewAgenda = false;
 let inspectorOn = false;
 let STYLE_OVERRIDES = [];
 let TEXT_OVERRIDES = [];
+let selectorDebugTimer = null;
 let previewNonce = Date.now();
 
 function esc(t){
@@ -282,6 +284,21 @@ function esc(t){
 function msg(text, isErr){
   MSG.textContent = text || "";
   MSG.className = `msg ${text ? (isErr ? "err" : "ok") : ""}`;
+}
+function setSelectorDebug(text){
+  const el = document.getElementById("selector-debug");
+  if(!el) return;
+  el.textContent = `Selector: ${String(text || "-")}`;
+  if(selectorDebugTimer){
+    clearTimeout(selectorDebugTimer);
+    selectorDebugTimer = null;
+  }
+  if(text){
+    selectorDebugTimer = setTimeout(()=>{
+      el.textContent = "Selector: -";
+      selectorDebugTimer = null;
+    }, 10000);
+  }
 }
 async function post(url, payload){
   const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload || {}) });
@@ -545,6 +562,7 @@ function bindInspector(){
     if(["html", "body", "script", "style"].includes(tag)) return;
     const selector = selectorForElement(target);
     if(!selector) return;
+    setSelectorDebug(`capturado (${previewDevice}): ${selector}`);
     openEditor({ selector, displayPath: `<${tag}> ${selector}`, sourceText: (target.innerText || target.textContent || "").trim().slice(0, 350) });
   };
   doc.addEventListener("dblclick", handler, true);
@@ -628,6 +646,7 @@ function applyEditValues(){
   upsertStyle(selector, "width", width, target);
   upsertStyle(selector, "height", height, target);
   upsertStyle(selector, "box-shadow", shadow, target);
+  setSelectorDebug(`aplicado (${target}): ${selector}`);
   renderEditedList();
   return { ok:true };
 }
