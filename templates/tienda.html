@@ -1815,6 +1815,12 @@
             display: inline-flex;
             align-items: center;
         }
+        body.mobile-ui .topbar-actions {
+            display: none !important;
+        }
+        body.mobile-ui .mobile-menu-btn {
+            display: none !important;
+        }
         body.mobile-ui .mobile-agenda-summary-fab.active {
             display: inline-flex;
             align-items: center;
@@ -2068,6 +2074,11 @@
             right: 16px;
             bottom: var(--mobile-wa-bottom);
             box-shadow: 0 14px 30px rgba(0,0,0,.34);
+            animation: waHint 2.6s ease-in-out infinite;
+        }
+        @keyframes waHint {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-3px) scale(1.02); }
         }
         .mobile-menu-list {
             display: grid;
@@ -2136,6 +2147,25 @@
             background: #ffedd5;
             color: #9a3412;
             border-color: #fdba74;
+        }
+        .mobile-cats-bubble .mobile-cat-chip.agenda-entry {
+            background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+            border-color: #fb923c;
+            color: #9a3412;
+            font-weight: 900;
+            box-shadow: 0 0 0 1px rgba(249, 115, 22, .18);
+        }
+        .mobile-cats-bubble .mobile-cat-chip.account-entry {
+            background: #ecfeff;
+            border-color: #67e8f9;
+            color: #0f766e;
+            font-weight: 800;
+        }
+        .mobile-cats-bubble .mobile-cat-chip.logout-entry {
+            background: #fff1f2;
+            border-color: #fecdd3;
+            color: #be123c;
+            font-weight: 800;
         }
         body.mobile-ui .mobile-cats-bubble {
             border-radius: 14px;
@@ -2444,10 +2474,10 @@
         <img id="wa-fab-icon" src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
     </a>
     <button type="button" class="mobile-agenda-summary-fab" id="mobile-agenda-summary-fab" aria-hidden="true">Resumen</button>
-    <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirCategoriasMobile()">Categorias</button>
+    <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirCategoriasMobile()">Menu</button>
     <div class="mobile-cats-bubble" id="mobile-cats-bubble" aria-hidden="true">
         <div class="mobile-cats-bubble-head">
-            <span>Categorias</span>
+            <span>Menu</span>
             <button type="button" class="mobile-cats-bubble-close" id="mobile-cats-bubble-close" aria-label="Cerrar categorias">x</button>
         </div>
         <div class="mobile-cats-bubble-list" id="mobile-cats-bubble-list"></div>
@@ -3468,6 +3498,7 @@
             if (clienteRegistrado?.direccion_lat && clienteRegistrado?.direccion_lng) {
                 agendaDireccionPin = { lat: Number(clienteRegistrado.direccion_lat), lng: Number(clienteRegistrado.direccion_lng) };
             }
+            renderCategoriasMenu();
         }
 
         function _setCuentaModo(mode) {
@@ -3690,10 +3721,21 @@
                 }).join("");
             }
             if (mobileCatsBubbleListEl) {
+                const nombreCliente = String(clienteRegistrado?.nombre || "").trim();
+                const nombreCorto = nombreCliente ? nombreCliente.split(/\s+/)[0].slice(0, 20) : "Cliente";
+                const authItems = clienteRegistrado
+                    ? `
+                        <button type="button" class="mobile-cat-chip account-entry" onclick="abrirCuentaDesdeMenuMobile()">Bienvenido(a) ${esc(nombreCorto)}</button>
+                        <button type="button" class="mobile-cat-chip logout-entry" onclick="cerrarSesionDesdeMenuMobile()">Cerrar sesion</button>
+                    `
+                    : `
+                        <button type="button" class="mobile-cat-chip account-entry" onclick="abrirLoginDesdeMenuMobile()">Iniciar sesion</button>
+                        <button type="button" class="mobile-cat-chip account-entry" onclick="abrirRegistroDesdeMenuMobile()">Registrar cuenta</button>
+                    `;
                 const agendaItem = agendaEnabled
-                    ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
+                    ? `<button type="button" class="mobile-cat-chip agenda-entry ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
-                mobileCatsBubbleListEl.innerHTML = agendaItem + all.map((c) => {
+                mobileCatsBubbleListEl.innerHTML = authItems + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -3705,6 +3747,26 @@
                     return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}');cerrarPanelesMobile();">${esc(label)}</button>`;
                 }).join("");
             }
+        }
+
+        function abrirLoginDesdeMenuMobile() {
+            cerrarPanelesMobile();
+            abrirModalCuenta("login");
+        }
+
+        function abrirRegistroDesdeMenuMobile() {
+            cerrarPanelesMobile();
+            abrirModalCuenta("register");
+        }
+
+        function abrirCuentaDesdeMenuMobile() {
+            cerrarPanelesMobile();
+            abrirModalCuenta("account");
+        }
+
+        function cerrarSesionDesdeMenuMobile() {
+            cerrarPanelesMobile();
+            cerrarSesionCliente();
         }
 
         function _trackTienda(evento = "heartbeat") {
@@ -6782,6 +6844,10 @@
         window.cambiarCategoria = cambiarCategoria;
         window.abrirMenuMobile = abrirMenuMobile;
         window.abrirCategoriasMobile = abrirCategoriasMobile;
+        window.abrirLoginDesdeMenuMobile = abrirLoginDesdeMenuMobile;
+        window.abrirRegistroDesdeMenuMobile = abrirRegistroDesdeMenuMobile;
+        window.abrirCuentaDesdeMenuMobile = abrirCuentaDesdeMenuMobile;
+        window.cerrarSesionDesdeMenuMobile = cerrarSesionDesdeMenuMobile;
         window._aplicarEscalaMovilDinamica = _aplicarEscalaMovilDinamica;
         window.abrirCarritoMobile = abrirCarritoMobile;
         window.repetirCompraVenta = repetirCompraVenta;
