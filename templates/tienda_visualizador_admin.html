@@ -479,15 +479,26 @@ function refreshPreview(){
 function selectorForElement(el){
   if(!el || !el.tagName) return "";
   if(el.id) return `#${el.id}`;
-  const withId = el.closest("[id]");
-  if(withId && withId.id) {
-    return `#${withId.id}`;
-  }
   const stableClass = Array.from(el.classList || [])
     .filter((x)=>x && !x.startsWith("leaflet-") && !/^active|open|show|hide|current|selected$/i.test(x))
     .slice(0, 2);
+  const tag = String(el.tagName || "").toLowerCase();
+  const closestWithId = el.closest("[id]");
+  if(closestWithId && closestWithId.id){
+    if(stableClass.length){
+      return `#${closestWithId.id} ${tag}.${stableClass.join(".")}`;
+    }
+    if(el.parentElement){
+      const siblings = Array.from(el.parentElement.children).filter((n)=>n.tagName === el.tagName);
+      const idx = siblings.indexOf(el);
+      if(idx >= 0){
+        return `#${closestWithId.id} ${tag}:nth-of-type(${idx + 1})`;
+      }
+    }
+    return `#${closestWithId.id} ${tag}`;
+  }
   if(stableClass.length){
-    return `${String(el.tagName || "").toLowerCase()}.${stableClass.join(".")}`;
+    return `${tag}.${stableClass.join(".")}`;
   }
   function safeClass(node){
     const cl = Array.from(node.classList || []).filter((x)=>x && !x.startsWith("leaflet-") && x.length < 42).slice(0, 2);
@@ -503,9 +514,9 @@ function selectorForElement(el){
   let node = el;
   const parts = [];
   for(let i=0; i<5 && node && node.tagName && node.tagName.toLowerCase() !== "html"; i++){
-    const tag = node.tagName.toLowerCase();
+    const nodeTag = node.tagName.toLowerCase();
     if(node.id){ parts.unshift(`#${node.id}`); break; }
-    parts.unshift(`${tag}${safeClass(node)}${nth(node)}`);
+    parts.unshift(`${nodeTag}${safeClass(node)}${nth(node)}`);
     node = node.parentElement;
   }
   return parts.join(" > ");
@@ -704,10 +715,13 @@ function bindUi(){
     if(!applied.ok){ msg(applied.error || "No se pudo aplicar", true); return; }
     const ok = await saveDraft(true);
     if(!ok){ msg("No se pudo guardar cambios", true); return; }
+    const pub = await post("/api/tienda/admin/visualizador/publish", {});
+    if(!pub.ok || !pub.j.success){ msg(pub.j.error || "Se guardo borrador, pero no se pudo publicar", true); return; }
     await loadState();
-    previewMode = "draft";
+    previewMode = "live";
+    previewAgenda = false;
     refreshPreview();
-    msg("Cambio guardado en borrador.");
+    msg("Cambio guardado y publicado en web.");
     closeEditor();
   });
 
