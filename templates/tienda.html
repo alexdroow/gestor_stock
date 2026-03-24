@@ -2531,6 +2531,7 @@
                 <button class="btn-primary" type="button" id="cuenta-guardar">Registrarme / Ingresar</button>
                 <button class="btn-muted" type="button" id="cuenta-guardar-direccion">Guardar direccion</button>
             </div>
+            <div id="cuenta-msg" style="min-height:18px;font-size:.88rem;color:#64748b;"></div>
             <div id="cuenta-historial-wrap">
                 <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de compras</div>
                 <div id="cuenta-historial" style="max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
@@ -2739,6 +2740,7 @@
         const cuentaGuardarEl = document.getElementById("cuenta-guardar");
         const cuentaGuardarDireccionEl = document.getElementById("cuenta-guardar-direccion");
         const cuentaModalTituloEl = document.getElementById("cuenta-modal-titulo");
+        const cuentaMsgEl = document.getElementById("cuenta-msg");
         const cuentaRowPerfilEl = document.getElementById("cuenta-row-perfil");
         const cuentaCuponesWrapEl = document.getElementById("cuenta-cupones-wrap");
         const cuentaDireccionWrapEl = document.getElementById("cuenta-direccion-wrap");
@@ -3458,6 +3460,13 @@
                     cuentaEstadoEl.textContent = "Registra tus datos para compras y reservas mas rapidas.";
                 }
             }
+            setCuentaMsg("", false);
+        }
+
+        function setCuentaMsg(text, isErr = false) {
+            if (!cuentaMsgEl) return;
+            cuentaMsgEl.textContent = String(text || "");
+            cuentaMsgEl.style.color = isErr ? "#b91c1c" : "#166534";
         }
 
         function cerrarSesionCliente() {
@@ -5996,6 +6005,7 @@
 
         function cerrarModalCuenta() {
             modalCuentaEl?.classList.remove("active");
+            setCuentaMsg("", false);
             _stopHistorialEstadoPoll();
         }
 
@@ -6104,11 +6114,11 @@
             const tel8 = normalizarTelefono8(cuentaTelefonoEl?.value);
             const nombre = String(cuentaNombreEl?.value || "").trim();
             const fechaNacimiento = String(cuentaFechaNacimientoEl?.value || "").trim();
-            if (nombre.length < 2) return msg("Ingresa tu nombre completo.", true);
-            if (!fechaNacimiento) return msg("Selecciona tu fecha de nacimiento.", true);
-            if (!email) return msg("Correo invalido para registro.", true);
-            if (!emailConfirm || emailConfirm !== email) return msg("Debes confirmar el correo correctamente.", true);
-            if (!tel8) return msg("Telefono invalido. Debe tener 8 digitos.", true);
+            if (nombre.length < 2) { setCuentaMsg("Ingresa tu nombre completo.", true); return; }
+            if (!fechaNacimiento) { setCuentaMsg("Selecciona tu fecha de nacimiento.", true); return; }
+            if (!email) { setCuentaMsg("Correo invalido para registro.", true); return; }
+            if (!emailConfirm || emailConfirm !== email) { setCuentaMsg("Debes confirmar el correo correctamente.", true); return; }
+            if (!tel8) { setCuentaMsg("Telefono invalido. Debe tener 8 digitos.", true); return; }
             try {
                 const res = await fetch("/api/tienda/clientes/registrar", {
                     method: "POST",
@@ -6144,8 +6154,10 @@
                 _setCuentaModo("account");
                 renderEstadoCuenta();
                 await cargarHistorialCliente();
+                setCuentaMsg("Cuenta registrada correctamente.");
                 msg("Cuenta de cliente registrada.");
             } catch (e) {
+                setCuentaMsg(e.message || "No se pudo registrar cliente", true);
                 msg(e.message || "No se pudo registrar cliente", true);
             }
         }
@@ -6153,8 +6165,8 @@
         async function iniciarSesionCliente() {
             const email = normalizarEmailCliente(cuentaEmailEl?.value);
             const tel8 = normalizarTelefono8(cuentaTelefonoEl?.value);
-            if (!email) return msg("Ingresa un correo valido.", true);
-            if (!tel8) return msg("Ingresa telefono valido (8 digitos).", true);
+            if (!email) { setCuentaMsg("Ingresa un correo valido.", true); return; }
+            if (!tel8) { setCuentaMsg("Ingresa telefono valido (8 digitos).", true); return; }
             try {
                 const res = await fetch("/api/tienda/clientes/historial", {
                     method: "POST",
@@ -6184,8 +6196,15 @@
                 _setCuentaModo("account");
                 renderEstadoCuenta();
                 await cargarHistorialCliente();
+                setCuentaMsg("Sesion iniciada correctamente.");
                 msg("Sesion iniciada correctamente.");
             } catch (e) {
+                const errTxt = String(e?.message || "No se pudo iniciar sesion");
+                if (/no registrado|not found|404/i.test(errTxt)) {
+                    setCuentaMsg("Datos incorrectos o cuenta no registrada. Verifica correo y telefono.", true);
+                } else {
+                    setCuentaMsg(errTxt, true);
+                }
                 msg(e.message || "No se pudo iniciar sesion", true);
             }
         }
