@@ -41,6 +41,10 @@
         iframe { width:100%; border:0; background:#fff; }
         #frame-web { height:78vh; }
         #frame-mobile { height:78vh; width:390px; max-width:100%; margin:0 auto; display:block; }
+        .device-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+        .device-tabs .btn.active { border-color:#0ea5e9; background:#e0f2fe; color:#0c4a6e; }
+        #frame-stage { height:78vh; display:block; }
+        .frame-box.mobile-view #frame-stage { width:390px; max-width:100%; margin:0 auto; display:block; }
         .mini { font-size:.78rem; color:var(--muted); }
         .split2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
         .versions { max-height:220px; overflow:auto; display:grid; gap:6px; }
@@ -181,20 +185,17 @@
                 <button class="btn" id="btn-preview-live">Preview live</button>
                 <button class="btn" id="btn-preview-agenda">Preview agenda</button>
             </div>
-            <div class="preview-grid">
-                <div class="frame-box">
+            <div class="device-tabs">
+                <button class="btn active" id="btn-tab-web" type="button">Web</button>
+                <button class="btn" id="btn-tab-mobile" type="button">Movil</button>
+            </div>
+            <div class="preview-grid" style="grid-template-columns:1fr;">
+                <div class="frame-box" id="frame-box-stage">
                     <div class="frame-head">
-                        <strong>Web</strong>
-                        <span class="mini" id="preview-mode-web">draft</span>
+                        <strong id="preview-device-label">Web</strong>
+                        <span class="mini" id="preview-mode-label">draft</span>
                     </div>
-                    <iframe id="frame-web" src="/tienda/preview?mode=draft"></iframe>
-                </div>
-                <div class="frame-box">
-                    <div class="frame-head">
-                        <strong>Movil</strong>
-                        <span class="mini" id="preview-mode-mobile">draft</span>
-                    </div>
-                    <iframe id="frame-mobile" src="/tienda/preview?mode=draft&mobile=1"></iframe>
+                    <iframe id="frame-stage" src="/tienda/preview?mode=draft"></iframe>
                 </div>
             </div>
         </section>
@@ -210,6 +211,8 @@ const FIELDS = [
 ];
 let STATE = { live:{}, draft:{}, presets:[], versiones:[] };
 let previewMode = "draft";
+let previewDevice = "web";
+let previewAgenda = false;
 
 function msg(t, err=false){ MSG.textContent = t||""; MSG.className = `msg ${t?(err?"err":"ok"):""}`; }
 function esc(t){ return String(t||"").replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -275,11 +278,20 @@ function previewSrc(mode, agenda=false, mobile=false){
   if(mobile) q.set("mobile","1");
   return `/tienda/preview?${q.toString()}`;
 }
+function applyDeviceTabUi(){
+  const webBtn = document.getElementById("btn-tab-web");
+  const mobBtn = document.getElementById("btn-tab-mobile");
+  const box = document.getElementById("frame-box-stage");
+  const lbl = document.getElementById("preview-device-label");
+  if(webBtn) webBtn.classList.toggle("active", previewDevice === "web");
+  if(mobBtn) mobBtn.classList.toggle("active", previewDevice === "mobile");
+  if(box) box.classList.toggle("mobile-view", previewDevice === "mobile");
+  if(lbl) lbl.textContent = previewDevice === "mobile" ? "Movil" : "Web";
+}
 function refreshPreview(){
-  document.getElementById("preview-mode-web").textContent = previewMode;
-  document.getElementById("preview-mode-mobile").textContent = previewMode;
-  document.getElementById("frame-web").src = previewSrc(previewMode, false, false);
-  document.getElementById("frame-mobile").src = previewSrc(previewMode, false, true);
+  document.getElementById("preview-mode-label").textContent = previewAgenda ? `${previewMode} · agenda` : previewMode;
+  document.getElementById("frame-stage").src = previewSrc(previewMode, previewAgenda, previewDevice === "mobile");
+  applyDeviceTabUi();
 }
 function fillPresetOptions(){
   const opts = [`<option value="">Selecciona preset</option>`].concat(
@@ -398,13 +410,25 @@ document.getElementById("btn-crear-programacion").addEventListener("click", asyn
   await loadProgramaciones();
 });
 document.getElementById("btn-recargar-programaciones").addEventListener("click", loadProgramaciones);
-document.getElementById("btn-preview-draft").addEventListener("click", ()=>{ previewMode="draft"; refreshPreview(); msg("Preview draft."); });
-document.getElementById("btn-preview-live").addEventListener("click", ()=>{ previewMode="live"; refreshPreview(); msg("Preview live."); });
-document.getElementById("btn-preview-agenda").addEventListener("click", ()=>{
-  document.getElementById("frame-web").src = previewSrc(previewMode, true, false);
-  document.getElementById("frame-mobile").src = previewSrc(previewMode, true, true);
-  msg("Preview agenda.");
+document.getElementById("btn-preview-draft").addEventListener("click", ()=>{
+  previewMode="draft";
+  previewAgenda = false;
+  refreshPreview();
+  msg("Preview draft.");
 });
+document.getElementById("btn-preview-live").addEventListener("click", ()=>{
+  previewMode="live";
+  previewAgenda = false;
+  refreshPreview();
+  msg("Preview live.");
+});
+document.getElementById("btn-preview-agenda").addEventListener("click", ()=>{
+  previewAgenda = true;
+  msg("Preview agenda.");
+  refreshPreview();
+});
+document.getElementById("btn-tab-web").addEventListener("click", ()=>{ previewDevice = "web"; refreshPreview(); });
+document.getElementById("btn-tab-mobile").addEventListener("click", ()=>{ previewDevice = "mobile"; refreshPreview(); });
 
 loadState();
 window.rollbackVersion = rollbackVersion;
@@ -412,4 +436,3 @@ window.delProg = delProg;
 </script>
 </body>
 </html>
-
