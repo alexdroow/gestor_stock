@@ -479,6 +479,16 @@ function refreshPreview(){
 function selectorForElement(el){
   if(!el || !el.tagName) return "";
   if(el.id) return `#${el.id}`;
+  const withId = el.closest("[id]");
+  if(withId && withId.id) {
+    return `#${withId.id}`;
+  }
+  const stableClass = Array.from(el.classList || [])
+    .filter((x)=>x && !x.startsWith("leaflet-") && !/^active|open|show|hide|current|selected$/i.test(x))
+    .slice(0, 2);
+  if(stableClass.length){
+    return `${String(el.tagName || "").toLowerCase()}.${stableClass.join(".")}`;
+  }
   function safeClass(node){
     const cl = Array.from(node.classList || []).filter((x)=>x && !x.startsWith("leaflet-") && x.length < 42).slice(0, 2);
     return cl.length ? `.${cl.join(".")}` : "";
@@ -619,7 +629,12 @@ async function saveDraft(silent){
     return false;
   }
   DRAFT_CFG = clone(r.j.draft || payload.config);
-  if(!silent) msg("Borrador guardado correctamente.");
+  STATE.draft = clone(DRAFT_CFG);
+  if(!silent){
+    const sc = Array.isArray(DRAFT_CFG.visual_element_overrides) ? DRAFT_CFG.visual_element_overrides.length : 0;
+    const tc = Array.isArray(DRAFT_CFG.visual_text_overrides) ? DRAFT_CFG.visual_text_overrides.length : 0;
+    msg(`Borrador guardado correctamente. (${sc} estilos, ${tc} textos)`);
+  }
   return true;
 }
 
@@ -689,6 +704,7 @@ function bindUi(){
     if(!applied.ok){ msg(applied.error || "No se pudo aplicar", true); return; }
     const ok = await saveDraft(true);
     if(!ok){ msg("No se pudo guardar cambios", true); return; }
+    await loadState();
     previewMode = "draft";
     refreshPreview();
     msg("Cambio guardado en borrador.");
