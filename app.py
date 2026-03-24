@@ -8824,7 +8824,7 @@ def api_tienda_checkout():
         payload_seguro = {
             "items": items_limpios,
             "codigo_pedido": str(data.get("codigo_pedido") or "").strip()[:80],
-            "fecha_venta": str(data.get("fecha_venta") or "").strip() or None,
+            "fecha_venta": None,
         }
         respuesta = _procesar_venta_desde_payload(
             payload_seguro,
