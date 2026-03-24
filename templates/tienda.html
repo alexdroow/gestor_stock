@@ -3396,7 +3396,11 @@
         function renderEstadoCuenta() {
             const logged = Boolean(clienteRegistrado);
             if (btnCuentaEl) btnCuentaEl.style.display = logged ? "" : "none";
-            if (btnCuentaEl) btnCuentaEl.textContent = "Mi cuenta (activa)";
+            if (btnCuentaEl) {
+                const nombreCliente = String(clienteRegistrado?.nombre || "").trim();
+                const nombreCorto = nombreCliente ? nombreCliente.split(/\s+/)[0].slice(0, 20) : "Cliente";
+                btnCuentaEl.textContent = `Bienvenido(a) ${nombreCorto}`;
+            }
             if (btnCerrarSesionEl) {
                 btnCerrarSesionEl.style.display = logged ? "" : "none";
             }
