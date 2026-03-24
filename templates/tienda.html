@@ -2431,8 +2431,9 @@
                 <div style="font-weight:800;color:#1e3a8a;">Tu pedido activo</div>
                 <div id="pedido-activo-texto" style="margin-top:4px;font-size:.92rem;color:#1f2937;">Sin pedidos activos.</div>
                 <div id="pedido-activo-meta" style="margin-top:6px;font-size:.82rem;color:#475569;"></div>
-                <div style="margin-top:8px;">
+                <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button type="button" id="pedido-activo-ver" class="btn-primary">Ver detalle</button>
+                    <button type="button" id="pedido-activo-cerrar" class="btn-muted">Cerrar</button>
                 </div>
             </div>
         </aside>
@@ -2771,6 +2772,7 @@
         const pedidoActivoTextoEl = document.getElementById("pedido-activo-texto");
         const pedidoActivoMetaEl = document.getElementById("pedido-activo-meta");
         const pedidoActivoVerEl = document.getElementById("pedido-activo-ver");
+        const pedidoActivoCerrarEl = document.getElementById("pedido-activo-cerrar");
         const ofertasPrevBtnEl = document.getElementById("ofertas-prev");
         const ofertasNextBtnEl = document.getElementById("ofertas-next");
         const secOfertasEl = document.getElementById("sec-ofertas");
@@ -2917,6 +2919,8 @@
         let agendaCakeCategorySearch = "";
         let agendaCakeCategoryExpanded = false;
         let cuentaModo = "register";
+        const PEDIDO_FINAL_VISIBLE_MS = 24 * 60 * 60 * 1000;
+        const PEDIDO_ACTIVO_DISMISS_KEY = "tienda_pedido_activo_dismissed_id";
         const AGENDA_CAKE_CATS_COLLAPSED = 6;
         let agendaCakeSelection = {
             size_id: "",
@@ -3338,6 +3342,33 @@
             return estado === "entregado" || estado === "cancelado";
         }
 
+        function _parseFechaMs(raw) {
+            const txt = String(raw || "").trim();
+            if (!txt) return 0;
+            const normalized = txt.includes("T") ? txt : txt.replace(" ", "T");
+            const ms = Date.parse(normalized);
+            return Number.isFinite(ms) ? ms : 0;
+        }
+
+        function _pedidoEstadoRefMs(p) {
+            if (!p || typeof p !== "object") return 0;
+            const t1 = _parseFechaMs(p.estado_actualizado);
+            if (t1 > 0) return t1;
+            const t2 = _parseFechaMs(p.fecha_hora_local);
+            if (t2 > 0) return t2;
+            return 0;
+        }
+
+        function _debeMostrarPedidoActivo(p) {
+            if (!p || !Number(p.venta_id || 0)) return false;
+            const dismissedId = Number(localStorage.getItem(PEDIDO_ACTIVO_DISMISS_KEY) || 0);
+            if (dismissedId > 0 && dismissedId === Number(p.venta_id || 0)) return false;
+            if (!_estadoPedidoFinal(p.estado)) return true;
+            const refMs = _pedidoEstadoRefMs(p);
+            if (refMs <= 0) return true;
+            return (Date.now() - refMs) <= PEDIDO_FINAL_VISIBLE_MS;
+        }
+
         function cargarUltimoPedidoLocal() {
             try {
                 const raw = localStorage.getItem("tienda_ultimo_pedido");
@@ -3345,16 +3376,11 @@
                 const obj = JSON.parse(raw);
                 const ventaId = Number(obj?.venta_id || 0);
                 if (!ventaId) return null;
-                const estado = String(obj?.estado || "recibido").trim().toLowerCase();
-                if (_estadoPedidoFinal(estado)) {
-                    localStorage.removeItem("tienda_ultimo_pedido");
-                    return null;
-                }
-                return {
+                const pedido = {
                     venta_id: ventaId,
                     codigo_operacion: String(obj?.codigo_operacion || ""),
                     fecha_hora_local: String(obj?.fecha_hora_local || ""),
-                    estado,
+                    estado: String(obj?.estado || "recibido").trim().toLowerCase(),
                     cliente_nombre: String(obj?.cliente_nombre || ""),
                     cliente_email: String(obj?.cliente_email || ""),
                     cliente_telefono: String(obj?.cliente_telefono || ""),
@@ -3364,6 +3390,11 @@
                     items: Array.isArray(obj?.items) ? obj.items : [],
                     estado_actualizado: String(obj?.estado_actualizado || ""),
                 };
+                if (!_debeMostrarPedidoActivo(pedido)) {
+                    localStorage.removeItem("tienda_ultimo_pedido");
+                    return null;
+                }
+                return pedido;
             } catch (_) {
                 return null;
             }
@@ -3379,8 +3410,11 @@
         function _renderPedidoActivoTienda() {
             if (!pedidoActivoBoxEl) return;
             const p = ultimoComprobantePedido;
-            if (!p || !Number(p.venta_id || 0)) {
+            if (!_debeMostrarPedidoActivo(p)) {
                 pedidoActivoBoxEl.style.display = "none";
+                if (p && _estadoPedidoFinal(p.estado) && !_debeMostrarPedidoActivo(p)) {
+                    try { localStorage.removeItem("tienda_ultimo_pedido"); } catch (_) {}
+                }
                 return;
             }
             pedidoActivoBoxEl.style.display = "";
@@ -6270,8 +6304,27 @@
 
         function _sincronizarPedidoActivoDesdeHistorial() {
             const items = Array.isArray(historialComprasCliente) ? historialComprasCliente : [];
-            if (!items.length) return;
-            const vigente = items.find((v) => !_estadoPedidoFinal(v.pedido_estado)) || items[0];
+            if (!items.length) {
+                ultimoComprobantePedido = null;
+                try { localStorage.removeItem("tienda_ultimo_pedido"); } catch (_) {}
+                _renderPedidoActivoTienda();
+                _stopPedidoEstadoPoll();
+                return;
+            }
+            const vigente = items.find((v) => !_estadoPedidoFinal(v.pedido_estado))
+                || items.find((v) => _debeMostrarPedidoActivo({
+                    venta_id: Number(v.id || 0),
+                    estado: String(v.pedido_estado || "recibido"),
+                    estado_actualizado: String(v.pedido_estado_actualizado || ""),
+                    fecha_hora_local: String(v.fecha_hora || ""),
+                }));
+            if (!vigente) {
+                ultimoComprobantePedido = null;
+                try { localStorage.removeItem("tienda_ultimo_pedido"); } catch (_) {}
+                _renderPedidoActivoTienda();
+                _stopPedidoEstadoPoll();
+                return;
+            }
             const vigenteId = Number(vigente?.id || 0);
             if (!vigenteId) return;
             if (!ultimoComprobantePedido || Number(ultimoComprobantePedido.venta_id || 0) !== vigenteId) {
@@ -6621,6 +6674,14 @@
             }
         }
 
+        function cerrarPedidoActivoBanner() {
+            const ventaId = Number(ultimoComprobantePedido?.venta_id || 0);
+            if (ventaId > 0) {
+                try { localStorage.setItem(PEDIDO_ACTIVO_DISMISS_KEY, String(ventaId)); } catch (_) {}
+            }
+            if (pedidoActivoBoxEl) pedidoActivoBoxEl.style.display = "none";
+        }
+
         function abrirMenuMobile() {
             if (!leftNavEl || !mobileOverlayEl) return;
             const isMobile = window.matchMedia("(max-width: 900px)").matches;
@@ -6795,6 +6856,7 @@
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
+        pedidoActivoCerrarEl?.addEventListener("click", cerrarPedidoActivoBanner);
         document.getElementById("modal-cuenta-cerrar")?.addEventListener("click", cerrarModalCuenta);
         document.getElementById("cuenta-guardar")?.addEventListener("click", registrarCuentaCliente);
         cuentaBuscarMapaEl?.addEventListener("click", _buscarDireccionCuentaEnMapa);
