@@ -113,6 +113,42 @@ function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt
 function money(v){try{return new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(Number(v||0));}catch(_){return `$${Number(v||0)}`;}}
 function msgProgram(t,e=false){programMsgEl.textContent=t||"";programMsgEl.style.color=e?"#b91c1c":"#166534";}
 function msgClients(t,e=false){clientsMsgEl.textContent=t||"";clientsMsgEl.style.color=e?"#b91c1c":"#334155";}
+function prettyApiError(err, fallback){
+    if(!err) return String(fallback||"Error inesperado");
+    const parts = [];
+    if(err.endpoint) parts.push(`API: ${err.endpoint}`);
+    if(err.status) parts.push(`HTTP ${err.status}`);
+    if(err.message) parts.push(String(err.message));
+    const txt = parts.join(" | ").trim();
+    return txt || String(fallback||"Error inesperado");
+}
+async function requestJson(url, opts){
+    let res = null;
+    let data = null;
+    try{
+        res = await fetch(url, opts||{});
+    }catch(_){
+        const e = new Error("Sin conexion con el servidor");
+        e.endpoint = url;
+        e.status = 0;
+        throw e;
+    }
+    const ct = String(res.headers.get("content-type")||"").toLowerCase();
+    if(ct.includes("application/json")){
+        try{ data = await res.json(); }catch(_){ data = null; }
+    }else{
+        const raw = await res.text();
+        data = { success:false, error: (raw||"").slice(0,220) || "Respuesta no JSON del servidor" };
+    }
+    if(!res.ok || !data || data.success===false){
+        const e = new Error((data && (data.error || data.message)) || `HTTP ${res.status}`);
+        e.endpoint = url;
+        e.status = Number(res.status||0);
+        e.payload = data;
+        throw e;
+    }
+    return data;
+}
 
 function renderLevels(){
     levelsListEl.innerHTML = (niveles||[]).map((n,idx)=>`
@@ -160,21 +196,17 @@ window.removeLevel = removeLevel;
 
 async function loadPrograma(){
     try{
-        const [rProg, rNiv] = await Promise.all([
-            fetch("/api/tienda/admin/clientes/programa"),
-            fetch("/api/tienda/admin/clientes/niveles"),
+        const [jProg, jNiv] = await Promise.all([
+            requestJson("/api/tienda/admin/clientes/programa"),
+            requestJson("/api/tienda/admin/clientes/niveles"),
         ]);
-        const jProg = await rProg.json();
-        const jNiv = await rNiv.json();
-        if(!rProg.ok || !jProg.success) throw new Error(jProg.error||"No se pudo cargar programa");
-        if(!rNiv.ok || !jNiv.success) throw new Error(jNiv.error||"No se pudo cargar niveles");
         document.getElementById("purchase_amount_base").value = Number((jProg.programa||{}).purchase_amount_base||1000);
         document.getElementById("purchase_points").value = Number((jProg.programa||{}).purchase_points||10);
         document.getElementById("agenda_points").value = Number((jProg.programa||{}).agenda_points||20);
         niveles = Array.isArray(jNiv.niveles)?jNiv.niveles:[];
         renderLevels();
         msgProgram("");
-    }catch(e){ msgProgram(e.message||"Error cargando programa", true); }
+    }catch(e){ msgProgram(prettyApiError(e, "Error cargando programa"), true); }
 }
 
 function renderClients(){
@@ -203,9 +235,7 @@ window.openClient = async function(id){
     renderClients();
     if(!selectedClientId) return;
     try{
-        const res = await fetch(`/api/tienda/admin/clientes/${selectedClientId}`);
-        const data = await res.json();
-        if(!res.ok || !data.success) throw new Error(data.error||"No se pudo cargar detalle");
+        const data = await requestJson(`/api/tienda/admin/clientes/${selectedClientId}`);
         const c = data.cliente||{};
         detailHeadEl.innerHTML = `<strong>${esc(c.nombre||"Cliente")}</strong> · ${esc(c.email||"")} · ${esc(c.telefono||"")} · Nivel: ${esc(c.nivel_nombre||"Sin nivel")} · Puntos: ${Number(c.puntos_total||0)}`;
         detailSalesEl.innerHTML = (Array.isArray(data.ventas)&&data.ventas.length)
@@ -218,23 +248,21 @@ window.openClient = async function(id){
             ? data.movimientos.map(m=>`<div><strong>${Number(m.puntos||0)>0?"+":""}${Number(m.puntos||0)}</strong> · ${esc(m.tipo||"")} · ${esc(m.detalle||"")} · ${esc(m.creado_en||"")}</div>`).join("")
             : `<div class="muted">Sin movimientos de puntos.</div>`;
     }catch(e){
-        detailHeadEl.textContent = e.message||"No se pudo cargar detalle";
+        detailHeadEl.textContent = prettyApiError(e, "No se pudo cargar detalle");
     }
 };
 
 async function loadClientes(){
     try{
         msgClients("Cargando clientes...");
-        const res = await fetch("/api/tienda/admin/clientes");
-        const data = await res.json();
-        if(!res.ok || !data.success) throw new Error(data.error||"No se pudo cargar clientes");
+        const data = await requestJson("/api/tienda/admin/clientes");
         clientes = Array.isArray(data.clientes)?data.clientes:[];
         renderClients();
         msgClients(`Clientes cargados: ${clientes.length}`);
     }catch(e){
         clientes = [];
         renderClients();
-        msgClients(e.message||"Error cargando clientes", true);
+        msgClients(prettyApiError(e, "Error cargando clientes"), true);
     }
 }
 
@@ -249,20 +277,16 @@ async function savePrograma(){
             },
             niveles: readLevelsFromUI(),
         };
-        const [rProg, rNiv] = await Promise.all([
-            fetch("/api/tienda/admin/clientes/programa", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({programa:payload.programa})}),
-            fetch("/api/tienda/admin/clientes/niveles", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({niveles:payload.niveles})}),
+        const [jProg, jNiv] = await Promise.all([
+            requestJson("/api/tienda/admin/clientes/programa", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({programa:payload.programa})}),
+            requestJson("/api/tienda/admin/clientes/niveles", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({niveles:payload.niveles})}),
         ]);
-        const jProg = await rProg.json();
-        const jNiv = await rNiv.json();
-        if(!rProg.ok || !jProg.success) throw new Error(jProg.error||"No se pudo guardar programa");
-        if(!rNiv.ok || !jNiv.success) throw new Error(jNiv.error||"No se pudo guardar niveles");
         niveles = Array.isArray(jNiv.niveles)?jNiv.niveles:[];
         renderLevels();
         msgProgram("Programa guardado correctamente.");
         await loadClientes();
     }catch(e){
-        msgProgram(e.message||"No se pudo guardar", true);
+        msgProgram(prettyApiError(e, "No se pudo guardar"), true);
     }
 }
 
