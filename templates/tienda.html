@@ -5392,6 +5392,26 @@
             w.document.close();
         }
 
+        async function _fetchJsonWithTimeout(url, options = {}, timeoutMs = 20000) {
+            const controller = new AbortController();
+            const t = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs || 20000)));
+            try {
+                const res = await fetch(url, { ...(options || {}), signal: controller.signal });
+                const data = await res.json();
+                if (!res.ok || !data || data.success === false) {
+                    throw new Error((data && (data.error || data.message)) || `HTTP ${res.status}`);
+                }
+                return data;
+            } catch (err) {
+                if (err && err.name === "AbortError") {
+                    throw new Error("Tiempo de espera agotado. Revisa la conexion e intenta nuevamente.");
+                }
+                throw err;
+            } finally {
+                clearTimeout(t);
+            }
+        }
+
         async function _confirmarReservaAgendaPendiente(opts = {}) {
             const payload = agendaReservaPendiente;
             if (!payload) return;
@@ -5401,40 +5421,38 @@
             let waManualUrl = "";
             let waStatusText = "";
             _agendaMsg("Reservando horario...");
+            if (agendaConfirmarAceptarEnviarEl) agendaConfirmarAceptarEnviarEl.disabled = true;
             try {
-                const res = await fetch("/api/tienda/agenda/reservar", {
+                const data = await _fetchJsonWithTimeout("/api/tienda/agenda/reservar", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo reservar");
+                }, 22000);
                 const reserva = data.reserva || {};
                 const payloadFinal = {
                     ...payload,
                     shipping_quote: reserva.shipping_quote || payload.shipping_quote || null,
                 };
                 const pdfInfo = _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
+                if (!pdfInfo || !pdfInfo.blobUrl) {
+                    waStatusText = "No se pudo preparar la vista previa del PDF en esta pestaña, pero puedes descargarlo nuevamente desde aqui o reintentar.";
+                }
+                const contacto = String(payloadFinal.nombre || payloadFinal.email || "cliente").trim();
+                const msgWa = `Hola mi nombre ${contacto} envio mi cotizacion para una pronta revision.`;
+                waManualUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
                 if (sendToPasteleria) {
                     try {
-                        const waRes = await fetch(`/api/tienda/agenda/reserva/${Number(reserva.id || 0)}/whatsapp-pasteleria`, {
+                        await _fetchJsonWithTimeout(`/api/tienda/agenda/reserva/${Number(reserva.id || 0)}/whatsapp-pasteleria`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json", Accept: "application/json" },
                             body: JSON.stringify({
                                 nombre: String(payloadFinal.nombre || "").trim(),
                                 email: String(payloadFinal.email || "").trim(),
                             }),
-                        });
-                        const waData = await waRes.json();
-                        if (!waRes.ok || !waData.success) {
-                            throw new Error(waData.error || "No se pudo enviar PDF por WhatsApp");
-                        }
+                        }, 9000);
                         sentPdfToPasteleria = true;
                         waStatusText = "PDF enviado automaticamente a Pasteleria Sucree por WhatsApp.";
                     } catch (errWa) {
-                        const contacto = String(payloadFinal.nombre || payloadFinal.email || "cliente").trim();
-                        const msgWa = `Hola mi nombre ${contacto} envio mi cotizacion para una pronta revision.`;
-                        waManualUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
                         waStatusText = `No se pudo enviar automaticamente por Twilio (${String(errWa?.message || "sin detalle")}). Puedes enviarlo manualmente con el boton de WhatsApp.`;
                     }
                 }
@@ -5467,7 +5485,15 @@
                 _renderAgendaDiaHora();
             } catch (e) {
                 _agendaMsg(e.message || "No se pudo reservar", "err");
+                const contactoErr = String(payload?.nombre || payload?.email || "cliente").trim();
+                const msgWaErr = `Hola mi nombre ${contactoErr} envio mi cotizacion para una pronta revision.`;
+                _abrirResumenReservaEnVentana(waWindow, payload || {}, { id: 0 }, null, {
+                    waManualUrl: `https://wa.me/56964330546?text=${encodeURIComponent(msgWaErr)}`,
+                    whatsappStatus: `No se pudo completar la reserva: ${String(e?.message || "sin detalle")}`,
+                });
                 await cargarAgendaDisponibilidad(true);
+            } finally {
+                if (agendaConfirmarAceptarEnviarEl) agendaConfirmarAceptarEnviarEl.disabled = false;
             }
         }
 
