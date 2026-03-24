@@ -2374,6 +2374,7 @@ def _default_tienda_personalizacion():
             "categorias": True,
             "agenda": True,
         },
+        "visual_element_overrides": [],
         "catalogo_torta": catalogo_torta_base,
         "custom_css": "",
     }
@@ -2641,6 +2642,33 @@ def _normalizar_tienda_personalizacion(payload):
         else:
             vis_cfg[key] = bool(vis_base.get(key, True))
     clean["visual_sections_visibility"] = vis_cfg
+    raw_overrides = data.get("visual_element_overrides")
+    overrides = []
+    if isinstance(raw_overrides, list):
+        for row in raw_overrides[:220]:
+            if not isinstance(row, dict):
+                continue
+            selector = str(row.get("selector") or "").strip()[:180]
+            prop = str(row.get("property") or "").strip().lower()[:60]
+            value = str(row.get("value") or "").strip()[:220]
+            target = str(row.get("target") or "both").strip().lower()
+            enabled = bool(row.get("enabled", True))
+            if not selector or not prop:
+                continue
+            if not re.match(r"^[a-z][a-z0-9\-]*$", prop):
+                continue
+            if target not in {"desktop", "mobile", "both"}:
+                target = "both"
+            if not re.match(r"^[#.\[:*a-zA-Z0-9_\-\s>,+~=\"'()]+$", selector):
+                continue
+            overrides.append({
+                "selector": selector,
+                "property": prop,
+                "value": value,
+                "target": target,
+                "enabled": enabled,
+            })
+    clean["visual_element_overrides"] = overrides
 
     clean["catalogo_torta"] = _normalizar_catalogo_torta_cfg(data.get("catalogo_torta") or base.get("catalogo_torta"))
 

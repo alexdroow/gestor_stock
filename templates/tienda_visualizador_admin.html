@@ -49,6 +49,10 @@
         .split2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
         .versions { max-height:220px; overflow:auto; display:grid; gap:6px; }
         .version-item { border:1px solid #e2e8f0; border-radius:8px; padding:7px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+        .ovr-grid { display:grid; grid-template-columns:2fr 1.2fr 1.4fr .9fr .9fr auto; gap:6px; align-items:center; }
+        .ovr-head { font-size:.75rem; color:#64748b; font-weight:800; }
+        .ovr-list { max-height:240px; overflow:auto; display:grid; gap:6px; }
+        .ovr-row { border:1px solid #e2e8f0; border-radius:8px; padding:6px; background:#fff; }
         @media (max-width: 1320px) { .grid { grid-template-columns:1fr; } .preview-grid { grid-template-columns:1fr; } }
     </style>
 </head>
@@ -114,6 +118,26 @@
                 <label class="full">CSS adicional
                     <textarea id="custom_css" placeholder="/* CSS extra opcional */"></textarea>
                 </label>
+            </div>
+            <div class="card">
+                <strong>Editor avanzado por selector (control total)</strong>
+                <div class="mini">Ejemplo: selector `.checkout-btn` propiedad `border-radius` valor `18px` target `mobile`.</div>
+                <div class="ovr-grid ovr-head">
+                    <div>Selector</div><div>Propiedad</div><div>Valor</div><div>Target</div><div>Activo</div><div></div>
+                </div>
+                <div class="ovr-grid">
+                    <input id="ovr-selector" type="text" placeholder=".checkout-btn">
+                    <input id="ovr-property" type="text" placeholder="font-size">
+                    <input id="ovr-value" type="text" placeholder="1.1rem">
+                    <select id="ovr-target">
+                        <option value="both">Ambos</option>
+                        <option value="desktop">Web</option>
+                        <option value="mobile">Movil</option>
+                    </select>
+                    <label style="display:flex;align-items:center;gap:6px;"><input id="ovr-enabled" type="checkbox" checked>On</label>
+                    <button class="btn" id="btn-ovr-add" type="button">Agregar</button>
+                </div>
+                <div class="ovr-list" id="ovr-list"></div>
             </div>
 
             <div class="card">
@@ -213,6 +237,7 @@ let STATE = { live:{}, draft:{}, presets:[], versiones:[] };
 let previewMode = "draft";
 let previewDevice = "web";
 let previewAgenda = false;
+let OVERRIDES = [];
 
 function msg(t, err=false){ MSG.textContent = t||""; MSG.className = `msg ${t?(err?"err":"ok"):""}`; }
 function esc(t){ return String(t||"").replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -257,6 +282,14 @@ function fillForm(cfg){
   document.getElementById("vis-agenda").checked = Boolean(vis.agenda ?? true);
   renderOrder("order-desktop", parseOrder(c.visual_sections_order_desktop));
   renderOrder("order-mobile", parseOrder(c.visual_sections_order_mobile));
+  OVERRIDES = Array.isArray(c.visual_element_overrides) ? c.visual_element_overrides.map((x)=>({
+    selector: String(x.selector||""),
+    property: String(x.property||""),
+    value: String(x.value||""),
+    target: String(x.target||"both"),
+    enabled: x.enabled !== false
+  })) : [];
+  renderOverrides();
 }
 function readForm(){
   const cfg = {};
@@ -269,7 +302,50 @@ function readForm(){
   };
   cfg.visual_sections_order_desktop = listToCsv("order-desktop");
   cfg.visual_sections_order_mobile = listToCsv("order-mobile");
+  cfg.visual_element_overrides = OVERRIDES.map((x)=>({
+    selector: String(x.selector||"").trim(),
+    property: String(x.property||"").trim().toLowerCase(),
+    value: String(x.value||"").trim(),
+    target: ["both","desktop","mobile"].includes(String(x.target||"both")) ? String(x.target) : "both",
+    enabled: x.enabled !== false
+  })).filter((x)=>x.selector && x.property);
   return cfg;
+}
+function renderOverrides(){
+  const box = document.getElementById("ovr-list");
+  if(!box) return;
+  box.innerHTML = (OVERRIDES||[]).map((r, i)=>`
+    <div class="ovr-row">
+      <div class="ovr-grid">
+        <input type="text" value="${esc(r.selector||"")}" data-ovr="${i}" data-key="selector">
+        <input type="text" value="${esc(r.property||"")}" data-ovr="${i}" data-key="property">
+        <input type="text" value="${esc(r.value||"")}" data-ovr="${i}" data-key="value">
+        <select data-ovr="${i}" data-key="target">
+          <option value="both" ${String(r.target)==="both"?"selected":""}>Ambos</option>
+          <option value="desktop" ${String(r.target)==="desktop"?"selected":""}>Web</option>
+          <option value="mobile" ${String(r.target)==="mobile"?"selected":""}>Movil</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" data-ovr="${i}" data-key="enabled" ${r.enabled!==false?"checked":""}>On</label>
+        <button class="btn warn" type="button" data-ovr-del="${i}">X</button>
+      </div>
+    </div>
+  `).join("") || `<div class="mini">Sin reglas avanzadas.</div>`;
+  box.querySelectorAll("[data-ovr][data-key]").forEach((el)=>{
+    el.addEventListener("change", ()=>{
+      const i = Number(el.getAttribute("data-ovr")||-1);
+      const key = String(el.getAttribute("data-key")||"");
+      if(i < 0 || !OVERRIDES[i]) return;
+      OVERRIDES[i][key] = key === "enabled" ? Boolean(el.checked) : String(el.value||"");
+    });
+  });
+  box.querySelectorAll("[data-ovr-del]").forEach((btn)=>{
+    btn.addEventListener("click", ()=>{
+      const i = Number(btn.getAttribute("data-ovr-del")||-1);
+      if(i < 0) return;
+      OVERRIDES.splice(i,1);
+      renderOverrides();
+    });
+  });
 }
 function previewSrc(mode, agenda=false, mobile=false){
   const q = new URLSearchParams();
@@ -410,6 +486,21 @@ document.getElementById("btn-crear-programacion").addEventListener("click", asyn
   await loadProgramaciones();
 });
 document.getElementById("btn-recargar-programaciones").addEventListener("click", loadProgramaciones);
+document.getElementById("btn-ovr-add").addEventListener("click", ()=>{
+  const selector = String(document.getElementById("ovr-selector").value || "").trim();
+  const property = String(document.getElementById("ovr-property").value || "").trim().toLowerCase();
+  const value = String(document.getElementById("ovr-value").value || "").trim();
+  const target = String(document.getElementById("ovr-target").value || "both").trim().toLowerCase();
+  const enabled = document.getElementById("ovr-enabled").checked;
+  if(!selector || !property) return msg("Selector y propiedad son obligatorios.", true);
+  OVERRIDES.push({ selector, property, value, target, enabled });
+  document.getElementById("ovr-selector").value = "";
+  document.getElementById("ovr-property").value = "";
+  document.getElementById("ovr-value").value = "";
+  document.getElementById("ovr-target").value = "both";
+  document.getElementById("ovr-enabled").checked = true;
+  renderOverrides();
+});
 document.getElementById("btn-preview-draft").addEventListener("click", ()=>{
   previewMode="draft";
   previewAgenda = false;

@@ -3194,6 +3194,7 @@
             visual_sections_order_desktop: "ofertas,destacados,categorias,agenda",
             visual_sections_order_mobile: "agenda,ofertas,destacados,categorias",
             visual_sections_visibility: { ofertas: true, destacados: true, categorias: true, agenda: true },
+            visual_element_overrides: [],
             custom_css: "",
         };
         const TIENDA_UI_INITIAL = {{ (tienda_personalizacion or {}) | tojson }};
@@ -3220,6 +3221,30 @@
             ];
             allow.forEach(([a, b]) => { out = out.replaceAll(a, b); });
             return out.replaceAll("\n", "<br>");
+        }
+
+        function _buildVisualOverridesCss(rows) {
+            if (!Array.isArray(rows) || !rows.length) return "";
+            const safeProp = /^[a-z][a-z0-9\-]*$/;
+            const safeSel = /^[#.\[:*a-zA-Z0-9_\-\s>,+~="'()]+$/;
+            const lines = [];
+            rows.forEach((r) => {
+                const selector = String(r?.selector || "").trim();
+                const prop = String(r?.property || "").trim().toLowerCase();
+                const value = String(r?.value ?? "").trim();
+                const target = String(r?.target || "both").trim().toLowerCase();
+                const enabled = r?.enabled !== false;
+                if (!enabled || !selector || !prop) return;
+                if (!safeProp.test(prop) || !safeSel.test(selector)) return;
+                if (target === "mobile") {
+                    lines.push(`body.mobile-ui ${selector}{${prop}:${value} !important;}`);
+                } else if (target === "desktop") {
+                    lines.push(`body:not(.mobile-ui) ${selector}{${prop}:${value} !important;}`);
+                } else {
+                    lines.push(`${selector}{${prop}:${value} !important;}`);
+                }
+            });
+            return lines.join("\n");
         }
 
         function aplicarPersonalizacionTienda(rawCfg) {
@@ -3348,7 +3373,11 @@
             root.style.setProperty("--font-scale-mobile", `${Math.max(70, Math.min(130, Number(tiendaUiCfg.visual_font_scale_mobile || TIENDA_UI_DEFAULTS.visual_font_scale_mobile) || 100))}%`);
 
             _renderAgendaPastelResumen();
-            if (tiendaCustomCssEl) tiendaCustomCssEl.textContent = String(tiendaUiCfg.custom_css || "");
+            if (tiendaCustomCssEl) {
+                const advCss = _buildVisualOverridesCss(tiendaUiCfg.visual_element_overrides || []);
+                const customCss = String(tiendaUiCfg.custom_css || "");
+                tiendaCustomCssEl.textContent = `${advCss}\n${customCss}`.trim();
+            }
 
             if (!Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA") {
                 categoriaActiva = "TODOS";
