@@ -74,6 +74,50 @@
         <section class="panel">
             <h2>Editor visual (borrador)</h2>
             <div class="fields">
+                <label>Marca superior
+                    <input id="brand_text" type="text" maxlength="90">
+                </label>
+                <label>Placeholder busqueda
+                    <input id="search_placeholder" type="text" maxlength="120">
+                </label>
+                <label>Titulo menu
+                    <input id="menu_title" type="text" maxlength="80">
+                </label>
+                <label>Titulo carrito
+                    <input id="cart_title" type="text" maxlength="80">
+                </label>
+                <label>Titulo ofertas
+                    <input id="sec_ofertas_title" type="text" maxlength="80">
+                </label>
+                <label>Titulo destacados
+                    <input id="sec_destacados_title" type="text" maxlength="80">
+                </label>
+                <label class="full">Texto carrito vacio
+                    <input id="empty_cart_text" type="text" maxlength="140">
+                </label>
+                <label>Color fondo
+                    <input id="color_bg" type="text" placeholder="#f5f5f5">
+                </label>
+                <label>Color panel
+                    <input id="color_panel" type="text" placeholder="#ffffff">
+                </label>
+                <label>Color lineas
+                    <input id="color_line" type="text" placeholder="#e5e7eb">
+                </label>
+                <label>Color texto
+                    <input id="color_text" type="text" placeholder="#111827">
+                </label>
+                <label>Color texto secundario
+                    <input id="color_muted" type="text" placeholder="#6b7280">
+                </label>
+                <label>Color acento
+                    <input id="color_accent" type="text" placeholder="#f45d08">
+                </label>
+                <label>Color acento hover
+                    <input id="color_accent_dark" type="text" placeholder="#cc4a03">
+                </label>
+                <label><input id="show_whatsapp_button" type="checkbox"> Mostrar boton WhatsApp</label>
+                <label><input id="agenda_enabled" type="checkbox"> Mostrar Agendar pedido</label>
                 <label>Max width web
                     <input id="visual_layout_max_width" type="number" min="960" max="1920" step="10">
                 </label>
@@ -228,11 +272,16 @@
 
 <script>
 const MSG = document.getElementById("msg");
-const FIELDS = [
+const NUM_FIELDS = [
   "visual_layout_max_width","visual_grid_min_desktop","visual_grid_min_mobile","visual_card_radius","visual_card_shadow",
   "visual_spacing_scale","visual_font_scale_desktop","visual_font_scale_mobile","visual_mobile_ui_scale",
-  "visual_fab_bottom_offset_mobile","visual_whatsapp_bottom_offset_mobile","custom_css"
+  "visual_fab_bottom_offset_mobile","visual_whatsapp_bottom_offset_mobile"
 ];
+const TEXT_FIELDS = [
+  "custom_css","brand_text","search_placeholder","menu_title","cart_title","sec_ofertas_title","sec_destacados_title",
+  "empty_cart_text","color_bg","color_panel","color_line","color_text","color_muted","color_accent","color_accent_dark"
+];
+const BOOL_FIELDS = ["show_whatsapp_button","agenda_enabled"];
 let STATE = { live:{}, draft:{}, presets:[], versiones:[] };
 let previewMode = "draft";
 let previewDevice = "web";
@@ -274,7 +323,9 @@ function renderOrder(id, arr){
 }
 function fillForm(cfg){
   const c = cfg || {};
-  FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; el.value = c[k] ?? ""; });
+  NUM_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; el.value = c[k] ?? ""; });
+  TEXT_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; el.value = c[k] ?? ""; });
+  BOOL_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; el.checked = Boolean(c[k]); });
   const vis = c.visual_sections_visibility || {};
   document.getElementById("vis-ofertas").checked = Boolean(vis.ofertas ?? true);
   document.getElementById("vis-destacados").checked = Boolean(vis.destacados ?? true);
@@ -293,7 +344,9 @@ function fillForm(cfg){
 }
 function readForm(){
   const cfg = {};
-  FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; cfg[k] = (k==="custom_css") ? String(el.value||"") : Number(el.value||0); });
+  NUM_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; cfg[k] = Number(el.value||0); });
+  TEXT_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; cfg[k] = String(el.value||""); });
+  BOOL_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; cfg[k] = Boolean(el.checked); });
   cfg.visual_sections_visibility = {
     ofertas: document.getElementById("vis-ofertas").checked,
     destacados: document.getElementById("vis-destacados").checked,
