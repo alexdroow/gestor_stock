@@ -6198,6 +6198,12 @@
                 await cargarHistorialCliente();
                 setCuentaMsg("Sesion iniciada correctamente.");
                 msg("Sesion iniciada correctamente.");
+                cerrarModalCuenta();
+                try {
+                    window.location.reload();
+                } catch (_) {
+                    window.location.href = window.location.href;
+                }
             } catch (e) {
                 const errTxt = String(e?.message || "No se pudo iniciar sesion");
                 if (/no registrado|not found|404/i.test(errTxt)) {
