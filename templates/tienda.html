@@ -78,6 +78,16 @@
             font-weight: 800;
             cursor: pointer;
         }
+        .menu-logout-btn {
+            border-color: #fecaca;
+            background: #fff1f2;
+            color: #9f1239;
+        }
+        .topbar-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
         .brand {
             font-weight: 800;
             color: #1f2937;
@@ -2257,7 +2267,10 @@
         <div class="search">
             <input id="search-input" type="search" placeholder="Buscar productos...">
         </div>
-        <button type="button" class="menu-quick-btn" id="btn-cuenta">Mi cuenta</button>
+        <div class="topbar-actions">
+            <button type="button" class="menu-quick-btn" id="btn-cuenta">Mi cuenta</button>
+            <button type="button" class="menu-quick-btn menu-logout-btn" id="btn-cerrar-sesion" style="display:none;">Cerrar sesion</button>
+        </div>
     </header>
 
     <main class="layout">
@@ -2715,6 +2728,7 @@
         const cuentaMapMetaEl = document.getElementById("cuenta-map-meta");
         const cuentaGuardarDireccionEl = document.getElementById("cuenta-guardar-direccion");
         const btnCuentaEl = document.getElementById("btn-cuenta");
+        const btnCerrarSesionEl = document.getElementById("btn-cerrar-sesion");
         const leftNavEl = document.querySelector(".left-nav");
         const cartPanelEl = document.querySelector(".cart-panel");
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
@@ -3361,6 +3375,9 @@
             if (btnCuentaEl) {
                 btnCuentaEl.textContent = clienteRegistrado ? "Mi cuenta (activa)" : "Mi cuenta";
             }
+            if (btnCerrarSesionEl) {
+                btnCerrarSesionEl.style.display = clienteRegistrado ? "" : "none";
+            }
             if (cuentaEstadoEl) {
                 if (clienteRegistrado) {
                     cuentaEstadoEl.textContent = `Cuenta activa: ${clienteRegistrado.email} / ${clienteRegistrado.telefono}`;
@@ -3385,6 +3402,24 @@
             if (clienteRegistrado?.direccion_lat && clienteRegistrado?.direccion_lng) {
                 agendaDireccionPin = { lat: Number(clienteRegistrado.direccion_lat), lng: Number(clienteRegistrado.direccion_lng) };
             }
+        }
+
+        function cerrarSesionCliente() {
+            clienteRegistrado = null;
+            historialComprasCliente = [];
+            cuponesClienteDisponibles = [];
+            try { localStorage.removeItem("tienda_cliente_reg"); } catch (_) {}
+            if (cuentaHistorialEl) cuentaHistorialEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay compras registradas.</div>`;
+            if (cuentaHistorialAgendaEl) cuentaHistorialAgendaEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay reservas registradas.</div>`;
+            if (cuentaCuponesEl) cuentaCuponesEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>`;
+            if (cuentaNombreEl) cuentaNombreEl.value = "";
+            if (cuentaFechaNacimientoEl) cuentaFechaNacimientoEl.value = "";
+            if (cuentaEmailEl) cuentaEmailEl.value = "";
+            if (cuentaEmailConfirmEl) cuentaEmailConfirmEl.value = "";
+            if (cuentaTelefonoEl) cuentaTelefonoEl.value = "";
+            if (cuentaDireccionBuscarEl) cuentaDireccionBuscarEl.value = "";
+            renderEstadoCuenta();
+            msg("Sesion cerrada correctamente.");
         }
 
         function msg(text, isErr = false) {
@@ -6633,6 +6668,7 @@
         cuentaConfirmarPinEl?.addEventListener("click", _confirmarPinCuenta);
         cuentaGuardarDireccionEl?.addEventListener("click", guardarDireccionCuentaCliente);
         btnCuentaEl?.addEventListener("click", abrirModalCuenta);
+        btnCerrarSesionEl?.addEventListener("click", cerrarSesionCliente);
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
