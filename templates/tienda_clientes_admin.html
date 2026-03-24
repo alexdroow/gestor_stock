@@ -215,6 +215,42 @@ function msgClientModal(t, e=false){
     if(e) clientModalMsgEl.style.color = "#b91c1c";
     else clientModalMsgEl.style.color = "#166534";
 }
+function renderVentaDetalleHtml(v){
+    const items = Array.isArray(v?.items) ? v.items : [];
+    const itemsHtml = items.length
+        ? `<div class="muted">${items.map(it=>{
+            const qty = Number(it?.cantidad||0);
+            const nom = esc(it?.producto_nombre||"Producto");
+            const pu = Number(it?.precio_unitario||0);
+            const puTxt = pu > 0 ? ` · ${money(pu)} c/u` : "";
+            return `${qty}x ${nom}${puTxt}`;
+        }).join(" · ")}</div>`
+        : `<div class="muted">Sin detalle de items.</div>`;
+    const cod = String(v?.codigo_pedido || v?.codigo_operacion || "").trim();
+    return `
+        <div>
+            <strong>#${Number(v?.id||0)}</strong> · ${esc(v?.fecha_hora||"")} · ${money(v?.total_monto||0)} · ${esc(v?.pedido_estado||"recibido")}
+            ${cod ? `<div class="muted">Codigo: ${esc(cod)}</div>` : ""}
+            ${itemsHtml}
+        </div>
+    `;
+}
+function renderReservaDetalleHtml(r){
+    const rid = Number(r?.id||0);
+    const pdfUrl = String(r?.pdf_url||"").trim();
+    const detRaw = String(r?.ingredientes||"").trim();
+    const det = detRaw.length > 280 ? `${detRaw.slice(0,280)}...` : detRaw;
+    const contacto = [String(r?.cliente||"").trim(), String(r?.telefono||"").trim()].filter(Boolean).join(" · ");
+    return `
+        <div>
+            <strong>#${rid}</strong> · ${esc(r?.fecha||"")} ${esc(r?.hora_inicio||"")} · ${esc(r?.tipo||"")} · ${esc(r?.estado||"pendiente")}
+            ${contacto ? `<div class="muted">${esc(contacto)}</div>` : ""}
+            ${String(r?.direccion||"").trim() ? `<div class="muted">Direccion: ${esc(r.direccion)}</div>` : ""}
+            ${det ? `<div class="muted">Detalle: ${esc(det)}</div>` : ""}
+            ${pdfUrl ? `<div style="margin-top:4px;"><a href="${esc(pdfUrl)}" target="_blank" rel="noopener" style="font-size:.82rem;font-weight:700;color:#0f766e;">Ver PDF reserva</a></div>` : ""}
+        </div>
+    `;
+}
 async function loadCuponesAdmin(){
     const data = await requestJson("/api/tienda/admin/cupones");
     cuponesAdmin = Array.isArray(data.cupones)?data.cupones:[];
@@ -315,10 +351,10 @@ window.openClient = async function(id){
         const c = data.cliente||{};
         detailHeadEl.innerHTML = `<strong>${esc(c.nombre||"Cliente")}</strong> · ${esc(c.email||"")} · ${esc(c.telefono||"")} · Nivel: ${esc(c.nivel_nombre||"Sin nivel")} · Puntos: ${Number(c.puntos_total||0)}`;
         detailSalesEl.innerHTML = (Array.isArray(data.ventas)&&data.ventas.length)
-            ? data.ventas.map(v=>`<div><strong>#${Number(v.id||0)}</strong> · ${esc(v.fecha_hora||"")} · ${money(v.total_monto||0)} · ${esc(v.pedido_estado||"recibido")}</div>`).join("")
+            ? data.ventas.map(v=>renderVentaDetalleHtml(v)).join("")
             : `<div class="muted">Sin compras.</div>`;
         detailAgendaEl.innerHTML = (Array.isArray(data.reservas)&&data.reservas.length)
-            ? data.reservas.map(r=>`<div><strong>#${Number(r.id||0)}</strong> · ${esc(r.fecha||"")} ${esc(r.hora_inicio||"")} · ${esc(r.tipo||"")} · ${esc(r.estado||"pendiente")}</div>`).join("")
+            ? data.reservas.map(r=>renderReservaDetalleHtml(r)).join("")
             : `<div class="muted">Sin reservas.</div>`;
         detailPointsEl.innerHTML = (Array.isArray(data.movimientos)&&data.movimientos.length)
             ? data.movimientos.map(m=>`<div><strong>${Number(m.puntos||0)>0?"+":""}${Number(m.puntos||0)}</strong> · ${esc(m.tipo||"")} · ${esc(m.detalle||"")} · ${esc(m.creado_en||"")}</div>`).join("")
@@ -336,10 +372,10 @@ window.openClientModal = async function(id){
         const c = data.cliente||{};
         clientModalHeadEl.innerHTML = `<strong>${esc(c.nombre||"Cliente")}</strong> · ${esc(c.email||"")} · ${esc(c.telefono||"")} · Nivel: ${esc(c.nivel_nombre||"Sin nivel")} · Puntos: ${Number(c.puntos_total||0)}`;
         clientModalSalesEl.innerHTML = (Array.isArray(data.ventas)&&data.ventas.length)
-            ? data.ventas.map(v=>`<div><strong>#${Number(v.id||0)}</strong> · ${esc(v.fecha_hora||"")} · ${money(v.total_monto||0)} · ${esc(v.pedido_estado||"recibido")}</div>`).join("")
+            ? data.ventas.map(v=>renderVentaDetalleHtml(v)).join("")
             : `<div class="muted">Sin compras.</div>`;
         clientModalAgendaEl.innerHTML = (Array.isArray(data.reservas)&&data.reservas.length)
-            ? data.reservas.map(r=>`<div><strong>#${Number(r.id||0)}</strong> · ${esc(r.fecha||"")} ${esc(r.hora_inicio||"")} · ${esc(r.tipo||"")} · ${esc(r.estado||"pendiente")}</div>`).join("")
+            ? data.reservas.map(r=>renderReservaDetalleHtml(r)).join("")
             : `<div class="muted">Sin reservas.</div>`;
         const regalos = Array.isArray(data.cupones_regalados)?data.cupones_regalados:[];
         clientModalCouponsEl.innerHTML = regalos.length

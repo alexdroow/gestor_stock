@@ -3984,10 +3984,47 @@ def api_tienda_admin_cliente_detalle(cliente_id):
             """,
             (email, telefono),
         )
-        ventas = [dict(r) for r in cursor.fetchall()]
+        ventas = []
+        for vrow in cursor.fetchall():
+            venta = dict(vrow)
+            venta_id = int(venta.get("id") or 0)
+            cursor.execute(
+                """
+                SELECT vd.producto_id, COALESCE(p.nombre, '') AS producto_nombre, vd.cantidad, vd.precio_unitario
+                FROM venta_detalles vd
+                LEFT JOIN productos p ON p.id = vd.producto_id
+                WHERE vd.venta_id = ?
+                ORDER BY vd.id ASC
+                """,
+                (venta_id,),
+            )
+            items = [dict(r) for r in cursor.fetchall()]
+            if not items:
+                cursor.execute(
+                    """
+                    SELECT vi.producto_id, COALESCE(vi.producto_nombre, '') AS producto_nombre, vi.cantidad, 0 AS precio_unitario
+                    FROM venta_items vi
+                    WHERE vi.venta_id = ?
+                    ORDER BY vi.id ASC
+                    """,
+                    (venta_id,),
+                )
+                items = [dict(r) for r in cursor.fetchall()]
+            venta["items"] = [
+                {
+                    "producto_id": int(it.get("producto_id") or 0),
+                    "producto_nombre": str(it.get("producto_nombre") or "").strip(),
+                    "cantidad": max(0, int(it.get("cantidad") or 0)),
+                    "precio_unitario": float(it.get("precio_unitario") or 0),
+                }
+                for it in items
+                if int(it.get("cantidad") or 0) > 0 and (str(it.get("producto_nombre") or "").strip() or int(it.get("producto_id") or 0) > 0)
+            ]
+            ventas.append(venta)
         cursor.execute(
             """
-            SELECT id, fecha, hora_inicio, hora_fin, estado, tipo, titulo, direccion, es_envio, creado
+            SELECT id, fecha, hora_inicio, hora_fin, estado, tipo, titulo, direccion, es_envio, creado,
+                   ingredientes, cliente, telefono, codigo_operacion, cliente_email, cliente_telefono
             FROM agenda_eventos
             WHERE LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?))
               AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)
@@ -3996,7 +4033,12 @@ def api_tienda_admin_cliente_detalle(cliente_id):
             """,
             (email, telefono),
         )
-        reservas = [dict(r) for r in cursor.fetchall()]
+        reservas = []
+        for r in cursor.fetchall():
+            reserva = dict(r)
+            rid = int(reserva.get("id") or 0)
+            reserva["pdf_url"] = f"/api/tienda/admin/agenda/reserva/{rid}/pdf"
+            reservas.append(reserva)
         cursor.execute(
             """
             SELECT id, tipo, origen_tipo, origen_id, puntos, detalle, creado_en
@@ -4017,6 +4059,42 @@ def api_tienda_admin_cliente_detalle(cliente_id):
             "movimientos": movimientos,
             "cupones_regalados": cupones_regalados,
         })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/agenda/reserva/<int:reserva_id>/pdf', methods=['GET'])
+def api_tienda_admin_agenda_reserva_pdf(reserva_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        if int(reserva_id or 0) <= 0:
+            return jsonify({"success": False, "error": "ID de reserva invalido"}), 400
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, cliente, telefono, direccion, ingredientes, codigo_operacion
+            FROM agenda_eventos
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (int(reserva_id),),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Reserva no encontrada"}), 404
+        reserva = dict(row)
+        filename = _crear_pdf_reserva_agenda_tienda(reserva)
+        abs_path = os.path.join(static_dir, "tienda_pedidos_pdf", filename)
+        if not os.path.exists(abs_path):
+            return jsonify({"success": False, "error": "No se pudo generar el PDF"}), 500
+        download = str(request.args.get("download") or "").strip() in ("1", "true", "si")
+        return send_file(abs_path, as_attachment=download, download_name=filename, mimetype="application/pdf")
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
