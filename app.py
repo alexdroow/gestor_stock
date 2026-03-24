@@ -5673,7 +5673,7 @@ def api_tienda_agenda_reservar():
                 tipo, titulo, fecha, hora_inicio, hora_fin, hora_entrega,
                 cliente, telefono, cliente_email, cliente_telefono, es_envio, direccion, ingredientes,
                 total, abono, motivo, alerta_minutos, estado, codigo_operacion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1440, 'pendiente', ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1440, 'pendiente', ?)
             """,
             (
                 tipo_pedido,
