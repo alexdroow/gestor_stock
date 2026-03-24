@@ -500,22 +500,12 @@ function selectorForElement(el){
     .filter((x)=>x && !x.startsWith("leaflet-") && !/^active|open|show|hide|current|selected$/i.test(x))
     .slice(0, 2);
   const tag = String(el.tagName || "").toLowerCase();
-  const closestWithId = el.closest("[id]");
-  if(closestWithId && closestWithId.id){
-    if(stableClass.length){
-      return `#${closestWithId.id} ${tag}.${stableClass.join(".")}`;
-    }
-    if(el.parentElement){
-      const siblings = Array.from(el.parentElement.children).filter((n)=>n.tagName === el.tagName);
-      const idx = siblings.indexOf(el);
-      if(idx >= 0){
-        return `#${closestWithId.id} ${tag}:nth-of-type(${idx + 1})`;
-      }
-    }
-    return `#${closestWithId.id} ${tag}`;
-  }
   if(stableClass.length){
     return `${tag}.${stableClass.join(".")}`;
+  }
+  const closestWithId = el.closest("[id]");
+  if(closestWithId && closestWithId.id){
+    return `#${closestWithId.id} ${tag}`;
   }
   function safeClass(node){
     const cl = Array.from(node.classList || []).filter((x)=>x && !x.startsWith("leaflet-") && x.length < 42).slice(0, 2);
@@ -533,7 +523,7 @@ function selectorForElement(el){
   for(let i=0; i<5 && node && node.tagName && node.tagName.toLowerCase() !== "html"; i++){
     const nodeTag = node.tagName.toLowerCase();
     if(node.id){ parts.unshift(`#${node.id}`); break; }
-    parts.unshift(`${nodeTag}${safeClass(node)}${nth(node)}`);
+    parts.unshift(`${nodeTag}${safeClass(node)}`);
     node = node.parentElement;
   }
   return parts.join(" > ");
@@ -585,11 +575,11 @@ function extractPx(value){
 }
 
 function openEditorBySelector(selector){
-  const target = previewDevice === "mobile" ? "mobile" : "desktop";
+  const target = "both";
   openEditor({ selector, displayPath: selector, sourceText: findText(selector, target) || "" });
 }
 function openEditor(data){
-  const target = previewDevice === "mobile" ? "mobile" : "desktop";
+  const target = "both";
   const selector = String(data.selector || "").trim();
   document.getElementById("edit-selector").value = selector;
   document.getElementById("edit-target").value = target;
