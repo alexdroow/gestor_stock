@@ -274,6 +274,7 @@ let previewAgenda = false;
 let inspectorOn = false;
 let STYLE_OVERRIDES = [];
 let TEXT_OVERRIDES = [];
+let previewNonce = Date.now();
 
 function esc(t){
   return String(t || "").replace(/[&<>\"']/g, (m)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
@@ -456,6 +457,7 @@ function previewSrc(mode, agenda, mobile){
   q.set("mode", mode);
   if(agenda) q.set("agenda", "1");
   if(mobile) q.set("mobile", "1");
+  q.set("_v", String(previewNonce));
   return `/tienda/preview?${q.toString()}`;
 }
 function updatePreviewHeader(){
@@ -470,6 +472,7 @@ function updatePreviewHeader(){
 }
 function refreshPreview(){
   updatePreviewHeader();
+  previewNonce = Date.now();
   frameStage.src = previewSrc(previewMode, previewAgenda, previewDevice === "mobile");
 }
 
