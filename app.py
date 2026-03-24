@@ -2375,6 +2375,7 @@ def _default_tienda_personalizacion():
             "agenda": True,
         },
         "visual_element_overrides": [],
+        "visual_text_overrides": [],
         "catalogo_torta": catalogo_torta_base,
         "custom_css": "",
     }
@@ -2669,6 +2670,29 @@ def _normalizar_tienda_personalizacion(payload):
                 "enabled": enabled,
             })
     clean["visual_element_overrides"] = overrides
+    raw_text_overrides = data.get("visual_text_overrides")
+    text_overrides = []
+    if isinstance(raw_text_overrides, list):
+        for row in raw_text_overrides[:220]:
+            if not isinstance(row, dict):
+                continue
+            selector = str(row.get("selector") or "").strip()[:180]
+            text = str(row.get("text") or "").strip()[:350]
+            target = str(row.get("target") or "both").strip().lower()
+            enabled = bool(row.get("enabled", True))
+            if not selector:
+                continue
+            if target not in {"desktop", "mobile", "both"}:
+                target = "both"
+            if not re.match(r"^[#.\[:*a-zA-Z0-9_\-\s>,+~=\"'()]+$", selector):
+                continue
+            text_overrides.append({
+                "selector": selector,
+                "text": text,
+                "target": target,
+                "enabled": enabled,
+            })
+    clean["visual_text_overrides"] = text_overrides
 
     clean["catalogo_torta"] = _normalizar_catalogo_torta_cfg(data.get("catalogo_torta") or base.get("catalogo_torta"))
 

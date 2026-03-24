@@ -5,61 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visualizador tienda</title>
     <style>
-        :root { --bg:#f8fafc; --panel:#fff; --line:#e2e8f0; --txt:#0f172a; --muted:#64748b; --accent:#ea580c; }
+        :root { --bg:#f8fafc; --panel:#fff; --line:#dbe5f0; --txt:#0f172a; --muted:#64748b; --accent:#ea580c; --ok:#16a34a; --warn:#dc2626; --shadow:0 10px 28px rgba(15,23,42,.08); }
         * { box-sizing:border-box; }
-        body { margin:0; font-family:"Segoe UI",Tahoma,sans-serif; background:var(--bg); color:var(--txt); }
-        .wrap { width:min(1600px,100%); margin:0 auto; padding:18px; display:grid; gap:12px; }
-        .top { border:1px solid var(--line); background:var(--panel); border-radius:12px; padding:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+        body { margin:0; font-family:"Segoe UI",Tahoma,sans-serif; color:var(--txt); background:radial-gradient(circle at top right,#fff7ed 0%,var(--bg) 32%); }
+        .wrap { width:min(1800px,100%); margin:0 auto; padding:14px; display:grid; gap:10px; }
+        .top { border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:12px; display:flex; justify-content:space-between; gap:8px; align-items:center; flex-wrap:wrap; box-shadow:var(--shadow); }
         .top h1 { margin:0; font-size:1.1rem; }
         .links { display:flex; gap:8px; flex-wrap:wrap; }
-        .links a { text-decoration:none; color:#334155; border:1px solid var(--line); border-radius:8px; padding:7px 10px; background:#fff; font-weight:700; }
-        .grid { display:grid; grid-template-columns:520px 1fr; gap:12px; align-items:start; }
-        .panel { border:1px solid var(--line); background:var(--panel); border-radius:12px; padding:12px; display:grid; gap:10px; }
-        .panel h2 { margin:0; font-size:1rem; }
+        .links a { text-decoration:none; color:#1f2937; border:1px solid #cbd5e1; border-radius:9px; padding:8px 11px; background:#fff; font-weight:800; }
+        .layout { display:grid; grid-template-columns:410px 1fr; gap:10px; align-items:start; }
+        .panel { border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:12px; display:grid; gap:10px; box-shadow:var(--shadow); }
+        .panel h2,.panel h3 { margin:0; }
+        .hint { color:var(--muted); font-size:.85rem; }
+        .btn { border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:#334155; padding:9px 12px; font-weight:800; cursor:pointer; }
+        .btn:hover { filter:brightness(.98); }
+        .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+        .btn.ok { background:var(--ok); border-color:var(--ok); color:#fff; }
+        .btn.warn { background:var(--warn); border-color:var(--warn); color:#fff; }
+        .btn.small { padding:6px 9px; border-radius:8px; font-size:.78rem; }
+        .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
         .fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
         .full { grid-column:1 / -1; }
-        label { display:grid; gap:4px; font-size:.82rem; color:#334155; font-weight:700; }
-        input[type="text"], input[type="number"], input[type="date"], input[type="time"], select, textarea {
-            width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 9px; font:inherit;
-        }
+        label { display:grid; gap:4px; font-weight:700; font-size:.83rem; color:#334155; }
+        input[type="text"],input[type="number"],input[type="date"],input[type="time"],select,textarea { width:100%; border:1px solid #cbd5e1; border-radius:9px; padding:8px 10px; font:inherit; color:var(--txt); background:#fff; }
         textarea { min-height:90px; resize:vertical; }
-        .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-        .btn { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:8px 10px; font-weight:800; cursor:pointer; }
-        .btn.primary { border-color:var(--accent); background:var(--accent); color:#fff; }
-        .btn.ok { border-color:#16a34a; background:#16a34a; color:#fff; }
-        .btn.warn { border-color:#dc2626; background:#dc2626; color:#fff; }
-        .msg { min-height:18px; font-size:.86rem; color:#475569; }
+        .check { display:flex; align-items:center; gap:6px; font-weight:700; font-size:.83rem; color:#334155; }
+        .check input { width:16px; height:16px; }
+        .block { border:1px solid #e2e8f0; border-radius:11px; background:#fff; padding:10px; display:grid; gap:9px; }
+        .slider-wrap { display:grid; gap:4px; }
+        .slider-wrap input[type="range"] { width:100%; accent-color:#ea580c; }
+        .mini-title { font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:#64748b; font-weight:900; }
+        .msg { min-height:18px; font-size:.86rem; color:#475569; font-weight:700; }
         .msg.ok { color:#166534; }
         .msg.err { color:#b91c1c; }
-        .card { border:1px solid #e2e8f0; border-radius:10px; padding:9px; background:#fff; display:grid; gap:8px; }
-        .dnd-list { list-style:none; margin:0; padding:0; display:grid; gap:6px; }
-        .dnd-item { border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; background:#f8fafc; font-weight:700; cursor:grab; user-select:none; }
-        .dnd-item.drag { opacity:.5; }
-        .preview-grid { display:grid; grid-template-columns:1fr 420px; gap:10px; }
-        .frame-box { border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
-        .frame-head { padding:8px 10px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.82rem; }
-        iframe { width:100%; border:0; background:#fff; }
-        #frame-web { height:78vh; }
-        #frame-mobile { height:78vh; width:390px; max-width:100%; margin:0 auto; display:block; }
-        .device-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
-        .device-tabs .btn.active { border-color:#0ea5e9; background:#e0f2fe; color:#0c4a6e; }
-        #frame-stage { height:78vh; display:block; }
-        .frame-box.mobile-view #frame-stage { width:390px; max-width:100%; margin:0 auto; display:block; }
-        .mini { font-size:.78rem; color:var(--muted); }
-        .split2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-        .versions { max-height:220px; overflow:auto; display:grid; gap:6px; }
-        .version-item { border:1px solid #e2e8f0; border-radius:8px; padding:7px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
-        .ovr-grid { display:grid; grid-template-columns:2fr 1.2fr 1.4fr .9fr .9fr auto; gap:6px; align-items:center; }
-        .ovr-head { font-size:.75rem; color:#64748b; font-weight:800; }
-        .ovr-list { max-height:240px; overflow:auto; display:grid; gap:6px; }
-        .ovr-row { border:1px solid #e2e8f0; border-radius:8px; padding:6px; background:#fff; }
-        @media (max-width: 1320px) { .grid { grid-template-columns:1fr; } .preview-grid { grid-template-columns:1fr; } }
+        .preview-panel { border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:12px; display:grid; gap:9px; box-shadow:var(--shadow); min-height:calc(100vh - 50px); }
+        .preview-head { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+        .device-tabs .btn.active,.mode-tabs .btn.active { border-color:#0ea5e9; background:#e0f2fe; color:#0c4a6e; }
+        .frame-box { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; position:relative; }
+        .frame-head { border-bottom:1px solid var(--line); padding:8px 10px; display:flex; justify-content:space-between; align-items:center; font-size:.82rem; color:#334155; background:#f8fafc; }
+        #frame-stage { width:100%; height:80vh; border:0; display:block; background:#fff; }
+        .frame-box.mobile-view #frame-stage { width:390px; max-width:100%; margin:0 auto; }
+        .list { max-height:220px; overflow:auto; display:grid; gap:7px; }
+        .list-item { border:1px solid #e2e8f0; border-radius:10px; padding:7px; display:grid; gap:6px; background:#fff; }
+        .list-item .head { display:flex; justify-content:space-between; gap:8px; align-items:center; font-size:.8rem; }
+        .edit-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; padding:12px; z-index:8000; }
+        .edit-overlay.active { display:flex; }
+        .edit-modal { width:min(960px,98vw); max-height:94vh; overflow:auto; border:1px solid #cbd5e1; border-radius:14px; background:#fff; padding:12px; display:grid; gap:10px; }
+        .edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .color-field { display:grid; grid-template-columns:1fr 46px; gap:6px; align-items:center; }
+        .color-field input[type="color"] { width:46px; height:38px; border:1px solid #cbd5e1; border-radius:8px; padding:0; background:#fff; }
+        .pill { border:1px solid #cbd5e1; border-radius:999px; padding:6px 10px; font-size:.78rem; font-weight:800; background:#f8fafc; color:#334155; display:inline-flex; align-items:center; gap:6px; }
+        details.adv { border:1px dashed #cbd5e1; border-radius:10px; padding:8px; background:#f8fafc; }
+        details.adv summary { cursor:pointer; font-weight:800; color:#1e293b; }
+        @media (max-width:1300px) { .layout { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
 <main class="wrap">
     <section class="top">
-        <h1>Visualizador tienda (staging + publish)</h1>
+        <h1>Visualizador tienda (edicion directa sobre preview)</h1>
         <div class="links">
             <a href="/ventas/admin-personalizacion">Personalizacion</a>
             <a href="/ventas/admin-catalogo">Catalogo tienda</a>
@@ -70,9 +74,11 @@
         </div>
     </section>
 
-    <section class="grid">
+    <section class="layout">
         <section class="panel">
-            <h2>Editor visual (borrador)</h2>
+            <h2>Editor simple (borrador)</h2>
+            <div class="hint">Doble click en cualquier elemento de la preview para editar texto, color, tamano y estilo. Este panel es solo para ajustes globales rapidos.</div>
+
             <div class="fields">
                 <label>Marca superior
                     <input id="brand_text" type="text" maxlength="90">
@@ -80,35 +86,14 @@
                 <label>Placeholder busqueda
                     <input id="search_placeholder" type="text" maxlength="120">
                 </label>
-                <label>Titulo menu
-                    <input id="menu_title" type="text" maxlength="80">
-                </label>
-                <label>Titulo carrito
-                    <input id="cart_title" type="text" maxlength="80">
-                </label>
-                <label>Titulo ofertas
-                    <input id="sec_ofertas_title" type="text" maxlength="80">
-                </label>
-                <label>Titulo destacados
-                    <input id="sec_destacados_title" type="text" maxlength="80">
-                </label>
-                <label class="full">Texto carrito vacio
-                    <input id="empty_cart_text" type="text" maxlength="140">
-                </label>
                 <label>Color fondo
                     <input id="color_bg" type="text" placeholder="#f5f5f5">
                 </label>
                 <label>Color panel
                     <input id="color_panel" type="text" placeholder="#ffffff">
                 </label>
-                <label>Color lineas
-                    <input id="color_line" type="text" placeholder="#e5e7eb">
-                </label>
                 <label>Color texto
                     <input id="color_text" type="text" placeholder="#111827">
-                </label>
-                <label>Color texto secundario
-                    <input id="color_muted" type="text" placeholder="#6b7280">
                 </label>
                 <label>Color acento
                     <input id="color_accent" type="text" placeholder="#f45d08">
@@ -116,467 +101,604 @@
                 <label>Color acento hover
                     <input id="color_accent_dark" type="text" placeholder="#cc4a03">
                 </label>
-                <label><input id="show_whatsapp_button" type="checkbox"> Mostrar boton WhatsApp</label>
-                <label><input id="agenda_enabled" type="checkbox"> Mostrar Agendar pedido</label>
-                <label>Max width web
-                    <input id="visual_layout_max_width" type="number" min="960" max="1920" step="10">
+                <label>Color texto secundario
+                    <input id="color_muted" type="text" placeholder="#6b7280">
                 </label>
-                <label>Cards min web
-                    <input id="visual_grid_min_desktop" type="number" min="160" max="380">
-                </label>
-                <label>Cards min movil
-                    <input id="visual_grid_min_mobile" type="number" min="130" max="280">
-                </label>
-                <label>Radio tarjetas
-                    <input id="visual_card_radius" type="number" min="6" max="28">
-                </label>
-                <label>Sombra tarjetas
-                    <input id="visual_card_shadow" type="number" min="0" max="36">
-                </label>
-                <label>Spacing global %
-                    <input id="visual_spacing_scale" type="number" min="80" max="140">
-                </label>
-                <label>Tipografia web %
-                    <input id="visual_font_scale_desktop" type="number" min="80" max="140">
-                </label>
-                <label>Tipografia movil %
-                    <input id="visual_font_scale_mobile" type="number" min="70" max="130">
-                </label>
-                <label>UI movil %
-                    <input id="visual_mobile_ui_scale" type="number" min="50" max="140">
-                </label>
-                <label>Offset FAB movil
-                    <input id="visual_fab_bottom_offset_mobile" type="number" min="-120" max="200">
-                </label>
-                <label>Offset WhatsApp movil
-                    <input id="visual_whatsapp_bottom_offset_mobile" type="number" min="-120" max="220">
-                </label>
-                <label>Preset
-                    <select id="preset-select"></select>
-                </label>
-                <label class="full">Visibilidad de secciones</label>
-                <label><input id="vis-ofertas" type="checkbox"> Ofertas</label>
-                <label><input id="vis-destacados" type="checkbox"> Destacados</label>
-                <label><input id="vis-categorias" type="checkbox"> Categorias</label>
-                <label><input id="vis-agenda" type="checkbox"> Agenda</label>
-                <label class="full">CSS adicional
-                    <textarea id="custom_css" placeholder="/* CSS extra opcional */"></textarea>
-                </label>
-            </div>
-            <div class="card">
-                <strong>Editor avanzado por selector (control total)</strong>
-                <div class="mini">Ejemplo: selector `.checkout-btn` propiedad `border-radius` valor `18px` target `mobile`.</div>
-                <div class="ovr-grid ovr-head">
-                    <div>Selector</div><div>Propiedad</div><div>Valor</div><div>Target</div><div>Activo</div><div></div>
-                </div>
-                <div class="ovr-grid">
-                    <input id="ovr-selector" type="text" placeholder=".checkout-btn">
-                    <input id="ovr-property" type="text" placeholder="font-size">
-                    <input id="ovr-value" type="text" placeholder="1.1rem">
-                    <select id="ovr-target">
-                        <option value="both">Ambos</option>
-                        <option value="desktop">Web</option>
-                        <option value="mobile">Movil</option>
-                    </select>
-                    <label style="display:flex;align-items:center;gap:6px;"><input id="ovr-enabled" type="checkbox" checked>On</label>
-                    <button class="btn" id="btn-ovr-add" type="button">Agregar</button>
-                </div>
-                <div class="ovr-list" id="ovr-list"></div>
+                <label class="check"><input id="show_whatsapp_button" type="checkbox"> Mostrar boton WhatsApp</label>
+                <label class="check"><input id="agenda_enabled" type="checkbox"> Mostrar Agendar pedido</label>
             </div>
 
-            <div class="card">
-                <strong>Orden de secciones (drag and drop)</strong>
-                <div class="mini">Web</div>
-                <ul class="dnd-list" id="order-desktop"></ul>
-                <div class="mini">Movil</div>
-                <ul class="dnd-list" id="order-mobile"></ul>
+            <div class="block">
+                <div class="mini-title">Escalas globales</div>
+                <div class="slider-wrap">
+                    <label>Tipografia web: <strong id="val-font-desktop">100%</strong></label>
+                    <input id="visual_font_scale_desktop" type="range" min="80" max="140" step="1">
+                </div>
+                <div class="slider-wrap">
+                    <label>Tipografia movil: <strong id="val-font-mobile">100%</strong></label>
+                    <input id="visual_font_scale_mobile" type="range" min="70" max="130" step="1">
+                </div>
+                <div class="slider-wrap">
+                    <label>UI movil general: <strong id="val-ui-mobile">100%</strong></label>
+                    <input id="visual_mobile_ui_scale" type="range" min="50" max="140" step="1">
+                </div>
+                <div class="slider-wrap">
+                    <label>Radio tarjetas: <strong id="val-card-radius">12px</strong></label>
+                    <input id="visual_card_radius" type="range" min="6" max="28" step="1">
+                </div>
+            </div>
+            <div class="block">
+                <div class="mini-title">Elementos editados sobre preview</div>
+                <div class="list" id="edited-list"></div>
             </div>
 
             <div class="row">
-                <button class="btn" id="btn-cargar-live">Cargar live -> draft</button>
-                <button class="btn" id="btn-cargar-draft">Recargar draft</button>
-                <button class="btn" id="btn-guardar-draft">Guardar borrador</button>
-                <button class="btn primary" id="btn-publicar">Publicar borrador</button>
+                <button class="btn" id="btn-cargar-live" type="button">Cargar live en editor</button>
+                <button class="btn" id="btn-cargar-draft" type="button">Recargar draft</button>
+                <button class="btn" id="btn-guardar-draft" type="button">Guardar borrador</button>
+                <button class="btn primary" id="btn-publicar" type="button">Publicar borrador</button>
             </div>
-            <div class="row">
-                <button class="btn" id="btn-preset-draft">Aplicar preset a draft</button>
-                <button class="btn" id="btn-preset-live">Aplicar preset a live</button>
-                <button class="btn" id="btn-duplicar-preset">Duplicar preset desde draft</button>
-            </div>
+
+            <details class="adv">
+                <summary>Opciones avanzadas (solo si las necesitas)</summary>
+                <div class="fields" style="margin-top:8px;">
+                    <label class="full">CSS adicional
+                        <textarea id="custom_css" placeholder="/* CSS extra opcional */"></textarea>
+                    </label>
+                    <label>Orden secciones web (CSV)
+                        <input id="visual_sections_order_desktop" type="text" placeholder="ofertas,destacados,categorias,agenda">
+                    </label>
+                    <label>Orden secciones movil (CSV)
+                        <input id="visual_sections_order_mobile" type="text" placeholder="agenda,ofertas,destacados,categorias">
+                    </label>
+                    <label class="check"><input id="vis-ofertas" type="checkbox"> Mostrar ofertas</label>
+                    <label class="check"><input id="vis-destacados" type="checkbox"> Mostrar destacados</label>
+                    <label class="check"><input id="vis-categorias" type="checkbox"> Mostrar categorias</label>
+                    <label class="check"><input id="vis-agenda" type="checkbox"> Mostrar agenda</label>
+                </div>
+            </details>
+
             <div class="msg" id="msg"></div>
-
-            <div class="card">
-                <strong>Programacion por fechas</strong>
-                <div class="fields">
-                    <label>Nombre
-                        <input id="prog-nombre" type="text" maxlength="90" placeholder="Navidad 2026">
-                    </label>
-                    <label>Preset
-                        <select id="prog-preset"></select>
-                    </label>
-                    <label>Inicio
-                        <input id="prog-inicio" type="date">
-                    </label>
-                    <label>Fin
-                        <input id="prog-fin" type="date">
-                    </label>
-                    <label>Hora inicio
-                        <input id="prog-hora-ini" type="time">
-                    </label>
-                    <label>Hora fin
-                        <input id="prog-hora-fin" type="time">
-                    </label>
-                    <label>Dias semana (1-7 CSV)
-                        <input id="prog-dias" type="text" placeholder="1,2,3,4,5">
-                    </label>
-                    <label>Prioridad
-                        <input id="prog-prio" type="number" min="0" max="99" value="0">
-                    </label>
-                </div>
-                <div class="row">
-                    <button class="btn" id="btn-crear-programacion">Crear programacion</button>
-                    <button class="btn" id="btn-recargar-programaciones">Recargar</button>
-                </div>
-                <div class="versions" id="programaciones-list"></div>
-            </div>
-
-            <div class="card">
-                <strong>Versiones y rollback</strong>
-                <div class="versions" id="versiones-list"></div>
-            </div>
         </section>
 
-        <section class="panel">
-            <h2>Vista previa privada (staging)</h2>
-            <div class="row">
-                <button class="btn" id="btn-preview-draft">Preview draft</button>
-                <button class="btn" id="btn-preview-live">Preview live</button>
-                <button class="btn" id="btn-preview-agenda">Preview agenda</button>
-            </div>
-            <div class="device-tabs">
-                <button class="btn active" id="btn-tab-web" type="button">Web</button>
-                <button class="btn" id="btn-tab-mobile" type="button">Movil</button>
-            </div>
-            <div class="preview-grid" style="grid-template-columns:1fr;">
-                <div class="frame-box" id="frame-box-stage">
-                    <div class="frame-head">
-                        <strong id="preview-device-label">Web</strong>
-                        <span class="mini" id="preview-mode-label">draft</span>
-                    </div>
-                    <iframe id="frame-stage" src="/tienda/preview?mode=draft"></iframe>
+        <section class="preview-panel">
+            <div class="preview-head">
+                <div class="row mode-tabs">
+                    <button class="btn active" id="btn-preview-draft" type="button">Preview draft</button>
+                    <button class="btn" id="btn-preview-live" type="button">Preview live</button>
+                    <button class="btn" id="btn-preview-agenda" type="button">Preview agenda</button>
                 </div>
+                <div class="row device-tabs">
+                    <button class="btn active" id="btn-tab-web" type="button">Web</button>
+                    <button class="btn" id="btn-tab-mobile" type="button">Movil</button>
+                    <button class="btn ok" id="btn-inspector-toggle" type="button">Activar edicion sobre preview</button>
+                </div>
+            </div>
+            <div class="hint" id="inspector-state">Inspector: OFF. Activalo y haz doble click sobre botones, titulos o textos en la preview.</div>
+
+            <div class="frame-box" id="frame-box-stage">
+                <div class="frame-head">
+                    <strong id="preview-device-label">Web</strong>
+                    <span id="preview-mode-label" class="pill">draft</span>
+                </div>
+                <iframe id="frame-stage" src="/tienda/preview?mode=draft"></iframe>
             </div>
         </section>
     </section>
 </main>
 
+<div class="edit-overlay" id="edit-overlay">
+    <div class="edit-modal">
+        <div class="row" style="justify-content:space-between; align-items:flex-start;">
+            <div>
+                <h3 style="margin:0;">Editor visual del elemento</h3>
+                <div class="hint" id="edit-path"></div>
+            </div>
+            <span class="pill" id="edit-device">target: both</span>
+        </div>
+
+        <div class="edit-grid">
+            <label class="full">Selector
+                <input id="edit-selector" type="text">
+            </label>
+            <label>Aplicar en
+                <select id="edit-target">
+                    <option value="both">Web + Movil</option>
+                    <option value="desktop">Solo Web</option>
+                    <option value="mobile">Solo Movil</option>
+                </select>
+            </label>
+            <label>Reemplazar texto (opcional)
+                <input id="edit-text" type="text" maxlength="350" placeholder="Nuevo texto para este elemento">
+            </label>
+            <label>Tamano de texto (px)
+                <input id="edit-font-size" type="number" min="8" max="72" step="1" placeholder="16">
+            </label>
+            <label>Color texto
+                <div class="color-field">
+                    <input id="edit-color" type="text" placeholder="#111827">
+                    <input id="edit-color-pick" type="color" value="#111827">
+                </div>
+            </label>
+            <label>Color fondo
+                <div class="color-field">
+                    <input id="edit-bg" type="text" placeholder="#ffffff">
+                    <input id="edit-bg-pick" type="color" value="#ffffff">
+                </div>
+            </label>
+            <label>Borde color
+                <div class="color-field">
+                    <input id="edit-border-color" type="text" placeholder="#cbd5e1">
+                    <input id="edit-border-color-pick" type="color" value="#cbd5e1">
+                </div>
+            </label>
+            <label>Grosor borde (px)
+                <input id="edit-border-width" type="number" min="0" max="12" step="1" placeholder="1">
+            </label>
+            <label>Radius (px)
+                <input id="edit-radius" type="number" min="0" max="80" step="1" placeholder="12">
+            </label>
+            <label>Padding (ej: 8px 12px)
+                <input id="edit-padding" type="text" placeholder="8px 12px">
+            </label>
+            <label>Ancho (ej: auto, 100%, 280px)
+                <input id="edit-width" type="text" placeholder="auto">
+            </label>
+            <label>Alto (ej: auto, 46px)
+                <input id="edit-height" type="text" placeholder="auto">
+            </label>
+            <label class="full">Sombra (ej: 0 8px 20px rgba(0,0,0,.2))
+                <input id="edit-shadow" type="text" placeholder="">
+            </label>
+        </div>
+
+        <div class="row">
+            <button class="btn warn" id="edit-remove" type="button">Eliminar personalizacion de este selector</button>
+            <div style="flex:1;"></div>
+            <button class="btn" id="edit-cancel" type="button">Cancelar</button>
+            <button class="btn ok" id="edit-save" type="button">Guardar y actualizar preview</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const MSG = document.getElementById("msg");
-const NUM_FIELDS = [
-  "visual_layout_max_width","visual_grid_min_desktop","visual_grid_min_mobile","visual_card_radius","visual_card_shadow",
-  "visual_spacing_scale","visual_font_scale_desktop","visual_font_scale_mobile","visual_mobile_ui_scale",
-  "visual_fab_bottom_offset_mobile","visual_whatsapp_bottom_offset_mobile"
-];
-const TEXT_FIELDS = [
-  "custom_css","brand_text","search_placeholder","menu_title","cart_title","sec_ofertas_title","sec_destacados_title",
-  "empty_cart_text","color_bg","color_panel","color_line","color_text","color_muted","color_accent","color_accent_dark"
-];
-const BOOL_FIELDS = ["show_whatsapp_button","agenda_enabled"];
+const frameStage = document.getElementById("frame-stage");
+const frameBox = document.getElementById("frame-box-stage");
+
 let STATE = { live:{}, draft:{}, presets:[], versiones:[] };
+let DRAFT_CFG = {};
 let previewMode = "draft";
 let previewDevice = "web";
 let previewAgenda = false;
-let OVERRIDES = [];
+let inspectorOn = false;
+let STYLE_OVERRIDES = [];
+let TEXT_OVERRIDES = [];
 
-function msg(t, err=false){ MSG.textContent = t||""; MSG.className = `msg ${t?(err?"err":"ok"):""}`; }
-function esc(t){ return String(t||"").replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-function post(url, payload){
-  return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload||{})}).then(r=>r.json().then(j=>({ok:r.ok,j})));
+function esc(t){
+  return String(t || "").replace(/[&<>\"']/g, (m)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
 }
-function parseOrder(csv){
-  const base = ["ofertas","destacados","categorias","agenda"];
-  const got = String(csv||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
-  const uniq = [];
-  got.forEach(k=>{ if(base.includes(k) && !uniq.includes(k)) uniq.push(k); });
-  base.forEach(k=>{ if(!uniq.includes(k)) uniq.push(k); });
-  return uniq;
+function msg(text, isErr){
+  MSG.textContent = text || "";
+  MSG.className = `msg ${text ? (isErr ? "err" : "ok") : ""}`;
 }
-function listToCsv(id){
-  return Array.from(document.querySelectorAll(`#${id} .dnd-item`)).map(x=>x.dataset.key).join(",");
+async function post(url, payload){
+  const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload || {}) });
+  const j = await r.json().catch(()=>({}));
+  return { ok: r.ok, j };
 }
-function renderOrder(id, arr){
-  const ul = document.getElementById(id);
-  ul.innerHTML = arr.map(k => `<li class="dnd-item" draggable="true" data-key="${esc(k)}">${esc(k)}</li>`).join("");
-  let drag = null;
-  ul.querySelectorAll(".dnd-item").forEach((li)=>{
-    li.addEventListener("dragstart",()=>{ drag = li; li.classList.add("drag"); });
-    li.addEventListener("dragend",()=>{ li.classList.remove("drag"); drag = null; });
-    li.addEventListener("dragover",(e)=>e.preventDefault());
-    li.addEventListener("drop",(e)=>{
-      e.preventDefault();
-      if(!drag || drag===li) return;
-      const nodes = Array.from(ul.children);
-      const di = nodes.indexOf(drag), ti = nodes.indexOf(li);
-      if(di < ti) ul.insertBefore(drag, li.nextSibling); else ul.insertBefore(drag, li);
-    });
-  });
+function clone(x){ return JSON.parse(JSON.stringify(x || {})); }
+
+function sliderLabel(id, labelId, suffix){
+  const el = document.getElementById(id);
+  const out = document.getElementById(labelId);
+  if(!el || !out) return;
+  out.textContent = `${el.value}${suffix || ""}`;
 }
-function fillForm(cfg){
-  const c = cfg || {};
-  NUM_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; el.value = c[k] ?? ""; });
-  TEXT_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; el.value = c[k] ?? ""; });
-  BOOL_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; el.checked = Boolean(c[k]); });
-  const vis = c.visual_sections_visibility || {};
-  document.getElementById("vis-ofertas").checked = Boolean(vis.ofertas ?? true);
-  document.getElementById("vis-destacados").checked = Boolean(vis.destacados ?? true);
-  document.getElementById("vis-categorias").checked = Boolean(vis.categorias ?? true);
-  document.getElementById("vis-agenda").checked = Boolean(vis.agenda ?? true);
-  renderOrder("order-desktop", parseOrder(c.visual_sections_order_desktop));
-  renderOrder("order-mobile", parseOrder(c.visual_sections_order_mobile));
-  OVERRIDES = Array.isArray(c.visual_element_overrides) ? c.visual_element_overrides.map((x)=>({
-    selector: String(x.selector||""),
-    property: String(x.property||""),
-    value: String(x.value||""),
-    target: String(x.target||"both"),
-    enabled: x.enabled !== false
+
+function bindGlobalFields(cfg){
+  document.getElementById("brand_text").value = cfg.brand_text || "";
+  document.getElementById("search_placeholder").value = cfg.search_placeholder || "";
+  document.getElementById("color_bg").value = cfg.color_bg || "";
+  document.getElementById("color_panel").value = cfg.color_panel || "";
+  document.getElementById("color_text").value = cfg.color_text || "";
+  document.getElementById("color_muted").value = cfg.color_muted || "";
+  document.getElementById("color_accent").value = cfg.color_accent || "";
+  document.getElementById("color_accent_dark").value = cfg.color_accent_dark || "";
+  document.getElementById("show_whatsapp_button").checked = Boolean(cfg.show_whatsapp_button);
+  document.getElementById("agenda_enabled").checked = Boolean(cfg.agenda_enabled);
+
+  document.getElementById("visual_font_scale_desktop").value = Number(cfg.visual_font_scale_desktop || 100);
+  document.getElementById("visual_font_scale_mobile").value = Number(cfg.visual_font_scale_mobile || 100);
+  document.getElementById("visual_mobile_ui_scale").value = Number(cfg.visual_mobile_ui_scale || 100);
+  document.getElementById("visual_card_radius").value = Number(cfg.visual_card_radius || 12);
+
+  document.getElementById("custom_css").value = cfg.custom_css || "";
+  document.getElementById("visual_sections_order_desktop").value = cfg.visual_sections_order_desktop || "ofertas,destacados,categorias,agenda";
+  document.getElementById("visual_sections_order_mobile").value = cfg.visual_sections_order_mobile || "agenda,ofertas,destacados,categorias";
+
+  const vis = cfg.visual_sections_visibility || {};
+  document.getElementById("vis-ofertas").checked = vis.ofertas !== false;
+  document.getElementById("vis-destacados").checked = vis.destacados !== false;
+  document.getElementById("vis-categorias").checked = vis.categorias !== false;
+  document.getElementById("vis-agenda").checked = vis.agenda !== false;
+
+  sliderLabel("visual_font_scale_desktop", "val-font-desktop", "%");
+  sliderLabel("visual_font_scale_mobile", "val-font-mobile", "%");
+  sliderLabel("visual_mobile_ui_scale", "val-ui-mobile", "%");
+  sliderLabel("visual_card_radius", "val-card-radius", "px");
+
+  STYLE_OVERRIDES = Array.isArray(cfg.visual_element_overrides) ? cfg.visual_element_overrides.map((x)=>({
+      selector: String(x.selector || ""), property: String(x.property || "").toLowerCase(), value: String(x.value || ""),
+      target: ["both","desktop","mobile"].includes(String(x.target || "both")) ? String(x.target) : "both", enabled: x.enabled !== false
   })) : [];
-  renderOverrides();
+
+  TEXT_OVERRIDES = Array.isArray(cfg.visual_text_overrides) ? cfg.visual_text_overrides.map((x)=>({
+      selector: String(x.selector || ""), text: String(x.text || ""),
+      target: ["both","desktop","mobile"].includes(String(x.target || "both")) ? String(x.target) : "both", enabled: x.enabled !== false
+  })) : [];
+
+  renderEditedList();
 }
-function readForm(){
-  const cfg = {};
-  NUM_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; cfg[k] = Number(el.value||0); });
-  TEXT_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; cfg[k] = String(el.value||""); });
-  BOOL_FIELDS.forEach((k)=>{ const el = document.getElementById(k); if(!el) return; cfg[k] = Boolean(el.checked); });
+function collectConfig(){
+  const cfg = clone(DRAFT_CFG);
+  cfg.brand_text = String(document.getElementById("brand_text").value || "").trim();
+  cfg.search_placeholder = String(document.getElementById("search_placeholder").value || "").trim();
+  cfg.color_bg = String(document.getElementById("color_bg").value || "").trim();
+  cfg.color_panel = String(document.getElementById("color_panel").value || "").trim();
+  cfg.color_text = String(document.getElementById("color_text").value || "").trim();
+  cfg.color_muted = String(document.getElementById("color_muted").value || "").trim();
+  cfg.color_accent = String(document.getElementById("color_accent").value || "").trim();
+  cfg.color_accent_dark = String(document.getElementById("color_accent_dark").value || "").trim();
+  cfg.show_whatsapp_button = document.getElementById("show_whatsapp_button").checked;
+  cfg.agenda_enabled = document.getElementById("agenda_enabled").checked;
+  cfg.visual_font_scale_desktop = Number(document.getElementById("visual_font_scale_desktop").value || 100);
+  cfg.visual_font_scale_mobile = Number(document.getElementById("visual_font_scale_mobile").value || 100);
+  cfg.visual_mobile_ui_scale = Number(document.getElementById("visual_mobile_ui_scale").value || 100);
+  cfg.visual_card_radius = Number(document.getElementById("visual_card_radius").value || 12);
+  cfg.custom_css = String(document.getElementById("custom_css").value || "");
+  cfg.visual_sections_order_desktop = String(document.getElementById("visual_sections_order_desktop").value || "").trim();
+  cfg.visual_sections_order_mobile = String(document.getElementById("visual_sections_order_mobile").value || "").trim();
   cfg.visual_sections_visibility = {
     ofertas: document.getElementById("vis-ofertas").checked,
     destacados: document.getElementById("vis-destacados").checked,
     categorias: document.getElementById("vis-categorias").checked,
     agenda: document.getElementById("vis-agenda").checked,
   };
-  cfg.visual_sections_order_desktop = listToCsv("order-desktop");
-  cfg.visual_sections_order_mobile = listToCsv("order-mobile");
-  cfg.visual_element_overrides = OVERRIDES.map((x)=>({
-    selector: String(x.selector||"").trim(),
-    property: String(x.property||"").trim().toLowerCase(),
-    value: String(x.value||"").trim(),
-    target: ["both","desktop","mobile"].includes(String(x.target||"both")) ? String(x.target) : "both",
-    enabled: x.enabled !== false
+  cfg.visual_element_overrides = STYLE_OVERRIDES.map((x)=>({
+      selector: String(x.selector || "").trim(), property: String(x.property || "").trim().toLowerCase(), value: String(x.value || "").trim(),
+      target: ["both","desktop","mobile"].includes(String(x.target || "both")) ? String(x.target) : "both", enabled: x.enabled !== false,
   })).filter((x)=>x.selector && x.property);
+  cfg.visual_text_overrides = TEXT_OVERRIDES.map((x)=>({
+      selector: String(x.selector || "").trim(), text: String(x.text || ""),
+      target: ["both","desktop","mobile"].includes(String(x.target || "both")) ? String(x.target) : "both", enabled: x.enabled !== false,
+  })).filter((x)=>x.selector);
   return cfg;
 }
-function renderOverrides(){
-  const box = document.getElementById("ovr-list");
-  if(!box) return;
-  box.innerHTML = (OVERRIDES||[]).map((r, i)=>`
-    <div class="ovr-row">
-      <div class="ovr-grid">
-        <input type="text" value="${esc(r.selector||"")}" data-ovr="${i}" data-key="selector">
-        <input type="text" value="${esc(r.property||"")}" data-ovr="${i}" data-key="property">
-        <input type="text" value="${esc(r.value||"")}" data-ovr="${i}" data-key="value">
-        <select data-ovr="${i}" data-key="target">
-          <option value="both" ${String(r.target)==="both"?"selected":""}>Ambos</option>
-          <option value="desktop" ${String(r.target)==="desktop"?"selected":""}>Web</option>
-          <option value="mobile" ${String(r.target)==="mobile"?"selected":""}>Movil</option>
-        </select>
-        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" data-ovr="${i}" data-key="enabled" ${r.enabled!==false?"checked":""}>On</label>
-        <button class="btn warn" type="button" data-ovr-del="${i}">X</button>
-      </div>
-    </div>
-  `).join("") || `<div class="mini">Sin reglas avanzadas.</div>`;
-  box.querySelectorAll("[data-ovr][data-key]").forEach((el)=>{
-    el.addEventListener("change", ()=>{
-      const i = Number(el.getAttribute("data-ovr")||-1);
-      const key = String(el.getAttribute("data-key")||"");
-      if(i < 0 || !OVERRIDES[i]) return;
-      OVERRIDES[i][key] = key === "enabled" ? Boolean(el.checked) : String(el.value||"");
+
+function upsertStyle(selector, property, value, target){
+  const s = String(selector || "").trim();
+  const p = String(property || "").trim().toLowerCase();
+  const t = ["both","desktop","mobile"].includes(String(target || "both")) ? String(target) : "both";
+  STYLE_OVERRIDES = STYLE_OVERRIDES.filter((x)=>!(String(x.selector)===s && String(x.property)===p && String(x.target || "both")===t));
+  if(String(value || "").trim()) STYLE_OVERRIDES.push({ selector: s, property: p, value: String(value).trim(), target: t, enabled: true });
+}
+function upsertText(selector, text, target){
+  const s = String(selector || "").trim();
+  const t = ["both","desktop","mobile"].includes(String(target || "both")) ? String(target) : "both";
+  TEXT_OVERRIDES = TEXT_OVERRIDES.filter((x)=>!(String(x.selector)===s && String(x.target || "both")===t));
+  if(String(text || "").trim()) TEXT_OVERRIDES.push({ selector: s, text: String(text), target: t, enabled: true });
+}
+function removeSelectorOverrides(selector){
+  const s = String(selector || "").trim();
+  STYLE_OVERRIDES = STYLE_OVERRIDES.filter((x)=>String(x.selector || "") !== s);
+  TEXT_OVERRIDES = TEXT_OVERRIDES.filter((x)=>String(x.selector || "") !== s);
+}
+function findStyle(selector, property, target){
+  const s = String(selector || "").trim();
+  const p = String(property || "").trim().toLowerCase();
+  const t = ["both","desktop","mobile"].includes(String(target || "both")) ? String(target) : "both";
+  const exact = STYLE_OVERRIDES.find((x)=>x.enabled !== false && String(x.selector)===s && String(x.property).toLowerCase()===p && String(x.target || "both")===t);
+  if(exact) return exact.value;
+  const both = STYLE_OVERRIDES.find((x)=>x.enabled !== false && String(x.selector)===s && String(x.property).toLowerCase()===p && String(x.target || "both")==="both");
+  return both ? both.value : "";
+}
+function findText(selector, target){
+  const s = String(selector || "").trim();
+  const t = ["both","desktop","mobile"].includes(String(target || "both")) ? String(target) : "both";
+  const exact = TEXT_OVERRIDES.find((x)=>x.enabled !== false && String(x.selector)===s && String(x.target || "both")===t);
+  if(exact) return exact.text;
+  const both = TEXT_OVERRIDES.find((x)=>x.enabled !== false && String(x.selector)===s && String(x.target || "both")==="both");
+  return both ? both.text : "";
+}
+
+function renderEditedList(){
+  const box = document.getElementById("edited-list");
+  const bySelector = {};
+  (STYLE_OVERRIDES || []).forEach((r)=>{
+    const s = String(r.selector || "").trim();
+    if(!s) return;
+    bySelector[s] = bySelector[s] || { styles: 0, texts: 0 };
+    bySelector[s].styles += 1;
+  });
+  (TEXT_OVERRIDES || []).forEach((r)=>{
+    const s = String(r.selector || "").trim();
+    if(!s) return;
+    bySelector[s] = bySelector[s] || { styles: 0, texts: 0 };
+    bySelector[s].texts += 1;
+  });
+  const rows = Object.keys(bySelector);
+  if(!rows.length){
+    box.innerHTML = `<div class="hint">Aun no hay elementos editados. Activa el inspector y haz doble click sobre la preview.</div>`;
+    return;
+  }
+  box.innerHTML = rows.map((sel)=>{
+    const info = bySelector[sel] || {styles:0,texts:0};
+    return `<div class="list-item"><div class="head"><strong>${esc(sel)}</strong><span class="pill">${info.styles} estilos · ${info.texts} texto</span></div><div class="row"><button class="btn small" type="button" data-edit-selector="${esc(sel)}">Editar</button><button class="btn small warn" type="button" data-del-selector="${esc(sel)}">Eliminar</button></div></div>`;
+  }).join("");
+  box.querySelectorAll("[data-del-selector]").forEach((btn)=>{
+    btn.addEventListener("click", async ()=>{
+      const selector = String(btn.getAttribute("data-del-selector") || "");
+      removeSelectorOverrides(selector);
+      renderEditedList();
+      await saveDraft(true);
+      refreshPreview();
+      msg("Elemento eliminado del borrador.");
     });
   });
-  box.querySelectorAll("[data-ovr-del]").forEach((btn)=>{
-    btn.addEventListener("click", ()=>{
-      const i = Number(btn.getAttribute("data-ovr-del")||-1);
-      if(i < 0) return;
-      OVERRIDES.splice(i,1);
-      renderOverrides();
-    });
+  box.querySelectorAll("[data-edit-selector]").forEach((btn)=>{
+    btn.addEventListener("click", ()=> openEditorBySelector(String(btn.getAttribute("data-edit-selector") || "")));
   });
 }
-function previewSrc(mode, agenda=false, mobile=false){
+
+function previewSrc(mode, agenda, mobile){
   const q = new URLSearchParams();
   q.set("mode", mode);
-  if(agenda) q.set("agenda","1");
-  if(mobile) q.set("mobile","1");
+  if(agenda) q.set("agenda", "1");
+  if(mobile) q.set("mobile", "1");
   return `/tienda/preview?${q.toString()}`;
 }
-function applyDeviceTabUi(){
-  const webBtn = document.getElementById("btn-tab-web");
-  const mobBtn = document.getElementById("btn-tab-mobile");
-  const box = document.getElementById("frame-box-stage");
-  const lbl = document.getElementById("preview-device-label");
-  if(webBtn) webBtn.classList.toggle("active", previewDevice === "web");
-  if(mobBtn) mobBtn.classList.toggle("active", previewDevice === "mobile");
-  if(box) box.classList.toggle("mobile-view", previewDevice === "mobile");
-  if(lbl) lbl.textContent = previewDevice === "mobile" ? "Movil" : "Web";
+function updatePreviewHeader(){
+  document.getElementById("preview-mode-label").textContent = previewAgenda ? `${previewMode} · agenda` : previewMode;
+  document.getElementById("preview-device-label").textContent = previewDevice === "mobile" ? "Movil" : "Web";
+  document.getElementById("btn-preview-draft").classList.toggle("active", previewMode === "draft" && !previewAgenda);
+  document.getElementById("btn-preview-live").classList.toggle("active", previewMode === "live" && !previewAgenda);
+  document.getElementById("btn-preview-agenda").classList.toggle("active", previewAgenda);
+  document.getElementById("btn-tab-web").classList.toggle("active", previewDevice === "web");
+  document.getElementById("btn-tab-mobile").classList.toggle("active", previewDevice === "mobile");
+  frameBox.classList.toggle("mobile-view", previewDevice === "mobile");
 }
 function refreshPreview(){
-  document.getElementById("preview-mode-label").textContent = previewAgenda ? `${previewMode} · agenda` : previewMode;
-  document.getElementById("frame-stage").src = previewSrc(previewMode, previewAgenda, previewDevice === "mobile");
-  applyDeviceTabUi();
+  updatePreviewHeader();
+  frameStage.src = previewSrc(previewMode, previewAgenda, previewDevice === "mobile");
 }
-function fillPresetOptions(){
-  const opts = [`<option value="">Selecciona preset</option>`].concat(
-    (STATE.presets||[]).map(p=>`<option value="${p.id}">${esc(p.nombre)}${p.built_in?" (base)":""}</option>`)
-  ).join("");
-  document.getElementById("preset-select").innerHTML = opts;
-  document.getElementById("prog-preset").innerHTML = opts;
+
+function selectorForElement(el){
+  if(!el || !el.tagName) return "";
+  if(el.id) return `#${el.id}`;
+  function safeClass(node){
+    const cl = Array.from(node.classList || []).filter((x)=>x && !x.startsWith("leaflet-") && x.length < 42).slice(0, 2);
+    return cl.length ? `.${cl.join(".")}` : "";
+  }
+  function nth(node){
+    const p = node.parentElement;
+    if(!p) return "";
+    const same = Array.from(p.children).filter((x)=>x.tagName === node.tagName);
+    if(same.length <= 1) return "";
+    return `:nth-of-type(${same.indexOf(node) + 1})`;
+  }
+  let node = el;
+  const parts = [];
+  for(let i=0; i<5 && node && node.tagName && node.tagName.toLowerCase() !== "html"; i++){
+    const tag = node.tagName.toLowerCase();
+    if(node.id){ parts.unshift(`#${node.id}`); break; }
+    parts.unshift(`${tag}${safeClass(node)}${nth(node)}`);
+    node = node.parentElement;
+  }
+  return parts.join(" > ");
 }
-function renderVersiones(){
-  const box = document.getElementById("versiones-list");
-  box.innerHTML = (STATE.versiones||[]).map(v=>`
-    <div class="version-item">
-      <div><strong>#${v.id}</strong> ${esc(v.origen||"manual")}<div class="mini">${esc(v.creado_en||"")}</div></div>
-      <button class="btn warn" onclick="rollbackVersion(${Number(v.id||0)})">Rollback</button>
-    </div>`).join("") || `<div class="mini">Sin versiones.</div>`;
+
+function syncColor(textId, pickId){
+  const text = document.getElementById(textId);
+  const pick = document.getElementById(pickId);
+  if(!text || !pick) return;
+  text.addEventListener("input", ()=>{
+    const v = String(text.value || "").trim();
+    if(/^#[0-9a-fA-F]{6}$/.test(v)) pick.value = v;
+  });
+  pick.addEventListener("input", ()=>{ text.value = pick.value; });
 }
-async function rollbackVersion(id){
-  if(!id) return;
-  if(!confirm(`Aplicar rollback version #${id}?`)) return;
-  const r = await post(`/api/tienda/admin/personalizacion/versiones/${id}/rollback`, {});
-  if(!r.ok || !r.j.success) return msg(r.j.error || "No se pudo hacer rollback", true);
-  msg("Rollback aplicado.");
-  await loadState();
+function bindInspector(){
+  const doc = frameStage.contentDocument;
+  if(!doc) return;
+  const handler = (ev)=>{
+    if(!inspectorOn) return;
+    const target = ev.target;
+    if(!target || !target.tagName) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const tag = String(target.tagName || "").toLowerCase();
+    if(["html", "body", "script", "style"].includes(tag)) return;
+    const selector = selectorForElement(target);
+    if(!selector) return;
+    openEditor({ selector, displayPath: `<${tag}> ${selector}`, sourceText: (target.innerText || target.textContent || "").trim().slice(0, 350) });
+  };
+  doc.addEventListener("dblclick", handler, true);
 }
-async function loadProgramaciones(){
-  const r = await fetch("/api/tienda/admin/personalizacion/programaciones");
-  const j = await r.json();
-  const box = document.getElementById("programaciones-list");
-  if(!r.ok || !j.success){ box.innerHTML = `<div class="mini">No se pudo cargar.</div>`; return; }
-  box.innerHTML = (j.programaciones||[]).map(p=>`
-    <div class="version-item">
-      <div><strong>${esc(p.nombre||"")}</strong><div class="mini">${esc((p.preset_nombre||"Preset")+" | "+(p.fecha_inicio||"-")+" a "+(p.fecha_fin||"-"))}</div></div>
-      <button class="btn warn" onclick="delProg(${Number(p.id||0)})">Eliminar</button>
-    </div>`).join("") || `<div class="mini">Sin programaciones.</div>`;
+
+frameStage.addEventListener("load", ()=>{ if(inspectorOn) bindInspector(); });
+
+function safeNumOrEmpty(v){
+  if(v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? String(n) : "";
 }
-async function delProg(id){
-  if(!confirm("Eliminar programacion?")) return;
-  const r = await post(`/api/tienda/admin/personalizacion/programaciones/${id}/eliminar`, {});
-  if(!r.ok || !r.j.success) return msg(r.j.error || "No se pudo eliminar", true);
-  msg("Programacion eliminada.");
-  await loadProgramaciones();
+function extractPx(value){
+  const txt = String(value || "").trim();
+  if(!txt) return "";
+  const m = txt.match(/^(-?\d+(?:\.\d+)?)px$/i);
+  if(m) return m[1];
+  if(/^\d+$/.test(txt)) return txt;
+  return "";
 }
+
+function openEditorBySelector(selector){
+  const target = previewDevice === "mobile" ? "mobile" : "desktop";
+  openEditor({ selector, displayPath: selector, sourceText: findText(selector, target) || "" });
+}
+function openEditor(data){
+  const target = previewDevice === "mobile" ? "mobile" : "desktop";
+  const selector = String(data.selector || "").trim();
+  document.getElementById("edit-selector").value = selector;
+  document.getElementById("edit-target").value = target;
+  document.getElementById("edit-device").textContent = `target: ${target}`;
+  document.getElementById("edit-path").textContent = String(data.displayPath || selector);
+  document.getElementById("edit-text").value = findText(selector, target) || String(data.sourceText || "");
+  document.getElementById("edit-font-size").value = safeNumOrEmpty(extractPx(findStyle(selector, "font-size", target)));
+  document.getElementById("edit-color").value = findStyle(selector, "color", target);
+  document.getElementById("edit-bg").value = findStyle(selector, "background-color", target);
+  document.getElementById("edit-border-color").value = findStyle(selector, "border-color", target);
+  document.getElementById("edit-border-width").value = safeNumOrEmpty(extractPx(findStyle(selector, "border-width", target)));
+  document.getElementById("edit-radius").value = safeNumOrEmpty(extractPx(findStyle(selector, "border-radius", target)));
+  document.getElementById("edit-padding").value = findStyle(selector, "padding", target);
+  document.getElementById("edit-width").value = findStyle(selector, "width", target);
+  document.getElementById("edit-height").value = findStyle(selector, "height", target);
+  document.getElementById("edit-shadow").value = findStyle(selector, "box-shadow", target);
+
+  [["edit-color","edit-color-pick"],["edit-bg","edit-bg-pick"],["edit-border-color","edit-border-color-pick"]].forEach(([t,p])=>{
+    const text = document.getElementById(t);
+    const pick = document.getElementById(p);
+    const v = String(text.value || "").trim();
+    if(/^#[0-9a-fA-F]{6}$/.test(v)) pick.value = v;
+  });
+  document.getElementById("edit-overlay").classList.add("active");
+}
+function closeEditor(){ document.getElementById("edit-overlay").classList.remove("active"); }
+
+function applyEditValues(){
+  const selector = String(document.getElementById("edit-selector").value || "").trim();
+  const target = String(document.getElementById("edit-target").value || "both").trim();
+  if(!selector) return { ok:false, error:"Selector vacio" };
+
+  const text = String(document.getElementById("edit-text").value || "");
+  const fontSize = String(document.getElementById("edit-font-size").value || "").trim();
+  const color = String(document.getElementById("edit-color").value || "").trim();
+  const bg = String(document.getElementById("edit-bg").value || "").trim();
+  const borderColor = String(document.getElementById("edit-border-color").value || "").trim();
+  const borderWidth = String(document.getElementById("edit-border-width").value || "").trim();
+  const radius = String(document.getElementById("edit-radius").value || "").trim();
+  const padding = String(document.getElementById("edit-padding").value || "").trim();
+  const width = String(document.getElementById("edit-width").value || "").trim();
+  const height = String(document.getElementById("edit-height").value || "").trim();
+  const shadow = String(document.getElementById("edit-shadow").value || "").trim();
+
+  upsertText(selector, text, target);
+  upsertStyle(selector, "font-size", fontSize ? `${fontSize}px` : "", target);
+  upsertStyle(selector, "color", color, target);
+  upsertStyle(selector, "background-color", bg, target);
+  upsertStyle(selector, "border-color", borderColor, target);
+  upsertStyle(selector, "border-width", borderWidth ? `${borderWidth}px` : "", target);
+  upsertStyle(selector, "border-style", borderWidth ? "solid" : "", target);
+  upsertStyle(selector, "border-radius", radius ? `${radius}px` : "", target);
+  upsertStyle(selector, "padding", padding, target);
+  upsertStyle(selector, "width", width, target);
+  upsertStyle(selector, "height", height, target);
+  upsertStyle(selector, "box-shadow", shadow, target);
+  renderEditedList();
+  return { ok:true };
+}
+
+async function saveDraft(silent){
+  const payload = { config: collectConfig() };
+  const r = await post("/api/tienda/admin/visualizador/draft", payload);
+  if(!r.ok || !r.j.success){
+    if(!silent) msg(r.j.error || "No se pudo guardar borrador", true);
+    return false;
+  }
+  DRAFT_CFG = clone(r.j.draft || payload.config);
+  if(!silent) msg("Borrador guardado correctamente.");
+  return true;
+}
+
 async function loadState(){
   const r = await fetch("/api/tienda/admin/visualizador/state");
-  const j = await r.json();
-  if(!r.ok || !j.success) return msg(j.error || "No se pudo cargar estado", true);
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || !j.success){
+    msg(j.error || "No se pudo cargar visualizador", true);
+    return;
+  }
   STATE = j;
-  fillForm(STATE.draft || STATE.live || {});
-  fillPresetOptions();
-  renderVersiones();
-  await loadProgramaciones();
+  DRAFT_CFG = clone(STATE.draft || STATE.live || {});
+  bindGlobalFields(DRAFT_CFG);
+  updatePreviewHeader();
   refreshPreview();
 }
 
-document.getElementById("btn-cargar-live").addEventListener("click", ()=>{
-  fillForm(STATE.live || {});
-  msg("Live cargado al formulario (aun no guardado).");
-});
-document.getElementById("btn-cargar-draft").addEventListener("click", ()=>{ fillForm(STATE.draft || {}); msg("Draft recargado."); });
-document.getElementById("btn-guardar-draft").addEventListener("click", async ()=>{
-  const r = await post("/api/tienda/admin/visualizador/draft", { config: readForm() });
-  if(!r.ok || !r.j.success) return msg(r.j.error || "No se pudo guardar draft", true);
-  msg("Borrador guardado.");
-  previewMode = "draft";
-  await loadState();
-});
-document.getElementById("btn-publicar").addEventListener("click", async ()=>{
-  const save = await post("/api/tienda/admin/visualizador/draft", { config: readForm() });
-  if(!save.ok || !save.j.success) return msg(save.j.error || "No se pudo guardar borrador", true);
-  const pub = await post("/api/tienda/admin/visualizador/publish", {});
-  if(!pub.ok || !pub.j.success) return msg(pub.j.error || "No se pudo publicar", true);
-  msg("Publicado correctamente.");
-  previewMode = "live";
-  await loadState();
-});
-document.getElementById("btn-preset-draft").addEventListener("click", async ()=>{
-  const pid = Number(document.getElementById("preset-select").value || 0);
-  if(!pid) return msg("Selecciona un preset.", true);
-  const r = await post("/api/tienda/admin/visualizador/preset-aplicar", { preset_id: pid, target: "draft" });
-  if(!r.ok || !r.j.success) return msg(r.j.error || "No se pudo aplicar preset", true);
-  msg("Preset aplicado a draft.");
-  await loadState();
-});
-document.getElementById("btn-preset-live").addEventListener("click", async ()=>{
-  const pid = Number(document.getElementById("preset-select").value || 0);
-  if(!pid) return msg("Selecciona un preset.", true);
-  const r = await post("/api/tienda/admin/visualizador/preset-aplicar", { preset_id: pid, target: "live" });
-  if(!r.ok || !r.j.success) return msg(r.j.error || "No se pudo aplicar preset a live", true);
-  msg("Preset aplicado a live.");
-  previewMode = "live";
-  await loadState();
-});
-document.getElementById("btn-duplicar-preset").addEventListener("click", async ()=>{
-  const nombre = prompt("Nombre del nuevo preset");
-  if(!nombre) return;
-  const r = await post("/api/tienda/admin/personalizacion/presets", { nombre: nombre.trim() });
-  if(!r.ok || !r.j.success) return msg(r.j.error || "No se pudo duplicar preset", true);
-  msg("Preset duplicado.");
-  await loadState();
-});
-document.getElementById("btn-crear-programacion").addEventListener("click", async ()=>{
-  const payload = {
-    nombre: document.getElementById("prog-nombre").value.trim(),
-    preset_id: Number(document.getElementById("prog-preset").value || 0),
-    fecha_inicio: document.getElementById("prog-inicio").value || "",
-    fecha_fin: document.getElementById("prog-fin").value || "",
-    hora_inicio: document.getElementById("prog-hora-ini").value || "",
-    hora_fin: document.getElementById("prog-hora-fin").value || "",
-    dias_semana: document.getElementById("prog-dias").value.trim(),
-    prioridad: Number(document.getElementById("prog-prio").value || 0),
-    activo: true
-  };
-  const r = await post("/api/tienda/admin/personalizacion/programaciones", payload);
-  if(!r.ok || !r.j.success) return msg(r.j.error || "No se pudo crear programacion", true);
-  msg("Programacion creada.");
-  await loadProgramaciones();
-});
-document.getElementById("btn-recargar-programaciones").addEventListener("click", loadProgramaciones);
-document.getElementById("btn-ovr-add").addEventListener("click", ()=>{
-  const selector = String(document.getElementById("ovr-selector").value || "").trim();
-  const property = String(document.getElementById("ovr-property").value || "").trim().toLowerCase();
-  const value = String(document.getElementById("ovr-value").value || "").trim();
-  const target = String(document.getElementById("ovr-target").value || "both").trim().toLowerCase();
-  const enabled = document.getElementById("ovr-enabled").checked;
-  if(!selector || !property) return msg("Selector y propiedad son obligatorios.", true);
-  OVERRIDES.push({ selector, property, value, target, enabled });
-  document.getElementById("ovr-selector").value = "";
-  document.getElementById("ovr-property").value = "";
-  document.getElementById("ovr-value").value = "";
-  document.getElementById("ovr-target").value = "both";
-  document.getElementById("ovr-enabled").checked = true;
-  renderOverrides();
-});
-document.getElementById("btn-preview-draft").addEventListener("click", ()=>{
-  previewMode="draft";
-  previewAgenda = false;
-  refreshPreview();
-  msg("Preview draft.");
-});
-document.getElementById("btn-preview-live").addEventListener("click", ()=>{
-  previewMode="live";
-  previewAgenda = false;
-  refreshPreview();
-  msg("Preview live.");
-});
-document.getElementById("btn-preview-agenda").addEventListener("click", ()=>{
-  previewAgenda = true;
-  msg("Preview agenda.");
-  refreshPreview();
-});
-document.getElementById("btn-tab-web").addEventListener("click", ()=>{ previewDevice = "web"; refreshPreview(); });
-document.getElementById("btn-tab-mobile").addEventListener("click", ()=>{ previewDevice = "mobile"; refreshPreview(); });
+function bindUi(){
+  [["visual_font_scale_desktop","val-font-desktop","%"],["visual_font_scale_mobile","val-font-mobile","%"],["visual_mobile_ui_scale","val-ui-mobile","%"],["visual_card_radius","val-card-radius","px"]].forEach(([id,out,suf])=>{
+    const el = document.getElementById(id);
+    el.addEventListener("input", ()=> sliderLabel(id, out, suf));
+  });
 
+  document.getElementById("btn-preview-draft").addEventListener("click", ()=>{ previewMode="draft"; previewAgenda=false; refreshPreview(); msg("Preview draft activo."); });
+  document.getElementById("btn-preview-live").addEventListener("click", ()=>{ previewMode="live"; previewAgenda=false; refreshPreview(); msg("Preview live activo."); });
+  document.getElementById("btn-preview-agenda").addEventListener("click", ()=>{ previewMode="draft"; previewAgenda=true; refreshPreview(); msg("Preview agenda activo."); });
+  document.getElementById("btn-tab-web").addEventListener("click", ()=>{ previewDevice="web"; refreshPreview(); });
+  document.getElementById("btn-tab-mobile").addEventListener("click", ()=>{ previewDevice="mobile"; refreshPreview(); });
+
+  document.getElementById("btn-inspector-toggle").addEventListener("click", ()=>{
+    inspectorOn = !inspectorOn;
+    document.getElementById("btn-inspector-toggle").textContent = inspectorOn ? "Desactivar edicion sobre preview" : "Activar edicion sobre preview";
+    document.getElementById("inspector-state").textContent = inspectorOn ? "Inspector: ON. Doble click sobre cualquier elemento para editarlo." : "Inspector: OFF. Activalo y haz doble click sobre la preview.";
+    if(inspectorOn) bindInspector();
+  });
+
+  document.getElementById("btn-cargar-live").addEventListener("click", ()=>{ DRAFT_CFG = clone(STATE.live || {}); bindGlobalFields(DRAFT_CFG); msg("Configuracion live cargada al editor. Aun no se guarda."); });
+  document.getElementById("btn-cargar-draft").addEventListener("click", ()=>{ DRAFT_CFG = clone(STATE.draft || {}); bindGlobalFields(DRAFT_CFG); msg("Draft recargado."); });
+  document.getElementById("btn-guardar-draft").addEventListener("click", async ()=>{ const ok = await saveDraft(false); if(ok){ previewMode="draft"; refreshPreview(); } });
+  document.getElementById("btn-publicar").addEventListener("click", async ()=>{
+    const saved = await saveDraft(true);
+    if(!saved){ msg("No se pudo guardar borrador antes de publicar.", true); return; }
+    const pub = await post("/api/tienda/admin/visualizador/publish", {});
+    if(!pub.ok || !pub.j.success){ msg(pub.j.error || "No se pudo publicar", true); return; }
+    msg("Borrador publicado en live.");
+    await loadState();
+    previewMode = "live";
+    refreshPreview();
+  });
+
+  document.getElementById("edit-cancel").addEventListener("click", closeEditor);
+  document.getElementById("edit-overlay").addEventListener("click", (ev)=>{ if(ev.target && ev.target.id === "edit-overlay") closeEditor(); });
+  document.getElementById("edit-target").addEventListener("change", ()=>{ document.getElementById("edit-device").textContent = `target: ${document.getElementById("edit-target").value}`; });
+
+  document.getElementById("edit-remove").addEventListener("click", async ()=>{
+    const selector = String(document.getElementById("edit-selector").value || "").trim();
+    if(!selector) return;
+    removeSelectorOverrides(selector);
+    renderEditedList();
+    const ok = await saveDraft(true);
+    if(ok){ refreshPreview(); msg("Personalizacion eliminada."); }
+    closeEditor();
+  });
+
+  document.getElementById("edit-save").addEventListener("click", async ()=>{
+    const applied = applyEditValues();
+    if(!applied.ok){ msg(applied.error || "No se pudo aplicar", true); return; }
+    const ok = await saveDraft(true);
+    if(!ok){ msg("No se pudo guardar cambios", true); return; }
+    previewMode = "draft";
+    refreshPreview();
+    msg("Cambio guardado en borrador.");
+    closeEditor();
+  });
+
+  syncColor("edit-color", "edit-color-pick");
+  syncColor("edit-bg", "edit-bg-pick");
+  syncColor("edit-border-color", "edit-border-color-pick");
+}
+
+bindUi();
 loadState();
-window.rollbackVersion = rollbackVersion;
-window.delProg = delProg;
 </script>
 </body>
 </html>

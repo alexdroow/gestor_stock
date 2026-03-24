@@ -3195,6 +3195,7 @@
             visual_sections_order_mobile: "agenda,ofertas,destacados,categorias",
             visual_sections_visibility: { ofertas: true, destacados: true, categorias: true, agenda: true },
             visual_element_overrides: [],
+            visual_text_overrides: [],
             custom_css: "",
         };
         const TIENDA_UI_INITIAL = {{ (tienda_personalizacion or {}) | tojson }};
@@ -3245,6 +3246,25 @@
                 }
             });
             return lines.join("\n");
+        }
+
+        function _applyVisualTextOverrides(rows) {
+            if (!Array.isArray(rows) || !rows.length) return;
+            const isMobile = document.body.classList.contains("mobile-ui");
+            rows.forEach((r) => {
+                const selector = String(r?.selector || "").trim();
+                const text = String(r?.text || "");
+                const target = String(r?.target || "both").trim().toLowerCase();
+                const enabled = r?.enabled !== false;
+                if (!enabled || !selector) return;
+                if (target === "mobile" && !isMobile) return;
+                if (target === "desktop" && isMobile) return;
+                document.querySelectorAll(selector).forEach((el) => {
+                    if (el && !el.dataset.visualTextLocked) {
+                        el.textContent = text;
+                    }
+                });
+            });
         }
 
         function aplicarPersonalizacionTienda(rawCfg) {
@@ -3378,6 +3398,7 @@
                 const customCss = String(tiendaUiCfg.custom_css || "");
                 tiendaCustomCssEl.textContent = `${advCss}\n${customCss}`.trim();
             }
+            _applyVisualTextOverrides(tiendaUiCfg.visual_text_overrides || []);
 
             if (!Boolean(tiendaUiCfg.agenda_enabled) && categoriaActiva === "AGENDA") {
                 categoriaActiva = "TODOS";
@@ -5998,6 +6019,7 @@
                 }
                 _agendaApplyMobileWizard(false);
                 _toggleMobileAgendaSummaryFab();
+                _applyVisualTextOverrides(tiendaUiCfg.visual_text_overrides || []);
                 return;
             }
             agendaPastelCerrarCatalogo();
@@ -6039,6 +6061,7 @@
                     </div>
                 </section>
             `).join("");
+            _applyVisualTextOverrides(tiendaUiCfg.visual_text_overrides || []);
         }
 
         function renderCart() {
