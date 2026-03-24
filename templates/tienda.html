@@ -2268,7 +2268,9 @@
             <input id="search-input" type="search" placeholder="Buscar productos...">
         </div>
         <div class="topbar-actions">
-            <button type="button" class="menu-quick-btn" id="btn-cuenta">Mi cuenta</button>
+            <button type="button" class="menu-quick-btn" id="btn-iniciar-sesion">Iniciar sesion</button>
+            <button type="button" class="menu-quick-btn" id="btn-registrar-cuenta">Registrar cuenta</button>
+            <button type="button" class="menu-quick-btn" id="btn-cuenta" style="display:none;">Mi cuenta</button>
             <button type="button" class="menu-quick-btn menu-logout-btn" id="btn-cerrar-sesion" style="display:none;">Cerrar sesion</button>
         </div>
     </header>
@@ -2492,15 +2494,15 @@
 
     <div class="modal-overlay" id="modal-cuenta">
         <div class="modal" style="width:min(760px,96vw);">
-            <h3>Mi cuenta</h3>
+            <h3 id="cuenta-modal-titulo">Mi cuenta</h3>
             <div id="cuenta-estado" style="font-size:.9rem;color:#334155;">Registra tus datos para compras y reservas mas rapidas.</div>
-            <div class="two">
+            <div class="two" id="cuenta-row-perfil">
                 <input id="cuenta-nombre" type="text" placeholder="Nombre completo" maxlength="80">
                 <input id="cuenta-fecha-nacimiento" type="date">
             </div>
             <div class="two">
                 <input id="cuenta-email" type="email" placeholder="Correo electronico">
-                <input id="cuenta-email-confirm" type="email" placeholder="Confirmar correo electronico">
+                <input id="cuenta-email-confirm" type="email" placeholder="Confirmar correo electronico" maxlength="120">
             </div>
             <div class="two">
                 <div class="phone-wrap">
@@ -2508,30 +2510,38 @@
                     <input id="cuenta-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
                 </div>
                 <div id="cuenta-programa" style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;font-size:.85rem;color:#334155;">Nivel: - · Puntos: 0</div>
-            <div style="font-size:.88rem;font-weight:700;color:#334155;">Cupones de tu cuenta</div>
-            <div id="cuenta-cupones" style="max-height:160px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
-                <div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>
             </div>
+            <div id="cuenta-cupones-wrap">
+                <div style="font-size:.88rem;font-weight:700;color:#334155;">Cupones de tu cuenta</div>
+                <div id="cuenta-cupones" style="max-height:160px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
+                    <div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>
+                </div>
             </div>
-            <div style="font-size:.88rem;font-weight:700;color:#334155;">Direccion por defecto para agenda</div>
-            <div class="agenda-map-actions" style="margin-top:0;">
-                <input id="cuenta-direccion-buscar" type="text" placeholder="Buscar direccion y confirmar pin">
-                <button type="button" id="cuenta-buscar-mapa">Buscar</button>
-                <button type="button" id="cuenta-confirmar-pin">Confirmar pin</button>
+            <div id="cuenta-direccion-wrap">
+                <div style="font-size:.88rem;font-weight:700;color:#334155;">Direccion por defecto para agenda</div>
+                <div class="agenda-map-actions" style="margin-top:0;">
+                    <input id="cuenta-direccion-buscar" type="text" placeholder="Buscar direccion y confirmar pin">
+                    <button type="button" id="cuenta-buscar-mapa">Buscar</button>
+                    <button type="button" id="cuenta-confirmar-pin">Confirmar pin</button>
+                </div>
+                <div class="agenda-map" id="cuenta-map" style="height:220px;"></div>
+                <div class="agenda-map-meta" id="cuenta-map-meta">Mueve el pin y confirma para guardar direccion por defecto.</div>
             </div>
-            <div class="agenda-map" id="cuenta-map" style="height:220px;"></div>
-            <div class="agenda-map-meta" id="cuenta-map-meta">Mueve el pin y confirma para guardar direccion por defecto.</div>
             <div class="modal-actions" style="justify-content:flex-start;">
                 <button class="btn-primary" type="button" id="cuenta-guardar">Registrarme / Ingresar</button>
                 <button class="btn-muted" type="button" id="cuenta-guardar-direccion">Guardar direccion</button>
             </div>
-            <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de compras</div>
-            <div id="cuenta-historial" style="max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
-                <div style="color:#64748b;font-size:.88rem;">Sin historial cargado.</div>
+            <div id="cuenta-historial-wrap">
+                <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de compras</div>
+                <div id="cuenta-historial" style="max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
+                    <div style="color:#64748b;font-size:.88rem;">Sin historial cargado.</div>
+                </div>
             </div>
-            <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de reservas en agenda</div>
-            <div id="cuenta-historial-agenda" style="max-height:220px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
-                <div style="color:#64748b;font-size:.88rem;">Sin reservas cargadas.</div>
+            <div id="cuenta-historial-agenda-wrap">
+                <div style="font-size:.88rem;font-weight:700;color:#334155;">Historial de reservas en agenda</div>
+                <div id="cuenta-historial-agenda" style="max-height:220px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
+                    <div style="color:#64748b;font-size:.88rem;">Sin reservas cargadas.</div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-cuenta-cerrar">Cerrar</button>
@@ -2726,7 +2736,16 @@
         const cuentaBuscarMapaEl = document.getElementById("cuenta-buscar-mapa");
         const cuentaConfirmarPinEl = document.getElementById("cuenta-confirmar-pin");
         const cuentaMapMetaEl = document.getElementById("cuenta-map-meta");
+        const cuentaGuardarEl = document.getElementById("cuenta-guardar");
         const cuentaGuardarDireccionEl = document.getElementById("cuenta-guardar-direccion");
+        const cuentaModalTituloEl = document.getElementById("cuenta-modal-titulo");
+        const cuentaRowPerfilEl = document.getElementById("cuenta-row-perfil");
+        const cuentaCuponesWrapEl = document.getElementById("cuenta-cupones-wrap");
+        const cuentaDireccionWrapEl = document.getElementById("cuenta-direccion-wrap");
+        const cuentaHistorialWrapEl = document.getElementById("cuenta-historial-wrap");
+        const cuentaHistorialAgendaWrapEl = document.getElementById("cuenta-historial-agenda-wrap");
+        const btnIniciarSesionEl = document.getElementById("btn-iniciar-sesion");
+        const btnRegistrarCuentaEl = document.getElementById("btn-registrar-cuenta");
         const btnCuentaEl = document.getElementById("btn-cuenta");
         const btnCerrarSesionEl = document.getElementById("btn-cerrar-sesion");
         const leftNavEl = document.querySelector(".left-nav");
@@ -2895,6 +2914,7 @@
         let agendaCakeCategoryGroup = "all";
         let agendaCakeCategorySearch = "";
         let agendaCakeCategoryExpanded = false;
+        let cuentaModo = "register";
         const AGENDA_CAKE_CATS_COLLAPSED = 6;
         let agendaCakeSelection = {
             size_id: "",
@@ -3372,14 +3392,20 @@
         }
 
         function renderEstadoCuenta() {
-            if (btnCuentaEl) {
-                btnCuentaEl.textContent = clienteRegistrado ? "Mi cuenta (activa)" : "Mi cuenta";
-            }
+            const logged = Boolean(clienteRegistrado);
+            if (btnCuentaEl) btnCuentaEl.style.display = logged ? "" : "none";
+            if (btnCuentaEl) btnCuentaEl.textContent = "Mi cuenta (activa)";
             if (btnCerrarSesionEl) {
-                btnCerrarSesionEl.style.display = clienteRegistrado ? "" : "none";
+                btnCerrarSesionEl.style.display = logged ? "" : "none";
+            }
+            if (btnIniciarSesionEl) {
+                btnIniciarSesionEl.style.display = logged ? "none" : "";
+            }
+            if (btnRegistrarCuentaEl) {
+                btnRegistrarCuentaEl.style.display = logged ? "none" : "";
             }
             if (cuentaEstadoEl) {
-                if (clienteRegistrado) {
+                if (logged) {
                     cuentaEstadoEl.textContent = `Cuenta activa: ${clienteRegistrado.email} / ${clienteRegistrado.telefono}`;
                 } else {
                     cuentaEstadoEl.textContent = "Registra nombre, nacimiento, correo y telefono para comprar y agendar mas rapido.";
@@ -3404,6 +3430,36 @@
             }
         }
 
+        function _setCuentaModo(mode) {
+            cuentaModo = mode === "login" ? "login" : (mode === "account" ? "account" : "register");
+            const isLogin = cuentaModo === "login";
+            const isAccount = cuentaModo === "account";
+            const showAdvanced = isAccount;
+            if (cuentaModalTituloEl) {
+                cuentaModalTituloEl.textContent = isLogin ? "Iniciar sesion" : (isAccount ? "Mi cuenta" : "Registrar cuenta");
+            }
+            if (cuentaRowPerfilEl) cuentaRowPerfilEl.style.display = isLogin ? "none" : "";
+            if (cuentaEmailConfirmEl) cuentaEmailConfirmEl.style.display = isLogin ? "none" : "";
+            if (cuentaProgramaEl) cuentaProgramaEl.style.display = showAdvanced ? "" : "none";
+            if (cuentaCuponesWrapEl) cuentaCuponesWrapEl.style.display = showAdvanced ? "" : "none";
+            if (cuentaDireccionWrapEl) cuentaDireccionWrapEl.style.display = showAdvanced ? "" : "none";
+            if (cuentaGuardarDireccionEl) cuentaGuardarDireccionEl.style.display = showAdvanced ? "" : "none";
+            if (cuentaHistorialWrapEl) cuentaHistorialWrapEl.style.display = showAdvanced ? "" : "none";
+            if (cuentaHistorialAgendaWrapEl) cuentaHistorialAgendaWrapEl.style.display = showAdvanced ? "" : "none";
+            if (cuentaGuardarDireccionEl) cuentaGuardarDireccionEl.disabled = !showAdvanced;
+            if (cuentaGuardarDireccionEl && !showAdvanced) cuentaGuardarDireccionEl.title = "Disponible cuando inicies sesion.";
+            if (cuentaGuardarEl) {
+                cuentaGuardarEl.textContent = isLogin ? "Iniciar sesion" : (isAccount ? "Actualizar cuenta" : "Registrar cuenta");
+            }
+            if (!clienteRegistrado && cuentaEstadoEl) {
+                if (isLogin) {
+                    cuentaEstadoEl.textContent = "Ingresa con correo y telefono (+569 + 8 digitos).";
+                } else {
+                    cuentaEstadoEl.textContent = "Registra tus datos para compras y reservas mas rapidas.";
+                }
+            }
+        }
+
         function cerrarSesionCliente() {
             clienteRegistrado = null;
             historialComprasCliente = [];
@@ -3418,6 +3474,7 @@
             if (cuentaEmailConfirmEl) cuentaEmailConfirmEl.value = "";
             if (cuentaTelefonoEl) cuentaTelefonoEl.value = "";
             if (cuentaDireccionBuscarEl) cuentaDireccionBuscarEl.value = "";
+            _setCuentaModo("login");
             renderEstadoCuenta();
             msg("Sesion cerrada correctamente.");
         }
@@ -5914,7 +5971,10 @@
             }
         }
 
-        function abrirModalCuenta() {
+        function abrirModalCuenta(mode = "auto") {
+            if (mode === "login") _setCuentaModo("login");
+            else if (mode === "register") _setCuentaModo("register");
+            else _setCuentaModo(clienteRegistrado ? "account" : "login");
             if (cuentaNombreEl) cuentaNombreEl.value = clienteRegistrado?.nombre || "";
             if (cuentaFechaNacimientoEl) cuentaFechaNacimientoEl.value = String(clienteRegistrado?.fecha_nacimiento || "");
             if (cuentaEmailEl) cuentaEmailEl.value = clienteRegistrado?.email || "";
@@ -5927,8 +5987,8 @@
             }
             renderEstadoCuenta();
             modalCuentaEl?.classList.add("active");
-            _initCuentaMap();
             if (clienteRegistrado) {
+                _initCuentaMap();
                 cargarHistorialCliente();
                 _startHistorialEstadoPoll();
             }
@@ -6036,6 +6096,9 @@
         window.aplicarCuponRegalado = aplicarCuponRegalado;
 
         async function registrarCuentaCliente() {
+            if (cuentaModo === "login") {
+                return iniciarSesionCliente();
+            }
             const email = normalizarEmailCliente(cuentaEmailEl?.value);
             const emailConfirm = normalizarEmailCliente(cuentaEmailConfirmEl?.value);
             const tel8 = normalizarTelefono8(cuentaTelefonoEl?.value);
@@ -6078,11 +6141,52 @@
                     direccion_lng: (cli.direccion_lng ?? (cuentaDireccionConfirmada ? Number(cuentaDireccionPin.lng || 0) : null)),
                 };
                 guardarClienteLocal(clienteRegistrado);
+                _setCuentaModo("account");
                 renderEstadoCuenta();
                 await cargarHistorialCliente();
                 msg("Cuenta de cliente registrada.");
             } catch (e) {
                 msg(e.message || "No se pudo registrar cliente", true);
+            }
+        }
+
+        async function iniciarSesionCliente() {
+            const email = normalizarEmailCliente(cuentaEmailEl?.value);
+            const tel8 = normalizarTelefono8(cuentaTelefonoEl?.value);
+            if (!email) return msg("Ingresa un correo valido.", true);
+            if (!tel8) return msg("Ingresa telefono valido (8 digitos).", true);
+            try {
+                const res = await fetch("/api/tienda/clientes/historial", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email,
+                        telefono: `+569${tel8}`,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo iniciar sesion");
+                const cli = data.cliente || {};
+                clienteRegistrado = {
+                    nombre: String(cli.nombre || nombreDesdeEmail(email)).trim() || nombreDesdeEmail(email),
+                    email: String(cli.email || email).trim().toLowerCase(),
+                    telefono: String(cli.telefono || `+569${tel8}`),
+                    telefono_digitos: normalizarTelefono8(cli.telefono || tel8),
+                    fecha_nacimiento: String(cli.fecha_nacimiento || ""),
+                    puntos_total: Number(cli.puntos_total || 0),
+                    puntos_actual: Number(cli.puntos_actual || 0),
+                    nivel: cli.nivel && typeof cli.nivel === "object" ? cli.nivel : null,
+                    direccion_default: String(cli.direccion_default || ""),
+                    direccion_lat: (cli.direccion_lat ?? null),
+                    direccion_lng: (cli.direccion_lng ?? null),
+                };
+                guardarClienteLocal(clienteRegistrado);
+                _setCuentaModo("account");
+                renderEstadoCuenta();
+                await cargarHistorialCliente();
+                msg("Sesion iniciada correctamente.");
+            } catch (e) {
+                msg(e.message || "No se pudo iniciar sesion", true);
             }
         }
 
@@ -6667,7 +6771,9 @@
         cuentaBuscarMapaEl?.addEventListener("click", _buscarDireccionCuentaEnMapa);
         cuentaConfirmarPinEl?.addEventListener("click", _confirmarPinCuenta);
         cuentaGuardarDireccionEl?.addEventListener("click", guardarDireccionCuentaCliente);
-        btnCuentaEl?.addEventListener("click", abrirModalCuenta);
+        btnCuentaEl?.addEventListener("click", () => abrirModalCuenta("account"));
+        btnIniciarSesionEl?.addEventListener("click", () => abrirModalCuenta("login"));
+        btnRegistrarCuentaEl?.addEventListener("click", () => abrirModalCuenta("register"));
         btnCerrarSesionEl?.addEventListener("click", cerrarSesionCliente);
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
