@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -2485,6 +2485,10 @@
                     <input id="cuenta-telefono" type="tel" inputmode="numeric" maxlength="8" placeholder="12345678">
                 </div>
                 <div id="cuenta-programa" style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;font-size:.85rem;color:#334155;">Nivel: - · Puntos: 0</div>
+            <div style="font-size:.88rem;font-weight:700;color:#334155;">Cupones de tu cuenta</div>
+            <div id="cuenta-cupones" style="max-height:160px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:8px;display:grid;gap:8px;">
+                <div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>
+            </div>
             </div>
             <div style="font-size:.88rem;font-weight:700;color:#334155;">Direccion por defecto para agenda</div>
             <div class="agenda-map-actions" style="margin-top:0;">
@@ -2692,6 +2696,7 @@
         const cuentaEmailConfirmEl = document.getElementById("cuenta-email-confirm");
         const cuentaTelefonoEl = document.getElementById("cuenta-telefono");
         const cuentaProgramaEl = document.getElementById("cuenta-programa");
+        const cuentaCuponesEl = document.getElementById("cuenta-cupones");
         const cuentaHistorialEl = document.getElementById("cuenta-historial");
         const cuentaHistorialAgendaEl = document.getElementById("cuenta-historial-agenda");
         const cuentaDireccionBuscarEl = document.getElementById("cuenta-direccion-buscar");
@@ -2838,6 +2843,7 @@
         let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
         let historialComprasCliente = [];
+        let cuponesClienteDisponibles = [];
         let carritoVacioTexto = "El carrito esta vacio.";
         let tiendaUiCfg = {};
         let agendaDias = [];
@@ -5672,7 +5678,9 @@
             try {
                 const payload = {
                     codigo_descuento: codigo,
-                    items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad }))
+                    items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad })),
+                    cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
+                    cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
                 };
                 const res = await fetch("/api/tienda/cupon/validar", {
                     method: "POST",
@@ -5885,6 +5893,49 @@
             `).join("");
         }
 
+        function aplicarCuponRegalado(codigo) {
+            const cod = String(codigo || "").trim();
+            if (!cod) return;
+            if (codigoDescuentoEl) codigoDescuentoEl.value = cod;
+            if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = cod;
+            if (!carrito.length) {
+                msg("Cupon cargado. Agrega productos al carrito y presiona Aplicar.", false);
+                return;
+            }
+            aplicarCupon();
+        }
+
+        function renderCuponesCliente(cupones) {
+            if (!cuentaCuponesEl) return;
+            const items = Array.isArray(cupones) ? cupones : [];
+            cuponesClienteDisponibles = items;
+            if (!items.length) {
+                cuentaCuponesEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>`;
+                return;
+            }
+            cuentaCuponesEl.innerHTML = items.map((c) => {
+                const code = String(c.codigo || "").trim();
+                const tipo = String(c.tipo_descuento || "porcentaje").trim().toLowerCase();
+                const valor = Number(c.valor_descuento || 0);
+                const beneficio = tipo === "monto_fijo" ? money.format(valor) : `${valor}%`;
+                const vence = String(c.fecha_vencimiento || c.fecha_fin || "").trim();
+                return `
+                    <div style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:4px;">
+                        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                            <strong>${esc(code || "CUPON")}</strong>
+                            <span class="pill">${esc(beneficio)}</span>
+                        </div>
+                        <div style="font-size:.82rem;color:#334155;">${esc(String(c.nombre || "Cupon de beneficio"))}</div>
+                        ${vence ? `<div style="font-size:.78rem;color:#64748b;">Vence: ${esc(vence)}</div>` : ""}
+                        <div style="display:flex;justify-content:flex-end;">
+                            <button class="btn-primary" type="button" onclick="aplicarCuponRegalado('${esc(code)}')">Usar cupon</button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+        window.aplicarCuponRegalado = aplicarCuponRegalado;
+
         async function registrarCuentaCliente() {
             const email = normalizarEmailCliente(cuentaEmailEl?.value);
             const emailConfirm = normalizarEmailCliente(cuentaEmailConfirmEl?.value);
@@ -5940,6 +5991,7 @@
             if (!clienteRegistrado) {
                 renderHistorialCliente([]);
                 renderHistorialAgendaCliente([]);
+                renderCuponesCliente([]);
                 return;
             }
             try {
@@ -5969,11 +6021,17 @@
                 historialComprasCliente = Array.isArray(data.ventas) ? data.ventas : [];
                 renderHistorialCliente(historialComprasCliente);
                 renderHistorialAgendaCliente(Array.isArray(data.agenda_reservas) ? data.agenda_reservas : []);
+                const cupones = Array.isArray(data.cupones_disponibles) ? data.cupones_disponibles : [];
+                renderCuponesCliente(cupones);
+                if (cupones.length > 0) {
+                    msg(`Tienes ${cupones.length} cupon(es) disponibles en Mi cuenta.`, false);
+                }
                 _sincronizarPedidoActivoDesdeHistorial();
             } catch (e) {
                 historialComprasCliente = [];
                 renderHistorialCliente([]);
                 renderHistorialAgendaCliente([]);
+                renderCuponesCliente([]);
                 msg(e.message || "No se pudo cargar historial", true);
             }
         }

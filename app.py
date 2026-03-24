@@ -3290,6 +3290,68 @@ def _obtener_cupon_por_codigo(codigo):
             conn.close()
 
 
+def _listar_cupones_regalados_cliente_cursor(cursor, cliente_id, solo_disponibles=False):
+    sql = """
+        SELECT cc.id, cc.cliente_id, cc.cupon_id, cc.activo, cc.usado, cc.usado_venta_id, cc.nota,
+               cc.asignado_por, cc.fecha_asignado, cc.fecha_vencimiento, cc.fecha_usado,
+               c.codigo, c.nombre, c.tipo_descuento, c.valor_descuento, c.activo AS cupon_activo,
+               c.fecha_inicio, c.fecha_fin, c.monto_minimo
+        FROM tienda_cliente_cupones cc
+        JOIN tienda_cupones c ON c.id = cc.cupon_id
+        WHERE cc.cliente_id = ?
+    """
+    params = [int(cliente_id)]
+    if solo_disponibles:
+        hoy = datetime.now().date().isoformat()
+        sql += """
+            AND cc.activo = 1
+            AND cc.usado = 0
+            AND c.activo = 1
+            AND (cc.fecha_vencimiento IS NULL OR TRIM(cc.fecha_vencimiento) = '' OR cc.fecha_vencimiento >= ?)
+            AND (c.fecha_inicio IS NULL OR TRIM(c.fecha_inicio) = '' OR c.fecha_inicio <= ?)
+            AND (c.fecha_fin IS NULL OR TRIM(c.fecha_fin) = '' OR c.fecha_fin >= ?)
+        """
+        params.extend([hoy, hoy, hoy])
+    sql += " ORDER BY datetime(cc.fecha_asignado) DESC, cc.id DESC"
+    cursor.execute(sql, tuple(params))
+    return [dict(r) for r in cursor.fetchall()]
+
+
+def _marcar_cupon_regalado_usado_cursor(cursor, cupon_id, cliente_ref, venta_id):
+    if not cupon_id or not cliente_ref:
+        return 0
+    today = datetime.now().date().isoformat()
+    cursor.execute(
+        """
+        SELECT id
+        FROM tienda_cliente_cupones
+        WHERE cupon_id = ?
+          AND LOWER(TRIM(COALESCE(cliente_ref, ''))) = LOWER(TRIM(?))
+          AND activo = 1
+          AND usado = 0
+          AND (fecha_vencimiento IS NULL OR TRIM(fecha_vencimiento) = '' OR fecha_vencimiento >= ?)
+        ORDER BY datetime(fecha_asignado) ASC, id ASC
+        LIMIT 1
+        """,
+        (int(cupon_id), str(cliente_ref or "").strip(), today),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return 0
+    rid = int(row["id"])
+    cursor.execute(
+        """
+        UPDATE tienda_cliente_cupones
+        SET usado = 1,
+            usado_venta_id = ?,
+            fecha_usado = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (int(venta_id), rid),
+    )
+    return int(cursor.rowcount or 0)
+
+
 def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref):
     if not cupon:
         return {"ok": False, "error": "Cupon no encontrado"}
@@ -3327,6 +3389,29 @@ def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cli
     try:
         conn = get_db()
         cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) AS total FROM tienda_cliente_cupones WHERE cupon_id = ? AND activo = 1",
+            (int(cupon["id"]),),
+        )
+        tiene_regalos = int(cursor.fetchone()["total"] or 0) > 0
+        if tiene_regalos:
+            if not cliente_ref:
+                return {"ok": False, "error": "Este cupon es personalizado. Inicia sesion en Mi cuenta para usarlo"}
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM tienda_cliente_cupones
+                WHERE cupon_id = ?
+                  AND LOWER(TRIM(COALESCE(cliente_ref, ''))) = LOWER(TRIM(?))
+                  AND activo = 1
+                  AND usado = 0
+                  AND (fecha_vencimiento IS NULL OR TRIM(fecha_vencimiento) = '' OR fecha_vencimiento >= ?)
+                """,
+                (int(cupon["id"]), str(cliente_ref or "").strip(), hoy),
+            )
+            match_cliente = int(cursor.fetchone()["total"] or 0)
+            if match_cliente <= 0:
+                return {"ok": False, "error": "Este cupon no esta disponible para tu cuenta"}
         usos_total_max = cupon.get("usos_max_total")
         if usos_total_max is not None and str(usos_total_max).strip() != "":
             max_total = int(usos_total_max)
@@ -3551,6 +3636,7 @@ def api_tienda_clientes_historial():
             (email, telefono),
         )
         agenda_reservas = [dict(r) for r in cursor.fetchall()]
+        cupones_disponibles = _listar_cupones_regalados_cliente_cursor(cursor, int(cli.get("id") or 0), solo_disponibles=True)
         niveles = _cargar_niveles_clientes(conn, solo_activos=True)
         nivel_actual = cli.get("nivel") if isinstance(cli.get("nivel"), dict) else None
         puntos_total = int(cli.get("puntos_total") or 0)
@@ -3568,6 +3654,7 @@ def api_tienda_clientes_historial():
                 "cliente": cli,
                 "ventas": ventas,
                 "agenda_reservas": agenda_reservas,
+                "cupones_disponibles": cupones_disponibles,
                 "programa": {
                     "nivel_actual": nivel_actual,
                     "siguiente_nivel": siguiente_nivel,
@@ -3832,8 +3919,21 @@ def api_tienda_admin_clientes():
             cursor.execute("SELECT COUNT(*) AS total FROM agenda_eventos WHERE LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (item.get("email"), item.get("telefono")))
             row_reservas = cursor.fetchone()
             reservas = int((dict(row_reservas).get("total") if row_reservas else 0) or 0)
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM tienda_cliente_cupones
+                WHERE cliente_id = ?
+                  AND activo = 1
+                  AND usado = 0
+                """,
+                (cid,),
+            )
+            row_cupones = cursor.fetchone()
+            cupones_pendientes = int((dict(row_cupones).get("total") if row_cupones else 0) or 0)
             item["compras_total"] = compras
             item["reservas_total"] = reservas
+            item["cupones_pendientes"] = cupones_pendientes
             item["id"] = cid
             item["puntos_actual"] = int(item.get("puntos_actual") or 0)
             item["puntos_total"] = int(item.get("puntos_total") or 0)
@@ -3908,8 +4008,126 @@ def api_tienda_admin_cliente_detalle(cliente_id):
             (int(cliente_id),),
         )
         movimientos = [dict(r) for r in cursor.fetchall()]
-        return jsonify({"success": True, "cliente": cli, "ventas": ventas, "reservas": reservas, "movimientos": movimientos})
+        cupones_regalados = _listar_cupones_regalados_cliente_cursor(cursor, int(cliente_id), solo_disponibles=False)
+        return jsonify({
+            "success": True,
+            "cliente": cli,
+            "ventas": ventas,
+            "reservas": reservas,
+            "movimientos": movimientos,
+            "cupones_regalados": cupones_regalados,
+        })
     except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/clientes/<int:cliente_id>/eliminar', methods=['POST'])
+def api_tienda_admin_cliente_eliminar(cliente_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("SELECT id, nombre, email, telefono FROM tienda_clientes WHERE id = ? LIMIT 1", (int(cliente_id),))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Cliente no encontrado"}), 404
+        cli = dict(row)
+        cursor.execute("DELETE FROM tienda_clientes WHERE id = ?", (int(cliente_id),))
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "cliente_eliminado": cli})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/clientes/<int:cliente_id>/regalar-cupon', methods=['POST'])
+def api_tienda_admin_cliente_regalar_cupon(cliente_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        cupon_id = int(data.get("cupon_id") or 0)
+        if cupon_id <= 0:
+            return jsonify({"success": False, "error": "Debes seleccionar un cupon"}), 400
+        nota = str(data.get("nota") or "").strip()[:240]
+        fecha_vencimiento = str(data.get("fecha_vencimiento") or "").strip()[:10]
+        if fecha_vencimiento:
+            try:
+                datetime.strptime(fecha_vencimiento, "%Y-%m-%d")
+            except ValueError:
+                return jsonify({"success": False, "error": "Fecha de vencimiento invalida"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("SELECT id, nombre, email, telefono, activo FROM tienda_clientes WHERE id = ? LIMIT 1", (int(cliente_id),))
+        cli_row = cursor.fetchone()
+        if not cli_row:
+            return jsonify({"success": False, "error": "Cliente no encontrado"}), 404
+        cli = dict(cli_row)
+        if not bool(cli.get("activo", 1)):
+            return jsonify({"success": False, "error": "El cliente esta inactivo"}), 400
+
+        cursor.execute("SELECT * FROM tienda_cupones WHERE id = ? LIMIT 1", (cupon_id,))
+        cup_row = cursor.fetchone()
+        if not cup_row:
+            return jsonify({"success": False, "error": "Cupon no encontrado"}), 404
+        cupon = dict(cup_row)
+        if not bool(cupon.get("activo", 0)):
+            return jsonify({"success": False, "error": "El cupon esta inactivo"}), 400
+
+        cliente_ref = _normalizar_cliente_ref(cli.get("email"), cli.get("telefono"))
+        cursor.execute(
+            """
+            SELECT id
+            FROM tienda_cliente_cupones
+            WHERE cliente_id = ?
+              AND cupon_id = ?
+              AND activo = 1
+              AND usado = 0
+            ORDER BY datetime(fecha_asignado) DESC, id DESC
+            LIMIT 1
+            """,
+            (int(cliente_id), int(cupon_id)),
+        )
+        dup = cursor.fetchone()
+        if dup:
+            return jsonify({"success": False, "error": "Este cliente ya tiene este cupon pendiente"}), 400
+
+        cursor.execute(
+            """
+            INSERT INTO tienda_cliente_cupones (
+                cliente_id, cliente_ref, cupon_id, activo, usado, nota, asignado_por, fecha_vencimiento, fecha_asignado
+            )
+            VALUES (?, ?, ?, 1, 0, ?, 'admin', ?, CURRENT_TIMESTAMP)
+            """,
+            (int(cliente_id), cliente_ref, int(cupon_id), nota, (fecha_vencimiento or None)),
+        )
+        regalo_id = int(cursor.lastrowid or 0)
+        conn.commit()
+        crear_backup()
+        return jsonify({
+            "success": True,
+            "regalo_id": regalo_id,
+            "cliente_id": int(cliente_id),
+            "cupon_id": int(cupon_id),
+            "codigo": str(cupon.get("codigo") or ""),
+        })
+    except Exception as e:
+        if conn:
+            conn.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
@@ -8654,6 +8872,13 @@ def api_tienda_checkout():
                 telefono=cliente_telefono,
                 email_confirmado=1,
             )
+            if cupon_aplicado and descuento_monto > 0 and cliente:
+                _marcar_cupon_regalado_usado_cursor(
+                    cursor,
+                    cupon_id=int(cupon_aplicado.get("id") or 0),
+                    cliente_ref=_normalizar_cliente_ref(cliente.get("email"), cliente.get("telefono")),
+                    venta_id=venta_id,
+                )
             if cliente:
                 cfg_prog = _obtener_config_programa_clientes(conn)
                 puntos_compra = _puntos_compra(total_neto, cfg_prog)

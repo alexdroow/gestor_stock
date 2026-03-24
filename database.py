@@ -7660,6 +7660,27 @@ def migrar_db():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_cliente_cupones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente_id INTEGER NOT NULL,
+                cliente_ref TEXT NOT NULL DEFAULT '',
+                cupon_id INTEGER NOT NULL,
+                activo INTEGER NOT NULL DEFAULT 1,
+                usado INTEGER NOT NULL DEFAULT 0,
+                usado_venta_id INTEGER,
+                nota TEXT DEFAULT '',
+                asignado_por TEXT NOT NULL DEFAULT 'admin',
+                fecha_asignado TEXT DEFAULT CURRENT_TIMESTAMP,
+                fecha_vencimiento TEXT,
+                fecha_usado TEXT,
+                FOREIGN KEY(cliente_id) REFERENCES tienda_clientes(id) ON DELETE CASCADE,
+                FOREIGN KEY(cupon_id) REFERENCES tienda_cupones(id),
+                FOREIGN KEY(usado_venta_id) REFERENCES ventas(id)
+            )
+            """
+        )
+        conn.execute(
+            """
             INSERT OR IGNORE INTO tienda_clientes_niveles
                 (id, nombre, slug, orden, puntos_minimos, beneficios_json, descuento_pct, activo, creado_en, actualizado_en)
             VALUES
@@ -7684,6 +7705,18 @@ def migrar_db():
             """
             CREATE INDEX IF NOT EXISTS idx_tienda_clientes_mov_cliente
             ON tienda_clientes_puntos_mov(cliente_id, creado_en DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_cliente_cupones_cliente
+            ON tienda_cliente_cupones(cliente_id, activo, usado, fecha_asignado DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_cliente_cupones_ref_cupon
+            ON tienda_cliente_cupones(cliente_ref, cupon_id, activo, usado)
             """
         )
         conn.execute(
