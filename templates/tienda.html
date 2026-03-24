@@ -1847,7 +1847,7 @@
         }
         body.mobile-ui .stock { font-size: 0.82rem; }
         body.mobile-ui .quick-add { width: var(--mobile-quick-add-size); height: var(--mobile-quick-add-size); font-size: var(--mobile-quick-add-font); box-shadow: 0 8px 20px rgba(249, 115, 22, .38); }
-        body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(105px, 58vw); width: min(105px, 58vw); }
+        body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(84px, 46vw); width: min(84px, 46vw); }
         body.mobile-ui .section h2 { font-size: 2.2rem; margin-bottom: 12px; }
         body.mobile-ui .tienda-estado-banner { font-size: 0.7rem; padding: 8px 9px; }
         body.mobile-ui .topbar .brand { font-size: 1.26rem; }
@@ -3613,7 +3613,7 @@
             const floatImg = String(tiendaUiCfg.offer_float_image_url || "").trim();
             const floatIcon = String(tiendaUiCfg.offer_float_icon || "").trim();
             return `
-                <article class="item-card ${esOferta ? "oferta" : ""}">
+                <article class="item-card ${esOferta ? "oferta" : ""}" onclick="agregarDesdeTarjeta(event, ${p.id}, ${agotado ? "true" : "false"})" ${agotado ? "" : "title=\"Agregar al carrito\""}>
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
                     ${badgeOn ? `<span class="offer-custom-badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
                     ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
@@ -3629,7 +3629,7 @@
                         <div class="item-desc">${esc(desc || "Sin descripcion")}</div>
                         <div class="stock">Disponible: ${stock} unidad(es)</div>
                     </div>
-                    <button class="quick-add" type="button" onclick="agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : "title=\"Agregar al carrito\""}><span class="quick-add-glyph" aria-hidden="true">&#128722;</span></button>
+                    <button class="quick-add" type="button" onclick="event.stopPropagation();agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : "title=\"Agregar al carrito\""}><span class="quick-add-glyph" aria-hidden="true">&#128722;</span></button>
                 </article>
             `;
         }
@@ -5930,6 +5930,12 @@
             renderCart();
         }
 
+        function agregarDesdeTarjeta(ev, id, agotado) {
+            if (ev && typeof ev.stopPropagation === "function") ev.stopPropagation();
+            if (agotado) return;
+            agregar(Number(id || 0));
+        }
+
         function sumar(id) {
             if (!tiendaAbierta) return msg("La tienda esta cerrada. No se pueden modificar compras.", true);
             const it = carrito.find((x) => x.id === id);
@@ -6769,6 +6775,7 @@
         }
 
         window.agregar = agregar;
+        window.agregarDesdeTarjeta = agregarDesdeTarjeta;
         window.sumar = sumar;
         window.restar = restar;
         window.cambiarCategoria = cambiarCategoria;
