@@ -5130,7 +5130,7 @@
             const jspdf = window.jspdf || null;
             if (!jspdf || !jspdf.jsPDF) {
                 _agendaMsg("No se pudo cargar generador PDF.", "err");
-                return;
+                return null;
             }
             const { jsPDF } = jspdf;
             const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -5359,7 +5359,37 @@
 
             const tipoNombre = String(payload.tipo || "reserva").toLowerCase();
             const fechaArchivo = String(payload.fecha || "").replaceAll("/", "-");
-            doc.save(`orden_reserva_tienda_-_${tipoNombre}_${fechaArchivo || "sin-fecha"}.pdf`);
+            const fileName = `orden_reserva_tienda_-_${tipoNombre}_${fechaArchivo || "sin-fecha"}.pdf`;
+            let blobUrl = "";
+            try {
+                const blob = doc.output("blob");
+                blobUrl = URL.createObjectURL(blob);
+            } catch (_) {
+                blobUrl = "";
+            }
+            doc.save(fileName);
+            return { fileName, blobUrl };
+        }
+
+        function _abrirResumenReservaEnVentana(extWin, payload, reserva, pdfInfo, extra = {}) {
+            const w = extWin && !extWin.closed ? extWin : window.open("", "_blank");
+            if (!w) return;
+            const nombre = esc(String(payload?.nombre || "-"));
+            const correo = esc(String(payload?.email || "-"));
+            const telefono = esc(String(payload?.telefono || "-"));
+            const tipo = esc(_labelTipoReserva(payload?.tipo));
+            const fecha = esc(_formatearFechaAgenda(payload?.fecha));
+            const hora = esc(String(payload?.hora_inicio || "-"));
+            const entrega = esc(String(payload?.entrega_tipo === "despacho" ? "Despacho" : "Retiro en tienda"));
+            const direccion = esc(String(payload?.direccion || "Retiro en local Sucree"));
+            const rid = Number(reserva?.id || 0);
+            const pdfHref = String((pdfInfo && pdfInfo.blobUrl) || "");
+            const pdfName = esc(String((pdfInfo && pdfInfo.fileName) || "reserva_agenda.pdf"));
+            const waManual = String(extra.waManualUrl || "").trim();
+            const waStatus = esc(String(extra.whatsappStatus || ""));
+            w.document.open();
+            w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resumen reserva</title><style>body{font-family:Segoe UI,Tahoma,sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:18px}.card{max-width:760px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:grid;gap:10px}.ok{color:#166534;font-weight:700}.warn{color:#92400e;background:#fffbeb;border:1px solid #fed7aa;border-radius:8px;padding:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.btn{display:inline-block;text-decoration:none;border:1px solid #cbd5e1;border-radius:8px;padding:9px 12px;font-weight:700;color:#0f172a;background:#fff}.btnp{background:#2563eb;color:#fff;border-color:#2563eb}.btnw{background:#16a34a;color:#fff;border-color:#16a34a}@media(max-width:680px){.grid{grid-template-columns:1fr}}</style></head><body><div class="card"><h2 style="margin:0">Reserva enviada correctamente</h2><div class="ok">Espera la confirmacion por WhatsApp. Horario de atencion: 10:00 a 20:00.</div>${waStatus ? `<div class="warn">${waStatus}</div>` : ""}<div class="grid"><div><strong>Reserva:</strong> #${rid || "-"}</div><div><strong>Tipo:</strong> ${tipo}</div><div><strong>Fecha:</strong> ${fecha}</div><div><strong>Hora:</strong> ${hora}</div><div><strong>Entrega:</strong> ${entrega}</div><div><strong>Telefono:</strong> ${telefono}</div></div><div><strong>Cliente:</strong> ${nombre}</div><div><strong>Correo:</strong> ${correo}</div><div><strong>Direccion:</strong> ${direccion}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${pdfHref ? `<a class="btn btnp" href="${pdfHref}" download="${pdfName}">Descargar PDF nuevamente</a>` : ""}${waManual ? `<a class="btn btnw" href="${waManual}" target="_blank" rel="noopener">Abrir WhatsApp manual</a>` : ""}<a class="btn" href="/tienda">Volver a tienda</a></div></div></body></html>`);
+            w.document.close();
         }
 
         async function _confirmarReservaAgendaPendiente(opts = {}) {
@@ -5368,6 +5398,8 @@
             const sendToPasteleria = Boolean(opts && opts.sendToPasteleria);
             const waWindow = opts && opts.waWindow ? opts.waWindow : null;
             let sentPdfToPasteleria = false;
+            let waManualUrl = "";
+            let waStatusText = "";
             _agendaMsg("Reservando horario...");
             try {
                 const res = await fetch("/api/tienda/agenda/reservar", {
@@ -5382,7 +5414,7 @@
                     ...payload,
                     shipping_quote: reserva.shipping_quote || payload.shipping_quote || null,
                 };
-                _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
+                const pdfInfo = _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
                 if (sendToPasteleria) {
                     try {
                         const waRes = await fetch(`/api/tienda/agenda/reserva/${Number(reserva.id || 0)}/whatsapp-pasteleria`, {
@@ -5397,23 +5429,19 @@
                         if (!waRes.ok || !waData.success) {
                             throw new Error(waData.error || "No se pudo enviar PDF por WhatsApp");
                         }
-                        if (waWindow && !waWindow.closed) waWindow.close();
                         sentPdfToPasteleria = true;
-                    } catch (_) {
+                        waStatusText = "PDF enviado automaticamente a Pasteleria Sucree por WhatsApp.";
+                    } catch (errWa) {
                         const contacto = String(payloadFinal.nombre || payloadFinal.email || "cliente").trim();
                         const msgWa = `Hola mi nombre ${contacto} envio mi cotizacion para una pronta revision.`;
-                        const waUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
-                        try {
-                            if (waWindow && !waWindow.closed) {
-                                waWindow.location.href = waUrl;
-                            } else {
-                                window.open(waUrl, "_blank");
-                            }
-                        } catch (_) {
-                            window.open(waUrl, "_blank");
-                        }
+                        waManualUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
+                        waStatusText = `No se pudo enviar automaticamente por Twilio (${String(errWa?.message || "sin detalle")}). Puedes enviarlo manualmente con el boton de WhatsApp.`;
                     }
                 }
+                _abrirResumenReservaEnVentana(waWindow, payloadFinal, reserva, pdfInfo, {
+                    waManualUrl,
+                    whatsappStatus: waStatusText,
+                });
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
                 if (String(payload.tipo || "") === "torta") {
                     _resetAgendaCakeSelection();
@@ -6768,7 +6796,14 @@
             _cerrarModalAgendaConfirmar();
         });
         agendaConfirmarAceptarEnviarEl?.addEventListener("click", () => {
-            const waWindow = window.open("about:blank", "_blank");
+            const waWindow = window.open("", "_blank");
+            try {
+                if (waWindow && !waWindow.closed) {
+                    waWindow.document.open();
+                    waWindow.document.write("<!doctype html><html><head><meta charset='utf-8'><title>Procesando reserva...</title></head><body style='font-family:Segoe UI,Tahoma,sans-serif;padding:20px;background:#f8fafc;color:#0f172a;'><h3 style='margin-top:0'>Procesando reserva...</h3><p>Estamos generando tu comprobante y enviando la solicitud a pasteleria.</p></body></html>");
+                    waWindow.document.close();
+                }
+            } catch (_) {}
             _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
         });
         modalAgendaConfirmarEl?.addEventListener("click", (ev) => {
