@@ -6912,6 +6912,48 @@ def api_insumos_calculo_recetas():
       ]
     }
     """
+    def _factor_unidad_local(unidad):
+        u = str(unidad or '').strip().lower().split('(')[0].strip()
+        if not u:
+            return 1.0, 'unidad'
+        if u in {'mg', 'miligramo', 'miligramos'}:
+            return 0.001, 'g'
+        if u in {'g', 'gr', 'gramo', 'gramos'}:
+            return 1.0, 'g'
+        if u in {'kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos'}:
+            return 1000.0, 'g'
+        if u in {'ml', 'mililitro', 'mililitros', 'cc', 'cm3'}:
+            return 1.0, 'ml'
+        if u in {'l', 'lt', 'litro', 'litros'}:
+            return 1000.0, 'ml'
+        if u in {'docena', 'docenas'}:
+            return 12.0, 'unidad'
+        return 1.0, 'unidad'
+
+    def _convertir_a_unidad_costeo(cantidad_receta, unidad_receta, unidad_costeo):
+        """
+        Convierte cantidad de receta a la unidad de costeo/compra del insumo.
+        Ej: 3960 gr -> 3.96 kg, 1200 cc -> 1.2 l
+        """
+        try:
+            qty = float(cantidad_receta or 0)
+        except Exception:
+            return 0.0
+        if qty <= 0:
+            return 0.0
+
+        f_receta, base_receta = _factor_unidad_local(unidad_receta)
+        f_costeo, base_costeo = _factor_unidad_local(unidad_costeo)
+
+        # Si no son compatibles, mantenemos cantidad original.
+        if base_receta != base_costeo:
+            return qty
+
+        cantidad_base = qty * f_receta
+        if f_costeo <= 0:
+            return cantidad_base
+        return cantidad_base / f_costeo
+
     try:
         data = request.get_json(silent=True) or {}
         seleccion = data.get('seleccion')
@@ -6972,9 +7014,15 @@ def api_insumos_calculo_recetas():
                         'cantidad': 0.0,
                         'precio_unitario': 0.0,
                         'precio_incluye_iva': True,
+                        'componentes': [],
                     },
                 )
-                row['cantidad'] += cantidad_base * lotes
+                row['componentes'].append(
+                    {
+                        'cantidad': cantidad_base * lotes,
+                        'unidad': item.get('unidad') or 'unidad',
+                    }
+                )
 
         if not acumulado:
             return jsonify({'success': True, 'items': [], 'recetas': resumen_recetas})
@@ -6997,12 +7045,35 @@ def api_insumos_calculo_recetas():
                 iid = int(dbrow['id'])
                 if iid not in acumulado:
                     continue
+                unidad_costeo = dbrow['unidad_compra'] or dbrow['unidad'] or acumulado[iid]['unidad']
+                cantidad_convertida = 0.0
+                for comp in (acumulado[iid].get('componentes') or []):
+                    cantidad_convertida += _convertir_a_unidad_costeo(
+                        comp.get('cantidad') or 0,
+                        comp.get('unidad') or 'unidad',
+                        unidad_costeo,
+                    )
+
                 acumulado[iid]['nombre'] = dbrow['nombre'] or acumulado[iid]['nombre']
-                acumulado[iid]['unidad'] = dbrow['unidad_compra'] or dbrow['unidad'] or acumulado[iid]['unidad']
+                acumulado[iid]['unidad'] = unidad_costeo
+                acumulado[iid]['cantidad'] = cantidad_convertida
                 acumulado[iid]['precio_unitario'] = float(dbrow['precio_unitario'] or 0)
                 acumulado[iid]['precio_incluye_iva'] = bool(dbrow['precio_incluye_iva'])
+                acumulado[iid].pop('componentes', None)
         finally:
             conn.close()
+
+        for iid, row in acumulado.items():
+            if float(row.get('cantidad') or 0) > 0:
+                continue
+            total_raw = 0.0
+            for comp in (row.get('componentes') or []):
+                try:
+                    total_raw += float(comp.get('cantidad') or 0)
+                except Exception:
+                    continue
+            row['cantidad'] = total_raw
+            row.pop('componentes', None)
 
         items = sorted(
             [

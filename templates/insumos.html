@@ -1397,9 +1397,13 @@
 
         .recetas-calc-inputs {
             display: grid;
-            grid-template-columns: 1.6fr 140px auto;
+            grid-template-columns: 1.8fr 140px auto;
             gap: 10px;
             align-items: end;
+        }
+
+        .recetas-select-wrap select {
+            min-height: 42px;
         }
 
         .recetas-calc-list {
@@ -2278,14 +2282,10 @@
                                     </div>
                                 </div>
                                 <div class="recetas-calc-inputs">
-                                    <div class="form-group" style="margin:0;">
-                                        <label for="calc-receta-select">Receta</label>
-                                        <select id="calc-receta-select">
-                                            <option value="">-- Seleccionar receta --</option>
-                                            {% for r in recetas %}
-                                            <option value="{{ r.id }}">{{ r.nombre }}</option>
-                                            {% endfor %}
-                                        </select>
+                                    <div class="form-group recetas-select-wrap" style="margin:0;">
+                                        <label for="calc-receta-buscar">Buscar receta (palabra clave)</label>
+                                        <input type="text" id="calc-receta-buscar" placeholder="Ej: queque, bizcocho, brownie..." oninput="filtrarRecetasCalculo()">
+                                        <select id="calc-receta-select" style="margin-top:8px;"></select>
                                     </div>
                                     <div class="form-group" style="margin:0;">
                                         <label for="calc-receta-lotes">Lotes</label>
@@ -3500,6 +3500,23 @@ let insumosData = [
         let recetasSeleccionCalculo = [];
         let comprasPendientesCache = [];
 
+        function filtrarRecetasCalculo() {
+            const input = document.getElementById('calc-receta-buscar');
+            const select = document.getElementById('calc-receta-select');
+            if (!select) return;
+            const q = String(input ? input.value : '').trim().toLowerCase();
+            const resultados = recetasCalculoData
+                .filter(r => {
+                    const nombre = String((r && r.nombre) || '').toLowerCase();
+                    return !q || nombre.includes(q);
+                })
+                .slice(0, 40);
+
+            let html = '<option value="">-- Seleccionar receta --</option>';
+            html += resultados.map(r => `<option value="${r.id}">${escapeHtml(r.nombre || ('Receta ' + r.id))}</option>`).join('');
+            select.innerHTML = html;
+        }
+
         function formatearCLP(valor) {
             return '$' + Math.round(Number(valor || 0)).toLocaleString('es-CL');
         }
@@ -4236,6 +4253,7 @@ function calcularTotales() {
         link.click();
     }
 
+    filtrarRecetasCalculo();
     renderRecetasSeleccionCalculo();
     applyPendingInsumosUiState();
     buscarInsumos();
