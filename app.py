@@ -7035,6 +7035,7 @@ def api_insumos_calculo_recetas():
             cursor.execute(
                 f"""
                 SELECT id, nombre, unidad, unidad_compra, COALESCE(precio_unitario, 0) AS precio_unitario,
+                       COALESCE(cantidad_comprada, 1) AS cantidad_comprada,
                        CASE WHEN precio_incluye_iva IS NULL THEN 1 ELSE precio_incluye_iva END AS precio_incluye_iva
                 FROM insumos
                 WHERE id IN ({placeholders})
@@ -7057,7 +7058,10 @@ def api_insumos_calculo_recetas():
                 acumulado[iid]['nombre'] = dbrow['nombre'] or acumulado[iid]['nombre']
                 acumulado[iid]['unidad'] = unidad_costeo
                 acumulado[iid]['cantidad'] = cantidad_convertida
-                acumulado[iid]['precio_unitario'] = float(dbrow['precio_unitario'] or 0)
+                cantidad_compra = float(dbrow['cantidad_comprada'] or 1)
+                if cantidad_compra <= 0:
+                    cantidad_compra = 1.0
+                acumulado[iid]['precio_unitario'] = float(dbrow['precio_unitario'] or 0) / cantidad_compra
                 acumulado[iid]['precio_incluye_iva'] = bool(dbrow['precio_incluye_iva'])
                 acumulado[iid].pop('componentes', None)
         finally:

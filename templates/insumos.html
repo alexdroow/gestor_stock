@@ -3476,6 +3476,7 @@ let insumosData = [
         unidad: {{ i.unidad|tojson }},
         unidad_compra: {{ (i.unidad_compra or i.unidad)|tojson }},
         precio_unitario: {{ (i.precio_unitario or 0)|tojson }},
+        cantidad_comprada: {{ (i.cantidad_comprada or 1)|tojson }},
         precio_incluye_iva: {{ (true if i.precio_incluye_iva else false)|tojson }},
         codigo_barra: {{ (i.codigo_barra or '')|tojson }}
     }{% if not loop.last %},{% endif %}
@@ -3519,6 +3520,23 @@ let insumosData = [
 
         function formatearCLP(valor) {
             return '$' + Math.round(Number(valor || 0)).toLocaleString('es-CL');
+        }
+
+        function precioUnitarioEfectivoCalculo(insumo) {
+            if (!insumo) return 0;
+            const precioCompra = Number(insumo.precio_unitario || 0);
+            const cantidadCompra = Number(insumo.cantidad_comprada || 1);
+            if (!Number.isFinite(precioCompra) || precioCompra <= 0) return 0;
+            const divisor = Number.isFinite(cantidadCompra) && cantidadCompra > 0 ? cantidadCompra : 1;
+            return precioCompra / divisor;
+        }
+
+        function etiquetaPrecioInsumoCalculo(insumo) {
+            if (!insumo) return 'Sin precio';
+            const unidadCompra = insumo.unidad_compra || insumo.unidad || '';
+            const precioEfectivo = precioUnitarioEfectivoCalculo(insumo);
+            if (!(precioEfectivo > 0)) return 'Sin precio';
+            return `$${Math.round(precioEfectivo).toLocaleString('es-CL')} / ${unidadCompra}`;
         }
 
         function construirPayloadDesdeFilaCalculo(fila) {
@@ -3867,10 +3885,9 @@ let insumosData = [
             let opciones = '<option value="">-- Seleccionar insumo --</option>';
             insumosData.forEach(ins => {
                 const unidadCompra = ins.unidad_compra || ins.unidad || '';
-                const precioText = ins.precio_unitario ? 
-                    `$${ins.precio_unitario.toLocaleString()} / ${unidadCompra}` : 
-                    'Sin precio';
-                opciones += `<option value="${ins.id}" data-precio="${ins.precio_unitario || 0}" data-unidad="${escapeHtml(unidadCompra)}">
+                const precioEfectivo = precioUnitarioEfectivoCalculo(ins);
+                const precioText = etiquetaPrecioInsumoCalculo(ins);
+                opciones += `<option value="${ins.id}" data-precio="${precioEfectivo || 0}" data-unidad="${escapeHtml(unidadCompra)}">
                     ${escapeHtml(ins.nombre)} (${escapeHtml(precioText)})
                 </option>`;
             });
@@ -3933,9 +3950,9 @@ filasCalculo[index] = {
             if (precio > 0) {
                 document.getElementById('precio-info-' + index).textContent = `Precio: $${precio.toLocaleString()} / ${unidadCompra}`;
             } else {
-                document.getElementById('precio-info-' + index).textContent = 'Sin precio registrado - Ingresa manual';
-                // Permitir ingresar precio manual si no hay
-                const precioManual = prompt('Este insumo no tiene precio registrado. Ingresa el precio de compra:');
+                document.getElementById('precio-info-' + index).textContent = 'Sin precio unitario registrado - Ingresa manual';
+                // Permitir ingresar precio manual por unidad de compra
+                const precioManual = prompt(`Este insumo no tiene precio unitario registrado. Ingresa precio por ${unidadCompra || 'unidad'}:`);
                 if (precioManual && !isNaN(precioManual)) {
                     filasCalculo[index].precio = parseFloat(precioManual);
                     document.getElementById('precio-info-' + index).textContent = `Precio: $${filasCalculo[index].precio.toLocaleString()} / ${unidadCompra}`;
