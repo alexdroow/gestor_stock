@@ -2476,6 +2476,9 @@
                                 <button onclick="agregarActivosAPendientes()" class="btn btn-warning" style="flex: 1;">
                                     &#128722; Enviar a pendientes
                                 </button>
+                                <button onclick="enviarListaWhatsappInsumos()" class="btn btn-success" style="flex: 1;">
+                                    &#128241; Enviar por WhatsApp
+                                </button>
                                 <button onclick="imprimirLista()" class="btn btn-primary" style="flex: 1;">
                                     Imprimir / Guardar PDF
                                 </button>
@@ -4768,6 +4771,28 @@ function calcularTotales() {
         link.href = URL.createObjectURL(blob);
         link.download = `lista_compras_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
+    }
+
+    function enviarListaWhatsappInsumos() {
+        const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null && Number(f.cantidad || 0) > 0);
+        if (activas.length === 0) {
+            alert('No hay insumos en la lista para enviar.');
+            return;
+        }
+
+        const fecha = new Date().toLocaleDateString('es-CL');
+        const encabezado = `Lista de compra de insumos (${fecha})`;
+        const detalle = activas.map((f, idx) => {
+            const cant = Number(f.cantidad || 0);
+            const cantTexto = Number.isInteger(cant) ? String(cant) : cant.toLocaleString('es-CL', { maximumFractionDigits: 3 });
+            const unidad = (f.unidad || 'unidad').toString().trim();
+            const nombre = (f.nombre || 'Insumo').toString().trim();
+            return `${idx + 1}. ${nombre}: ${cantTexto} ${unidad}`;
+        }).join('\n');
+
+        const mensaje = `${encabezado}\n\n${detalle}`;
+        const url = `https://wa.me/56964330546?text=${encodeURIComponent(mensaje)}`;
+        window.open(url, '_blank');
     }
 
     filtrarRecetasCalculo();
