@@ -3986,10 +3986,28 @@ let insumosData = [
                     local.cantidad_comprada = cantidad;
                     local.unidad_compra = unidad;
                 }
+                const lookupKey = String(insumoId);
+                if (insumosLookup[lookupKey]) {
+                    insumosLookup[lookupKey].precio_unitario = precio;
+                    insumosLookup[lookupKey].cantidad_comprada = cantidad;
+                    insumosLookup[lookupKey].unidad_compra = unidad;
+                }
+                if (local) {
+                    actualizarFilaInsumoEnTabla(insumoId, {
+                        nombre: local.nombre,
+                        codigo_barra: local.codigo_barra || '',
+                        unidad: local.unidad || unidad || 'unidad',
+                        stock: Number(local.stock || 0),
+                        stock_minimo: Number(local.stock_minimo || 0),
+                        precio_unitario: precio,
+                        cantidad_comprada: cantidad,
+                        unidad_compra: unidad
+                    });
+                }
                 refrescarOpcionesInsumoCalculo(insumoId);
                 actualizarPreviewAjusteCosteo();
                 calcularTotales();
-                setAjusteCosteoMsg('Ajuste guardado correctamente.');
+                setAjusteCosteoMsg('Ajuste guardado como regla para futuras recetas y aplicado en la lista actual.');
             } catch (e) {
                 setAjusteCosteoMsg(e.message || 'Error guardando ajuste.', true);
             }
