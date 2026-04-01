@@ -1465,6 +1465,21 @@
             background: #fffaf0;
         }
 
+        .costeo-ajuste-box {
+            margin: 10px 0 14px;
+            border: 1px dashed #93c5fd;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fbff;
+        }
+
+        .costeo-ajuste-grid {
+            margin-top: 8px;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
         .beta-sugerencias-list {
             display: grid;
             gap: 8px;
@@ -1488,10 +1503,27 @@
             border-color: #92400e;
         }
 
+        body.dark-mode .costeo-ajuste-box {
+            background: #1f2937;
+            border-color: #334155;
+        }
+
         body.dark-mode .beta-sug-item {
             background: #0f172a;
             border-color: #334155;
             color: #e2e8f0;
+        }
+
+        @media (max-width: 900px) {
+            .costeo-ajuste-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .costeo-ajuste-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         body.dark-mode .recetas-calc-box {
@@ -2326,24 +2358,56 @@
                                 Selecciona los insumos que necesitas comprar. Los precios se cargan automáticamente según tu última compra registrada.
                             </p>
 
-                            {% if beta_costeo_alertas %}
-                            <p style="color:#92400e; margin:-8px 0 14px; font-size:12px;">
-                                Beta costeo: se muestra precio real por unidad segun cantidad comprada y se alertan configuraciones sospechosas.
-                                Para desactivar: <code>GESTIONSTOCK_BETA_COSTEO_ALERTAS=0</code>.
-                            </p>
-                            <div class="beta-sugerencias-box">
+                            <div class="costeo-ajuste-box">
                                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                                    <button type="button" class="btn btn-secondary" onclick="generarSugerenciasAutocorreccion()">
-                                        Autocorregir sugerencias (beta)
+                                    <button type="button" class="btn btn-secondary" onclick="toggleAjusteCosteoPanel()">
+                                        Ajustar costeo por insumo
                                     </button>
-                                    <button type="button" class="btn btn-success" onclick="aplicarTodasSugerenciasAutocorreccion()">
-                                        Aplicar todas
-                                    </button>
-                                    <span id="beta-sugerencias-msg" class="recetas-calc-msg" style="margin:0;"></span>
+                                    <span id="ajuste-costeo-msg" class="recetas-calc-msg" style="margin:0;"></span>
                                 </div>
-                                <div id="beta-sugerencias-list" class="beta-sugerencias-list"></div>
+                                <div id="ajuste-costeo-panel" style="display:none;">
+                                    <div class="recetas-calc-inputs" style="margin-top:8px;">
+                                        <div class="form-group recetas-select-wrap" style="margin:0;">
+                                            <label for="ajuste-costeo-buscar">Buscar insumo</label>
+                                            <input type="text" id="ajuste-costeo-buscar" placeholder="Ej: azucar, harina, huevos..." oninput="filtrarAjusteCosteoInsumos()">
+                                            <select id="ajuste-costeo-select" style="margin-top:8px;" onchange="cargarAjusteCosteoSeleccion()"></select>
+                                        </div>
+                                    </div>
+                                    <div class="costeo-ajuste-grid">
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="ajuste-costeo-precio">Precio compra total ($)</label>
+                                            <input type="number" id="ajuste-costeo-precio" min="0" step="1" oninput="actualizarPreviewAjusteCosteo()">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="ajuste-costeo-cantidad">Cantidad comprada</label>
+                                            <input type="number" id="ajuste-costeo-cantidad" min="0.01" step="0.01" oninput="actualizarPreviewAjusteCosteo()">
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label for="ajuste-costeo-unidad">Unidad compra</label>
+                                            <select id="ajuste-costeo-unidad" onchange="actualizarPreviewAjusteCosteo()">
+                                                <option value="unidad">Unidad</option>
+                                                <option value="kg">kg</option>
+                                                <option value="g">g</option>
+                                                <option value="l">L</option>
+                                                <option value="ml">ml</option>
+                                                <option value="caja">Caja</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin:0;">
+                                            <label>Costo calculo por unidad</label>
+                                            <input type="text" id="ajuste-costeo-efectivo" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="recetas-calc-actions">
+                                        <button type="button" class="btn btn-success" onclick="guardarAjusteCosteoSeleccion()">
+                                            Guardar ajuste
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" onclick="cargarAjusteCosteoSeleccion()">
+                                            Recargar datos
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            {% endif %}
                             <div class="recetas-calc-box">
                                 <div class="recetas-calc-head">
                                     <div>
@@ -3772,6 +3836,165 @@ let insumosData = [
             setBetaSugerenciasMsg(`Sugerencias aplicadas: ${ok}.`);
         }
 
+        function setAjusteCosteoMsg(msg, isError = false) {
+            const el = document.getElementById('ajuste-costeo-msg');
+            if (!el) return;
+            el.textContent = String(msg || '');
+            el.style.color = isError ? '#b91c1c' : '#64748b';
+        }
+
+        function toggleAjusteCosteoPanel() {
+            const panel = document.getElementById('ajuste-costeo-panel');
+            if (!panel) return;
+            const abrir = panel.style.display === 'none' || !panel.style.display;
+            panel.style.display = abrir ? 'block' : 'none';
+            if (abrir) {
+                filtrarAjusteCosteoInsumos();
+                cargarAjusteCosteoSeleccion();
+            }
+        }
+
+        function filtrarAjusteCosteoInsumos() {
+            const input = document.getElementById('ajuste-costeo-buscar');
+            const select = document.getElementById('ajuste-costeo-select');
+            if (!select) return;
+            const q = String(input ? input.value : '').trim().toLowerCase();
+            const prev = String(select.value || '');
+            const lista = [...insumosData]
+                .filter(i => {
+                    const nombre = String(i.nombre || '').toLowerCase();
+                    return !q || nombre.includes(q);
+                })
+                .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
+                .slice(0, 120);
+
+            let html = '<option value="">-- Seleccionar insumo --</option>';
+            html += lista.map(i => `<option value="${i.id}">${escapeHtml(i.nombre || ('Insumo ' + i.id))}</option>`).join('');
+            select.innerHTML = html;
+            if (prev && [...select.options].some(o => String(o.value) === prev)) {
+                select.value = prev;
+            } else if (select.options.length > 1) {
+                select.selectedIndex = 1;
+            }
+        }
+
+        function cargarAjusteCosteoSeleccion() {
+            const select = document.getElementById('ajuste-costeo-select');
+            if (!select || !select.value) return;
+            const ins = insumosData.find(i => Number(i.id) === Number(select.value));
+            if (!ins) return;
+            const precioEl = document.getElementById('ajuste-costeo-precio');
+            const cantidadEl = document.getElementById('ajuste-costeo-cantidad');
+            const unidadEl = document.getElementById('ajuste-costeo-unidad');
+            if (precioEl) precioEl.value = Number(ins.precio_unitario || 0);
+            if (cantidadEl) cantidadEl.value = Number(ins.cantidad_comprada || 1);
+            if (unidadEl) unidadEl.value = ins.unidad_compra || ins.unidad || 'unidad';
+            actualizarPreviewAjusteCosteo();
+            setAjusteCosteoMsg(`Editando ${ins.nombre}.`);
+        }
+
+        function actualizarPreviewAjusteCosteo() {
+            const precio = Number((document.getElementById('ajuste-costeo-precio') || {}).value || 0);
+            const cantidad = Number((document.getElementById('ajuste-costeo-cantidad') || {}).value || 0);
+            const unidad = String((document.getElementById('ajuste-costeo-unidad') || {}).value || 'unidad');
+            const out = document.getElementById('ajuste-costeo-efectivo');
+            if (!out) return;
+            if (!(precio > 0) || !(cantidad > 0)) {
+                out.value = '$0 / ' + unidad;
+                return;
+            }
+            out.value = `$${Math.round(precio / cantidad).toLocaleString('es-CL')} / ${unidad}`;
+        }
+
+        async function guardarAjusteCosteoInsumo(insumoId, cambios = {}) {
+            const respDet = await fetch(`/api/insumo/${insumoId}/detalle`);
+            const det = await respDet.json();
+            if (!respDet.ok || !det.success || !det.insumo) {
+                throw new Error(det.error || `No se pudo cargar insumo #${insumoId}`);
+            }
+            const ins = det.insumo;
+            const payload = {
+                nombre: ins.nombre,
+                codigo_barra: ins.codigo_barra || '',
+                unidad: ins.unidad || 'unidad',
+                unidad_compra: (cambios.unidad_compra !== undefined) ? String(cambios.unidad_compra) : (ins.unidad_compra || ins.unidad || 'unidad'),
+                stock: ins.stock || 0,
+                stock_minimo: ins.stock_minimo || 0,
+                precio_unitario: (cambios.precio_unitario !== undefined) ? Number(cambios.precio_unitario) : Number(ins.precio_unitario || 0),
+                cantidad_comprada: (cambios.cantidad_comprada !== undefined) ? Number(cambios.cantidad_comprada) : Number(ins.cantidad_comprada || 1),
+                precio_incluye_iva: Boolean(ins.precio_incluye_iva),
+                cantidad_por_scan: ins.cantidad_por_scan || 1,
+                unidad_por_scan: ins.unidad_por_scan || ins.unidad || 'unidad'
+            };
+            const respUpd = await fetch(`/api/insumo/${insumoId}/actualizar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const upd = await respUpd.json();
+            if (!respUpd.ok || !upd.success) {
+                throw new Error(upd.error || `No se pudo actualizar insumo #${insumoId}`);
+            }
+        }
+
+        function refrescarOpcionesInsumoCalculo(insumoId) {
+            const ins = insumosData.find(i => Number(i.id) === Number(insumoId));
+            if (!ins) return;
+            const nuevoPrecio = precioUnitarioEfectivoCalculo(ins);
+            const unidad = ins.unidad_compra || ins.unidad || 'unidad';
+            const texto = `${ins.nombre} (${etiquetaPrecioInsumoCalculo(ins)})`;
+            document.querySelectorAll('.select-insumo-calc').forEach(sel => {
+                const op = [...sel.options].find(o => Number(o.value) === Number(insumoId));
+                if (!op) return;
+                op.dataset.precio = String(nuevoPrecio || 0);
+                op.dataset.unidad = unidad;
+                op.textContent = texto;
+                if (Number(sel.value) === Number(insumoId)) {
+                    const idx = Number(String(sel.id || '').replace('select-', ''));
+                    if (Number.isFinite(idx)) actualizarFilaCalculo(idx);
+                }
+            });
+        }
+
+        async function guardarAjusteCosteoSeleccion() {
+            const select = document.getElementById('ajuste-costeo-select');
+            if (!select || !select.value) {
+                setAjusteCosteoMsg('Selecciona un insumo.', true);
+                return;
+            }
+            const precio = Number((document.getElementById('ajuste-costeo-precio') || {}).value || 0);
+            const cantidad = Number((document.getElementById('ajuste-costeo-cantidad') || {}).value || 0);
+            const unidad = String((document.getElementById('ajuste-costeo-unidad') || {}).value || 'unidad');
+            if (!(cantidad > 0)) {
+                setAjusteCosteoMsg('Cantidad comprada debe ser mayor a 0.', true);
+                return;
+            }
+            if (precio < 0) {
+                setAjusteCosteoMsg('Precio no puede ser negativo.', true);
+                return;
+            }
+            const insumoId = Number(select.value);
+            try {
+                await guardarAjusteCosteoInsumo(insumoId, {
+                    precio_unitario: precio,
+                    cantidad_comprada: cantidad,
+                    unidad_compra: unidad
+                });
+                const local = insumosData.find(i => Number(i.id) === insumoId);
+                if (local) {
+                    local.precio_unitario = precio;
+                    local.cantidad_comprada = cantidad;
+                    local.unidad_compra = unidad;
+                }
+                refrescarOpcionesInsumoCalculo(insumoId);
+                actualizarPreviewAjusteCosteo();
+                calcularTotales();
+                setAjusteCosteoMsg('Ajuste guardado correctamente.');
+            } catch (e) {
+                setAjusteCosteoMsg(e.message || 'Error guardando ajuste.', true);
+            }
+        }
+
         function construirPayloadDesdeFilaCalculo(fila) {
             if (!fila || fila === null || !fila.insumoId) return null;
             const cantidad = Number(fila.cantidad || 0);
@@ -4530,6 +4753,8 @@ function calcularTotales() {
     }
 
     filtrarRecetasCalculo();
+    filtrarAjusteCosteoInsumos();
+    cargarAjusteCosteoSeleccion();
     renderRecetasSeleccionCalculo();
     applyPendingInsumosUiState();
     buscarInsumos();
