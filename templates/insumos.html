@@ -1366,7 +1366,108 @@
             flex: 0 0 auto;
             min-width: 240px;
         }
-        
+
+        .recetas-calc-box {
+            border: 1px solid #fcd34d;
+            background: linear-gradient(135deg, #fffdf4, #fffbeb);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .recetas-calc-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .recetas-calc-title {
+            font-weight: 800;
+            color: #92400e;
+            font-size: 15px;
+        }
+
+        .recetas-calc-sub {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .recetas-calc-inputs {
+            display: grid;
+            grid-template-columns: 1.6fr 140px auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .recetas-calc-list {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .receta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #fff;
+            border: 1px solid #fed7aa;
+            color: #78350f;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .receta-chip button {
+            border: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fee2e2;
+            color: #991b1b;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .recetas-calc-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .recetas-calc-msg {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        body.dark-mode .recetas-calc-box {
+            background: linear-gradient(135deg, #3f2b0a, #2b1f08);
+            border-color: #92400e;
+        }
+
+        body.dark-mode .recetas-calc-title {
+            color: #fdba74;
+        }
+
+        body.dark-mode .recetas-calc-sub,
+        body.dark-mode .recetas-calc-msg {
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .receta-chip {
+            background: #1e293b;
+            border-color: #78350f;
+            color: #fde68a;
+        }
+
 .select-insumo-calc {
     width: 100%;
     padding: 8px 12px;
@@ -1559,6 +1660,10 @@
         @media (max-width: 960px) {
             .pendientes-resumen {
                 grid-template-columns: repeat(2, minmax(120px, 1fr));
+            }
+
+            .recetas-calc-inputs {
+                grid-template-columns: 1fr;
             }
 
             .insumo-calc-row {
@@ -2165,7 +2270,47 @@
                                 Selecciona los insumos que necesitas comprar. Los precios se cargan automáticamente según tu última compra registrada.
                             </p>
 
-                                <div id="lista-calculo">
+                            <div class="recetas-calc-box">
+                                <div class="recetas-calc-head">
+                                    <div>
+                                        <div class="recetas-calc-title">&#127859; Planificar compras por recetas</div>
+                                        <div class="recetas-calc-sub">Selecciona recetas + lotes y generamos automaticamente el listado de insumos.</div>
+                                    </div>
+                                </div>
+                                <div class="recetas-calc-inputs">
+                                    <div class="form-group" style="margin:0;">
+                                        <label for="calc-receta-select">Receta</label>
+                                        <select id="calc-receta-select">
+                                            <option value="">-- Seleccionar receta --</option>
+                                            {% for r in recetas %}
+                                            <option value="{{ r.id }}">{{ r.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label for="calc-receta-lotes">Lotes</label>
+                                        <input type="number" id="calc-receta-lotes" min="0.1" step="0.1" value="1">
+                                    </div>
+                                    <button type="button" class="btn btn-secondary" onclick="agregarRecetaSeleccionCalculo()">Agregar receta</button>
+                                </div>
+                                <div class="recetas-calc-list" id="calc-recetas-list">
+                                    <span class="recetas-calc-msg">Aun no agregas recetas a la planificacion.</span>
+                                </div>
+                                <div class="recetas-calc-actions">
+                                    <button type="button" class="btn btn-warning" onclick="generarInsumosDesdeRecetas()">
+                                        Generar insumos en calculadora
+                                    </button>
+                                    <button type="button" class="btn btn-success" onclick="generarInsumosDesdeRecetas(true)">
+                                        Generar + enviar a pendientes
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="limpiarSeleccionRecetasCalculo()">
+                                        Limpiar seleccion
+                                    </button>
+                                </div>
+                                <div id="calc-recetas-msg" class="recetas-calc-msg"></div>
+                            </div>
+
+                            <div id="lista-calculo">
                                     <!-- Las filas se agregan dinámicamente aquí -->
                                 </div>
 
@@ -3336,6 +3481,23 @@ let insumosData = [
     }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
+        const recetasCalculoData = [
+            {% for r in recetas %}
+            {
+                id: {{ r.id|tojson }},
+                nombre: {{ r.nombre|tojson }},
+                rendimiento: {{ (r.rendimiento or 1)|tojson }},
+                insumos: {{ (r.insumos or [])|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+        const recetasCalculoMap = {};
+        recetasCalculoData.forEach(r => {
+            if (r && r.id !== null && r.id !== undefined) {
+                recetasCalculoMap[String(r.id)] = r;
+            }
+        });
+        let recetasSeleccionCalculo = [];
         let comprasPendientesCache = [];
 
         function formatearCLP(valor) {
@@ -3364,6 +3526,140 @@ let insumosData = [
                 comprados: 0,
                 pendiente_con_iva: 0
             };
+        }
+
+        function renderRecetasSeleccionCalculo() {
+            const wrap = document.getElementById('calc-recetas-list');
+            if (!wrap) return;
+            if (!recetasSeleccionCalculo.length) {
+                wrap.innerHTML = '<span class="recetas-calc-msg">Aun no agregas recetas a la planificacion.</span>';
+                return;
+            }
+            wrap.innerHTML = recetasSeleccionCalculo.map((fila, idx) => `
+                <span class="receta-chip">
+                    ${escapeHtml(fila.receta_nombre)} x ${Number(fila.lotes || 0).toLocaleString('es-CL')}
+                    <button type="button" onclick="eliminarRecetaSeleccionCalculo(${idx})" title="Quitar">x</button>
+                </span>
+            `).join('');
+        }
+
+        function setMensajeRecetasCalculo(msg, isError = false) {
+            const el = document.getElementById('calc-recetas-msg');
+            if (!el) return;
+            el.textContent = String(msg || '');
+            el.style.color = isError ? '#b91c1c' : '#64748b';
+        }
+
+        function agregarRecetaSeleccionCalculo() {
+            const select = document.getElementById('calc-receta-select');
+            const lotesEl = document.getElementById('calc-receta-lotes');
+            if (!select || !lotesEl) return;
+
+            const recetaId = String(select.value || '').trim();
+            const receta = recetasCalculoMap[recetaId];
+            if (!receta) {
+                setMensajeRecetasCalculo('Selecciona una receta valida.', true);
+                return;
+            }
+
+            const lotes = Number(lotesEl.value || 0);
+            if (!Number.isFinite(lotes) || lotes <= 0) {
+                setMensajeRecetasCalculo('Los lotes deben ser mayores a 0.', true);
+                return;
+            }
+
+            const existente = recetasSeleccionCalculo.find(r => String(r.receta_id) === recetaId);
+            if (existente) {
+                existente.lotes = Number(existente.lotes || 0) + lotes;
+            } else {
+                recetasSeleccionCalculo.push({
+                    receta_id: Number(receta.id),
+                    receta_nombre: receta.nombre || ('Receta ' + receta.id),
+                    lotes: lotes
+                });
+            }
+
+            renderRecetasSeleccionCalculo();
+            setMensajeRecetasCalculo('Receta agregada a la planificacion.');
+        }
+
+        function eliminarRecetaSeleccionCalculo(index) {
+            if (!recetasSeleccionCalculo[index]) return;
+            recetasSeleccionCalculo.splice(index, 1);
+            renderRecetasSeleccionCalculo();
+            setMensajeRecetasCalculo('Receta removida de la planificacion.');
+        }
+
+        function limpiarSeleccionRecetasCalculo() {
+            recetasSeleccionCalculo = [];
+            renderRecetasSeleccionCalculo();
+            setMensajeRecetasCalculo('Planificacion limpia.');
+        }
+
+        function buscarFilaActivaPorInsumo(insumoId) {
+            const idBuscado = Number(insumoId || 0);
+            if (!idBuscado) return -1;
+            for (let i = 0; i < filasCalculo.length; i += 1) {
+                const fila = filasCalculo[i];
+                if (fila && Number(fila.insumoId || 0) === idBuscado) return i;
+            }
+            return -1;
+        }
+
+        function upsertFilaCalculoDesdeInsumo(item) {
+            const insumoId = Number(item.insumo_id || 0);
+            if (!insumoId) return;
+            let idx = buscarFilaActivaPorInsumo(insumoId);
+            if (idx < 0) {
+                idx = agregarFilaCalculo();
+                const select = document.getElementById('select-' + idx);
+                if (select) {
+                    select.value = String(insumoId);
+                    actualizarFilaCalculo(idx);
+                }
+            }
+            const cantidadInput = document.getElementById('cantidad-' + idx);
+            if (!cantidadInput) return;
+            const actual = Number(cantidadInput.value || 0);
+            const extra = Number(item.cantidad || 0);
+            const nueva = (Number.isFinite(actual) ? actual : 0) + (Number.isFinite(extra) ? extra : 0);
+            cantidadInput.value = String(Math.round(nueva * 10000) / 10000);
+            calcularTotalFila(idx);
+        }
+
+        async function generarInsumosDesdeRecetas(enviarPendientes = false) {
+            if (!recetasSeleccionCalculo.length) {
+                setMensajeRecetasCalculo('Agrega al menos una receta para generar la lista.', true);
+                return;
+            }
+            setMensajeRecetasCalculo('Calculando insumos requeridos...');
+            try {
+                const response = await fetch('/api/insumos/calculo-recetas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ seleccion: recetasSeleccionCalculo })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo calcular insumos por recetas');
+                }
+
+                const items = Array.isArray(data.items) ? data.items : [];
+                if (!items.length) {
+                    setMensajeRecetasCalculo('Las recetas seleccionadas no tienen insumos directos.', true);
+                    return;
+                }
+
+                items.forEach(upsertFilaCalculoDesdeInsumo);
+                calcularTotales();
+                setMensajeRecetasCalculo(`Se agregaron/actualizaron ${items.length} insumo(s) desde recetas.`);
+
+                if (enviarPendientes) {
+                    agregarActivosAPendientes();
+                }
+            } catch (err) {
+                setMensajeRecetasCalculo(err.message || 'Error al generar insumos desde recetas.', true);
+            }
         }
 
         function renderComprasPendientes(items, resumen) {
@@ -3587,6 +3883,7 @@ fila.innerHTML = `
             
             container.appendChild(fila);
             filasCalculo.push({ id: index, insumoId: null, precio: 0, cantidad: 0, total: 0 });
+            return index;
         }
 
         function actualizarFilaCalculo(index) {
@@ -3939,6 +4236,7 @@ function calcularTotales() {
         link.click();
     }
 
+    renderRecetasSeleccionCalculo();
     applyPendingInsumosUiState();
     buscarInsumos();
     cargarComprasPendientes();

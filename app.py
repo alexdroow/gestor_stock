@@ -6886,15 +6886,138 @@ def insumos():
         cursor.execute(query)
         insumos = cursor.fetchall()
         conn.close()
+
+        recetas = obtener_recetas()
         
         return render_template('insumos.html',
                              insumos=insumos,
+                             recetas=recetas,
                              orden=orden,
                              direccion=direccion,
                              solo_cero=solo_cero)
     except Exception as e:
         print(f"Error en insumos: {e}")
         return f"Error: {str(e)}", 500
+
+
+@app.route('/api/insumos/calculo-recetas', methods=['POST'])
+def api_insumos_calculo_recetas():
+    """
+    Calcula los insumos requeridos para una selección de recetas y lotes.
+    payload esperado:
+    {
+      "seleccion": [
+        {"receta_id": 1, "lotes": 2.5},
+        ...
+      ]
+    }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        seleccion = data.get('seleccion')
+        if not isinstance(seleccion, list) or not seleccion:
+            return jsonify({'success': False, 'error': 'Debes enviar al menos una receta seleccionada'}), 400
+
+        recetas = obtener_recetas() or []
+        mapa_recetas = {int(r['id']): r for r in recetas if r.get('id') is not None}
+
+        acumulado = {}
+        resumen_recetas = []
+
+        for idx, fila in enumerate(seleccion, start=1):
+            if not isinstance(fila, dict):
+                return jsonify({'success': False, 'error': f'Fila {idx} de selección inválida'}), 400
+
+            try:
+                receta_id = int(fila.get('receta_id'))
+            except Exception:
+                return jsonify({'success': False, 'error': f'Receta inválida en fila {idx}'}), 400
+
+            try:
+                lotes = float(fila.get('lotes', 1) or 1)
+            except Exception:
+                return jsonify({'success': False, 'error': f'Lotes inválidos en fila {idx}'}), 400
+
+            if lotes <= 0:
+                return jsonify({'success': False, 'error': f'Los lotes deben ser mayores a 0 (fila {idx})'}), 400
+
+            receta = mapa_recetas.get(receta_id)
+            if not receta:
+                return jsonify({'success': False, 'error': f'No se encontró la receta #{receta_id}'}), 404
+
+            resumen_recetas.append({
+                'receta_id': receta_id,
+                'receta_nombre': receta.get('nombre') or f'Receta {receta_id}',
+                'lotes': lotes,
+            })
+
+            for item in (receta.get('insumos') or []):
+                insumo_id = item.get('insumo_id')
+                if not insumo_id:
+                    continue
+                try:
+                    insumo_id = int(insumo_id)
+                    cantidad_base = float(item.get('cantidad') or 0)
+                except Exception:
+                    continue
+                if cantidad_base <= 0:
+                    continue
+
+                row = acumulado.setdefault(
+                    insumo_id,
+                    {
+                        'insumo_id': insumo_id,
+                        'nombre': item.get('insumo_nombre') or f'Insumo {insumo_id}',
+                        'unidad': item.get('unidad') or 'unidad',
+                        'cantidad': 0.0,
+                        'precio_unitario': 0.0,
+                        'precio_incluye_iva': True,
+                    },
+                )
+                row['cantidad'] += cantidad_base * lotes
+
+        if not acumulado:
+            return jsonify({'success': True, 'items': [], 'recetas': resumen_recetas})
+
+        conn = get_db()
+        try:
+            cursor = conn.cursor()
+            ids = list(acumulado.keys())
+            placeholders = ','.join(['?'] * len(ids))
+            cursor.execute(
+                f"""
+                SELECT id, nombre, unidad, unidad_compra, COALESCE(precio_unitario, 0) AS precio_unitario,
+                       CASE WHEN precio_incluye_iva IS NULL THEN 1 ELSE precio_incluye_iva END AS precio_incluye_iva
+                FROM insumos
+                WHERE id IN ({placeholders})
+                """,
+                tuple(ids),
+            )
+            for dbrow in cursor.fetchall():
+                iid = int(dbrow['id'])
+                if iid not in acumulado:
+                    continue
+                acumulado[iid]['nombre'] = dbrow['nombre'] or acumulado[iid]['nombre']
+                acumulado[iid]['unidad'] = dbrow['unidad_compra'] or dbrow['unidad'] or acumulado[iid]['unidad']
+                acumulado[iid]['precio_unitario'] = float(dbrow['precio_unitario'] or 0)
+                acumulado[iid]['precio_incluye_iva'] = bool(dbrow['precio_incluye_iva'])
+        finally:
+            conn.close()
+
+        items = sorted(
+            [
+                {
+                    **v,
+                    'cantidad': round(float(v.get('cantidad') or 0), 4),
+                }
+                for v in acumulado.values()
+            ],
+            key=lambda x: (x.get('nombre') or '').lower(),
+        )
+
+        return jsonify({'success': True, 'items': items, 'recetas': resumen_recetas})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/compras-pendientes', methods=['GET'])
