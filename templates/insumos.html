@@ -1457,6 +1457,43 @@
             color: #64748b;
         }
 
+        .beta-sugerencias-box {
+            margin: 10px 0 14px;
+            border: 1px dashed #f59e0b;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fffaf0;
+        }
+
+        .beta-sugerencias-list {
+            display: grid;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .beta-sug-item {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #fed7aa;
+            background: #fff;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+
+        body.dark-mode .beta-sugerencias-box {
+            background: #1f2937;
+            border-color: #92400e;
+        }
+
+        body.dark-mode .beta-sug-item {
+            background: #0f172a;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
+
         body.dark-mode .recetas-calc-box {
             background: linear-gradient(135deg, #3f2b0a, #2b1f08);
             border-color: #92400e;
@@ -2284,6 +2321,18 @@
                                 Beta costeo: se muestra precio real por unidad segun cantidad comprada y se alertan configuraciones sospechosas.
                                 Para desactivar: <code>GESTIONSTOCK_BETA_COSTEO_ALERTAS=0</code>.
                             </p>
+                            <div class="beta-sugerencias-box">
+                                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                                    <button type="button" class="btn btn-secondary" onclick="generarSugerenciasAutocorreccion()">
+                                        Autocorregir sugerencias (beta)
+                                    </button>
+                                    <button type="button" class="btn btn-success" onclick="aplicarTodasSugerenciasAutocorreccion()">
+                                        Aplicar todas
+                                    </button>
+                                    <span id="beta-sugerencias-msg" class="recetas-calc-msg" style="margin:0;"></span>
+                                </div>
+                                <div id="beta-sugerencias-list" class="beta-sugerencias-list"></div>
+                            </div>
                             {% endif %}
                             <div class="recetas-calc-box">
                                 <div class="recetas-calc-head">
@@ -3563,6 +3612,150 @@ let insumosData = [
                 return `Revisar: ${unidad} con cantidad comprada=1 puede inflar costo.`;
             }
             return '';
+        }
+
+        function sugerenciaCantidadComprada(insumo) {
+            if (!insumo) return null;
+            const nombre = String(insumo.nombre || '').toLowerCase();
+            const unidadCompra = String(insumo.unidad_compra || insumo.unidad || '').toLowerCase();
+            const actual = Number(insumo.cantidad_comprada || 0);
+            const precioCompra = Number(insumo.precio_unitario || 0);
+            if (!(precioCompra > 0) || !(actual > 0)) return null;
+
+            // Casos frecuentes de configuración errónea:
+            if (nombre.includes('huevo') && (unidadCompra === 'caja' || unidadCompra === 'unidad') && actual === 1) {
+                return { cantidad: 180, motivo: 'Huevos por caja suele ser 180 unidades' };
+            }
+            if ((unidadCompra === 'kg' || unidadCompra === 'kilo' || unidadCompra === 'kilos') && actual === 1) {
+                return { cantidad: 20, motivo: 'Para sacos de secos, se sugiere 20 kg' };
+            }
+            if ((unidadCompra === 'l' || unidadCompra === 'lt') && actual === 1) {
+                return { cantidad: 5, motivo: 'Para líquidos, se sugiere bidón de 5 l' };
+            }
+            return null;
+        }
+
+        function setBetaSugerenciasMsg(msg, isError = false) {
+            const el = document.getElementById('beta-sugerencias-msg');
+            if (!el) return;
+            el.textContent = String(msg || '');
+            el.style.color = isError ? '#b91c1c' : '#64748b';
+        }
+
+        let betaSugerenciasPendientes = [];
+
+        function generarSugerenciasAutocorreccion() {
+            if (!BETA_COSTEO_ALERTAS) return;
+            const listEl = document.getElementById('beta-sugerencias-list');
+            if (!listEl) return;
+
+            const idsActivos = new Set();
+            filasCalculo.forEach(f => {
+                if (f && f.insumoId) idsActivos.add(Number(f.insumoId));
+            });
+            const candidatos = idsActivos.size
+                ? insumosData.filter(i => idsActivos.has(Number(i.id)))
+                : insumosData;
+
+            betaSugerenciasPendientes = candidatos
+                .map(ins => {
+                    const sug = sugerenciaCantidadComprada(ins);
+                    if (!sug) return null;
+                    return {
+                        id: Number(ins.id),
+                        nombre: ins.nombre,
+                        actual: Number(ins.cantidad_comprada || 0),
+                        sugerida: Number(sug.cantidad),
+                        motivo: sug.motivo || 'Sugerencia beta',
+                    };
+                })
+                .filter(Boolean);
+
+            if (!betaSugerenciasPendientes.length) {
+                listEl.innerHTML = '<div class="recetas-calc-msg">Sin sugerencias para los insumos actuales.</div>';
+                setBetaSugerenciasMsg('No se detectaron incoherencias comunes.');
+                return;
+            }
+
+            listEl.innerHTML = betaSugerenciasPendientes.map(s => `
+                <div class="beta-sug-item" id="beta-sug-${s.id}">
+                    <div><strong>${escapeHtml(s.nombre)}</strong><br>Actual: ${s.actual} -> Sugerida: ${s.sugerida}. ${escapeHtml(s.motivo)}</div>
+                    <button type="button" class="btn btn-secondary" onclick="quitarSugerenciaAutocorreccion(${s.id})">Quitar</button>
+                    <button type="button" class="btn btn-warning" onclick="aplicarSugerenciaAutocorreccion(${s.id})">Aplicar</button>
+                </div>
+            `).join('');
+            setBetaSugerenciasMsg(`Se detectaron ${betaSugerenciasPendientes.length} sugerencia(s).`);
+        }
+
+        function quitarSugerenciaAutocorreccion(insumoId) {
+            betaSugerenciasPendientes = betaSugerenciasPendientes.filter(s => Number(s.id) !== Number(insumoId));
+            const item = document.getElementById(`beta-sug-${insumoId}`);
+            if (item) item.remove();
+            setBetaSugerenciasMsg(`Sugerencias pendientes: ${betaSugerenciasPendientes.length}`);
+        }
+
+        async function guardarCantidadCompradaInsumo(insumoId, nuevaCantidad) {
+            const respDet = await fetch(`/api/insumo/${insumoId}/detalle`);
+            const det = await respDet.json();
+            if (!respDet.ok || !det.success || !det.insumo) {
+                throw new Error(det.error || `No se pudo cargar insumo #${insumoId}`);
+            }
+            const ins = det.insumo;
+            const payload = {
+                nombre: ins.nombre,
+                codigo_barra: ins.codigo_barra || '',
+                unidad: ins.unidad || 'unidad',
+                unidad_compra: ins.unidad_compra || ins.unidad || 'unidad',
+                stock: ins.stock || 0,
+                stock_minimo: ins.stock_minimo || 0,
+                precio_unitario: ins.precio_unitario || 0,
+                cantidad_comprada: Number(nuevaCantidad),
+                precio_incluye_iva: Boolean(ins.precio_incluye_iva),
+                cantidad_por_scan: ins.cantidad_por_scan || 1,
+                unidad_por_scan: ins.unidad_por_scan || ins.unidad || 'unidad'
+            };
+            const respUpd = await fetch(`/api/insumo/${insumoId}/actualizar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const upd = await respUpd.json();
+            if (!respUpd.ok || !upd.success) {
+                throw new Error(upd.error || `No se pudo actualizar insumo #${insumoId}`);
+            }
+        }
+
+        async function aplicarSugerenciaAutocorreccion(insumoId) {
+            const sug = betaSugerenciasPendientes.find(s => Number(s.id) === Number(insumoId));
+            if (!sug) return;
+            try {
+                await guardarCantidadCompradaInsumo(insumoId, sug.sugerida);
+                const ins = insumosData.find(i => Number(i.id) === Number(insumoId));
+                if (ins) ins.cantidad_comprada = sug.sugerida;
+                quitarSugerenciaAutocorreccion(insumoId);
+                setBetaSugerenciasMsg(`Aplicado en ${sug.nombre}. Recarga la calculadora para refrescar filas existentes.`);
+            } catch (e) {
+                setBetaSugerenciasMsg(e.message || 'Error aplicando sugerencia.', true);
+            }
+        }
+
+        async function aplicarTodasSugerenciasAutocorreccion() {
+            if (!betaSugerenciasPendientes.length) {
+                generarSugerenciasAutocorreccion();
+                if (!betaSugerenciasPendientes.length) return;
+            }
+            let ok = 0;
+            for (const s of [...betaSugerenciasPendientes]) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    await guardarCantidadCompradaInsumo(s.id, s.sugerida);
+                    const ins = insumosData.find(i => Number(i.id) === Number(s.id));
+                    if (ins) ins.cantidad_comprada = s.sugerida;
+                    quitarSugerenciaAutocorreccion(s.id);
+                    ok += 1;
+                } catch (_) {}
+            }
+            setBetaSugerenciasMsg(`Sugerencias aplicadas: ${ok}.`);
         }
 
         function construirPayloadDesdeFilaCalculo(fila) {
