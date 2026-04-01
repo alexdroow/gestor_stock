@@ -2153,6 +2153,13 @@
                                         <option value="caja">Caja</option>
                                     </select>
                                 </div>
+                                <div class="form-group" style="flex: 1 1 100%; margin-top: -4px;">
+                                    <div style="font-size: 12px; color: #64748b;">
+                                        Ejemplo correcto: si compras <strong>5 kg</strong> de azucar por <strong>$5.000</strong>,
+                                        registra <strong>Precio de compra = 5000</strong>, <strong>Cantidad comprada = 5</strong>, <strong>Unidad de compra = kg</strong>.
+                                        El sistema calcula automaticamente el costo por 1 kg.
+                                    </div>
+                                </div>
                                 <div class="form-group" style="flex: 0.3; display: flex; align-items: center; margin-top: 20px;">
                                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none;">
                                         <input type="checkbox" name="precio_incluye_iva" checked style="width: auto;">
@@ -2262,7 +2269,10 @@
                                                 <div style="font-size: 12px; color: #64748b; margin-top: 2px;">ID: #{{ i.id }}</div>
                                                 {% if i.precio_unitario and i.precio_unitario > 0 %}
                                                 <div class="insumo-meta">
-                                                    Compra: ${{ "{:,.0f}".format(i.precio_unitario).replace(",", ".") }} / {{ i.unidad_compra or i.unidad }}
+                                                    Compra: ${{ "{:,.0f}".format(i.precio_unitario).replace(",", ".") }} por {{ "{:,.2f}".format(i.cantidad_comprada or 1).rstrip('0').rstrip('.').replace(",", ".") }} {{ i.unidad_compra or i.unidad }}
+                                                    {% if (i.cantidad_comprada or 1) > 0 %}
+                                                    | Costo calculo: ${{ "{:,.0f}".format((i.precio_unitario or 0) / (i.cantidad_comprada or 1)).replace(",", ".") }} / {{ i.unidad_compra or i.unidad }}
+                                                    {% endif %}
                                                 </div>
                                                 {% else %}
                                                 <div class="insumo-meta">Compra: sin precio registrado</div>
@@ -3323,7 +3333,11 @@
             const metaEl = row.querySelector('.insumo-meta');
             if (metaEl) {
                 if (precio > 0) {
-                    metaEl.textContent = `Compra: $${formatearPrecioEntero(precio)} / ${unidadCompra}`;
+                    const cantidadCompra = Number(payload.cantidad_comprada || 1);
+                    const divisor = (Number.isFinite(cantidadCompra) && cantidadCompra > 0) ? cantidadCompra : 1;
+                    const precioEfectivo = precio / divisor;
+                    const cantidadFmt = (Math.round(divisor * 100) / 100).toString().replace('.', ',');
+                    metaEl.textContent = `Compra: $${formatearPrecioEntero(precio)} por ${cantidadFmt} ${unidadCompra} | Costo calculo: $${formatearPrecioEntero(precioEfectivo)} / ${unidadCompra}`;
                 } else {
                     metaEl.textContent = 'Compra: sin precio registrado';
                 }
@@ -3598,7 +3612,7 @@ let insumosData = [
             const unidadCompra = insumo.unidad_compra || insumo.unidad || '';
             const precioEfectivo = precioUnitarioEfectivoCalculo(insumo);
             if (!(precioEfectivo > 0)) return 'Sin precio';
-            return `$${Math.round(precioEfectivo).toLocaleString('es-CL')} / ${unidadCompra}`;
+            return `Costo calculo: $${Math.round(precioEfectivo).toLocaleString('es-CL')} / ${unidadCompra}`;
         }
 
         function diagnosticoCosteoInsumo(insumo) {
@@ -4172,14 +4186,17 @@ filasCalculo[index] = {
             
             const precioCompra = Number(insumo ? insumo.precio_unitario : 0);
             const cantidadCompra = Number(insumo ? insumo.cantidad_comprada : 1);
+            const divisor = (Number.isFinite(cantidadCompra) && cantidadCompra > 0) ? cantidadCompra : 1;
+            const precioEfectivo = (precioCompra > 0) ? (precioCompra / divisor) : 0;
+            const cantidadFmt = (Math.round(divisor * 100) / 100).toString().replace('.', ',');
             const detalleCompra = (precioCompra > 0)
-                ? `Compra: $${Math.round(precioCompra).toLocaleString('es-CL')} por ${cantidadCompra} ${unidadCompra || 'unidad'}`
+                ? `Compra registrada: $${Math.round(precioCompra).toLocaleString('es-CL')} por ${cantidadFmt} ${unidadCompra || 'unidad'}`
                 : '';
             const warning = diagnosticoCosteoInsumo(insumo);
 
             if (precio > 0) {
                 if (infoEl) {
-                    infoEl.textContent = `Precio: $${Math.round(precio).toLocaleString('es-CL')} / ${unidadCompra}${detalleCompra ? ' | ' + detalleCompra : ''}`;
+                    infoEl.textContent = `Costo calculo: $${Math.round(precioEfectivo || precio).toLocaleString('es-CL')} / ${unidadCompra}${detalleCompra ? ' | ' + detalleCompra : ''}`;
                     infoEl.classList.toggle('warn', Boolean(warning));
                 }
             } else {
@@ -4192,13 +4209,13 @@ filasCalculo[index] = {
                 if (precioManual && !isNaN(precioManual)) {
                     filasCalculo[index].precio = parseFloat(precioManual);
                     if (infoEl) {
-                        infoEl.textContent = `Precio: $${Math.round(filasCalculo[index].precio).toLocaleString('es-CL')} / ${unidadCompra}`;
+                        infoEl.textContent = `Costo calculo: $${Math.round(filasCalculo[index].precio).toLocaleString('es-CL')} / ${unidadCompra}`;
                         infoEl.classList.remove('warn');
                     }
                 }
             }
             if (warning && infoEl) {
-                infoEl.textContent = `${infoEl.textContent} | ⚠ ${warning}`;
+                infoEl.textContent = `${infoEl.textContent} | ALERTA: ${warning}`;
             }
             
 document.getElementById('unidad-' + index).textContent = unidadCompra;
@@ -4523,4 +4540,5 @@ function calcularTotales() {
 <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
 </body>
 </html>
+
 
