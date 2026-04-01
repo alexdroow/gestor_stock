@@ -1221,6 +1221,11 @@
             font-size: 13px;
             color: #64748b;
         }
+
+        .insumo-calc-precio.warn {
+            color: #b91c1c;
+            font-weight: 700;
+        }
         
         body.dark-mode .insumo-calc-precio {
             color: #94a3b8;
@@ -2274,6 +2279,12 @@
                                 Selecciona los insumos que necesitas comprar. Los precios se cargan automáticamente según tu última compra registrada.
                             </p>
 
+                            {% if beta_costeo_alertas %}
+                            <p style="color:#92400e; margin:-8px 0 14px; font-size:12px;">
+                                Beta costeo: se muestra precio real por unidad segun cantidad comprada y se alertan configuraciones sospechosas.
+                                Para desactivar: <code>GESTIONSTOCK_BETA_COSTEO_ALERTAS=0</code>.
+                            </p>
+                            {% endif %}
                             <div class="recetas-calc-box">
                                 <div class="recetas-calc-head">
                                     <div>
@@ -3482,6 +3493,8 @@ let insumosData = [
     }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
+        const BETA_COSTEO_ALERTAS = {{ 'true' if beta_costeo_alertas else 'false' }};
+        const BETA_COSTEO_ALERTAS_KEYWORD = 'GESTIONSTOCK_BETA_COSTEO_ALERTAS=0';
         const recetasCalculoData = [
             {% for r in recetas %}
             {
@@ -3537,6 +3550,19 @@ let insumosData = [
             const precioEfectivo = precioUnitarioEfectivoCalculo(insumo);
             if (!(precioEfectivo > 0)) return 'Sin precio';
             return `$${Math.round(precioEfectivo).toLocaleString('es-CL')} / ${unidadCompra}`;
+        }
+
+        function diagnosticoCosteoInsumo(insumo) {
+            if (!BETA_COSTEO_ALERTAS || !insumo) return '';
+            const unidad = String(insumo.unidad_compra || insumo.unidad || '').toLowerCase();
+            const cantidad = Number(insumo.cantidad_comprada || 0);
+            const precio = Number(insumo.precio_unitario || 0);
+            if (!(precio > 0)) return 'Sin precio configurado.';
+            if (!(cantidad > 0)) return 'Cantidad comprada debe ser mayor a 0.';
+            if ((unidad === 'caja' || unidad === 'kg' || unidad === 'l' || unidad === 'lt') && cantidad === 1) {
+                return `Revisar: ${unidad} con cantidad comprada=1 puede inflar costo.`;
+            }
+            return '';
         }
 
         function construirPayloadDesdeFilaCalculo(fila) {
@@ -3923,9 +3949,13 @@ fila.innerHTML = `
         function actualizarFilaCalculo(index) {
             const select = document.getElementById('select-' + index);
             const option = select.options[select.selectedIndex];
+            const infoEl = document.getElementById('precio-info-' + index);
             
             if (!option.value) {
-                document.getElementById('precio-info-' + index).textContent = 'Selecciona un insumo';
+                if (infoEl) {
+                    infoEl.textContent = 'Selecciona un insumo';
+                    infoEl.classList.remove('warn');
+                }
                 document.getElementById('unidad-' + index).textContent = '-';
                 filasCalculo[index] = { ...filasCalculo[index], insumoId: null, precio: 0, unidad: '', nombre: '' };
                 calcularTotales();
@@ -3947,16 +3977,35 @@ filasCalculo[index] = {
     precio_incluye_iva: insumo ? Boolean(insumo.precio_incluye_iva) : true
 };
             
+            const precioCompra = Number(insumo ? insumo.precio_unitario : 0);
+            const cantidadCompra = Number(insumo ? insumo.cantidad_comprada : 1);
+            const detalleCompra = (precioCompra > 0)
+                ? `Compra: $${Math.round(precioCompra).toLocaleString('es-CL')} por ${cantidadCompra} ${unidadCompra || 'unidad'}`
+                : '';
+            const warning = diagnosticoCosteoInsumo(insumo);
+
             if (precio > 0) {
-                document.getElementById('precio-info-' + index).textContent = `Precio: $${precio.toLocaleString()} / ${unidadCompra}`;
+                if (infoEl) {
+                    infoEl.textContent = `Precio: $${Math.round(precio).toLocaleString('es-CL')} / ${unidadCompra}${detalleCompra ? ' | ' + detalleCompra : ''}`;
+                    infoEl.classList.toggle('warn', Boolean(warning));
+                }
             } else {
-                document.getElementById('precio-info-' + index).textContent = 'Sin precio unitario registrado - Ingresa manual';
+                if (infoEl) {
+                    infoEl.textContent = 'Sin precio unitario registrado - Ingresa manual';
+                    infoEl.classList.add('warn');
+                }
                 // Permitir ingresar precio manual por unidad de compra
                 const precioManual = prompt(`Este insumo no tiene precio unitario registrado. Ingresa precio por ${unidadCompra || 'unidad'}:`);
                 if (precioManual && !isNaN(precioManual)) {
                     filasCalculo[index].precio = parseFloat(precioManual);
-                    document.getElementById('precio-info-' + index).textContent = `Precio: $${filasCalculo[index].precio.toLocaleString()} / ${unidadCompra}`;
+                    if (infoEl) {
+                        infoEl.textContent = `Precio: $${Math.round(filasCalculo[index].precio).toLocaleString('es-CL')} / ${unidadCompra}`;
+                        infoEl.classList.remove('warn');
+                    }
                 }
+            }
+            if (warning && infoEl) {
+                infoEl.textContent = `${infoEl.textContent} | ⚠ ${warning}`;
             }
             
 document.getElementById('unidad-' + index).textContent = unidadCompra;

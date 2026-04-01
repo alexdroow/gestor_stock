@@ -6888,10 +6888,12 @@ def insumos():
         conn.close()
 
         recetas = obtener_recetas()
+        beta_costeo_alertas = str(os.environ.get('GESTIONSTOCK_BETA_COSTEO_ALERTAS', '1')).strip().lower() not in {'0', 'false', 'off', 'no'}
         
         return render_template('insumos.html',
                              insumos=insumos,
                              recetas=recetas,
+                             beta_costeo_alertas=beta_costeo_alertas,
                              orden=orden,
                              direccion=direccion,
                              solo_cero=solo_cero)
