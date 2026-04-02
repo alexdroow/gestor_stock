@@ -8517,7 +8517,7 @@ def agregar_producto():
 @app.route('/ventas')
 def ventas():
     try:
-        productos = _obtener_productos_para_venta()
+        productos = _obtener_productos_para_venta(include_zero_stock=True)
         agenda_evento_id = request.args.get('agenda_evento', type=int)
         agenda_evento = obtener_evento_agenda_por_id(agenda_evento_id) if agenda_evento_id else None
         return render_template('ventas.html', productos=productos, agenda_evento=agenda_evento)
@@ -9046,7 +9046,7 @@ def _obtener_productos_para_venta(include_zero_stock=False):
 @app.route('/api/ventas/productos-disponibles')
 def api_productos_venta_disponibles():
     try:
-        productos = _obtener_productos_para_venta()
+        productos = _obtener_productos_para_venta(include_zero_stock=True)
         return jsonify({"success": True, "productos": productos})
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
