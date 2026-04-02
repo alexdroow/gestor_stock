@@ -1731,7 +1731,7 @@
                              data-bajo-minimo="{{ 1 if p.bajo_minimo else 0 }}"
                              data-cerca-minimo="{{ 1 if p.cerca_minimo else 0 }}"
                              data-baja-porcion="{{ 1 if p.baja_porcion else 0 }}"
-                             data-agotado="{{ 1 if (p.sin_porcion_disponible or p.bajo_minimo or p.dependencias_criticas) else 0 }}"
+                             data-agotado="{{ 1 if ((p.stock_visual if p.stock_visual is defined else p.stock)|float <= 0) else 0 }}"
                              data-requiere-desactivacion="{{ 1 if p.desactivacion_manual_requiere_confirmacion else 0 }}"
                              data-desactivacion-confirmada="{{ 1 if p.desactivacion_manual_confirmada else 0 }}"
                              data-porciones="{{ p.porciones_disponibles }}"
@@ -1778,7 +1778,7 @@
                             <div class="producto-dependencias {{ 'critica' if p.dependencias_criticas else 'aviso' if p.dependencias_alerta_texto else '' }}">
                                 {{ p.dependencias_alerta_texto or '' }}
                             </div>
-                            <div class="producto-reposicion" style="{{ '' if (p.sin_porcion_disponible or p.bajo_minimo or p.dependencias_criticas) else 'display:none;' }}">
+                            <div class="producto-reposicion" style="{{ '' if ((p.stock_visual if p.stock_visual is defined else p.stock)|float <= 0) else 'display:none;' }}">
                                 <div class="producto-reposicion-label">Fecha reposici&oacute;n (tienda)</div>
                                 <div class="producto-reposicion-row">
                                     <input
@@ -2544,6 +2544,7 @@
 
             const stockNumerico = Number(info.stock_visual ?? info.stock ?? 0);
             const porciones = Number(info.porciones_disponibles || 0);
+            const agotadoStockReal = stockNumerico <= 0 || porciones <= 0 || Boolean(info.sin_porcion_disponible);
             const esCritico =
                 porciones <= 0
                 || Boolean(info.sin_porcion_disponible)
@@ -2568,7 +2569,7 @@
             card.setAttribute('data-bajo-minimo', info.bajo_minimo ? '1' : '0');
             card.setAttribute('data-cerca-minimo', esCercaMinimo ? '1' : '0');
             card.setAttribute('data-baja-porcion', info.baja_porcion ? '1' : '0');
-            card.setAttribute('data-agotado', esCritico ? '1' : '0');
+            card.setAttribute('data-agotado', agotadoStockReal ? '1' : '0');
             card.setAttribute('data-requiere-desactivacion', requiereConfirmacion ? '1' : '0');
             card.setAttribute('data-desactivacion-confirmada', desactivacionConfirmada ? '1' : '0');
             card.setAttribute('data-porciones', String(porciones));
@@ -2663,7 +2664,7 @@
 
             const reposWrap = card.querySelector('.producto-reposicion');
             if (reposWrap) {
-                reposWrap.style.display = esCritico ? '' : 'none';
+                reposWrap.style.display = agotadoStockReal ? '' : 'none';
                 const reposInput = reposWrap.querySelector('.reposicion-input');
                 const reposEstado = reposWrap.querySelector('.producto-reposicion-estado');
                 const fechaReposicion = String(info.fecha_reposicion_tienda || '').trim();
