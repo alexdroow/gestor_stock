@@ -1473,6 +1473,36 @@
             display: grid;
             gap: 10px;
         }
+        /* Hardening modal exito para evitar estilos globales/custom que lo rompan */
+        #modal-exito-pedido {
+            z-index: 5000;
+        }
+        #modal-exito-pedido .modal {
+            width: min(520px, 96vw);
+            max-height: 88vh;
+            overflow: auto;
+            background: #fff !important;
+            border-radius: 12px !important;
+            border: 1px solid #e5e7eb !important;
+            padding: 14px !important;
+            display: grid !important;
+            gap: 10px !important;
+            box-shadow: 0 20px 60px rgba(2, 6, 23, .28);
+        }
+        #modal-exito-pedido h3 {
+            margin: 0;
+            color: #0f172a;
+            font-weight: 800;
+            white-space: normal;
+            word-break: break-word;
+        }
+        #modal-exito-texto,
+        #modal-exito-estado,
+        #modal-exito-detalle {
+            white-space: normal !important;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
         #modal-cuenta .modal {
             max-height: 90vh;
             overflow: auto;
@@ -1981,6 +2011,34 @@
         body.mobile-ui #modal-exito-texto {
             font-size: 1.55rem !important;
             line-height: 1.45;
+        }
+        body.mobile-ui #modal-exito-pedido .modal {
+            width: min(460px, 94vw);
+            max-height: 86vh;
+            padding: 14px;
+            gap: 10px;
+        }
+        body.mobile-ui #modal-exito-pedido h3 {
+            font-size: 1.2rem;
+        }
+        body.mobile-ui #modal-exito-texto {
+            font-size: 0.95rem !important;
+            line-height: 1.4;
+        }
+        body.mobile-ui #modal-exito-estado,
+        body.mobile-ui #modal-exito-detalle {
+            font-size: 0.9rem !important;
+        }
+        body.mobile-ui #modal-exito-pedido .modal-actions {
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        body.mobile-ui #modal-exito-pedido .modal-actions .btn-muted,
+        body.mobile-ui #modal-exito-pedido .modal-actions .btn-primary {
+            font-size: 0.9rem;
+            padding: 9px 12px;
+            min-width: 132px;
         }
         body.mobile-ui .modal .btn-muted,
         body.mobile-ui .modal .btn-primary {
@@ -6783,7 +6841,7 @@
                 renderCart();
                 cerrarModalCliente();
                 abrirModalExito();
-                msg(`Compra confirmada. Venta #${data.venta_id}`);
+                msg("");
                 _trackTienda("checkout");
                 await cargarProductos();
                 if (clienteRegistrado) await cargarHistorialCliente();
