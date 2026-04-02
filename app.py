@@ -899,6 +899,11 @@ def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
         oferta_programada_activa = False
     if fecha_fin and hoy > fecha_fin:
         oferta_programada_activa = False
+    fecha_reposicion_tienda_visible = fecha_reposicion_tienda
+    fecha_reposicion_obj = _parse_fecha_yyyy_mm_dd(fecha_reposicion_tienda)
+    # Si llego la fecha de reposicion y el producto sigue sin stock, ocultamos la fecha al cliente.
+    if fecha_reposicion_obj and max_compra <= 0 and hoy >= fecha_reposicion_obj:
+        fecha_reposicion_tienda_visible = ""
     descuento_producto_efectivo = descuento_base_producto if oferta_programada_activa else 0.0
     descuento = descuento_producto_efectivo
     if categoria_descuento > descuento:
@@ -955,7 +960,7 @@ def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
         "descripcion_tienda": descripcion,
         "oferta_inicio_tienda": oferta_inicio_tienda,
         "oferta_fin_tienda": oferta_fin_tienda,
-        "fecha_reposicion_tienda": fecha_reposicion_tienda,
+        "fecha_reposicion_tienda": fecha_reposicion_tienda_visible,
         "oferta_programada_activa": bool(oferta_programada_activa),
         "destacado_tienda": bool(item.get("destacado_tienda")),
         "orden_tienda": int(item.get("orden_tienda") or 0),
