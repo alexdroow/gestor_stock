@@ -9003,6 +9003,20 @@ def _enriquecer_productos_con_dependencias_venta(cursor, productos):
                 stock_visual_origen = "insumo"
                 stock_visual_dependencia_nombre = dep_insumo.get("nombre")
 
+        # Si el producto esta vinculado a una dependencia de stock (producto/insumo),
+        # la disponibilidad en porciones debe seguir la misma base usada en "stock_visual".
+        if tipo_dep in {"producto", "insumo"} and dep_id > 0:
+            try:
+                consumo_base = float(item.get("stock_dependencia_cantidad") or 1)
+            except (TypeError, ValueError):
+                consumo_base = 1.0
+            if consumo_base <= 0:
+                consumo_base = 1.0
+            porciones_por_dependencia = max(0, int(math.floor((float(stock_visual) + 1e-9) / consumo_base)))
+            item["porciones_disponibles"] = porciones_por_dependencia
+            item["sin_porcion_disponible"] = porciones_por_dependencia < 1
+            item["baja_porcion"] = porciones_por_dependencia <= 1
+
         item["stock_visual"] = stock_visual
         item["stock_visual_unidad"] = stock_visual_unidad
         item["stock_visual_origen"] = stock_visual_origen
