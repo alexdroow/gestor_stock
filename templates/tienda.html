@@ -3767,6 +3767,13 @@
             return `<img src="${esc(src)}?v=${Date.now()}" alt="${esc(p.nombre)}" style="${imgStyle(p)}">`;
         }
 
+        function formatoAgotadoHasta(fechaIso) {
+            const raw = String(fechaIso || "").trim();
+            const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!m) return raw;
+            return `${m[3]}-${m[2]}-${m[1]}`;
+        }
+
         function cardHtml(p, compact = false) {
             const oldPrice = n(p.precio_base);
             const finalPrice = n(p.precio_final);
@@ -3774,6 +3781,8 @@
             const desc = String(p.descripcion_tienda || "").trim();
             const stock = Math.max(0, Number(p.max_compra || 0));
             const agotado = stock <= 0;
+            const fechaReposicion = String(p.fecha_reposicion_tienda || "").trim();
+            const agotadoText = fechaReposicion ? `Agotado hasta ${formatoAgotadoHasta(fechaReposicion)}` : "Agotado";
             const esOferta = hasDiscount;
             const badgeOn = esOferta && Boolean(tiendaUiCfg.offer_badge_enabled);
             const badgeText = String(tiendaUiCfg.offer_badge_text || "").trim() || "Oferta";
@@ -3785,14 +3794,14 @@
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
                     ${badgeOn ? `<span class="offer-custom-badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
                     ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
-                    <div class="item-photo">${fotoHtml(p)}${agotado ? `<span class="agotado-overlay">Agotado</span>` : ""}</div>
+                    <div class="item-photo">${fotoHtml(p)}${agotado ? `<span class="agotado-overlay">${esc(agotadoText)}</span>` : ""}</div>
                     <div class="item-body">
                         <div class="item-name">${esc(p.nombre)}</div>
                         <div class="price-row">
                             <span class="price-final">${money.format(finalPrice)}</span>
                             ${hasDiscount ? `<span class="price-old">${money.format(oldPrice)}</span>` : ""}
                             ${hasDiscount ? `<span class="discount-chip">-${Math.round(n(p.descuento_tienda_pct))}%</span>` : ""}
-                            ${agotado ? `<span class="agotado-chip">Agotado</span>` : ""}
+                            ${agotado ? `<span class="agotado-chip">${esc(agotadoText)}</span>` : ""}
                         </div>
                         <div class="item-desc">${esc(desc || "Sin descripcion")}</div>
                         <div class="stock">Disponible: ${stock} unidad(es)</div>

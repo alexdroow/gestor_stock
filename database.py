@@ -1918,6 +1918,7 @@ def actualizar_producto(producto_id, data):
         descuento_tienda_actual = float(actual["descuento_tienda_pct"] or 0) if "descuento_tienda_pct" in actual.keys() else 0.0
         oferta_inicio_tienda_actual = (actual["oferta_inicio_tienda"] if "oferta_inicio_tienda" in actual.keys() else None) or None
         oferta_fin_tienda_actual = (actual["oferta_fin_tienda"] if "oferta_fin_tienda" in actual.keys() else None) or None
+        fecha_reposicion_tienda_actual = (actual["fecha_reposicion_tienda"] if "fecha_reposicion_tienda" in actual.keys() else None) or None
         foto_fit_tienda_actual = (actual["foto_fit_tienda"] if "foto_fit_tienda" in actual.keys() else None) or "cover"
         foto_pos_tienda_actual = (actual["foto_pos_tienda"] if "foto_pos_tienda" in actual.keys() else None) or "center"
         foto_pos_x_tienda_actual = float(actual["foto_pos_x_tienda"] or 50) if "foto_pos_x_tienda" in actual.keys() else 50.0
@@ -1931,6 +1932,10 @@ def actualizar_producto(producto_id, data):
         descuento_tienda_pct = float(data.get("descuento_tienda_pct", descuento_tienda_actual) or 0)
         oferta_inicio_tienda = _normalizar_fecha_iso(data.get("oferta_inicio_tienda", oferta_inicio_tienda_actual), "Fecha inicio oferta")
         oferta_fin_tienda = _normalizar_fecha_iso(data.get("oferta_fin_tienda", oferta_fin_tienda_actual), "Fecha fin oferta")
+        fecha_reposicion_tienda = _normalizar_fecha_iso(
+            data.get("fecha_reposicion_tienda", fecha_reposicion_tienda_actual),
+            "Fecha reposicion tienda",
+        )
         foto_fit_tienda = str(data.get("foto_fit_tienda", foto_fit_tienda_actual) or "cover").strip().lower()
         foto_pos_tienda = str(data.get("foto_pos_tienda", foto_pos_tienda_actual) or "center").strip().lower()
         foto_pos_x_tienda = float(data.get("foto_pos_x_tienda", foto_pos_x_tienda_actual) or 50)
@@ -2135,7 +2140,7 @@ def actualizar_producto(producto_id, data):
                 porcion_cantidad = ?, porcion_unidad = ?,
                 stock_dependencia_tipo = ?, stock_dependencia_id = ?, stock_dependencia_cantidad = ?,
                 categoria_tienda = ?, descripcion_tienda = ?, descuento_tienda_pct = ?,
-                oferta_inicio_tienda = ?, oferta_fin_tienda = ?,
+                oferta_inicio_tienda = ?, oferta_fin_tienda = ?, fecha_reposicion_tienda = ?,
                 foto_fit_tienda = ?, foto_pos_tienda = ?, foto_pos_x_tienda = ?, foto_pos_y_tienda = ?, foto_zoom_tienda = ?,
                 destacado_tienda = ?, orden_tienda = ?, activo_tienda = ?
             WHERE id = ?
@@ -2159,6 +2164,7 @@ def actualizar_producto(producto_id, data):
                 descuento_tienda_pct,
                 oferta_inicio_tienda,
                 oferta_fin_tienda,
+                fecha_reposicion_tienda,
                 foto_fit_tienda,
                 foto_pos_tienda,
                 foto_pos_x_tienda,
@@ -7136,6 +7142,7 @@ def migrar_db():
         _ensure_column(conn, "productos", "descuento_tienda_pct", "REAL DEFAULT 0")
         _ensure_column(conn, "productos", "oferta_inicio_tienda", "TEXT")
         _ensure_column(conn, "productos", "oferta_fin_tienda", "TEXT")
+        _ensure_column(conn, "productos", "fecha_reposicion_tienda", "TEXT")
         _ensure_column(conn, "productos", "foto_fit_tienda", "TEXT DEFAULT 'cover'")
         _ensure_column(conn, "productos", "foto_pos_tienda", "TEXT DEFAULT 'center'")
         _ensure_column(conn, "productos", "foto_pos_x_tienda", "REAL DEFAULT 50")

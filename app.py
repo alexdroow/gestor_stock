@@ -888,6 +888,7 @@ def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
     descuento_base_producto = float(item.get("descuento_tienda_pct") or 0)
     oferta_inicio_tienda = str(item.get("oferta_inicio_tienda") or "").strip()
     oferta_fin_tienda = str(item.get("oferta_fin_tienda") or "").strip()
+    fecha_reposicion_tienda = str(item.get("fecha_reposicion_tienda") or "").strip()
     fecha_inicio = _parse_fecha_yyyy_mm_dd(oferta_inicio_tienda)
     fecha_fin = _parse_fecha_yyyy_mm_dd(oferta_fin_tienda)
     if not now_local:
@@ -954,6 +955,7 @@ def _serializar_producto_tienda(producto, categorias_map=None, now_local=None):
         "descripcion_tienda": descripcion,
         "oferta_inicio_tienda": oferta_inicio_tienda,
         "oferta_fin_tienda": oferta_fin_tienda,
+        "fecha_reposicion_tienda": fecha_reposicion_tienda,
         "oferta_programada_activa": bool(oferta_programada_activa),
         "destacado_tienda": bool(item.get("destacado_tienda")),
         "orden_tienda": int(item.get("orden_tienda") or 0),
@@ -6545,6 +6547,8 @@ def api_actualizar_producto(id):
             data["oferta_inicio_tienda"] = str(data.get("oferta_inicio_tienda") or "").strip() or None
         if "oferta_fin_tienda" in data:
             data["oferta_fin_tienda"] = str(data.get("oferta_fin_tienda") or "").strip() or None
+        if "fecha_reposicion_tienda" in data:
+            data["fecha_reposicion_tienda"] = str(data.get("fecha_reposicion_tienda") or "").strip() or None
         if "foto_fit_tienda" in data:
             fit = str(data.get("foto_fit_tienda") or "cover").strip().lower()
             data["foto_fit_tienda"] = fit if fit in {"cover", "contain"} else "cover"

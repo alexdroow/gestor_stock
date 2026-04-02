@@ -621,6 +621,59 @@
             font-weight: 700;
         }
 
+        .producto-reposicion {
+            margin-top: 8px;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            background: #fff7ed;
+            text-align: left;
+        }
+
+        .producto-reposicion-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #9a3412;
+            margin-bottom: 6px;
+        }
+
+        .producto-reposicion-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .producto-reposicion-row input[type="date"] {
+            flex: 1;
+            min-width: 0;
+            padding: 6px 8px;
+            border: 1px solid #fdba74;
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: inherit;
+            color: #7c2d12;
+            background: #fff;
+        }
+
+        .producto-reposicion-row .btn-reposicion {
+            border: 1px solid #f97316;
+            background: #fff;
+            color: #c2410c;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .producto-reposicion-estado {
+            margin-top: 6px;
+            font-size: 11px;
+            color: #9a3412;
+            line-height: 1.3;
+        }
+
         .producto-acciones {
             margin-top: 10px;
         }
@@ -1315,6 +1368,28 @@
             color: #fda4af;
         }
 
+        body.dark-mode .producto-reposicion {
+            border-color: rgba(251, 146, 60, 0.4);
+            background: rgba(30, 41, 59, 0.6);
+        }
+
+        body.dark-mode .producto-reposicion-label,
+        body.dark-mode .producto-reposicion-estado {
+            color: #fdba74;
+        }
+
+        body.dark-mode .producto-reposicion-row input[type="date"] {
+            background: #0f172a;
+            border-color: rgba(251, 146, 60, 0.45);
+            color: #fdba74;
+        }
+
+        body.dark-mode .producto-reposicion-row .btn-reposicion {
+            background: rgba(15, 23, 42, 0.7);
+            color: #fdba74;
+            border-color: rgba(251, 146, 60, 0.5);
+        }
+
         body.dark-mode .btn-desactivacion {
             background: #3f2b03;
             border-color: #c2410c;
@@ -1644,6 +1719,7 @@
                         <button type="button" class="stock-filtro-btn active" data-filtro="todos" onclick="aplicarFiltroStock('todos')">Todos</button>
                         <button type="button" class="stock-filtro-btn" data-filtro="bajo_minimo" onclick="aplicarFiltroStock('bajo_minimo')">Bajo m&iacute;nimo</button>
                         <button type="button" class="stock-filtro-btn" data-filtro="baja_porcion" onclick="aplicarFiltroStock('baja_porcion')">Baja porci&oacute;n</button>
+                        <button type="button" class="stock-filtro-btn" data-filtro="agotados" onclick="aplicarFiltroStock('agotados')">Agotados</button>
                     </div>
                     
                     <div class="productos-grid" id="productos-grid">
@@ -1655,9 +1731,11 @@
                              data-bajo-minimo="{{ 1 if p.bajo_minimo else 0 }}"
                              data-cerca-minimo="{{ 1 if p.cerca_minimo else 0 }}"
                              data-baja-porcion="{{ 1 if p.baja_porcion else 0 }}"
+                             data-agotado="{{ 1 if (p.sin_porcion_disponible or p.bajo_minimo or p.dependencias_criticas) else 0 }}"
                              data-requiere-desactivacion="{{ 1 if p.desactivacion_manual_requiere_confirmacion else 0 }}"
                              data-desactivacion-confirmada="{{ 1 if p.desactivacion_manual_confirmada else 0 }}"
                              data-porciones="{{ p.porciones_disponibles }}"
+                             data-fecha-reposicion="{{ p.fecha_reposicion_tienda or '' }}"
                              onclick='agregarAlCarrito({{ p.id }})'>
                             <div class="producto-media">
                                 {% if p.foto %}
@@ -1699,6 +1777,26 @@
                             </div>
                             <div class="producto-dependencias {{ 'critica' if p.dependencias_criticas else 'aviso' if p.dependencias_alerta_texto else '' }}">
                                 {{ p.dependencias_alerta_texto or '' }}
+                            </div>
+                            <div class="producto-reposicion" style="{{ '' if (p.sin_porcion_disponible or p.bajo_minimo or p.dependencias_criticas) else 'display:none;' }}">
+                                <div class="producto-reposicion-label">Fecha reposici&oacute;n (tienda)</div>
+                                <div class="producto-reposicion-row">
+                                    <input
+                                        type="date"
+                                        class="reposicion-input"
+                                        value="{{ p.fecha_reposicion_tienda or '' }}"
+                                        onclick="event.stopPropagation()"
+                                        onchange="event.stopPropagation()"
+                                    >
+                                    <button type="button" class="btn-reposicion" onclick="guardarFechaReposicion(event, {{ p.id }})">Guardar</button>
+                                </div>
+                                <div class="producto-reposicion-estado">
+                                    {% if p.fecha_reposicion_tienda %}
+                                        Agotado hasta {{ p.fecha_reposicion_tienda }}
+                                    {% else %}
+                                        Sin fecha definida.
+                                    {% endif %}
+                                </div>
                             </div>
                             <div class="producto-acciones">
                                 <button
@@ -2345,6 +2443,7 @@
                 icono: {{ (p.icono or 'cupcake')|tojson }},
                 foto_url: {{ (url_for('static', filename=p.foto) if p.foto else '')|tojson }},
                 precio: {{ (p.precio or 0)|tojson }},
+                fecha_reposicion_tienda: {{ (p.fecha_reposicion_tienda or '')|tojson }},
                 stock: {{ p.stock|tojson }},
                 unidad: {{ (p.unidad or 'unidad')|tojson }},
                 stock_visual: {{ (p.stock_visual if p.stock_visual is defined else p.stock)|tojson }},
@@ -2391,7 +2490,7 @@
                     buscadorInput.value = state.q;
                 }
 
-                if (state.filtro === 'bajo_minimo' || state.filtro === 'baja_porcion' || state.filtro === 'todos') {
+                if (state.filtro === 'bajo_minimo' || state.filtro === 'baja_porcion' || state.filtro === 'agotados' || state.filtro === 'todos') {
                     aplicarFiltroStock(state.filtro);
                 } else {
                     filtrarProductos();
@@ -2411,7 +2510,7 @@
             if (raw) return;
             const params = new URLSearchParams(window.location.search || '');
             const filtro = (params.get('filtro') || '').trim().toLowerCase();
-            if (filtro === 'baja_porcion' || filtro === 'bajo_minimo' || filtro === 'todos') {
+            if (filtro === 'baja_porcion' || filtro === 'bajo_minimo' || filtro === 'agotados' || filtro === 'todos') {
                 aplicarFiltroStock(filtro);
             }
         }
@@ -2421,6 +2520,14 @@
             if (!Number.isFinite(num)) return '0';
             if (Math.abs(num - Math.round(num)) < 1e-9) return String(Math.round(num));
             return num.toFixed(2);
+        }
+
+        function formatearFechaReposicionCorta(fechaIso) {
+            const raw = String(fechaIso || '').trim();
+            if (!raw) return '';
+            const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!m) return raw;
+            return `${m[3]}-${m[2]}-${m[1]}`;
         }
 
         function construirDescripcionPorcion(info) {
@@ -2461,9 +2568,11 @@
             card.setAttribute('data-bajo-minimo', info.bajo_minimo ? '1' : '0');
             card.setAttribute('data-cerca-minimo', esCercaMinimo ? '1' : '0');
             card.setAttribute('data-baja-porcion', info.baja_porcion ? '1' : '0');
+            card.setAttribute('data-agotado', esCritico ? '1' : '0');
             card.setAttribute('data-requiere-desactivacion', requiereConfirmacion ? '1' : '0');
             card.setAttribute('data-desactivacion-confirmada', desactivacionConfirmada ? '1' : '0');
             card.setAttribute('data-porciones', String(porciones));
+            card.setAttribute('data-fecha-reposicion', String(info.fecha_reposicion_tienda || '').trim());
             card.classList.toggle('agotado', esCritico && !desactivacionConfirmada);
             card.classList.toggle('bajo-minimo', Boolean(info.bajo_minimo));
             card.classList.toggle('cerca-minimo', esCercaMinimo);
@@ -2552,6 +2661,22 @@
                 }
             }
 
+            const reposWrap = card.querySelector('.producto-reposicion');
+            if (reposWrap) {
+                reposWrap.style.display = esCritico ? '' : 'none';
+                const reposInput = reposWrap.querySelector('.reposicion-input');
+                const reposEstado = reposWrap.querySelector('.producto-reposicion-estado');
+                const fechaReposicion = String(info.fecha_reposicion_tienda || '').trim();
+                if (reposInput && reposInput.value !== fechaReposicion) {
+                    reposInput.value = fechaReposicion;
+                }
+                if (reposEstado) {
+                    reposEstado.textContent = fechaReposicion
+                        ? `Agotado hasta ${formatearFechaReposicionCorta(fechaReposicion)}`
+                        : 'Sin fecha definida.';
+                }
+            }
+
             const btn = card.querySelector('.btn-desactivacion');
             if (btn) {
                 btn.classList.remove('hidden', 'pendiente', 'confirmado');
@@ -2576,6 +2701,7 @@
                     ...productosData[id],
                     stock: Number(item.stock || 0),
                     unidad: item.unidad || productosData[id].unidad || 'unidad',
+                    fecha_reposicion_tienda: String(item.fecha_reposicion_tienda || productosData[id].fecha_reposicion_tienda || '').trim(),
                     stock_visual: Number((item.stock_visual ?? item.stock) || 0),
                     stock_visual_unidad: item.stock_visual_unidad || item.unidad || productosData[id].stock_visual_unidad || productosData[id].unidad || 'unidad',
                     stock_visual_origen: item.stock_visual_origen || productosData[id].stock_visual_origen || 'propio',
@@ -2709,11 +2835,62 @@
                 const matchTexto = nombre.includes(texto);
                 const esBajoMinimo = card.getAttribute('data-bajo-minimo') === '1';
                 const esBajaPorcion = card.getAttribute('data-baja-porcion') === '1';
+                const esAgotado = card.getAttribute('data-agotado') === '1';
                 let matchFiltro = true;
                 if (filtroStockActivo === 'bajo_minimo') matchFiltro = esBajoMinimo;
                 if (filtroStockActivo === 'baja_porcion') matchFiltro = esBajaPorcion;
+                if (filtroStockActivo === 'agotados') matchFiltro = esAgotado;
                 card.style.display = (matchTexto && matchFiltro) ? '' : 'none';
             });
+        }
+
+        async function guardarFechaReposicion(event, id) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const card = document.querySelector(`.producto-card[data-id="${id}"]`);
+            if (!card) return;
+            const input = card.querySelector('.reposicion-input');
+            if (!input) return;
+            const fecha = String(input.value || '').trim();
+            const estadoEl = card.querySelector('.producto-reposicion-estado');
+            const boton = event && event.currentTarget ? event.currentTarget : null;
+            const textoPrevio = boton ? boton.textContent : '';
+
+            try {
+                if (boton) {
+                    boton.disabled = true;
+                    boton.textContent = 'Guardando...';
+                }
+                const response = await fetch(`/api/producto/${id}/actualizar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fecha_reposicion_tienda: fecha || '' })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar la fecha de reposicion');
+                }
+                if (productosData[id]) {
+                    productosData[id].fecha_reposicion_tienda = fecha;
+                }
+                actualizarTarjetaProducto(id);
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess('Fecha de reposicion guardada.');
+                } else if (estadoEl) {
+                    estadoEl.textContent = fecha
+                        ? `Agotado hasta ${formatearFechaReposicionCorta(fecha)}`
+                        : 'Sin fecha definida.';
+                }
+            } catch (err) {
+                alert('[ERROR] ' + (err.message || 'No se pudo guardar la fecha de reposicion'));
+            } finally {
+                if (boton) {
+                    boton.disabled = false;
+                    boton.textContent = textoPrevio || 'Guardar';
+                }
+            }
         }
 
         function activarEdicionPrecio(event, id) {
