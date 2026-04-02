@@ -1164,6 +1164,27 @@
             object-fit: cover;
             object-position: center;
         }
+        .item-card.agotado .item-photo img {
+            filter: grayscale(1) contrast(.88) brightness(.9);
+        }
+        .agotado-overlay {
+            position: absolute;
+            inset: 10px 10px auto 10px;
+            z-index: 4;
+            text-align: center;
+            font-size: .84rem;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: #ffffff;
+            background: rgba(15, 23, 42, .78);
+            border: 1px solid rgba(255, 255, 255, .35);
+            border-radius: 10px;
+            padding: 6px 8px;
+            box-shadow: 0 8px 20px rgba(0,0,0,.25);
+            backdrop-filter: blur(1px);
+            pointer-events: none;
+        }
         .item-photo .fallback {
             font-size: 1.8rem;
             color: #fdba74;
@@ -1849,6 +1870,7 @@
         body.mobile-ui .price-old { font-size: 0.87rem; }
         body.mobile-ui .discount-chip,
         body.mobile-ui .agotado-chip { font-size: 0.88rem; padding: 4px 8px; }
+        body.mobile-ui .agotado-overlay { font-size: .78rem; inset: 8px 8px auto 8px; }
         body.mobile-ui .offer-custom-badge {
             font-size: .62rem;
             padding: 4px 7px;
@@ -3759,11 +3781,11 @@
             const floatImg = String(tiendaUiCfg.offer_float_image_url || "").trim();
             const floatIcon = String(tiendaUiCfg.offer_float_icon || "").trim();
             return `
-                <article class="item-card ${esOferta ? "oferta" : ""}" onclick="agregarDesdeTarjeta(event, ${p.id}, ${agotado ? "true" : "false"})" ${agotado ? "" : "title=\"Agregar al carrito\""}>
+                <article class="item-card ${esOferta ? "oferta" : ""} ${agotado ? "agotado" : ""}" onclick="agregarDesdeTarjeta(event, ${p.id}, ${agotado ? "true" : "false"})" ${agotado ? "" : "title=\"Agregar al carrito\""}>
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
                     ${badgeOn ? `<span class="offer-custom-badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
                     ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
-                    <div class="item-photo">${fotoHtml(p)}</div>
+                    <div class="item-photo">${fotoHtml(p)}${agotado ? `<span class="agotado-overlay">Agotado</span>` : ""}</div>
                     <div class="item-body">
                         <div class="item-name">${esc(p.nombre)}</div>
                         <div class="price-row">
@@ -6037,7 +6059,7 @@
                 : "<div>No hay destacados.</div>";
 
             const ofertas = visibles
-                .filter((p) => n(p.descuento_tienda_pct) > 0)
+                .filter((p) => n(p.descuento_tienda_pct) > 0 && Math.max(0, Number(p.max_compra || 0)) > 0)
                 .sort((a, b) => n(b.descuento_tienda_pct) - n(a.descuento_tienda_pct));
             ofertasListEl.innerHTML = ofertas.length
                 ? ofertas.map((p) => cardHtml(p)).join("")
