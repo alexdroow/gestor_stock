@@ -576,10 +576,21 @@
                 try {
                     const res = await fetch('/api/tienda/admin/pedidos-chat-activos', { headers: { Accept: 'application/json' } });
                     const data = await res.json();
-                    if (!res.ok || !data?.success) return;
+                    if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar pedidos activos');
                     pedidosActivos = Array.isArray(data.pedidos) ? data.pedidos : [];
                     renderHub();
-                } catch (_) {}
+                } catch (err) {
+                    try {
+                        const fab = ensureFab();
+                        const hub = ensureHub();
+                        if (fab) fab.textContent = 'Pedidos activos (0)';
+                        const list = hub?.querySelector?.('#sucree-pedidos-hub-list');
+                        if (list) {
+                            list.innerHTML = '<div style="font-size:.85rem;color:#b45309;">No se pudieron cargar pedidos activos temporalmente.</div>';
+                        }
+                    } catch (_) {}
+                    console.warn('sucree pedidos activos error:', err);
+                }
             }
 
             function renderAlert() {
@@ -626,7 +637,9 @@
                 } catch (_) {}
             }
 
-            // Si no hay sesion admin o endpoint no disponible, simplemente no muestra nada.
+            // Mantener UI visible aunque el endpoint falle temporalmente.
+            ensureFab();
+            ensureHub();
             pollActivos();
             pollNuevos();
             setInterval(pollActivos, POLL_MS);

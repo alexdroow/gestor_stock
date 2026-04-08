@@ -3929,7 +3929,10 @@
         }
 
         async function _pollPedidosTiendaNuevos() {
-            if (window.__sucreePedidosGlobalInit) return;
+            if (window.__sucreePedidosGlobalInit) {
+                _setVentasOnlineIndicator(true, 'Monitoreo global de pedidos activo');
+                return;
+            }
             try {
                 const response = await fetch(`/api/tienda/admin/pedidos-nuevos?since_id=${Number(_pedidosTiendaLastId || 0)}`, {
                     headers: { Accept: 'application/json' }
