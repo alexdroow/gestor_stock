@@ -1702,6 +1702,19 @@
             font-size: .82rem;
             font-weight: 700;
         }
+        .checkout-despacho-notice {
+            display: none;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+            border-radius: 9px;
+            padding: 8px;
+            font-size: .82rem;
+            font-weight: 700;
+        }
+        .checkout-despacho-notice.active {
+            display: block;
+        }
         #modal-cuenta .modal {
             max-height: 90vh;
             overflow: auto;
@@ -2339,7 +2352,8 @@
         }
         body.mobile-ui #checkout-hora-help,
         body.mobile-ui .checkout-shipping-quote,
-        body.mobile-ui .checkout-shipping-warning {
+        body.mobile-ui .checkout-shipping-warning,
+        body.mobile-ui .checkout-despacho-notice {
             font-size: .8rem;
         }
         body.mobile-ui .modal .btn-muted,
@@ -3036,6 +3050,9 @@
                     <button type="button" class="checkout-delivery-btn active" id="checkout-entrega-retiro">Retiro en tienda</button>
                     <button type="button" class="checkout-delivery-btn" id="checkout-entrega-despacho">Despacho</button>
                 </div>
+                <div class="checkout-despacho-notice" id="checkout-despacho-notice">
+                    Los despachos se realizan por Uber Envíos. El valor final incluye recargo de servicio.
+                </div>
                 <div class="checkout-delivery-time">
                     <label for="checkout-hora-retiro">Hora de retiro/entrega</label>
                     <input id="checkout-hora-retiro" type="time" step="300">
@@ -3222,6 +3239,7 @@
         const checkoutMapMetaEl = document.getElementById("checkout-map-meta");
         const checkoutShippingQuoteEl = document.getElementById("checkout-shipping-quote");
         const checkoutShippingWarningEl = document.getElementById("checkout-shipping-warning");
+        const checkoutDespachoNoticeEl = document.getElementById("checkout-despacho-notice");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
         const modalExitoEstadoEl = document.getElementById("modal-exito-estado");
@@ -3398,6 +3416,7 @@
         let checkoutDireccionConfirmada = false;
         let checkoutDireccionPin = { lat: -33.510911, lng: -70.784909 };
         let checkoutShippingQuote = null;
+        let checkoutShippingError = "";
         let pedidoEstadoPollTimer = null;
         let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
@@ -7222,7 +7241,7 @@
             }
             if (!quote) {
                 checkoutShippingWarningEl.style.display = "block";
-                checkoutShippingWarningEl.textContent = "Confirma PIN y hora para calcular despacho.";
+                checkoutShippingWarningEl.textContent = String(checkoutShippingError || "Confirma PIN y hora para calcular despacho.");
                 return;
             }
             if (_checkoutShippingVisible()) {
@@ -7261,6 +7280,7 @@
 
         function _resetCheckoutShippingQuote() {
             checkoutShippingQuote = null;
+            checkoutShippingError = "";
             _renderCheckoutShippingQuote();
             _renderTotalesResumenCheckout();
         }
@@ -7270,6 +7290,7 @@
             if (checkoutEntregaRetiroEl) checkoutEntregaRetiroEl.classList.toggle("active", checkoutEntregaTipo === "retiro");
             if (checkoutEntregaDespachoEl) checkoutEntregaDespachoEl.classList.toggle("active", checkoutEntregaTipo === "despacho");
             if (checkoutDespachoWrapEl) checkoutDespachoWrapEl.classList.toggle("active", checkoutEntregaTipo === "despacho");
+            if (checkoutDespachoNoticeEl) checkoutDespachoNoticeEl.classList.toggle("active", checkoutEntregaTipo === "despacho");
             if (checkoutEntregaTipo !== "despacho") {
                 _resetCheckoutShippingQuote();
                 return;
@@ -7277,7 +7298,7 @@
             if (!checkoutDireccionConfirmada) {
                 if (checkoutShippingWarningEl) {
                     checkoutShippingWarningEl.style.display = "block";
-                    checkoutShippingWarningEl.textContent = "Confirma el pin para calcular despacho.";
+                    checkoutShippingWarningEl.textContent = "Los despachos se realizan por Uber Envíos. Confirma pin y hora para calcular el valor.";
                 }
             }
             setTimeout(() => _initCheckoutMap(), 80);
@@ -7338,13 +7359,18 @@
 
         async function _cotizarDespachoCheckoutDesdePin() {
             if (checkoutEntregaTipo !== "despacho") return;
-            const hora = String(checkoutHoraRetiroEl?.value || "").trim();
+            let hora = String(checkoutHoraRetiroEl?.value || "").trim();
             if (!_esHoraCheckoutValida(hora)) {
-                _resetCheckoutShippingQuote();
-                return;
+                const minHora = _horaMinimaCheckoutHHMM();
+                if (checkoutHoraRetiroEl) checkoutHoraRetiroEl.value = minHora;
+                _actualizarAyudaHoraCheckout();
+                hora = minHora;
             }
             if (!checkoutDireccionConfirmada) {
-                _resetCheckoutShippingQuote();
+                checkoutShippingQuote = null;
+                checkoutShippingError = "Confirma el PIN de la direccion para calcular despacho.";
+                _renderCheckoutShippingQuote();
+                _renderTotalesResumenCheckout();
                 return;
             }
             try {
@@ -7360,12 +7386,10 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cotizar despacho");
                 checkoutShippingQuote = (data.quote && typeof data.quote === "object") ? data.quote : null;
+                checkoutShippingError = "";
             } catch (err) {
                 checkoutShippingQuote = null;
-                if (checkoutShippingWarningEl) {
-                    checkoutShippingWarningEl.style.display = "block";
-                    checkoutShippingWarningEl.textContent = String(err.message || "No se pudo cotizar despacho.");
-                }
+                checkoutShippingError = String(err.message || "No se pudo cotizar despacho.");
             } finally {
                 _renderCheckoutShippingQuote();
                 _renderTotalesResumenCheckout();
@@ -7401,6 +7425,7 @@
             checkoutClientePendiente = norm.value;
             checkoutEntregaTipo = "retiro";
             checkoutShippingQuote = null;
+            checkoutShippingError = "";
             checkoutDireccionConfirmada = false;
             if (clienteRegistrado?.direccion_lat && clienteRegistrado?.direccion_lng) {
                 checkoutDireccionPin = {
