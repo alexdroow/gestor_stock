@@ -3643,6 +3643,8 @@
         let pedidoChatUnreadCount = 0;
         let pedidoChatLastNotifiedId = 0;
         let pedidoChatToastTimer = null;
+        let pedidoChatCountdownTimer = null;
+        let pedidoChatCountdownSeconds = 0;
         let cuentaModo = "register";
         const PEDIDO_FINAL_VISIBLE_MS = 24 * 60 * 60 * 1000;
         const PEDIDO_ACTIVO_DISMISS_KEY = "tienda_pedido_activo_dismissed_id";
@@ -4327,6 +4329,56 @@
             }
         }
 
+        function _formatCountdownMmSs(totalSeconds) {
+            const s = Math.max(0, Number(totalSeconds || 0));
+            const mm = Math.floor(s / 60);
+            const ss = s % 60;
+            return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+        }
+
+        function _stopPedidoChatCountdown() {
+            if (pedidoChatCountdownTimer) {
+                clearInterval(pedidoChatCountdownTimer);
+                pedidoChatCountdownTimer = null;
+            }
+            pedidoChatCountdownSeconds = 0;
+        }
+
+        function _setPedidoChatStatusText(activo, estado, cierreRestanteSegundos) {
+            if (!pedidoChatStatusEl) return;
+            const estadoNorm = String(estado || "").trim().toLowerCase();
+            const restante = Math.max(0, Number(cierreRestanteSegundos || 0));
+            if (activo && estadoNorm === "entregado" && restante > 0) {
+                pedidoChatStatusEl.textContent = `Chat activo temporalmente. Se cerrara en ${_formatCountdownMmSs(restante)}.`;
+                pedidoChatStatusEl.style.color = "#166534";
+                return;
+            }
+            pedidoChatStatusEl.textContent = activo
+                ? "Chat activo mientras se prepara el pedido."
+                : "Chat cerrado: pedido/reserva finalizado.";
+            pedidoChatStatusEl.style.color = activo ? "#166534" : "#b45309";
+        }
+
+        function _startPedidoChatCountdownIfNeeded(activo, estado, cierreRestanteSegundos) {
+            _stopPedidoChatCountdown();
+            const estadoNorm = String(estado || "").trim().toLowerCase();
+            const restante = Math.max(0, Number(cierreRestanteSegundos || 0));
+            if (!(activo && estadoNorm === "entregado" && restante > 0)) {
+                _setPedidoChatStatusText(activo, estado, 0);
+                return;
+            }
+            pedidoChatCountdownSeconds = restante;
+            _setPedidoChatStatusText(true, "entregado", pedidoChatCountdownSeconds);
+            pedidoChatCountdownTimer = setInterval(() => {
+                pedidoChatCountdownSeconds = Math.max(0, pedidoChatCountdownSeconds - 1);
+                _setPedidoChatStatusText(true, "entregado", pedidoChatCountdownSeconds);
+                if (pedidoChatCountdownSeconds <= 0) {
+                    _stopPedidoChatCountdown();
+                    _setPedidoChatStatusText(false, "entregado", 0);
+                }
+            }, 1000);
+        }
+
         function _notifyPedidoChatNuevoMensaje(unreadCount) {
             const unread = Math.max(0, Number(unreadCount || 0));
             if (unread <= 0) return;
@@ -4442,16 +4494,14 @@
                     }
                 }
                 _renderPedidoChatBadge();
-                if (pedidoChatStatusEl) {
-                    pedidoChatStatusEl.textContent = activo ? "Chat activo mientras se prepara el pedido." : "Chat cerrado: pedido/reserva finalizado.";
-                    pedidoChatStatusEl.style.color = activo ? "#166534" : "#b45309";
-                }
+                _startPedidoChatCountdownIfNeeded(activo, data?.estado || "", Number(data?.chat_cierre_restante_segundos || 0));
                 if (pedidoChatInputEl) pedidoChatInputEl.disabled = !activo;
                 if (pedidoChatSendEl) pedidoChatSendEl.disabled = !activo;
                 if (!activo && String(ctx.origen_tipo) === "agenda") {
                     try { localStorage.removeItem("tienda_ultima_reserva_chat"); } catch (_) {}
                 }
             } catch (e) {
+                _stopPedidoChatCountdown();
                 if (pedidoChatStatusEl) {
                     pedidoChatStatusEl.textContent = String(e?.message || "No se pudo cargar chat");
                     pedidoChatStatusEl.style.color = "#b91c1c";
@@ -4464,6 +4514,7 @@
                 clearInterval(pedidoChatPollTimer);
                 pedidoChatPollTimer = null;
             }
+            _stopPedidoChatCountdown();
         }
 
         function _syncPedidoChatContext() {

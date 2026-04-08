@@ -1372,6 +1372,20 @@ def _parse_sqlite_datetime_safe(raw):
         return None
 
 
+def _chat_cierre_restante_segundos(origen_tipo, estado_raw, estado_actualizado_raw=None):
+    estado = str(estado_raw or "").strip().lower()
+    if str(origen_tipo or "").strip().lower() != "venta":
+        return None
+    if estado != "entregado":
+        return None
+    dt = _parse_sqlite_datetime_safe(estado_actualizado_raw)
+    if not dt:
+        return 0
+    limite = dt + timedelta(minutes=15)
+    restante = int((limite - datetime.now()).total_seconds())
+    return max(0, restante)
+
+
 def _chat_estado_activo(origen_tipo, estado_raw, estado_actualizado_raw=None):
     estado = str(estado_raw or "").strip().lower()
     if origen_tipo == "agenda":
@@ -1379,10 +1393,7 @@ def _chat_estado_activo(origen_tipo, estado_raw, estado_actualizado_raw=None):
     if estado in {"recibido", "confirmado", "preparando", "listo"}:
         return True
     if estado == "entregado":
-        dt = _parse_sqlite_datetime_safe(estado_actualizado_raw)
-        if not dt:
-            return False
-        return dt >= (datetime.now() - timedelta(minutes=30))
+        return (_chat_cierre_restante_segundos(origen_tipo, estado, estado_actualizado_raw) or 0) > 0
     return False
 
 
@@ -1411,6 +1422,7 @@ def _chat_info_origen_cursor(cursor, origen_tipo, origen_id):
             "origen_id": oid,
             "estado": estado,
             "chat_activo": _chat_estado_activo("agenda", estado),
+            "chat_cierre_restante_segundos": _chat_cierre_restante_segundos("agenda", estado, None),
             "cliente_email": str(data.get("cliente_email") or "").strip().lower(),
             "cliente_telefono": _normalizar_telefono_cl(data.get("cliente_telefono")),
             "cliente_nombre": str(data.get("cliente") or "").strip(),
@@ -1437,6 +1449,7 @@ def _chat_info_origen_cursor(cursor, origen_tipo, origen_id):
         "origen_id": oid,
         "estado": estado,
         "chat_activo": _chat_estado_activo("venta", estado, data.get("pedido_estado_actualizado")),
+        "chat_cierre_restante_segundos": _chat_cierre_restante_segundos("venta", estado, data.get("pedido_estado_actualizado")),
         "cliente_email": str(data.get("cliente_email") or "").strip().lower(),
         "cliente_telefono": _normalizar_telefono_cl(data.get("cliente_telefono")),
         "cliente_nombre": str(data.get("cliente_nombre") or "").strip(),
@@ -5854,6 +5867,7 @@ def api_tienda_chat_listar(origen_tipo, origen_id):
             {
                 "success": True,
                 "chat_activo": bool(info.get("chat_activo")),
+                "chat_cierre_restante_segundos": int(info.get("chat_cierre_restante_segundos") or 0),
                 "origen_tipo": origen_tipo,
                 "origen_id": int(origen_id),
                 "estado": str(info.get("estado") or ""),
