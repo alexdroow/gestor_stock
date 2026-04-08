@@ -3051,7 +3051,7 @@
                     <button type="button" class="checkout-delivery-btn" id="checkout-entrega-despacho">Despacho</button>
                 </div>
                 <div class="checkout-despacho-notice" id="checkout-despacho-notice">
-                    Los despachos se realizan por Uber Envíos. El valor final incluye recargo de servicio.
+                    Los despachos se realizan por Uber Envíos.
                 </div>
                 <div class="checkout-delivery-time">
                     <label for="checkout-hora-retiro">Hora de retiro/entrega</label>
@@ -7247,12 +7247,10 @@
             if (_checkoutShippingVisible()) {
                 const fee = Number(quote.shipping_fee || 0);
                 const dist = Number(quote.distance_km || 0);
-                const baseStore = Number(quote.shipping_fee_store_base || 0);
-                const markup = Number(quote.shipping_fee_markup || 0);
                 const band = String(quote.time_band_label || "").trim();
                 const range = String(quote.range_label || "").trim();
                 checkoutShippingQuoteEl.style.display = "block";
-                checkoutShippingQuoteEl.textContent = `Despacho estimado: ${money.format(fee)} (base ${money.format(baseStore)} + recargo Uber ${money.format(markup)}). Distancia: ${dist.toFixed(2)} km${range ? ` · ${range}` : ""}${band ? ` · ${band}` : ""}.`;
+                checkoutShippingQuoteEl.textContent = `Despacho estimado (Uber Envíos): ${money.format(fee)}. Distancia: ${dist.toFixed(2)} km${range ? ` · ${range}` : ""}${band ? ` · ${band}` : ""}.`;
             } else {
                 checkoutShippingWarningEl.style.display = "block";
                 checkoutShippingWarningEl.textContent = String(quote.warning || "Direccion fuera de zona de cotizacion visible. Te contactaremos para cotizar despacho.");
@@ -7465,7 +7463,7 @@
                     <div class="checkout-ticket-total"><span>Subtotal</span><strong id="checkout-ticket-subtotal">${money.format(subtotal)}</strong></div>
                     <div class="checkout-ticket-total discount"><span>Descuento</span><strong id="checkout-ticket-descuento">-${money.format(descuento)}</strong></div>
                     <div class="checkout-ticket-total iva"><span>IVA incluido (19%)</span><strong id="checkout-ticket-iva">${money.format(0)}</strong></div>
-                    <div class="checkout-ticket-total" id="checkout-ticket-despacho-row" style="display:none;"><span>Despacho (incluye recargo Uber 30%)</span><strong id="checkout-ticket-despacho">${money.format(0)}</strong></div>
+                    <div class="checkout-ticket-total" id="checkout-ticket-despacho-row" style="display:none;"><span>Despacho</span><strong id="checkout-ticket-despacho">${money.format(0)}</strong></div>
                     <div class="checkout-ticket-total final"><span>Total</span><strong id="checkout-ticket-total">${money.format(total)}</strong></div>
                 </div>
             `;
