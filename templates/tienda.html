@@ -2411,20 +2411,23 @@
             font-size: 1.16rem;
             padding: 11px 16px;
         }
-        body.mobile-ui #pedido-chat-box {
-            margin-top: 8px !important;
-            padding: 7px !important;
+        body.mobile-ui #pedido-chat-modal .modal {
+            width: min(420px, 94vw);
+            max-height: 84vh;
+            padding: 12px;
+            gap: 8px;
         }
         body.mobile-ui #pedido-chat-list {
-            height: 180px !important;
-            max-height: 34vh !important;
+            height: 220px !important;
+            max-height: 38vh !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
             -webkit-overflow-scrolling: touch !important;
             touch-action: pan-y !important;
         }
         body.mobile-ui #pedido-chat-input,
-        body.mobile-ui #pedido-chat-send {
+        body.mobile-ui #pedido-chat-send,
+        body.mobile-ui #pedido-chat-close {
             font-size: .85rem !important;
             padding: 8px 9px !important;
         }
@@ -2937,16 +2940,11 @@
                 <div id="pedido-activo-meta" style="margin-top:6px;font-size:.82rem;color:#475569;"></div>
                 <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button type="button" id="pedido-activo-ver" class="btn-primary">Ver detalle</button>
+                    <button type="button" id="pedido-activo-chat-toggle" class="btn-primary" style="display:none;position:relative;">
+                        Abrir chat
+                        <span id="pedido-chat-badge" style="display:none;position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;border-radius:999px;min-width:20px;height:20px;line-height:20px;padding:0 6px;font-size:.72rem;font-weight:800;"></span>
+                    </button>
                     <button type="button" id="pedido-activo-cerrar" class="btn-muted">Cerrar</button>
-                </div>
-                <div id="pedido-chat-box" style="display:none;margin-top:10px;border:1px solid #c7d2fe;background:#ffffff;border-radius:10px;padding:8px;">
-                    <div style="font-weight:700;color:#1e293b;font-size:.88rem;">Chat con pasteleria</div>
-                    <div id="pedido-chat-status" style="margin-top:4px;font-size:.78rem;color:#475569;">Cargando chat...</div>
-                    <div id="pedido-chat-list" style="margin-top:6px;height:220px;max-height:42vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#f8fafc;display:grid;gap:6px;"></div>
-                    <div style="display:flex;gap:6px;margin-top:6px;">
-                        <input type="text" id="pedido-chat-input" maxlength="1000" placeholder="Escribe tu mensaje..." style="flex:1;">
-                        <button type="button" id="pedido-chat-send" class="btn-primary">Enviar</button>
-                    </div>
                 </div>
             </div>
         </aside>
@@ -3234,6 +3232,21 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="pedido-chat-modal">
+        <div class="modal" style="width:min(430px,94vw);padding:12px;gap:8px;max-height:86vh;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <h3 style="margin:0;">Chat con pasteleria</h3>
+                <button type="button" id="pedido-chat-close" class="btn-muted">Cerrar</button>
+            </div>
+            <div id="pedido-chat-status" style="margin-top:2px;font-size:.78rem;color:#475569;">Cargando chat...</div>
+            <div id="pedido-chat-list" style="margin-top:6px;height:240px;max-height:42vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#f8fafc;display:grid;gap:6px;"></div>
+            <div style="display:flex;gap:6px;margin-top:2px;">
+                <input type="text" id="pedido-chat-input" maxlength="1000" placeholder="Escribe tu mensaje..." style="flex:1;">
+                <button type="button" id="pedido-chat-send" class="btn-primary">Enviar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
         const catListEl = document.getElementById("cat-list");
@@ -3348,7 +3361,10 @@
         const pedidoActivoMetaEl = document.getElementById("pedido-activo-meta");
         const pedidoActivoVerEl = document.getElementById("pedido-activo-ver");
         const pedidoActivoCerrarEl = document.getElementById("pedido-activo-cerrar");
-        const pedidoChatBoxEl = document.getElementById("pedido-chat-box");
+        const pedidoActivoChatToggleEl = document.getElementById("pedido-activo-chat-toggle");
+        const pedidoChatBadgeEl = document.getElementById("pedido-chat-badge");
+        const pedidoChatModalEl = document.getElementById("pedido-chat-modal");
+        const pedidoChatCloseEl = document.getElementById("pedido-chat-close");
         const pedidoChatStatusEl = document.getElementById("pedido-chat-status");
         const pedidoChatListEl = document.getElementById("pedido-chat-list");
         const pedidoChatInputEl = document.getElementById("pedido-chat-input");
@@ -3511,6 +3527,8 @@
         let pedidoChatContext = null;
         let pedidoChatPollTimer = null;
         let pedidoChatLastMsgId = 0;
+        let pedidoChatModalOpen = false;
+        let pedidoChatUnreadCount = 0;
         let cuentaModo = "register";
         const PEDIDO_FINAL_VISIBLE_MS = 24 * 60 * 60 * 1000;
         const PEDIDO_ACTIVO_DISMISS_KEY = "tienda_pedido_activo_dismissed_id";
@@ -4127,6 +4145,41 @@
             return null;
         }
 
+        function _pedidoChatCtxKey(ctx) {
+            if (!ctx) return "";
+            return `tienda_chat_seen_${String(ctx.origen_tipo || "venta")}_${Number(ctx.origen_id || 0)}`;
+        }
+
+        function _pedidoChatGetSeenId(ctx) {
+            const key = _pedidoChatCtxKey(ctx);
+            if (!key) return 0;
+            try {
+                return Number(localStorage.getItem(key) || 0) || 0;
+            } catch (_) {
+                return 0;
+            }
+        }
+
+        function _pedidoChatSetSeenId(ctx, id) {
+            const key = _pedidoChatCtxKey(ctx);
+            if (!key) return;
+            try { localStorage.setItem(key, String(Number(id || 0) || 0)); } catch (_) {}
+        }
+
+        function _renderPedidoChatBadge() {
+            if (!pedidoActivoChatToggleEl) return;
+            const show = Boolean(pedidoChatContext);
+            pedidoActivoChatToggleEl.style.display = show ? "" : "none";
+            if (!show || !pedidoChatBadgeEl) return;
+            if (pedidoChatUnreadCount > 0) {
+                pedidoChatBadgeEl.style.display = "";
+                pedidoChatBadgeEl.textContent = String(Math.min(99, pedidoChatUnreadCount));
+            } else {
+                pedidoChatBadgeEl.style.display = "none";
+                pedidoChatBadgeEl.textContent = "";
+            }
+        }
+
         function _renderPedidoChatMensajes(mensajes) {
             if (!pedidoChatListEl) return;
             const arr = Array.isArray(mensajes) ? mensajes : [];
@@ -4159,15 +4212,34 @@
 
         async function _pollPedidoChat() {
             const ctx = pedidoChatContext;
-            if (!ctx || !pedidoChatBoxEl) return;
+            if (!ctx || !pedidoChatStatusEl || !pedidoChatListEl) return;
             try {
                 const url = `/api/tienda/chat/${encodeURIComponent(ctx.origen_tipo)}/${Number(ctx.origen_id || 0)}?role=cliente&email=${encodeURIComponent(ctx.email)}&telefono=${encodeURIComponent(ctx.telefono)}`;
                 const res = await fetch(url, { headers: { Accept: "application/json" } });
                 const data = await res.json();
                 if (!res.ok || !data?.success) throw new Error(data?.error || "No se pudo cargar chat");
-                pedidoChatBoxEl.style.display = "";
                 _renderPedidoChatMensajes(data.mensajes || []);
                 const activo = Boolean(data.chat_activo);
+                let lastPasteleriaId = 0;
+                for (const m of (Array.isArray(data.mensajes) ? data.mensajes : [])) {
+                    const tipo = String(m.remitente_tipo || "").trim().toLowerCase();
+                    const mid = Number(m.id || 0);
+                    if (tipo === "pasteleria" && mid > lastPasteleriaId) lastPasteleriaId = mid;
+                }
+                const seenId = _pedidoChatGetSeenId(ctx);
+                if (pedidoChatModalOpen) {
+                    _pedidoChatSetSeenId(ctx, lastPasteleriaId);
+                    pedidoChatUnreadCount = 0;
+                } else {
+                    let unread = 0;
+                    for (const m of (Array.isArray(data.mensajes) ? data.mensajes : [])) {
+                        const tipo = String(m.remitente_tipo || "").trim().toLowerCase();
+                        const mid = Number(m.id || 0);
+                        if (tipo === "pasteleria" && mid > seenId) unread += 1;
+                    }
+                    pedidoChatUnreadCount = unread;
+                }
+                _renderPedidoChatBadge();
                 if (pedidoChatStatusEl) {
                     pedidoChatStatusEl.textContent = activo ? "Chat activo mientras se prepara el pedido." : "Chat cerrado: pedido/reserva finalizado.";
                     pedidoChatStatusEl.style.color = activo ? "#166534" : "#b45309";
@@ -4193,7 +4265,7 @@
         }
 
         function _syncPedidoChatContext() {
-            if (!pedidoChatBoxEl) return;
+            if (!pedidoActivoChatToggleEl) return;
             const nextCtx = _buildPedidoChatContext();
             const prevKey = pedidoChatContext ? `${pedidoChatContext.origen_tipo}:${pedidoChatContext.origen_id}` : "";
             const nextKey = nextCtx ? `${nextCtx.origen_tipo}:${nextCtx.origen_id}` : "";
@@ -4201,17 +4273,39 @@
             if (!pedidoChatContext) {
                 _stopPedidoChatPoll();
                 pedidoChatLastMsgId = 0;
-                pedidoChatBoxEl.style.display = "none";
+                pedidoChatUnreadCount = 0;
+                _renderPedidoChatBadge();
+                if (pedidoChatModalEl) pedidoChatModalEl.style.display = "none";
+                pedidoChatModalOpen = false;
                 return;
             }
             if (prevKey !== nextKey) {
                 pedidoChatLastMsgId = 0;
                 if (pedidoChatListEl) pedidoChatListEl.innerHTML = `<div style="font-size:.8rem;color:#64748b;">Cargando mensajes...</div>`;
             }
+            _renderPedidoChatBadge();
             _pollPedidoChat();
             if (!pedidoChatPollTimer) {
                 pedidoChatPollTimer = setInterval(_pollPedidoChat, 5000);
             }
+        }
+
+        function _abrirModalPedidoChat() {
+            if (!pedidoChatContext || !pedidoChatModalEl) return;
+            pedidoChatModalEl.style.display = "flex";
+            pedidoChatModalOpen = true;
+            pedidoChatUnreadCount = 0;
+            _renderPedidoChatBadge();
+            _pollPedidoChat();
+            setTimeout(() => {
+                try { pedidoChatInputEl?.focus(); } catch (_) {}
+            }, 80);
+        }
+
+        function _cerrarModalPedidoChat() {
+            if (!pedidoChatModalEl) return;
+            pedidoChatModalEl.style.display = "none";
+            pedidoChatModalOpen = false;
         }
 
         async function _enviarMensajePedidoChatCliente() {
@@ -4331,8 +4425,11 @@
             try { localStorage.removeItem("tienda_cliente_reg"); } catch (_) {}
             try { localStorage.removeItem("tienda_ultima_reserva_chat"); } catch (_) {}
             pedidoChatContext = null;
+            pedidoChatUnreadCount = 0;
             _stopPedidoChatPoll();
-            if (pedidoChatBoxEl) pedidoChatBoxEl.style.display = "none";
+            if (pedidoChatModalEl) pedidoChatModalEl.style.display = "none";
+            pedidoChatModalOpen = false;
+            _renderPedidoChatBadge();
             if (cuentaHistorialEl) cuentaHistorialEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay compras registradas.</div>`;
             if (cuentaHistorialAgendaEl) cuentaHistorialAgendaEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay reservas registradas.</div>`;
             if (cuentaCuponesEl) cuentaCuponesEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>`;
@@ -8280,7 +8377,9 @@
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
+        pedidoActivoChatToggleEl?.addEventListener("click", _abrirModalPedidoChat);
         pedidoActivoCerrarEl?.addEventListener("click", cerrarPedidoActivoBanner);
+        pedidoChatCloseEl?.addEventListener("click", _cerrarModalPedidoChat);
         pedidoChatSendEl?.addEventListener("click", _enviarMensajePedidoChatCliente);
         pedidoChatInputEl?.addEventListener("keydown", (ev) => {
             if (ev.key === "Enter") {
@@ -8301,6 +8400,7 @@
         modalCheckoutResumenEl?.addEventListener("click", (ev) => { if (ev.target === modalCheckoutResumenEl) cerrarModalCheckoutResumen(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
+        pedidoChatModalEl?.addEventListener("click", (ev) => { if (ev.target === pedidoChatModalEl) _cerrarModalPedidoChat(); });
         agendaCakeOpenCartEl?.addEventListener("click", _abrirModalAgendaCakeCart);
         mobileAgendaSummaryFabEl?.addEventListener("click", _abrirModalAgendaCakeCart);
         agendaCakeOpenCart2El?.addEventListener("click", () => {
