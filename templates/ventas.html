@@ -3593,7 +3593,7 @@
                     <button type="button" id="pedido-chat-admin-close" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">Cerrar</button>
                 </div>
                 <div id="pedido-chat-admin-meta" style="padding:8px 10px;font-size:.82rem;color:#475569;">-</div>
-                <div id="pedido-chat-admin-list" style="margin:0 10px 10px;max-height:260px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#f8fafc;display:grid;gap:6px;"></div>
+                <div id="pedido-chat-admin-list" style="margin:0 10px 10px;max-height:260px;overflow-y:auto;overflow-x:hidden;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#f8fafc;display:grid;gap:6px;"></div>
                 <div style="display:flex;gap:6px;padding:0 10px 10px;">
                     <input id="pedido-chat-admin-input" type="text" maxlength="1000" placeholder="Responder al cliente..." style="flex:1;">
                     <button type="button" id="pedido-chat-admin-send" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:8px;padding:7px 10px;font-weight:700;cursor:pointer;">Enviar</button>
@@ -3627,8 +3627,8 @@
                 const admin = tipo === 'pasteleria';
                 const txt = String(m.mensaje || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
                 const fecha = String(m.creado_en || '').replace('T',' ').slice(0,16);
-                return `<div style="display:grid;gap:2px;justify-items:${admin ? 'end' : 'start'};">
-                    <div style="max-width:92%;padding:7px 8px;border-radius:9px;border:1px solid ${admin ? '#93c5fd' : '#bbf7d0'};background:${admin ? '#eff6ff' : '#f0fdf4'};font-size:.85rem;color:#0f172a;">${txt}</div>
+                return `<div style="display:flex;flex-direction:column;gap:2px;align-items:${admin ? 'flex-end' : 'flex-start'};min-width:0;">
+                    <div style="display:inline-block;width:fit-content;max-width:92%;padding:7px 8px;border-radius:9px;border:1px solid ${admin ? '#93c5fd' : '#bbf7d0'};background:${admin ? '#eff6ff' : '#f0fdf4'};font-size:.85rem;color:#0f172a;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;">${txt}</div>
                     <div style="font-size:.72rem;color:#64748b;">${admin ? 'Pasteleria' : 'Cliente'} · ${fecha}</div>
                 </div>`;
             }).join('');
@@ -3695,7 +3695,75 @@
         }
         window._abrirChatPedidoOnline = _abrirChatPedidoOnline;
 
+        function _mensajeRapidoPedido(tipo, pedidoId) {
+            const id = Number(pedidoId || 0);
+            switch (String(tipo || '').toLowerCase()) {
+                case 'recibido':
+                    return `Su pedido #${id} a sido recibido exitosamente.`;
+                case 'preparando':
+                    return 'Su pedido esta siendo preperado le avisaremos cuando este listo para retirar.';
+                case 'listo':
+                    return 'Su pedido se encuentra listo para ser retirado.';
+                case 'despacho':
+                    return 'Su pedido esta listo sera enviado por Uber envios a la brevedad, sera notificado por WhatsApp cuando vaya en camino.';
+                case 'entregado':
+                    return 'Su pedido ya a sido entregado exitosamente, Muchas gracias por preferir Pasteleria Sucree.';
+                default:
+                    return '';
+            }
+        }
+
+        async function _enviarMensajeRapidoPedido(ventaId, tipo) {
+            const idNum = Number(ventaId || 0);
+            if (!idNum) return;
+            const tipoNorm = String(tipo || '').toLowerCase();
+            const mensaje = _mensajeRapidoPedido(tipoNorm, idNum);
+            const estadoMap = {
+                recibido: 'confirmado',
+                preparando: 'preparando',
+                listo: 'listo',
+                despacho: 'listo',
+                entregado: 'entregado',
+            };
+            const nuevoEstado = estadoMap[tipoNorm] || 'confirmado';
+            try {
+                const r1 = await fetch(`/api/tienda/admin/pedido/${idNum}/estado`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ estado: nuevoEstado }),
+                });
+                const d1 = await r1.json();
+                if (!r1.ok || !d1?.success) throw new Error(d1?.error || 'No se pudo actualizar estado');
+                const r2 = await fetch(`/api/tienda/chat/venta/${idNum}/enviar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ role: 'admin', mensaje }),
+                });
+                const d2 = await r2.json();
+                if (!r2.ok || !d2?.success) throw new Error(d2?.error || 'No se pudo enviar mensaje');
+                _pollPedidosChatActivosVentas();
+                if (_pedidoChatAdminCtx && Number(_pedidoChatAdminCtx.id || 0) === idNum) {
+                    _pollChatPedidoOnlineAdmin();
+                }
+                if (window.AppUX?.toastSuccess) window.AppUX.toastSuccess('Mensaje enviado al cliente.');
+            } catch (err) {
+                if (window.AppUX?.toastError) window.AppUX.toastError(err.message || 'No se pudo enviar mensaje rapido');
+            }
+        }
+        window._enviarMensajeRapidoPedido = _enviarMensajeRapidoPedido;
+
+        function _toggleMensajesRapidos(id) {
+            const box = document.getElementById(`pedido-quick-${Number(id || 0)}`);
+            const btn = document.getElementById(`pedido-quick-toggle-${Number(id || 0)}`);
+            if (!box || !btn) return;
+            const open = box.style.display !== 'none';
+            box.style.display = open ? 'none' : 'grid';
+            btn.textContent = open ? 'Mostrar mensajes' : 'Ocultar mensajes';
+        }
+        window._toggleMensajesRapidos = _toggleMensajesRapidos;
+
         function _ensureChatsHubVentas() {
+            if (window.__sucreePedidosGlobalInit) return null;
             let hub = document.getElementById('ventas-chat-hub');
             if (hub) return hub;
             hub = document.createElement('div');
@@ -3703,7 +3771,7 @@
             hub.style.cssText = 'position:fixed;right:20px;bottom:92px;z-index:9998;width:min(360px,92vw);background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 12px 28px rgba(2,6,23,.18);display:none;';
             hub.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:1px solid #e2e8f0;">
-                    <strong style="color:#0f172a;">Chats tienda</strong>
+                    <strong style="color:#0f172a;">Pedidos activos</strong>
                     <button type="button" id="ventas-chat-hub-close" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">Cerrar</button>
                 </div>
                 <div id="ventas-chat-hub-list" style="max-height:260px;overflow:auto;padding:10px;display:grid;gap:8px;">
@@ -3715,12 +3783,13 @@
         }
 
         function _ensureChatsHubFab() {
+            if (window.__sucreePedidosGlobalInit) return null;
             let fab = document.getElementById('ventas-chat-hub-fab');
             if (fab) return fab;
             fab = document.createElement('button');
             fab.id = 'ventas-chat-hub-fab';
             fab.type = 'button';
-            fab.textContent = 'Chats tienda';
+            fab.textContent = 'Pedidos activos';
             fab.style.cssText = 'position:fixed;right:20px;bottom:42px;z-index:9997;border:1px solid #1d4ed8;background:#2563eb;color:#fff;border-radius:999px;padding:9px 14px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(37,99,235,.35);';
             fab.addEventListener('click', () => {
                 const hub = _ensureChatsHubVentas();
@@ -3731,13 +3800,14 @@
         }
 
         async function _pollPedidosChatActivosVentas() {
+            if (window.__sucreePedidosGlobalInit) return;
             try {
                 const res = await fetch('/api/tienda/admin/pedidos-chat-activos', { headers: { Accept: 'application/json' } });
                 const data = await res.json();
                 if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar chats');
                 const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
                 const fab = _ensureChatsHubFab();
-                if (fab) fab.textContent = `Chats tienda (${pedidos.length})`;
+                if (fab) fab.textContent = `Pedidos activos (${pedidos.length})`;
                 const list = document.getElementById('ventas-chat-hub-list');
                 if (!list) return;
                 if (!pedidos.length) {
@@ -3759,8 +3829,16 @@
                         <div style="font-size:.85rem;color:#475569;">${nom}</div>
                         <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
                         <div style="font-size:.8rem;color:#334155;">${estado} · ${entrega}${hora ? ` · ${hora}` : ''}</div>
-                        <div style="margin-top:6px;">
+                        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_abrirChatPedidoOnline(${id}, '${emEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
+                            <button type="button" id="pedido-quick-toggle-${id}" onclick="_toggleMensajesRapidos(${id})" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Mostrar mensajes</button>
+                        </div>
+                        <div id="pedido-quick-${id}" style="display:none;grid-template-columns:1fr;gap:6px;margin-top:6px;">
+                            <button type="button" onclick="_enviarMensajeRapidoPedido(${id},'recibido')" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Pedido recibido</button>
+                            <button type="button" onclick="_enviarMensajeRapidoPedido(${id},'preparando')" style="border:1px solid #fde68a;background:#fffbeb;color:#92400e;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">En preparacion</button>
+                            <button type="button" onclick="_enviarMensajeRapidoPedido(${id},'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo para retiro</button>
+                            <button type="button" onclick="_enviarMensajeRapidoPedido(${id},'despacho')" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Despacho</button>
+                            <button type="button" onclick="_enviarMensajeRapidoPedido(${id},'entregado')" style="border:1px solid #fecaca;background:#fef2f2;color:#991b1b;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Pedido entregado</button>
                         </div>
                     </div>`;
                 }).join('');
@@ -3851,6 +3929,7 @@
         }
 
         async function _pollPedidosTiendaNuevos() {
+            if (window.__sucreePedidosGlobalInit) return;
             try {
                 const response = await fetch(`/api/tienda/admin/pedidos-nuevos?since_id=${Number(_pedidosTiendaLastId || 0)}`, {
                     headers: { Accept: 'application/json' }

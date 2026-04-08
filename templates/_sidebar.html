@@ -75,6 +75,72 @@
         body.dark-mode .st-item.st-alert .st-value {
             color: #fecaca;
         }
+        .sucree-pedidos-fab {
+            position: fixed;
+            right: 18px;
+            bottom: 22px;
+            z-index: 120000;
+            border: 1px solid #1d4ed8;
+            background: #2563eb;
+            color: #fff;
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 24px rgba(37,99,235,.35);
+            display: none;
+        }
+        .sucree-pedidos-hub {
+            position: fixed;
+            right: 18px;
+            bottom: 72px;
+            z-index: 120001;
+            width: min(380px, 92vw);
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(2,6,23,.22);
+            display: none;
+        }
+        .sucree-pedidos-chat {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 120002;
+            width: min(430px, 92vw);
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            box-shadow: 0 14px 32px rgba(2,6,23,.25);
+            display: none;
+        }
+        .sucree-pedidos-alert {
+            position: fixed;
+            inset: 0;
+            z-index: 130000;
+            background: rgba(15,23,42,.74);
+            padding: 18px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .sucree-pedidos-alert-panel {
+            width: min(920px, 96vw);
+            max-height: 88vh;
+            overflow: auto;
+            background: #fff;
+            border: 2px solid #ef4444;
+            border-radius: 16px;
+            box-shadow: 0 28px 48px rgba(0,0,0,.35);
+            padding: 16px;
+        }
+        body.dark-mode .sucree-pedidos-hub,
+        body.dark-mode .sucree-pedidos-chat,
+        body.dark-mode .sucree-pedidos-alert-panel {
+            background: #0f172a;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
     </style>
 
     <div class="logo">
@@ -208,6 +274,360 @@
                 if (document.visibilityState === 'visible') loadTuyaSidebar();
             });
             window.addEventListener('sucree-tuya-sidebar-updated', loadTuyaSidebar);
+        })();
+
+        (function () {
+            if (window.__sucreePedidosGlobalInit) return;
+            window.__sucreePedidosGlobalInit = true;
+
+            const POLL_MS = 5000;
+            const LAST_ID_KEY = 'sucree_pedidos_nuevos_last_id';
+            let pedidosActivos = [];
+            let nuevosPendientes = [];
+            let chatCtx = null;
+            let chatTimer = null;
+            let initNuevos = false;
+            let lastId = Number(localStorage.getItem(LAST_ID_KEY) || 0) || 0;
+
+            function esc(v) {
+                return String(v || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
+            }
+            function labelEstado(raw) {
+                const est = String(raw || 'recibido').trim().toLowerCase();
+                const map = { recibido:'Recibido', confirmado:'Confirmado', preparando:'En preparacion', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
+                return map[est] || 'Recibido';
+            }
+            function beep() {
+                try {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    if (!AC) return;
+                    const ctx = new AC();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = 880;
+                    gain.gain.value = 0.03;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.16);
+                    setTimeout(() => { try { ctx.close(); } catch (_) {} }, 260);
+                } catch (_) {}
+            }
+
+            function ensureFab() {
+                let fab = document.getElementById('sucree-pedidos-fab');
+                if (fab) return fab;
+                fab = document.createElement('button');
+                fab.id = 'sucree-pedidos-fab';
+                fab.className = 'sucree-pedidos-fab';
+                fab.type = 'button';
+                fab.textContent = 'Pedidos activos';
+                fab.addEventListener('click', () => {
+                    const hub = ensureHub();
+                    hub.style.display = hub.style.display === 'none' ? 'block' : 'none';
+                });
+                document.body.appendChild(fab);
+                return fab;
+            }
+
+            function ensureHub() {
+                let hub = document.getElementById('sucree-pedidos-hub');
+                if (hub) return hub;
+                hub = document.createElement('div');
+                hub.id = 'sucree-pedidos-hub';
+                hub.className = 'sucree-pedidos-hub';
+                hub.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:1px solid #e2e8f0;">
+                        <strong>Pedidos activos</strong>
+                        <button type="button" id="sucree-pedidos-hub-close" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">Cerrar</button>
+                    </div>
+                    <div id="sucree-pedidos-hub-list" style="max-height:280px;overflow:auto;padding:10px;display:grid;gap:8px;">
+                        <div style="font-size:.85rem;color:#64748b;">Cargando...</div>
+                    </div>`;
+                document.body.appendChild(hub);
+                hub.querySelector('#sucree-pedidos-hub-close')?.addEventListener('click', () => { hub.style.display = 'none'; });
+                return hub;
+            }
+
+            function ensureChat() {
+                let wrap = document.getElementById('sucree-pedidos-chat');
+                if (wrap) return wrap;
+                wrap = document.createElement('div');
+                wrap.id = 'sucree-pedidos-chat';
+                wrap.className = 'sucree-pedidos-chat';
+                wrap.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #e2e8f0;">
+                        <strong>Chat pedido</strong>
+                        <button type="button" id="sucree-pedidos-chat-close" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">Cerrar</button>
+                    </div>
+                    <div id="sucree-pedidos-chat-meta" style="padding:8px 10px;font-size:.82rem;color:#475569;">-</div>
+                    <div id="sucree-pedidos-chat-list" style="margin:0 10px 10px;max-height:280px;overflow-y:auto;overflow-x:hidden;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#f8fafc;display:grid;gap:6px;"></div>
+                    <div style="display:flex;gap:6px;padding:0 10px 10px;">
+                        <input id="sucree-pedidos-chat-input" type="text" maxlength="1000" placeholder="Responder al cliente..." style="flex:1;">
+                        <button type="button" id="sucree-pedidos-chat-send" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:8px;padding:7px 10px;font-weight:700;cursor:pointer;">Enviar</button>
+                    </div>`;
+                document.body.appendChild(wrap);
+                wrap.querySelector('#sucree-pedidos-chat-close')?.addEventListener('click', () => {
+                    wrap.style.display = 'none';
+                    chatCtx = null;
+                    if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+                });
+                wrap.querySelector('#sucree-pedidos-chat-send')?.addEventListener('click', sendChat);
+                wrap.querySelector('#sucree-pedidos-chat-input')?.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter') { ev.preventDefault(); sendChat(); }
+                });
+                return wrap;
+            }
+
+            function ensureAlert() {
+                let ov = document.getElementById('sucree-pedidos-alert');
+                if (ov) return ov;
+                ov = document.createElement('div');
+                ov.id = 'sucree-pedidos-alert';
+                ov.className = 'sucree-pedidos-alert';
+                ov.innerHTML = `
+                    <div class="sucree-pedidos-alert-panel">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+                            <div>
+                                <div style="font-size:1.2rem;font-weight:900;color:#991b1b;">Nuevo pedido online</div>
+                                <div style="font-size:.95rem;color:#475569;">Prioridad alta: revisa y responde al cliente.</div>
+                            </div>
+                            <div id="sucree-pedidos-alert-count" style="background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:999px;font-weight:800;">0</div>
+                        </div>
+                        <div id="sucree-pedidos-alert-body" style="display:grid;gap:10px;"></div>
+                        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+                            <button type="button" id="sucree-pedidos-alert-open" style="border:1px solid #2563eb;background:#2563eb;color:#fff;padding:9px 12px;border-radius:8px;font-weight:800;cursor:pointer;">Ver pedidos activos</button>
+                            <button type="button" id="sucree-pedidos-alert-close" style="border:1px solid #cbd5e1;background:#fff;color:#334155;padding:9px 12px;border-radius:8px;font-weight:700;cursor:pointer;">Cerrar</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(ov);
+                ov.querySelector('#sucree-pedidos-alert-open')?.addEventListener('click', () => {
+                    ov.style.display = 'none';
+                    const hub = ensureHub();
+                    hub.style.display = 'block';
+                });
+                ov.querySelector('#sucree-pedidos-alert-close')?.addEventListener('click', () => { ov.style.display = 'none'; });
+                return ov;
+            }
+
+            function quickMsg(kind, pedidoId) {
+                const id = Number(pedidoId || 0);
+                switch (String(kind || '').toLowerCase()) {
+                    case 'recibido': return `Su pedido #${id} a sido recibido exitosamente.`;
+                    case 'preparando': return 'Su pedido esta siendo preperado le avisaremos cuando este listo para retirar.';
+                    case 'listo': return 'Su pedido se encuentra listo para ser retirado.';
+                    case 'despacho': return 'Su pedido esta listo sera enviado por Uber envios a la brevedad, sera notificado por WhatsApp cuando vaya en camino.';
+                    case 'entregado': return 'Su pedido ya a sido entregado exitosamente, Muchas gracias por preferir Pasteleria Sucree.';
+                    default: return '';
+                }
+            }
+
+            async function sendQuick(ventaId, kind) {
+                const id = Number(ventaId || 0);
+                if (!id) return;
+                const estadoMap = { recibido:'confirmado', preparando:'preparando', listo:'listo', despacho:'listo', entregado:'entregado' };
+                const estado = estadoMap[String(kind || '').toLowerCase()] || 'confirmado';
+                const mensaje = quickMsg(kind, id);
+                try {
+                    const r1 = await fetch(`/api/tienda/admin/pedido/${id}/estado`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        body: JSON.stringify({ estado }),
+                    });
+                    const d1 = await r1.json();
+                    if (!r1.ok || !d1?.success) throw new Error(d1?.error || 'No se pudo actualizar estado');
+                    const r2 = await fetch(`/api/tienda/chat/venta/${id}/enviar`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        body: JSON.stringify({ role: 'admin', mensaje }),
+                    });
+                    const d2 = await r2.json();
+                    if (!r2.ok || !d2?.success) throw new Error(d2?.error || 'No se pudo enviar mensaje');
+                    pollActivos();
+                    if (chatCtx && Number(chatCtx.id || 0) === id) pollChat();
+                } catch (err) {
+                    alert(err.message || 'No se pudo enviar mensaje rapido');
+                }
+            }
+            window._sucreeSendQuickPedido = sendQuick;
+
+            function toggleQuick(id) {
+                const box = document.getElementById(`sucree-quick-${Number(id || 0)}`);
+                const btn = document.getElementById(`sucree-quick-toggle-${Number(id || 0)}`);
+                if (!box || !btn) return;
+                const opened = box.style.display !== 'none';
+                box.style.display = opened ? 'none' : 'grid';
+                btn.textContent = opened ? 'Mostrar mensajes' : 'Ocultar mensajes';
+            }
+            window._sucreeToggleQuickPedido = toggleQuick;
+
+            function renderHub() {
+                const fab = ensureFab();
+                const hub = ensureHub();
+                fab.style.display = '';
+                fab.textContent = `Pedidos activos (${pedidosActivos.length})`;
+                const list = hub.querySelector('#sucree-pedidos-hub-list');
+                if (!list) return;
+                if (!pedidosActivos.length) {
+                    list.innerHTML = '<div style="font-size:.85rem;color:#64748b;">No hay pedidos online activos para chat.</div>';
+                    return;
+                }
+                list.innerHTML = pedidosActivos.map((p) => {
+                    const id = Number(p.id || 0);
+                    const nom = esc(String(p.cliente_nombre || '').trim() || 'sin nombre');
+                    const em = esc(String(p.cliente_email || '').trim() || '-');
+                    const tel = esc(String(p.cliente_telefono || '').trim() || '-');
+                    const estado = labelEstado(p.pedido_estado);
+                    const entrega = String(p.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'Despacho' : 'Retiro';
+                    const hora = esc(String(p.hora_retiro || '').trim());
+                    return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
+                        <div style="font-weight:800;color:#0f172a;">Pedido #${id}</div>
+                        <div style="font-size:.85rem;color:#475569;">${nom}</div>
+                        <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
+                        <div style="font-size:.8rem;color:#334155;">${estado} · ${entrega}${hora ? ` · ${hora}` : ''}</div>
+                        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                            <button type="button" onclick="_sucreeAbrirChatPedido(${id})" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
+                            <button type="button" id="sucree-quick-toggle-${id}" onclick="_sucreeToggleQuickPedido(${id})" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Mostrar mensajes</button>
+                        </div>
+                        <div id="sucree-quick-${id}" style="display:none;grid-template-columns:1fr;gap:6px;margin-top:6px;">
+                            <button type="button" onclick="_sucreeSendQuickPedido(${id},'recibido')" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Pedido recibido</button>
+                            <button type="button" onclick="_sucreeSendQuickPedido(${id},'preparando')" style="border:1px solid #fde68a;background:#fffbeb;color:#92400e;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">En preparacion</button>
+                            <button type="button" onclick="_sucreeSendQuickPedido(${id},'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo para retiro</button>
+                            <button type="button" onclick="_sucreeSendQuickPedido(${id},'despacho')" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Despacho</button>
+                            <button type="button" onclick="_sucreeSendQuickPedido(${id},'entregado')" style="border:1px solid #fecaca;background:#fef2f2;color:#991b1b;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Pedido entregado</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            function renderChat(mensajes) {
+                const list = document.getElementById('sucree-pedidos-chat-list');
+                if (!list) return;
+                const arr = Array.isArray(mensajes) ? mensajes : [];
+                if (!arr.length) {
+                    list.innerHTML = '<div style="font-size:.82rem;color:#64748b;">Sin mensajes aun.</div>';
+                    return;
+                }
+                list.innerHTML = arr.map((m) => {
+                    const admin = String(m.remitente_tipo || '').toLowerCase() === 'pasteleria';
+                    const txt = esc(String(m.mensaje || ''));
+                    const fecha = esc(String(m.creado_en || '').replace('T', ' ').slice(0, 16));
+                    return `<div style="display:flex;flex-direction:column;gap:2px;align-items:${admin ? 'flex-end' : 'flex-start'};min-width:0;">
+                        <div style="display:inline-block;width:fit-content;max-width:92%;padding:7px 8px;border-radius:9px;border:1px solid ${admin ? '#93c5fd' : '#bbf7d0'};background:${admin ? '#eff6ff' : '#f0fdf4'};font-size:.85rem;color:#0f172a;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;">${txt}</div>
+                        <div style="font-size:.72rem;color:#64748b;">${admin ? 'Pasteleria' : 'Cliente'} · ${fecha}</div>
+                    </div>`;
+                }).join('');
+                list.scrollTop = list.scrollHeight;
+            }
+
+            async function pollChat() {
+                if (!chatCtx) return;
+                try {
+                    const res = await fetch(`/api/tienda/chat/venta/${Number(chatCtx.id || 0)}?role=admin`, { headers: { Accept: 'application/json' } });
+                    const data = await res.json();
+                    if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar chat');
+                    const meta = document.getElementById('sucree-pedidos-chat-meta');
+                    if (meta) {
+                        meta.textContent = `Pedido #${Number(chatCtx.id || 0)} · ${data.chat_activo ? 'Chat activo' : 'Chat cerrado'}`;
+                        meta.style.color = data.chat_activo ? '#166534' : '#b45309';
+                    }
+                    renderChat(data.mensajes || []);
+                    const input = document.getElementById('sucree-pedidos-chat-input');
+                    const send = document.getElementById('sucree-pedidos-chat-send');
+                    if (input) input.disabled = !data.chat_activo;
+                    if (send) send.disabled = !data.chat_activo;
+                } catch (_) {}
+            }
+
+            async function sendChat() {
+                if (!chatCtx) return;
+                const input = document.getElementById('sucree-pedidos-chat-input');
+                const texto = String(input?.value || '').trim();
+                if (!texto) return;
+                try {
+                    const res = await fetch(`/api/tienda/chat/venta/${Number(chatCtx.id || 0)}/enviar`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        body: JSON.stringify({ role: 'admin', mensaje: texto }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo enviar');
+                    if (input) input.value = '';
+                    await pollChat();
+                } catch (err) {
+                    alert(err.message || 'No se pudo enviar');
+                }
+            }
+
+            function openChat(id) {
+                const pid = Number(id || 0);
+                if (!pid) return;
+                chatCtx = { id: pid };
+                const wrap = ensureChat();
+                wrap.style.display = 'block';
+                pollChat();
+                if (chatTimer) clearInterval(chatTimer);
+                chatTimer = setInterval(pollChat, POLL_MS);
+            }
+            window._sucreeAbrirChatPedido = openChat;
+
+            async function pollActivos() {
+                try {
+                    const res = await fetch('/api/tienda/admin/pedidos-chat-activos', { headers: { Accept: 'application/json' } });
+                    const data = await res.json();
+                    if (!res.ok || !data?.success) return;
+                    pedidosActivos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                    renderHub();
+                } catch (_) {}
+            }
+
+            function renderAlert() {
+                const ov = ensureAlert();
+                const count = ov.querySelector('#sucree-pedidos-alert-count');
+                const body = ov.querySelector('#sucree-pedidos-alert-body');
+                if (!count || !body) return;
+                count.textContent = String(nuevosPendientes.length);
+                body.innerHTML = nuevosPendientes.map((p) => `
+                    <div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
+                        <div style="font-weight:800;">Pedido #${Number(p.id || 0)}</div>
+                        <div style="font-size:.9rem;color:#475569;">Cliente: <strong>${esc(p.cliente_nombre || 'sin nombre')}</strong></div>
+                        <div style="font-size:.9rem;color:#334155;">Entrega: <strong>${esc(String(p.entrega_tipo || 'retiro'))}</strong></div>
+                        <div style="font-size:.9rem;color:#111827;font-weight:700;">Total: $${Math.round(Number(p.total_monto || 0)).toLocaleString('es-CL')}</div>
+                    </div>
+                `).join('');
+                ov.style.display = 'flex';
+            }
+
+            async function pollNuevos() {
+                try {
+                    const res = await fetch(`/api/tienda/admin/pedidos-nuevos?since_id=${Number(lastId || 0)}`, { headers: { Accept: 'application/json' } });
+                    const data = await res.json();
+                    if (!res.ok || !data?.success) return;
+                    const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                    const maxId = Number(data.max_id || 0) || 0;
+                    if (!initNuevos) {
+                        initNuevos = true;
+                        lastId = Math.max(lastId, maxId);
+                        localStorage.setItem(LAST_ID_KEY, String(lastId));
+                        return;
+                    }
+                    if (pedidos.length) {
+                        nuevosPendientes = [...pedidos, ...nuevosPendientes].slice(0, 30);
+                        renderAlert();
+                        beep();
+                        setTimeout(beep, 300);
+                    }
+                    lastId = Math.max(lastId, maxId);
+                    localStorage.setItem(LAST_ID_KEY, String(lastId));
+                } catch (_) {}
+            }
+
+            // Si no hay sesion admin o endpoint no disponible, simplemente no muestra nada.
+            pollActivos();
+            pollNuevos();
+            setInterval(pollActivos, POLL_MS);
+            setInterval(pollNuevos, POLL_MS);
         })();
     </script>
 </aside>

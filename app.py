@@ -1362,11 +1362,28 @@ def _chat_origen_tipo(raw):
     return "venta"
 
 
-def _chat_estado_activo(origen_tipo, estado_raw):
+def _parse_sqlite_datetime_safe(raw):
+    txt = str(raw or "").strip()
+    if not txt:
+        return None
+    try:
+        return datetime.fromisoformat(txt.replace("Z", "").replace(" ", "T"))
+    except Exception:
+        return None
+
+
+def _chat_estado_activo(origen_tipo, estado_raw, estado_actualizado_raw=None):
     estado = str(estado_raw or "").strip().lower()
     if origen_tipo == "agenda":
         return estado in {"pendiente", "confirmado", "preparando"}
-    return estado in {"recibido", "confirmado", "preparando"}
+    if estado in {"recibido", "confirmado", "preparando", "listo"}:
+        return True
+    if estado == "entregado":
+        dt = _parse_sqlite_datetime_safe(estado_actualizado_raw)
+        if not dt:
+            return False
+        return dt >= (datetime.now() - timedelta(minutes=30))
+    return False
 
 
 def _chat_info_origen_cursor(cursor, origen_tipo, origen_id):
@@ -1402,6 +1419,7 @@ def _chat_info_origen_cursor(cursor, origen_tipo, origen_id):
         """
         SELECT id,
                COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS estado,
+               pedido_estado_actualizado,
                cliente_email, cliente_telefono, cliente_nombre
         FROM ventas
         WHERE id = ? AND canal_venta = 'tienda_online'
@@ -1418,7 +1436,7 @@ def _chat_info_origen_cursor(cursor, origen_tipo, origen_id):
         "origen_tipo": "venta",
         "origen_id": oid,
         "estado": estado,
-        "chat_activo": _chat_estado_activo("venta", estado),
+        "chat_activo": _chat_estado_activo("venta", estado, data.get("pedido_estado_actualizado")),
         "cliente_email": str(data.get("cliente_email") or "").strip().lower(),
         "cliente_telefono": _normalizar_telefono_cl(data.get("cliente_telefono")),
         "cliente_nombre": str(data.get("cliente_nombre") or "").strip(),
@@ -5704,16 +5722,21 @@ def api_tienda_admin_pedidos_chat_activos():
             """
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
+                   v.pedido_estado_actualizado,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
                    v.hora_retiro
             FROM ventas v
             WHERE v.canal_venta = 'tienda_online'
-              AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
+              AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo', 'entregado')
             ORDER BY v.id DESC
             LIMIT 40
             """
         )
         rows = [dict(r) for r in cursor.fetchall()]
+        rows = [
+            r for r in rows
+            if _chat_estado_activo("venta", r.get("pedido_estado"), r.get("pedido_estado_actualizado"))
+        ]
         return jsonify({"success": True, "pedidos": rows})
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "pedidos": []}), 500
