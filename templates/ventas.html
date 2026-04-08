@@ -3695,6 +3695,78 @@
         }
         window._abrirChatPedidoOnline = _abrirChatPedidoOnline;
 
+        function _ensureChatsHubVentas() {
+            let hub = document.getElementById('ventas-chat-hub');
+            if (hub) return hub;
+            hub = document.createElement('div');
+            hub.id = 'ventas-chat-hub';
+            hub.style.cssText = 'position:fixed;right:20px;bottom:92px;z-index:9998;width:min(360px,92vw);background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 12px 28px rgba(2,6,23,.18);display:none;';
+            hub.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:1px solid #e2e8f0;">
+                    <strong style="color:#0f172a;">Chats tienda</strong>
+                    <button type="button" id="ventas-chat-hub-close" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">Cerrar</button>
+                </div>
+                <div id="ventas-chat-hub-list" style="max-height:260px;overflow:auto;padding:10px;display:grid;gap:8px;">
+                    <div style="font-size:.85rem;color:#64748b;">Cargando...</div>
+                </div>`;
+            document.body.appendChild(hub);
+            hub.querySelector('#ventas-chat-hub-close')?.addEventListener('click', () => { hub.style.display = 'none'; });
+            return hub;
+        }
+
+        function _ensureChatsHubFab() {
+            let fab = document.getElementById('ventas-chat-hub-fab');
+            if (fab) return fab;
+            fab = document.createElement('button');
+            fab.id = 'ventas-chat-hub-fab';
+            fab.type = 'button';
+            fab.textContent = 'Chats tienda';
+            fab.style.cssText = 'position:fixed;right:20px;bottom:42px;z-index:9997;border:1px solid #1d4ed8;background:#2563eb;color:#fff;border-radius:999px;padding:9px 14px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(37,99,235,.35);';
+            fab.addEventListener('click', () => {
+                const hub = _ensureChatsHubVentas();
+                hub.style.display = hub.style.display === 'none' ? 'block' : 'none';
+            });
+            document.body.appendChild(fab);
+            return fab;
+        }
+
+        async function _pollPedidosChatActivosVentas() {
+            try {
+                const res = await fetch('/api/tienda/admin/pedidos-chat-activos', { headers: { Accept: 'application/json' } });
+                const data = await res.json();
+                if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar chats');
+                const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                const fab = _ensureChatsHubFab();
+                if (fab) fab.textContent = `Chats tienda (${pedidos.length})`;
+                const list = document.getElementById('ventas-chat-hub-list');
+                if (!list) return;
+                if (!pedidos.length) {
+                    list.innerHTML = `<div style="font-size:.85rem;color:#64748b;">No hay pedidos online activos para chat.</div>`;
+                    return;
+                }
+                list.innerHTML = pedidos.map((p) => {
+                    const id = Number(p.id || 0);
+                    const nom = String(p.cliente_nombre || '').trim() || 'sin nombre';
+                    const em = String(p.cliente_email || '').trim() || '-';
+                    const tel = String(p.cliente_telefono || '').trim() || '-';
+                    const estado = _labelEstadoPedido(String(p.pedido_estado || 'recibido'));
+                    const entrega = String(p.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'Despacho' : 'Retiro';
+                    const hora = String(p.hora_retiro || '').trim();
+                    const emEnc = encodeURIComponent(em);
+                    const telEnc = encodeURIComponent(tel);
+                    return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
+                        <div style="font-weight:800;color:#0f172a;">Pedido #${id}</div>
+                        <div style="font-size:.85rem;color:#475569;">${nom}</div>
+                        <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
+                        <div style="font-size:.8rem;color:#334155;">${estado} · ${entrega}${hora ? ` · ${hora}` : ''}</div>
+                        <div style="margin-top:6px;">
+                            <button type="button" onclick="_abrirChatPedidoOnline(${id}, '${emEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (_) {}
+        }
+
         async function _actualizarEstadoPedidoOnline(ventaId, estado) {
             const idNum = Number(ventaId || 0);
             if (!idNum) return;
@@ -3842,6 +3914,10 @@
         _pedidosTiendaPollTimer = setInterval(_pollPedidosTiendaNuevos, 12000);
         _pollActividadTiendaEnVentas();
         _actividadTiendaPollTimer = setInterval(_pollActividadTiendaEnVentas, 5000);
+        _ensureChatsHubFab();
+        _ensureChatsHubVentas();
+        _pollPedidosChatActivosVentas();
+        setInterval(_pollPedidosChatActivosVentas, 10000);
     </script>
 
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>

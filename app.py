@@ -5692,6 +5692,36 @@ def api_tienda_admin_pedidos_nuevos():
             conn.close()
 
 
+@app.route('/api/tienda/admin/pedidos-chat-activos', methods=['GET'])
+def api_tienda_admin_pedidos_chat_activos():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono,
+                   COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
+                   COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
+                   v.hora_retiro
+            FROM ventas v
+            WHERE v.canal_venta = 'tienda_online'
+              AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
+            ORDER BY v.id DESC
+            LIMIT 40
+            """
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        return jsonify({"success": True, "pedidos": rows})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "pedidos": []}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/tienda/admin/pedido/<int:venta_id>/estado', methods=['POST'])
 def api_tienda_admin_pedido_estado(venta_id):
     if not session.get(_ADMIN_SESSION_KEY):
