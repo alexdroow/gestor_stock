@@ -1892,6 +1892,9 @@
             padding: var(--mobile-menu-fab-pad);
             font-size: var(--mobile-menu-fab-font);
         }
+        body.mobile-ui main.layout {
+            font-size: 90%;
+        }
         body.mobile-ui .grid { grid-template-columns: repeat(2, minmax(var(--grid-min-mobile), 1fr)); gap: 9px; }
         body.mobile-ui .scroller { grid-template-columns: repeat(2, minmax(var(--grid-min-mobile), 1fr)); gap: 9px; }
         body.mobile-ui .item-name { font-size: 1.17rem; min-height: auto; }
@@ -1917,7 +1920,10 @@
         }
         body.mobile-ui .stock { font-size: 0.82rem; }
         body.mobile-ui .photo-add { width: var(--mobile-quick-add-size); height: var(--mobile-quick-add-size); font-size: var(--mobile-quick-add-font); box-shadow: 0 8px 20px rgba(249, 115, 22, .38); }
-        body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(84px, 46vw); width: min(84px, 46vw); }
+        body.mobile-ui .ofertas-track .item-card {
+            flex: 0 0 min(calc(84px * 0.8), calc(46vw * 0.8));
+            width: min(calc(84px * 0.8), calc(46vw * 0.8));
+        }
         body.mobile-ui .section h2 { font-size: 2.2rem; margin-bottom: 12px; }
         body.mobile-ui .tienda-estado-banner { font-size: 0.7rem; padding: 8px 9px; }
         body.mobile-ui .topbar .brand { font-size: 1.26rem; }
