@@ -592,7 +592,10 @@
                     <div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
                         <div style="font-weight:800;">Pedido #${Number(p.id || 0)}</div>
                         <div style="font-size:.9rem;color:#475569;">Cliente: <strong>${esc(p.cliente_nombre || 'sin nombre')}</strong></div>
-                        <div style="font-size:.9rem;color:#334155;">Entrega: <strong>${esc(String(p.entrega_tipo || 'retiro'))}</strong></div>
+                        <div style="font-size:.86rem;color:#64748b;">Correo: ${esc(p.cliente_email || '-')} · Telefono: ${esc(p.cliente_telefono || '-')}</div>
+                        <div style="font-size:.9rem;color:#334155;">Entrega: <strong>${esc(String(p.entrega_tipo || 'retiro'))}</strong>${String(p.hora_retiro || '').trim() ? ` · Hora: <strong>${esc(String(p.hora_retiro || ''))}</strong>` : ''}</div>
+                        ${String(p.direccion_entrega || '').trim() ? `<div style="font-size:.84rem;color:#475569;">Direccion: ${esc(String(p.direccion_entrega || ''))}</div>` : ''}
+                        <div style="font-size:.88rem;color:#334155;margin-top:4px;"><strong>Productos:</strong> ${esc(String(p.productos || '-'))}</div>
                         <div style="font-size:.9rem;color:#111827;font-weight:700;">Total: $${Math.round(Number(p.total_monto || 0)).toLocaleString('es-CL')}</div>
                     </div>
                 `).join('');
