@@ -4328,8 +4328,8 @@
                 const isCli = tipo === "cliente";
                 const texto = esc(String(m.mensaje || ""));
                 const fecha = esc(String(m.creado_en || "").replace("T", " ").slice(0, 16));
-                return `<div style="display:grid;gap:2px;justify-items:${isCli ? "end" : "start"};">
-                    <div style="max-width:92%;padding:7px 9px;border-radius:10px;border:1px solid ${isCli ? "#fdba74" : "#93c5fd"};background:${isCli ? "#fff7ed" : "#eff6ff"};font-size:.83rem;color:#0f172a;">${texto}</div>
+                return `<div style="display:flex;flex-direction:column;gap:2px;align-items:${isCli ? "flex-end" : "flex-start"};">
+                    <div style="display:inline-block;width:fit-content;max-width:92%;padding:7px 9px;border-radius:10px;border:1px solid ${isCli ? "#fdba74" : "#93c5fd"};background:${isCli ? "#fff7ed" : "#eff6ff"};font-size:.83rem;line-height:1.35;color:#0f172a;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;">${texto}</div>
                     <div style="font-size:.72rem;color:${isCli ? "#9a3412" : "#1d4ed8"};">${isCli ? "Cliente (tu)" : "Pasteleria Sucree"} · ${fecha}</div>
                 </div>`;
             }).join("");
