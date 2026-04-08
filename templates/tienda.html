@@ -1518,6 +1518,22 @@
             padding: 14px;
             gap: 10px;
         }
+        .checkout-ticket-head {
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            font-size: .82rem;
+            color: #64748b;
+        }
+        .checkout-ticket-head strong {
+            color: #0f172a;
+            font-size: .9rem;
+        }
         #modal-checkout-cliente {
             background: #f8fafc;
             border: 1px dashed #cbd5e1;
@@ -1531,14 +1547,21 @@
             word-break: break-word;
         }
         #modal-checkout-detalle {
-            background: #fff;
-            border: 1px solid #e5e7eb;
+            background: #fbfdff;
+            border: 1px solid #dbe7f3;
             border-radius: 10px;
             padding: 10px;
             max-height: 280px;
             overflow: auto;
             display: grid;
             gap: 8px;
+        }
+        .checkout-ticket-list-label {
+            font-size: .76rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 800;
         }
         .checkout-ticket-lines {
             display: grid;
@@ -1588,6 +1611,90 @@
             padding-top: 6px;
             border-top: 1px solid #e5e7eb;
             font-size: 1rem;
+        }
+        .checkout-ticket-total.final strong {
+            font-size: 1.08rem;
+        }
+        .checkout-delivery-wrap {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px;
+            display: grid;
+            gap: 8px;
+            background: #f8fafc;
+        }
+        .checkout-delivery-title {
+            font-size: .9rem;
+            font-weight: 800;
+            color: #334155;
+        }
+        .checkout-delivery-toggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .checkout-delivery-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #fff;
+            color: #0f172a;
+            font-weight: 800;
+            font-size: .86rem;
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+        .checkout-delivery-btn.active {
+            border-color: var(--accent);
+            color: #9a3412;
+            background: #ffedd5;
+            box-shadow: 0 0 0 2px rgba(244, 93, 8, .14);
+        }
+        .checkout-delivery-time label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: .84rem;
+            font-weight: 700;
+            color: #334155;
+        }
+        #checkout-hora-retiro {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            padding: 9px;
+            background: #fff;
+        }
+        #checkout-hora-help {
+            margin-top: 5px;
+            font-size: .78rem;
+            color: #64748b;
+        }
+        .checkout-despacho-wrap {
+            display: none;
+            gap: 8px;
+            padding-top: 4px;
+        }
+        .checkout-despacho-wrap.active {
+            display: grid;
+        }
+        .checkout-shipping-quote {
+            display: none;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+            border-radius: 9px;
+            padding: 8px;
+            font-size: .82rem;
+            font-weight: 700;
+        }
+        .checkout-shipping-warning {
+            display: none;
+            border: 1px solid #fed7aa;
+            background: #fffbeb;
+            color: #92400e;
+            border-radius: 9px;
+            padding: 8px;
+            font-size: .82rem;
+            font-weight: 700;
         }
         #modal-cuenta .modal {
             max-height: 90vh;
@@ -2142,6 +2249,13 @@
         body.mobile-ui #modal-checkout-resumen h3 {
             font-size: 1.2rem;
         }
+        body.mobile-ui .checkout-ticket-head {
+            font-size: .76rem;
+            padding: 8px;
+        }
+        body.mobile-ui .checkout-ticket-head strong {
+            font-size: .86rem;
+        }
         body.mobile-ui #modal-checkout-cliente,
         body.mobile-ui #modal-checkout-detalle {
             font-size: .9rem !important;
@@ -2150,16 +2264,38 @@
         body.mobile-ui .checkout-ticket-total {
             font-size: .9rem;
         }
+        body.mobile-ui .checkout-ticket-total.final strong {
+            font-size: 1rem;
+        }
         body.mobile-ui #modal-checkout-resumen .modal-actions {
-            flex-wrap: wrap;
-            justify-content: flex-end;
+            flex-wrap: nowrap;
+            justify-content: space-between;
             gap: 8px;
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            padding-top: 6px;
+            border-top: 1px solid #e5e7eb;
         }
         body.mobile-ui #modal-checkout-resumen .modal-actions .btn-muted,
         body.mobile-ui #modal-checkout-resumen .modal-actions .btn-primary {
-            font-size: 0.9rem;
-            padding: 9px 12px;
-            min-width: 132px;
+            font-size: 0.86rem;
+            padding: 8px 10px;
+            min-width: 0;
+            flex: 1;
+        }
+        body.mobile-ui .checkout-delivery-btn {
+            font-size: .84rem;
+            padding: 8px 9px;
+        }
+        body.mobile-ui #checkout-hora-retiro {
+            font-size: .9rem;
+            padding: 9px;
+        }
+        body.mobile-ui #checkout-hora-help,
+        body.mobile-ui .checkout-shipping-quote,
+        body.mobile-ui .checkout-shipping-warning {
+            font-size: .8rem;
         }
         body.mobile-ui .modal .btn-muted,
         body.mobile-ui .modal .btn-primary {
@@ -2843,8 +2979,35 @@
         <div class="modal">
             <h3>Resumen de compra</h3>
             <div style="font-size:.9rem;color:#64748b;">Revisa el detalle antes de confirmar el pedido.</div>
+            <div class="checkout-ticket-head">
+                <span>Comprobante previo</span>
+                <strong id="checkout-ticket-head-total">$0</strong>
+            </div>
             <div id="modal-checkout-cliente"></div>
             <div id="modal-checkout-detalle"></div>
+            <div class="checkout-delivery-wrap" id="checkout-delivery-wrap">
+                <div class="checkout-delivery-title">Entrega del pedido</div>
+                <div class="checkout-delivery-toggle">
+                    <button type="button" class="checkout-delivery-btn active" id="checkout-entrega-retiro">Retiro en tienda</button>
+                    <button type="button" class="checkout-delivery-btn" id="checkout-entrega-despacho">Despacho</button>
+                </div>
+                <div class="checkout-delivery-time">
+                    <label for="checkout-hora-retiro">Hora de retiro/entrega</label>
+                    <input id="checkout-hora-retiro" type="time" step="300">
+                    <div id="checkout-hora-help"></div>
+                </div>
+                <div class="checkout-despacho-wrap" id="checkout-despacho-wrap">
+                    <div class="agenda-map-actions">
+                        <input id="checkout-direccion-buscar" type="text" maxlength="240" placeholder="Direccion de despacho (buscar y confirmar pin)">
+                        <button type="button" id="checkout-buscar-mapa">Buscar</button>
+                        <button type="button" id="checkout-confirmar-pin">Confirmar pin</button>
+                    </div>
+                    <div class="agenda-map" id="checkout-map" style="height:220px;"></div>
+                    <div class="agenda-map-meta" id="checkout-map-meta">Mueve el pin al punto exacto y confirma.</div>
+                    <div class="checkout-shipping-quote" id="checkout-shipping-quote"></div>
+                    <div class="checkout-shipping-warning" id="checkout-shipping-warning"></div>
+                </div>
+            </div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-checkout-cancel">Volver</button>
                 <button class="btn-primary" type="button" id="modal-checkout-confirm">Confirmar compra</button>
@@ -3003,6 +3166,17 @@
         const modalCheckoutResumenEl = document.getElementById("modal-checkout-resumen");
         const modalCheckoutClienteEl = document.getElementById("modal-checkout-cliente");
         const modalCheckoutDetalleEl = document.getElementById("modal-checkout-detalle");
+        const checkoutEntregaRetiroEl = document.getElementById("checkout-entrega-retiro");
+        const checkoutEntregaDespachoEl = document.getElementById("checkout-entrega-despacho");
+        const checkoutHoraRetiroEl = document.getElementById("checkout-hora-retiro");
+        const checkoutHoraHelpEl = document.getElementById("checkout-hora-help");
+        const checkoutDespachoWrapEl = document.getElementById("checkout-despacho-wrap");
+        const checkoutDireccionBuscarEl = document.getElementById("checkout-direccion-buscar");
+        const checkoutBuscarMapaEl = document.getElementById("checkout-buscar-mapa");
+        const checkoutConfirmarPinEl = document.getElementById("checkout-confirmar-pin");
+        const checkoutMapMetaEl = document.getElementById("checkout-map-meta");
+        const checkoutShippingQuoteEl = document.getElementById("checkout-shipping-quote");
+        const checkoutShippingWarningEl = document.getElementById("checkout-shipping-warning");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
         const modalExitoEstadoEl = document.getElementById("modal-exito-estado");
@@ -3173,6 +3347,12 @@
         let mensajePostPedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.";
         let ultimoComprobantePedido = null;
         let checkoutClientePendiente = null;
+        let checkoutEntregaTipo = "retiro";
+        let checkoutMap = null;
+        let checkoutMarker = null;
+        let checkoutDireccionConfirmada = false;
+        let checkoutDireccionPin = { lat: -33.510911, lng: -70.784909 };
+        let checkoutShippingQuote = null;
         let pedidoEstadoPollTimer = null;
         let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
@@ -6927,6 +7107,234 @@
             msg(`Repeticion aplicada: ${agregados} unidad(es) agregadas${omitidos > 0 ? `, ${omitidos} omitidas por stock` : ""}.`, omitidos > 0 && agregados === 0);
         }
 
+        function _horaMinimaCheckoutHHMM() {
+            const d = new Date();
+            d.setSeconds(0, 0);
+            d.setMinutes(d.getMinutes() + 30);
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mm = String(d.getMinutes()).padStart(2, "0");
+            return `${hh}:${mm}`;
+        }
+
+        function _esHoraCheckoutValida(hora) {
+            const h = String(hora || "").trim();
+            if (!/^\d{2}:\d{2}$/.test(h)) return false;
+            const now = new Date();
+            const min = new Date(now.getTime() + (30 * 60 * 1000));
+            const parts = h.split(":");
+            const hh = Number(parts[0] || 0);
+            const mm = Number(parts[1] || 0);
+            const sel = new Date(now);
+            sel.setHours(hh, mm, 0, 0);
+            return sel.getTime() >= min.getTime();
+        }
+
+        function _actualizarAyudaHoraCheckout() {
+            if (!checkoutHoraHelpEl) return;
+            const minHora = _horaMinimaCheckoutHHMM();
+            const horaSel = String(checkoutHoraRetiroEl?.value || "").trim();
+            if (!horaSel) {
+                checkoutHoraHelpEl.textContent = `La hora minima disponible es ${minHora} (30 min desde ahora).`;
+                checkoutHoraHelpEl.style.color = "#64748b";
+                return;
+            }
+            if (!_esHoraCheckoutValida(horaSel)) {
+                checkoutHoraHelpEl.textContent = `Hora invalida. Debe ser igual o mayor a ${minHora}.`;
+                checkoutHoraHelpEl.style.color = "#b91c1c";
+                return;
+            }
+            checkoutHoraHelpEl.textContent = `Hora seleccionada: ${horaSel}`;
+            checkoutHoraHelpEl.style.color = "#166534";
+        }
+
+        function _checkoutShippingVisible() {
+            return Boolean(
+                checkoutEntregaTipo === "despacho"
+                && checkoutShippingQuote
+                && checkoutShippingQuote.inside_maipu
+                && checkoutShippingQuote.visible_to_client
+                && Number.isFinite(Number(checkoutShippingQuote.shipping_fee))
+            );
+        }
+
+        function _checkoutCalcularTotales() {
+            const subtotal = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
+            const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const despacho = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0)) : 0;
+            const total = Math.max(0, subtotal - descuento + despacho);
+            return { subtotal, descuento, despacho, total };
+        }
+
+        function _renderCheckoutShippingQuote() {
+            if (!checkoutShippingQuoteEl || !checkoutShippingWarningEl) return;
+            const quote = checkoutShippingQuote;
+            checkoutShippingQuoteEl.style.display = "none";
+            checkoutShippingWarningEl.style.display = "none";
+            checkoutShippingQuoteEl.textContent = "";
+            checkoutShippingWarningEl.textContent = "";
+            if (checkoutEntregaTipo !== "despacho") {
+                return;
+            }
+            if (!quote) {
+                checkoutShippingWarningEl.style.display = "block";
+                checkoutShippingWarningEl.textContent = "Confirma PIN y hora para calcular despacho.";
+                return;
+            }
+            if (_checkoutShippingVisible()) {
+                const fee = Number(quote.shipping_fee || 0);
+                const dist = Number(quote.distance_km || 0);
+                const baseStore = Number(quote.shipping_fee_store_base || 0);
+                const markup = Number(quote.shipping_fee_markup || 0);
+                const band = String(quote.time_band_label || "").trim();
+                const range = String(quote.range_label || "").trim();
+                checkoutShippingQuoteEl.style.display = "block";
+                checkoutShippingQuoteEl.textContent = `Despacho estimado: ${money.format(fee)} (base ${money.format(baseStore)} + recargo Uber ${money.format(markup)}). Distancia: ${dist.toFixed(2)} km${range ? ` · ${range}` : ""}${band ? ` · ${band}` : ""}.`;
+            } else {
+                checkoutShippingWarningEl.style.display = "block";
+                checkoutShippingWarningEl.textContent = String(quote.warning || "Direccion fuera de zona de cotizacion visible. Te contactaremos para cotizar despacho.");
+            }
+        }
+
+        function _renderTotalesResumenCheckout() {
+            const totals = _checkoutCalcularTotales();
+            const subEl = document.getElementById("checkout-ticket-subtotal");
+            const descEl = document.getElementById("checkout-ticket-descuento");
+            const shipRowEl = document.getElementById("checkout-ticket-despacho-row");
+            const shipEl = document.getElementById("checkout-ticket-despacho");
+            const totalEl = document.getElementById("checkout-ticket-total");
+            const headTotalEl = document.getElementById("checkout-ticket-head-total");
+            if (subEl) subEl.textContent = money.format(totals.subtotal);
+            if (descEl) descEl.textContent = `-${money.format(totals.descuento)}`;
+            if (shipRowEl) shipRowEl.style.display = (checkoutEntregaTipo === "despacho") ? "" : "none";
+            if (shipEl) shipEl.textContent = money.format(totals.despacho);
+            if (totalEl) totalEl.textContent = money.format(totals.total);
+            if (headTotalEl) headTotalEl.textContent = money.format(totals.total);
+        }
+
+        function _resetCheckoutShippingQuote() {
+            checkoutShippingQuote = null;
+            _renderCheckoutShippingQuote();
+            _renderTotalesResumenCheckout();
+        }
+
+        function _setCheckoutEntregaTipo(tipo) {
+            checkoutEntregaTipo = (String(tipo || "").trim().toLowerCase() === "despacho") ? "despacho" : "retiro";
+            if (checkoutEntregaRetiroEl) checkoutEntregaRetiroEl.classList.toggle("active", checkoutEntregaTipo === "retiro");
+            if (checkoutEntregaDespachoEl) checkoutEntregaDespachoEl.classList.toggle("active", checkoutEntregaTipo === "despacho");
+            if (checkoutDespachoWrapEl) checkoutDespachoWrapEl.classList.toggle("active", checkoutEntregaTipo === "despacho");
+            if (checkoutEntregaTipo !== "despacho") {
+                _resetCheckoutShippingQuote();
+                return;
+            }
+            if (!checkoutDireccionConfirmada) {
+                if (checkoutShippingWarningEl) {
+                    checkoutShippingWarningEl.style.display = "block";
+                    checkoutShippingWarningEl.textContent = "Confirma el pin para calcular despacho.";
+                }
+            }
+            setTimeout(() => _initCheckoutMap(), 80);
+            _renderTotalesResumenCheckout();
+        }
+
+        function _initCheckoutMap() {
+            if (!checkoutDespachoWrapEl || !checkoutDespachoWrapEl.classList.contains("active")) return;
+            const mapEl = document.getElementById("checkout-map");
+            if (!mapEl || typeof L === "undefined") return;
+            if (!checkoutMap) {
+                checkoutMap = L.map(mapEl).setView([checkoutDireccionPin.lat, checkoutDireccionPin.lng], 13);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    maxZoom: 19,
+                    attribution: "&copy; OpenStreetMap",
+                }).addTo(checkoutMap);
+                checkoutMarker = L.marker([checkoutDireccionPin.lat, checkoutDireccionPin.lng], { draggable: true }).addTo(checkoutMap);
+                checkoutMarker.on("dragend", () => {
+                    const p = checkoutMarker.getLatLng();
+                    checkoutDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
+                    checkoutDireccionConfirmada = false;
+                    _resetCheckoutShippingQuote();
+                    if (checkoutMapMetaEl) checkoutMapMetaEl.textContent = "Pin movido. Debes confirmar nuevamente.";
+                });
+            } else {
+                checkoutMap.invalidateSize();
+                if (checkoutMarker) checkoutMarker.setLatLng([checkoutDireccionPin.lat, checkoutDireccionPin.lng]);
+                checkoutMap.setView([checkoutDireccionPin.lat, checkoutDireccionPin.lng], 13);
+            }
+        }
+
+        async function _buscarDireccionCheckoutEnMapa() {
+            const query = String(checkoutDireccionBuscarEl?.value || "").trim();
+            if (!query) return msg("Escribe una direccion para buscar.", true);
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=cl&limit=1&q=${encodeURIComponent(query)}`;
+                const res = await fetch(`${url}&t=${Date.now()}`, { headers: { Accept: "application/json" }, cache: "no-store" });
+                const data = await res.json();
+                if (!Array.isArray(data) || !data.length) throw new Error("No se encontro la direccion en el mapa.");
+                const first = data[0];
+                const lat = Number(first.lat || 0);
+                const lng = Number(first.lon || 0);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error("Coordenadas invalidas para esa direccion.");
+                checkoutDireccionPin = { lat, lng };
+                if (checkoutMap && checkoutMarker) {
+                    checkoutMap.setView([lat, lng], 16);
+                    checkoutMarker.setLatLng([lat, lng]);
+                }
+                const displayName = String(first.display_name || query).trim();
+                if (checkoutDireccionBuscarEl) checkoutDireccionBuscarEl.value = displayName;
+                checkoutDireccionConfirmada = false;
+                _resetCheckoutShippingQuote();
+                if (checkoutMapMetaEl) checkoutMapMetaEl.textContent = "Direccion encontrada. Ahora confirma el pin.";
+            } catch (e) {
+                msg(e.message || "No se pudo buscar direccion en mapa.", true);
+            }
+        }
+
+        async function _cotizarDespachoCheckoutDesdePin() {
+            if (checkoutEntregaTipo !== "despacho") return;
+            const hora = String(checkoutHoraRetiroEl?.value || "").trim();
+            if (!_esHoraCheckoutValida(hora)) {
+                _resetCheckoutShippingQuote();
+                return;
+            }
+            if (!checkoutDireccionConfirmada) {
+                _resetCheckoutShippingQuote();
+                return;
+            }
+            try {
+                const res = await fetch("/api/tienda/checkout/despacho-cotizar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        lat: Number(checkoutDireccionPin.lat || 0),
+                        lng: Number(checkoutDireccionPin.lng || 0),
+                        hora_retiro: hora,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cotizar despacho");
+                checkoutShippingQuote = (data.quote && typeof data.quote === "object") ? data.quote : null;
+            } catch (err) {
+                checkoutShippingQuote = null;
+                if (checkoutShippingWarningEl) {
+                    checkoutShippingWarningEl.style.display = "block";
+                    checkoutShippingWarningEl.textContent = String(err.message || "No se pudo cotizar despacho.");
+                }
+            } finally {
+                _renderCheckoutShippingQuote();
+                _renderTotalesResumenCheckout();
+            }
+        }
+
+        async function _confirmarPinCheckout() {
+            if (!checkoutMap || !checkoutMarker) return msg("El mapa aun no esta listo.", true);
+            const p = checkoutMarker.getLatLng();
+            checkoutDireccionPin = { lat: Number(p.lat), lng: Number(p.lng) };
+            const direccionPin = await _reverseGeocodeAgendaPin(checkoutDireccionPin.lat, checkoutDireccionPin.lng);
+            if (direccionPin && checkoutDireccionBuscarEl) checkoutDireccionBuscarEl.value = direccionPin;
+            checkoutDireccionConfirmada = true;
+            if (checkoutMapMetaEl) checkoutMapMetaEl.textContent = `Pin confirmado: ${checkoutDireccionPin.lat.toFixed(6)}, ${checkoutDireccionPin.lng.toFixed(6)}`;
+            await _cotizarDespachoCheckoutDesdePin();
+        }
+
         function _normalizarDatosCheckoutCliente(datosCliente) {
             const nombre = String(datosCliente?.nombre || "").trim();
             const email = normalizarEmailCliente(datosCliente?.email);
@@ -6943,6 +7351,18 @@
             const norm = _normalizarDatosCheckoutCliente(datosCliente);
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             checkoutClientePendiente = norm.value;
+            checkoutEntregaTipo = "retiro";
+            checkoutShippingQuote = null;
+            checkoutDireccionConfirmada = false;
+            if (clienteRegistrado?.direccion_lat && clienteRegistrado?.direccion_lng) {
+                checkoutDireccionPin = {
+                    lat: Number(clienteRegistrado.direccion_lat),
+                    lng: Number(clienteRegistrado.direccion_lng),
+                };
+            }
+            if (checkoutDireccionBuscarEl) {
+                checkoutDireccionBuscarEl.value = String(clienteRegistrado?.direccion_default || "").trim();
+            }
             const items = carrito.map((it) => ({
                 nombre: String(it.nombre || ""),
                 cantidad: Number(it.cantidad || 0),
@@ -6965,14 +7385,23 @@
                 </div>
             `).join("");
             modalCheckoutDetalleEl.innerHTML = `
+                <div class="checkout-ticket-list-label">Detalle del pedido</div>
                 <div class="checkout-ticket-lines">${itemsHtml || "<div>Sin detalle de productos.</div>"}</div>
                 <hr class="checkout-ticket-divider">
                 <div class="checkout-ticket-totals">
-                    <div class="checkout-ticket-total"><span>Subtotal</span><strong>${money.format(subtotal)}</strong></div>
-                    <div class="checkout-ticket-total discount"><span>Descuento</span><strong>-${money.format(descuento)}</strong></div>
-                    <div class="checkout-ticket-total final"><span>Total</span><strong>${money.format(total)}</strong></div>
+                    <div class="checkout-ticket-total"><span>Subtotal</span><strong id="checkout-ticket-subtotal">${money.format(subtotal)}</strong></div>
+                    <div class="checkout-ticket-total discount"><span>Descuento</span><strong id="checkout-ticket-descuento">-${money.format(descuento)}</strong></div>
+                    <div class="checkout-ticket-total" id="checkout-ticket-despacho-row" style="display:none;"><span>Despacho (incluye recargo Uber 30%)</span><strong id="checkout-ticket-despacho">${money.format(0)}</strong></div>
+                    <div class="checkout-ticket-total final"><span>Total</span><strong id="checkout-ticket-total">${money.format(total)}</strong></div>
                 </div>
             `;
+            if (checkoutHoraRetiroEl) {
+                checkoutHoraRetiroEl.value = _horaMinimaCheckoutHHMM();
+            }
+            _actualizarAyudaHoraCheckout();
+            _setCheckoutEntregaTipo("retiro");
+            _renderCheckoutShippingQuote();
+            _renderTotalesResumenCheckout();
             cerrarModalCliente();
             modalCheckoutResumenEl.classList.add("active");
         }
@@ -6985,6 +7414,18 @@
 
         async function confirmarCheckoutDesdeResumen() {
             if (!checkoutClientePendiente) return msg("No hay datos de cliente para confirmar.", true);
+            const horaRetiro = String(checkoutHoraRetiroEl?.value || "").trim();
+            if (!_esHoraCheckoutValida(horaRetiro)) {
+                _actualizarAyudaHoraCheckout();
+                return msg("Debes seleccionar una hora valida (minimo 30 min desde ahora).", true);
+            }
+            if (checkoutEntregaTipo === "despacho") {
+                const direccion = String(checkoutDireccionBuscarEl?.value || "").trim();
+                if (direccion.length < 8) return msg("Ingresa una direccion valida para despacho.", true);
+                if (!checkoutDireccionConfirmada) return msg("Confirma la direccion con el pin del mapa.", true);
+                await _cotizarDespachoCheckoutDesdePin();
+                if (!checkoutShippingQuote) return msg("No se pudo cotizar despacho. Reintenta confirmar el pin.", true);
+            }
             const btnConfirm = document.getElementById("modal-checkout-confirm");
             if (btnConfirm) {
                 btnConfirm.disabled = true;
@@ -7011,14 +7452,22 @@
             }));
             const subtotalSnapshot = itemsSnapshot.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
             const descuentoSnapshot = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const totalSnapshot = Math.max(0, subtotalSnapshot - descuentoSnapshot);
+            const despachoSnapshot = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote?.shipping_fee || 0)) : 0;
+            const totalSnapshot = Math.max(0, subtotalSnapshot - descuentoSnapshot + despachoSnapshot);
             const payload = {
                 items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
                 codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
                 cliente_nombre: String(datosCliente?.nombre || "").trim(),
                 cliente_email: normalizarEmailCliente(datosCliente?.email),
                 cliente_telefono: String(datosCliente?.telefono || "").trim(),
-                fecha_venta: new Date().toISOString().slice(0, 10)
+                fecha_venta: new Date().toISOString().slice(0, 10),
+                entrega_tipo: checkoutEntregaTipo,
+                hora_retiro: String(checkoutHoraRetiroEl?.value || "").trim(),
+                direccion: checkoutEntregaTipo === "despacho" ? String(checkoutDireccionBuscarEl?.value || "").trim() : "",
+                direccion_confirmada: checkoutEntregaTipo === "despacho" ? Boolean(checkoutDireccionConfirmada) : false,
+                lat: checkoutEntregaTipo === "despacho" ? Number(checkoutDireccionPin.lat || 0) : null,
+                lng: checkoutEntregaTipo === "despacho" ? Number(checkoutDireccionPin.lng || 0) : null,
+                shipping_quote: checkoutEntregaTipo === "despacho" ? (checkoutShippingQuote || null) : null,
             };
             const norm = _normalizarDatosCheckoutCliente(datosCliente);
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
@@ -7042,6 +7491,10 @@
                     subtotal: Number(data.subtotal || subtotalSnapshot || 0),
                     descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
                     total: Number(data.total_monto || totalSnapshot || 0),
+                    entrega_tipo: String(data.entrega_tipo || payload.entrega_tipo || "retiro"),
+                    hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
+                    direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
+                    despacho_monto: Number(data.despacho_monto || despachoSnapshot || 0),
                     items: itemsSnapshot,
                 };
                 guardarUltimoPedidoLocal();
@@ -7099,11 +7552,17 @@
                     modalExitoDetalleEl.innerHTML = `
                         <div><strong>Pedido #${Number(p.venta_id || 0)}</strong></div>
                         <div style="color:#64748b;">${esc(p.fecha_hora_local || "")}</div>
+                        <div style="color:#334155;">
+                            <strong>Entrega:</strong> ${esc(String(p.entrega_tipo || "retiro").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda")}
+                            ${String(p.hora_retiro || "").trim() ? ` · <strong>Hora:</strong> ${esc(String(p.hora_retiro || ""))}` : ""}
+                        </div>
+                        ${String(p.entrega_tipo || "").toLowerCase() === "despacho" ? `<div style="color:#334155;"><strong>Direccion:</strong> ${esc(String(p.direccion_entrega || "-"))}</div>` : ""}
                         <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
                         <div style="display:grid;gap:6px;">${itemsHtml || "<div>Sin detalle de productos.</div>"}</div>
                         <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
                         <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong>${money.format(Number(p.subtotal || 0))}</strong></div>
                         <div style="display:flex;justify-content:space-between;color:#b91c1c;"><span>Descuento</span><strong>-${money.format(Number(p.descuento || 0))}</strong></div>
+                        ${String(p.entrega_tipo || "").toLowerCase() === "despacho" ? `<div style="display:flex;justify-content:space-between;"><span>Despacho</span><strong>${money.format(Number(p.despacho_monto || 0))}</strong></div>` : ""}
                         <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${money.format(Number(p.total || 0))}</strong></div>
                     `;
                 } else {
@@ -7367,6 +7826,16 @@
             doc.text(`Cliente: ${String(p.cliente_nombre || "")}`, left, y); y += 16;
             doc.text(`Correo: ${String(p.cliente_email || "")}`, left, y); y += 16;
             doc.text(`Telefono: ${String(p.cliente_telefono || "")}`, left, y); y += 20;
+            const entregaTxt = String(p.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
+            doc.text(`Entrega: ${entregaTxt}`, left, y); y += 16;
+            if (String(p.hora_retiro || "").trim()) {
+                doc.text(`Hora: ${String(p.hora_retiro || "")}`, left, y); y += 16;
+            }
+            if (entregaTxt === "Despacho") {
+                doc.text(`Direccion: ${String(p.direccion_entrega || "-")}`, left, y); y += 16;
+                doc.text(`Despacho: ${money.format(Number(p.despacho_monto || 0))}`, left, y); y += 16;
+            }
+            y += 4;
             doc.setFont("helvetica", "bold");
             doc.text("Detalle", left, y); y += 14;
             doc.setFont("helvetica", "normal");
@@ -7416,6 +7885,18 @@
         document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
         document.getElementById("modal-checkout-cancel")?.addEventListener("click", cerrarModalCheckoutResumen);
         document.getElementById("modal-checkout-confirm")?.addEventListener("click", confirmarCheckoutDesdeResumen);
+        checkoutEntregaRetiroEl?.addEventListener("click", () => _setCheckoutEntregaTipo("retiro"));
+        checkoutEntregaDespachoEl?.addEventListener("click", () => _setCheckoutEntregaTipo("despacho"));
+        checkoutHoraRetiroEl?.addEventListener("change", async () => {
+            _actualizarAyudaHoraCheckout();
+            if (checkoutEntregaTipo === "despacho" && checkoutDireccionConfirmada) {
+                await _cotizarDespachoCheckoutDesdePin();
+            } else {
+                _renderTotalesResumenCheckout();
+            }
+        });
+        checkoutBuscarMapaEl?.addEventListener("click", _buscarDireccionCheckoutEnMapa);
+        checkoutConfirmarPinEl?.addEventListener("click", _confirmarPinCheckout);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);

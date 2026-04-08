@@ -1692,6 +1692,23 @@ def _cotizar_envio_agenda(lat, lng, cfg_tienda=None, hora_inicio=None):
     return quote
 
 
+def _cotizar_envio_checkout_tienda(lat, lng, cfg_tienda=None, hora_inicio=None):
+    quote = dict(_cotizar_envio_agenda(lat, lng, cfg_tienda=cfg_tienda, hora_inicio=hora_inicio) or {})
+    recargo_pct = 30.0
+    quote["service_provider"] = "uber_entregas"
+    quote["service_markup_pct"] = recargo_pct
+    quote["shipping_fee_store_base"] = quote.get("shipping_fee")
+    quote["shipping_fee_markup"] = 0
+    if bool(quote.get("inside_maipu")) and bool(quote.get("visible_to_client")) and quote.get("shipping_fee") is not None:
+        base = float(quote.get("shipping_fee") or 0)
+        markup = int(round(base * (recargo_pct / 100.0)))
+        final_fee = int(round(base + markup))
+        quote["shipping_fee_markup"] = int(max(0, markup))
+        quote["shipping_fee"] = int(max(0, final_fee))
+        quote["visible_to_client"] = True
+    return quote
+
+
 def _rangos_ocupados_evento_agenda(evento, slot_minutes):
     tipo = str(evento.get("tipo") or "").strip().lower()
     hora_inicio = _hhmm_a_minutos(evento.get("hora_inicio"))
@@ -1948,7 +1965,20 @@ def _normalizar_numero_whatsapp(raw):
     return f"whatsapp:+{dig}"
 
 
-def _crear_pdf_resumen_pedido_tienda(venta_id, cliente_nombre, cliente_email, cliente_telefono, items, subtotal, descuento, total):
+def _crear_pdf_resumen_pedido_tienda(
+    venta_id,
+    cliente_nombre,
+    cliente_email,
+    cliente_telefono,
+    items,
+    subtotal,
+    descuento,
+    total,
+    entrega_tipo="retiro",
+    hora_retiro=None,
+    direccion_entrega=None,
+    despacho_monto=0,
+):
     if canvas is None:
         raise RuntimeError("ReportLab no esta instalado en el entorno.")
     base_dir = os.path.join(static_dir, "tienda_pedidos_pdf")
@@ -1971,6 +2001,17 @@ def _crear_pdf_resumen_pedido_tienda(venta_id, cliente_nombre, cliente_email, cl
     y -= 14
     c.drawString(40, y, f"Telefono: {cliente_telefono}")
     y -= 24
+    entrega_txt = "Despacho" if str(entrega_tipo or "").strip().lower() == "despacho" else "Retiro en tienda"
+    c.drawString(40, y, f"Entrega: {entrega_txt}")
+    y -= 14
+    if hora_retiro:
+        c.drawString(40, y, f"Hora retiro/entrega: {str(hora_retiro)}")
+        y -= 14
+    if str(entrega_txt).lower().startswith("despacho"):
+        c.drawString(40, y, f"Direccion: {str(direccion_entrega or '-').strip()[:150]}")
+        y -= 14
+        c.drawString(40, y, f"Despacho estimado: ${float(despacho_monto or 0):,.0f}".replace(",", "."))
+        y -= 20
 
     c.setFont("Helvetica-Bold", 11)
     c.drawString(40, y, "Productos")
@@ -2103,7 +2144,21 @@ def _enviar_whatsapp_twilio(body_text, media_url=None):
         return False, str(e)
 
 
-def _notificar_whatsapp_pedido_tienda_async(venta_id, cliente_nombre, cliente_email, cliente_telefono, items, subtotal, descuento, total, host_url):
+def _notificar_whatsapp_pedido_tienda_async(
+    venta_id,
+    cliente_nombre,
+    cliente_email,
+    cliente_telefono,
+    items,
+    subtotal,
+    descuento,
+    total,
+    host_url,
+    entrega_tipo="retiro",
+    hora_retiro=None,
+    direccion_entrega=None,
+    despacho_monto=0,
+):
     if not _bool_env("GESTIONSTOCK_WHATSAPP_ENABLED", default=False):
         return
 
@@ -2118,6 +2173,10 @@ def _notificar_whatsapp_pedido_tienda_async(venta_id, cliente_nombre, cliente_em
                 subtotal=subtotal,
                 descuento=descuento,
                 total=total,
+                entrega_tipo=entrega_tipo,
+                hora_retiro=hora_retiro,
+                direccion_entrega=direccion_entrega,
+                despacho_monto=despacho_monto,
             )
             media_url = f"{str(host_url or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
             resumen_items = ", ".join(
@@ -2129,6 +2188,10 @@ def _notificar_whatsapp_pedido_tienda_async(venta_id, cliente_nombre, cliente_em
                 f"Cliente: {cliente_nombre}\n"
                 f"Correo: {cliente_email}\n"
                 f"Telefono: {cliente_telefono}\n"
+                f"Entrega: {'Despacho' if str(entrega_tipo or '').strip().lower() == 'despacho' else 'Retiro en tienda'}\n"
+                f"Hora: {str(hora_retiro or '-')}\n"
+                f"Direccion: {str(direccion_entrega or '-').strip()[:140]}\n"
+                f"Despacho: ${float(despacho_monto or 0):,.0f}\n"
                 f"Total: ${total:,.0f}\n"
                 f"Items: {resumen_items}\n"
                 "Adjunto PDF de respaldo."
@@ -5523,6 +5586,10 @@ def api_tienda_admin_pedidos_nuevos():
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.codigo_pedido,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
+                   COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
+                   v.hora_retiro,
+                   v.direccion_entrega,
+                   v.despacho_monto,
                    COALESCE(vp.productos, '') AS productos
             FROM ventas v
             LEFT JOIN (
@@ -5739,6 +5806,27 @@ def api_tienda_agenda_despacho_cotizar():
             return jsonify({"success": False, "error": "Selecciona primero un horario valido para calcular despacho"}), 400
         cfg_tienda = _obtener_tienda_personalizacion()
         quote = _cotizar_envio_agenda(lat, lng, cfg_tienda=cfg_tienda, hora_inicio=hora_inicio)
+        return jsonify({"success": True, "quote": quote})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tienda/checkout/despacho-cotizar', methods=['POST'])
+def api_tienda_checkout_despacho_cotizar():
+    try:
+        data = request.get_json(silent=True) or {}
+        try:
+            lat = float(data.get("lat"))
+            lng = float(data.get("lng"))
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Coordenadas invalidas para cotizar despacho"}), 400
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            return jsonify({"success": False, "error": "Coordenadas fuera de rango"}), 400
+        hora_inicio = str(data.get("hora_retiro") or data.get("hora_inicio") or "").strip()
+        if not _parse_hora_hhmm(hora_inicio):
+            return jsonify({"success": False, "error": "Selecciona una hora valida para calcular despacho"}), 400
+        cfg_tienda = _obtener_tienda_personalizacion()
+        quote = _cotizar_envio_checkout_tienda(lat, lng, cfg_tienda=cfg_tienda, hora_inicio=hora_inicio)
         return jsonify({"success": True, "quote": quote})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -9326,8 +9414,30 @@ def api_tienda_checkout():
         cliente_telefono = telefono_norm
         cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
         cliente_ref = _normalizar_cliente_ref(cliente_email, cliente_telefono)
+        entrega_tipo = str(data.get("entrega_tipo") or "retiro").strip().lower()
+        if entrega_tipo not in {"retiro", "despacho"}:
+            entrega_tipo = "retiro"
+        hora_retiro = str(data.get("hora_retiro") or "").strip()
+        if not _parse_hora_hhmm(hora_retiro):
+            return jsonify({'success': False, 'error': 'Selecciona una hora valida para retiro/entrega (HH:MM).'}), 400
+        direccion_entrega = str(data.get("direccion") or "").strip()[:240]
+        direccion_confirmada = bool(data.get("direccion_confirmada"))
+        try:
+            entrega_lat = float(data.get("lat")) if data.get("lat") not in (None, "") else None
+            entrega_lng = float(data.get("lng")) if data.get("lng") not in (None, "") else None
+        except (TypeError, ValueError):
+            entrega_lat, entrega_lng = None, None
 
         now_local = datetime.now(ZoneInfo("America/Santiago"))
+        min_retiro_dt = now_local + timedelta(minutes=30)
+        try:
+            hh, mm = [int(x) for x in hora_retiro.split(":")]
+            retiro_dt = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        except Exception:
+            return jsonify({'success': False, 'error': 'Hora de retiro invalida.'}), 400
+        if retiro_dt < min_retiro_dt:
+            return jsonify({'success': False, 'error': 'La hora de retiro/entrega debe ser al menos 30 minutos desde ahora.'}), 400
+
         categorias = _cargar_categorias_tienda()
         categorias_map = {str(c.get("nombre") or "").strip().lower(): c for c in categorias}
         mapa = {
@@ -9384,6 +9494,26 @@ def api_tienda_checkout():
             )
 
         subtotal = sum(float(it["precio_unitario"]) * int(it["cantidad"]) for it in items_limpios)
+        shipping_quote = None
+        despacho_monto = 0.0
+        if entrega_tipo == "despacho":
+            if len(direccion_entrega) < 8:
+                return jsonify({'success': False, 'error': 'Ingresa una direccion valida para despacho.'}), 400
+            if not direccion_confirmada:
+                return jsonify({'success': False, 'error': 'Debes confirmar la direccion con el pin del mapa.'}), 400
+            if entrega_lat is None or entrega_lng is None:
+                return jsonify({'success': False, 'error': 'Coordenadas de despacho invalidas.'}), 400
+            if not (-90 <= float(entrega_lat) <= 90 and -180 <= float(entrega_lng) <= 180):
+                return jsonify({'success': False, 'error': 'Coordenadas de despacho fuera de rango.'}), 400
+            shipping_quote = _cotizar_envio_checkout_tienda(
+                float(entrega_lat),
+                float(entrega_lng),
+                cfg_tienda=_obtener_tienda_personalizacion(),
+                hora_inicio=hora_retiro,
+            )
+            if bool(shipping_quote.get("inside_maipu")) and bool(shipping_quote.get("visible_to_client")):
+                despacho_monto = float(shipping_quote.get("shipping_fee") or 0)
+
         descuento_monto = 0.0
         descuento_nivel_monto = 0.0
         descuento_nivel_pct = 0.0
@@ -9427,9 +9557,10 @@ def api_tienda_checkout():
             permitir_agenda=False,
         )
         venta_id = int(respuesta.get("venta_id") or 0)
-        total_neto = subtotal - descuento_monto - descuento_nivel_monto
-        if total_neto < 0:
-            total_neto = 0
+        total_productos = subtotal - descuento_monto - descuento_nivel_monto
+        if total_productos < 0:
+            total_productos = 0
+        total_neto = float(total_productos) + float(despacho_monto or 0)
         conn = None
         try:
             conn = get_db()
@@ -9438,7 +9569,8 @@ def api_tienda_checkout():
                 """
                 UPDATE ventas
                 SET cliente_nombre = ?, cliente_email = ?, cliente_telefono = ?, descuento_codigo = ?, descuento_monto = ?, total_monto = ?,
-                    pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP
+                    pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP,
+                    entrega_tipo = ?, hora_retiro = ?, direccion_entrega = ?, entrega_lat = ?, entrega_lng = ?, despacho_monto = ?, entrega_detalle_json = ?
                 WHERE id = ?
                 """,
                 (
@@ -9448,6 +9580,13 @@ def api_tienda_checkout():
                     (cupon_codigo or None),
                     (descuento_monto + descuento_nivel_monto),
                     total_neto,
+                    entrega_tipo,
+                    hora_retiro,
+                    (direccion_entrega if entrega_tipo == "despacho" else None),
+                    (float(entrega_lat) if entrega_tipo == "despacho" and entrega_lat is not None else None),
+                    (float(entrega_lng) if entrega_tipo == "despacho" and entrega_lng is not None else None),
+                    (float(despacho_monto) if entrega_tipo == "despacho" else 0),
+                    (json.dumps(shipping_quote, ensure_ascii=False) if isinstance(shipping_quote, dict) else None),
                     venta_id,
                 ),
             )
@@ -9498,6 +9637,11 @@ def api_tienda_checkout():
         respuesta["cliente_nombre"] = cliente_nombre
         respuesta["cliente_email"] = cliente_email
         respuesta["cliente_telefono"] = cliente_telefono
+        respuesta["entrega_tipo"] = entrega_tipo
+        respuesta["hora_retiro"] = hora_retiro
+        respuesta["direccion_entrega"] = (direccion_entrega if entrega_tipo == "despacho" else "")
+        respuesta["despacho_monto"] = round(float(despacho_monto or 0), 2)
+        respuesta["shipping_quote"] = shipping_quote if isinstance(shipping_quote, dict) else None
         respuesta["total_monto"] = round(total_neto, 2)
         _notificar_whatsapp_pedido_tienda_async(
             venta_id=venta_id,
@@ -9509,6 +9653,10 @@ def api_tienda_checkout():
             descuento=float(descuento_monto),
             total=float(total_neto),
             host_url=request.url_root,
+            entrega_tipo=entrega_tipo,
+            hora_retiro=hora_retiro,
+            direccion_entrega=(direccion_entrega if entrega_tipo == "despacho" else ""),
+            despacho_monto=float(despacho_monto or 0),
         )
         return jsonify(respuesta)
     except ValueError as e:

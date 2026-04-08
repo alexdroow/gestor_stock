@@ -1115,6 +1115,11 @@
                     const mostrarPrecios = canal === 'presencial';
                     const items = (data.items || []).map((item, index) => renderDetalleProducto(item, index, mostrarPrecios)).join('');
                     const totalMonto = Number(data.venta?.total_monto || 0);
+                    const entregaTipo = String(data.venta?.entrega_tipo || 'retiro').toLowerCase();
+                    const entregaTxt = entregaTipo === 'despacho' ? 'Despacho' : 'Retiro en tienda';
+                    const horaRetiro = String(data.venta?.hora_retiro || '').trim();
+                    const direccionEntrega = String(data.venta?.direccion_entrega || '').trim();
+                    const despachoMonto = Number(data.venta?.despacho_monto || 0);
 
                     document.getElementById('detalle-contenido').innerHTML = `
                         <div style="margin-bottom: 16px; color: #64748b;">
@@ -1129,6 +1134,9 @@
                             Correo: <strong>${escapeHtml(data.venta?.cliente_email || '-')}</strong>
                             <br>
                             Telefono: <strong>${escapeHtml(data.venta?.cliente_telefono || '-')}</strong>
+                            <br>
+                            Entrega: <strong>${escapeHtml(entregaTxt)}</strong>${horaRetiro ? ` · Hora: <strong>${escapeHtml(horaRetiro)}</strong>` : ''}
+                            ${entregaTipo === 'despacho' ? `<br>Direccion: <strong>${escapeHtml(direccionEntrega || '-')}</strong><br>Despacho: <strong>${formatearMonedaCLP(despachoMonto)}</strong>` : ''}
                             <br>
                             Codigo operación: <strong>${escapeHtml(data.venta?.codigo_operacion || '-')}</strong>
                             ${mostrarPrecios ? `<div class="detalle-total">Total: ${formatearMonedaCLP(totalMonto)}</div>` : ''}
@@ -1251,10 +1259,22 @@
             doc.setFontSize(9);
             const ventaId = data.venta?.id || '';
             const fecha = String(data.venta?.fecha_hora || '').replace('T', ' ').slice(0, 16);
+            const entregaTipo = String(data.venta?.entrega_tipo || 'retiro').toLowerCase();
+            const entregaTxt = entregaTipo === 'despacho' ? 'Despacho' : 'Retiro';
+            const horaRetiro = String(data.venta?.hora_retiro || '').trim();
+            const direccionEntrega = String(data.venta?.direccion_entrega || '').trim();
+            const despachoMonto = Number(data.venta?.despacho_monto || 0);
             doc.text(`Venta: #${ventaId}`, margin, y); y += 4;
             if (fecha) { doc.text(`Fecha: ${fecha}`, margin, y); y += 4; }
             const codigoPedido = String(data.venta?.codigo_pedido || '').trim();
             if (codigoPedido) { doc.text(`Pedido: ${codigoPedido}`, margin, y); y += 4; }
+            doc.text(`Entrega: ${entregaTxt}`, margin, y); y += 4;
+            if (horaRetiro) { doc.text(`Hora: ${horaRetiro}`, margin, y); y += 4; }
+            if (entregaTipo === 'despacho') {
+                const dirLines = doc.splitTextToSize(`Direccion: ${direccionEntrega || '-'}`, 64);
+                dirLines.forEach((linea) => { doc.text(linea, margin, y); y += 4; });
+                doc.text(`Despacho: ${formatearMonedaCLP(despachoMonto)}`, margin, y); y += 4;
+            }
             doc.text('-------------------------------', margin, y); y += 5;
 
             items.forEach((item) => {
