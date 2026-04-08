@@ -1504,6 +1504,91 @@
             word-break: break-word;
             overflow-wrap: anywhere;
         }
+        #modal-checkout-resumen {
+            z-index: 4900;
+        }
+        #modal-checkout-resumen .modal {
+            width: min(560px, 96vw);
+            max-height: 88vh;
+            overflow: auto;
+            background: #fff;
+            border-radius: 14px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 20px 60px rgba(2, 6, 23, .24);
+            padding: 14px;
+            gap: 10px;
+        }
+        #modal-checkout-cliente {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 10px;
+            display: grid;
+            gap: 4px;
+            font-size: .9rem;
+            color: #334155;
+            white-space: normal;
+            word-break: break-word;
+        }
+        #modal-checkout-detalle {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px;
+            max-height: 280px;
+            overflow: auto;
+            display: grid;
+            gap: 8px;
+        }
+        .checkout-ticket-lines {
+            display: grid;
+            gap: 6px;
+        }
+        .checkout-ticket-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: .9rem;
+            color: #1f2937;
+        }
+        .checkout-ticket-line span:first-child {
+            flex: 1;
+            min-width: 0;
+            white-space: normal;
+            word-break: break-word;
+        }
+        .checkout-ticket-line span:last-child {
+            font-weight: 700;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+        .checkout-ticket-divider {
+            border: 0;
+            border-top: 1px dashed #d1d5db;
+            margin: 2px 0;
+        }
+        .checkout-ticket-totals {
+            display: grid;
+            gap: 5px;
+        }
+        .checkout-ticket-total {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: .92rem;
+        }
+        .checkout-ticket-total strong {
+            color: #0f172a;
+        }
+        .checkout-ticket-total.discount strong {
+            color: #b91c1c;
+        }
+        .checkout-ticket-total.final {
+            margin-top: 2px;
+            padding-top: 6px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 1rem;
+        }
         #modal-cuenta .modal {
             max-height: 90vh;
             overflow: auto;
@@ -2044,6 +2129,34 @@
         }
         body.mobile-ui #modal-exito-pedido .modal-actions .btn-muted,
         body.mobile-ui #modal-exito-pedido .modal-actions .btn-primary {
+            font-size: 0.9rem;
+            padding: 9px 12px;
+            min-width: 132px;
+        }
+        body.mobile-ui #modal-checkout-resumen .modal {
+            width: min(460px, 94vw);
+            max-height: 86vh;
+            padding: 14px;
+            gap: 10px;
+        }
+        body.mobile-ui #modal-checkout-resumen h3 {
+            font-size: 1.2rem;
+        }
+        body.mobile-ui #modal-checkout-cliente,
+        body.mobile-ui #modal-checkout-detalle {
+            font-size: .9rem !important;
+        }
+        body.mobile-ui .checkout-ticket-line,
+        body.mobile-ui .checkout-ticket-total {
+            font-size: .9rem;
+        }
+        body.mobile-ui #modal-checkout-resumen .modal-actions {
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        body.mobile-ui #modal-checkout-resumen .modal-actions .btn-muted,
+        body.mobile-ui #modal-checkout-resumen .modal-actions .btn-primary {
             font-size: 0.9rem;
             padding: 9px 12px;
             min-width: 132px;
@@ -2730,8 +2843,8 @@
         <div class="modal">
             <h3>Resumen de compra</h3>
             <div style="font-size:.9rem;color:#64748b;">Revisa el detalle antes de confirmar el pedido.</div>
-            <div id="modal-checkout-cliente" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-top:8px;"></div>
-            <div id="modal-checkout-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:280px;overflow:auto;margin-top:8px;"></div>
+            <div id="modal-checkout-cliente"></div>
+            <div id="modal-checkout-detalle"></div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-checkout-cancel">Volver</button>
                 <button class="btn-primary" type="button" id="modal-checkout-confirm">Confirmar compra</button>
@@ -6838,23 +6951,27 @@
             const subtotal = items.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
             const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
             const total = Math.max(0, subtotal - descuento);
+            const cuponTxt = String(cuponAplicado.codigo || "").trim();
             modalCheckoutClienteEl.innerHTML = `
                 <div><strong>Cliente:</strong> ${esc(norm.value.nombre)}</div>
                 <div><strong>Correo:</strong> ${esc(norm.value.email)}</div>
                 <div><strong>Telefono:</strong> ${esc(norm.value.telefono)}</div>
+                ${cuponTxt ? `<div><strong>Cupon:</strong> ${esc(cuponTxt)}</div>` : ""}
             `;
             const itemsHtml = items.map((it) => `
-                <div style="display:flex;justify-content:space-between;gap:8px;">
+                <div class="checkout-ticket-line">
                     <span>${esc(it.nombre)} x${Number(it.cantidad || 0)}</span>
                     <span>${money.format(Number(it.subtotal || 0))}</span>
                 </div>
             `).join("");
             modalCheckoutDetalleEl.innerHTML = `
-                <div style="display:grid;gap:6px;">${itemsHtml || "<div>Sin detalle de productos.</div>"}</div>
-                <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
-                <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong>${money.format(subtotal)}</strong></div>
-                <div style="display:flex;justify-content:space-between;color:#b91c1c;"><span>Descuento</span><strong>-${money.format(descuento)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${money.format(total)}</strong></div>
+                <div class="checkout-ticket-lines">${itemsHtml || "<div>Sin detalle de productos.</div>"}</div>
+                <hr class="checkout-ticket-divider">
+                <div class="checkout-ticket-totals">
+                    <div class="checkout-ticket-total"><span>Subtotal</span><strong>${money.format(subtotal)}</strong></div>
+                    <div class="checkout-ticket-total discount"><span>Descuento</span><strong>-${money.format(descuento)}</strong></div>
+                    <div class="checkout-ticket-total final"><span>Total</span><strong>${money.format(total)}</strong></div>
+                </div>
             `;
             cerrarModalCliente();
             modalCheckoutResumenEl.classList.add("active");
