@@ -4163,7 +4163,17 @@
 
         function msg(text, isErr = false) {
             const safeText = String(text || "");
-            if (/^pedido\s+recibido\b/i.test(safeText)) {
+            const normText = safeText.replace(/\s+/g, " ").trim().toLowerCase();
+            if (
+                normText.includes("pedido recibido")
+                || normText.includes("hemos recibido")
+                || normText.includes("te contactaremos a la brevedad")
+                || normText.includes("descarga el archivo pdf")
+            ) {
+                msgEl.textContent = "";
+                return;
+            }
+            if (!isErr && safeText.length > 140) {
                 msgEl.textContent = "";
                 return;
             }
@@ -7680,6 +7690,13 @@
                 msgEl.style.display = "none";
             }
             if (modalCheckoutResumenEl) modalCheckoutResumenEl.classList.remove("active");
+            modalExitoEl.style.setProperty("display", "flex", "important");
+            modalExitoEl.style.setProperty("position", "fixed", "important");
+            modalExitoEl.style.setProperty("inset", "0", "important");
+            modalExitoEl.style.setProperty("z-index", "99999", "important");
+            modalExitoEl.style.setProperty("background", "rgba(17, 24, 39, .55)", "important");
+            modalExitoEl.style.setProperty("align-items", "center", "important");
+            modalExitoEl.style.setProperty("justify-content", "center", "important");
             const pedidoNum = Number(p.venta_id || 0);
             if (modalExitoOrderChipEl) {
                 modalExitoOrderChipEl.textContent = `Pedido #${pedidoNum || "-"}`;
@@ -7730,14 +7747,19 @@
                 };
             }
             modalExitoEl.classList.add("active");
-            modalExitoEl.style.display = "flex";
             _renderPedidoActivoTienda();
             _startPedidoEstadoPoll();
         }
 
         function cerrarModalExito() {
             modalExitoEl.classList.remove("active");
-            modalExitoEl.style.display = "";
+            modalExitoEl.style.removeProperty("display");
+            modalExitoEl.style.removeProperty("position");
+            modalExitoEl.style.removeProperty("inset");
+            modalExitoEl.style.removeProperty("z-index");
+            modalExitoEl.style.removeProperty("background");
+            modalExitoEl.style.removeProperty("align-items");
+            modalExitoEl.style.removeProperty("justify-content");
             if (msgEl) msgEl.style.display = "";
         }
 
