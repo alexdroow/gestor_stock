@@ -1355,6 +1355,84 @@ def _pedido_estado_label(estado):
     return labels.get(est, "Recibido")
 
 
+def _chat_origen_tipo(raw):
+    v = str(raw or "").strip().lower()
+    if v in {"venta", "agenda"}:
+        return v
+    return "venta"
+
+
+def _chat_estado_activo(origen_tipo, estado_raw):
+    estado = str(estado_raw or "").strip().lower()
+    if origen_tipo == "agenda":
+        return estado in {"pendiente", "confirmado", "preparando"}
+    return estado in {"recibido", "confirmado", "preparando"}
+
+
+def _chat_info_origen_cursor(cursor, origen_tipo, origen_id):
+    origen = _chat_origen_tipo(origen_tipo)
+    oid = int(origen_id or 0)
+    if oid <= 0:
+        return None
+    if origen == "agenda":
+        cursor.execute(
+            """
+            SELECT id, estado, cliente_email, cliente_telefono, cliente
+            FROM agenda_eventos
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (oid,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        estado = str(data.get("estado") or "").strip().lower() or "pendiente"
+        return {
+            "origen_tipo": "agenda",
+            "origen_id": oid,
+            "estado": estado,
+            "chat_activo": _chat_estado_activo("agenda", estado),
+            "cliente_email": str(data.get("cliente_email") or "").strip().lower(),
+            "cliente_telefono": _normalizar_telefono_cl(data.get("cliente_telefono")),
+            "cliente_nombre": str(data.get("cliente") or "").strip(),
+        }
+    cursor.execute(
+        """
+        SELECT id,
+               COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS estado,
+               cliente_email, cliente_telefono, cliente_nombre
+        FROM ventas
+        WHERE id = ? AND canal_venta = 'tienda_online'
+        LIMIT 1
+        """,
+        (oid,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    data = dict(row)
+    estado = _normalizar_pedido_estado(data.get("estado"))
+    return {
+        "origen_tipo": "venta",
+        "origen_id": oid,
+        "estado": estado,
+        "chat_activo": _chat_estado_activo("venta", estado),
+        "cliente_email": str(data.get("cliente_email") or "").strip().lower(),
+        "cliente_telefono": _normalizar_telefono_cl(data.get("cliente_telefono")),
+        "cliente_nombre": str(data.get("cliente_nombre") or "").strip(),
+    }
+
+
+def _chat_cliente_autorizado(info_origen, email, telefono):
+    if not info_origen:
+        return False
+    email_in = str(email or "").strip().lower()
+    tel_in = _normalizar_telefono_cl(telefono)
+    return bool(email_in) and bool(tel_in) and email_in == str(info_origen.get("cliente_email") or "").strip().lower() and tel_in == _normalizar_telefono_cl(info_origen.get("cliente_telefono"))
+
+
 def _clamp_int(value, default=0, min_value=0, max_value=9999):
     try:
         out = int(value)
@@ -5681,6 +5759,119 @@ def api_tienda_pedido_estado(venta_id):
             }
         )
     except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/chat/<string:origen_tipo>/<int:origen_id>', methods=['GET'])
+def api_tienda_chat_listar(origen_tipo, origen_id):
+    conn = None
+    try:
+        origen_tipo = _chat_origen_tipo(origen_tipo)
+        role = str(request.args.get("role") or "cliente").strip().lower()
+        conn = get_db()
+        cursor = conn.cursor()
+        info = _chat_info_origen_cursor(cursor, origen_tipo, int(origen_id))
+        if not info:
+            return jsonify({"success": False, "error": "Pedido/Reserva no encontrado"}), 404
+
+        if role == "admin":
+            if not session.get(_ADMIN_SESSION_KEY):
+                return jsonify({"success": False, "error": "No autorizado"}), 401
+        else:
+            email = str(request.args.get("email") or "").strip().lower()
+            telefono = str(request.args.get("telefono") or "").strip()
+            if not _chat_cliente_autorizado(info, email, telefono):
+                return jsonify({"success": False, "error": "Cliente no autorizado para este chat"}), 403
+
+        cursor.execute(
+            """
+            SELECT id, remitente_tipo, mensaje, creado_en
+            FROM tienda_pedido_chat
+            WHERE origen_tipo = ? AND origen_id = ?
+            ORDER BY id ASC
+            LIMIT 250
+            """,
+            (origen_tipo, int(origen_id)),
+        )
+        mensajes = [dict(r) for r in cursor.fetchall()]
+        return jsonify(
+            {
+                "success": True,
+                "chat_activo": bool(info.get("chat_activo")),
+                "origen_tipo": origen_tipo,
+                "origen_id": int(origen_id),
+                "estado": str(info.get("estado") or ""),
+                "mensajes": mensajes,
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/chat/<string:origen_tipo>/<int:origen_id>/enviar', methods=['POST'])
+def api_tienda_chat_enviar(origen_tipo, origen_id):
+    conn = None
+    try:
+        origen_tipo = _chat_origen_tipo(origen_tipo)
+        role = str((request.get_json(silent=True) or {}).get("role") or "cliente").strip().lower()
+        data = request.get_json(silent=True) or {}
+        mensaje = str(data.get("mensaje") or "").strip()
+        if len(mensaje) < 1:
+            return jsonify({"success": False, "error": "Mensaje vacio"}), 400
+        if len(mensaje) > 1000:
+            return jsonify({"success": False, "error": "Mensaje demasiado largo (max 1000)"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        info = _chat_info_origen_cursor(cursor, origen_tipo, int(origen_id))
+        if not info:
+            return jsonify({"success": False, "error": "Pedido/Reserva no encontrado"}), 404
+        if not bool(info.get("chat_activo")):
+            return jsonify({"success": False, "error": "Chat cerrado para este pedido/reserva"}), 409
+
+        if role == "admin":
+            if not session.get(_ADMIN_SESSION_KEY):
+                return jsonify({"success": False, "error": "No autorizado"}), 401
+            remitente = "pasteleria"
+            email = str(info.get("cliente_email") or "").strip().lower()
+            telefono = str(info.get("cliente_telefono") or "").strip()
+        else:
+            email = str(data.get("email") or "").strip().lower()
+            telefono = str(data.get("telefono") or "").strip()
+            if not _chat_cliente_autorizado(info, email, telefono):
+                return jsonify({"success": False, "error": "Cliente no autorizado para este chat"}), 403
+            remitente = "cliente"
+            telefono = _normalizar_telefono_cl(telefono)
+
+        cursor.execute(
+            """
+            INSERT INTO tienda_pedido_chat (
+                origen_tipo, origen_id, cliente_email, cliente_telefono, remitente_tipo, mensaje
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (origen_tipo, int(origen_id), email, telefono, remitente, mensaje),
+        )
+        msg_id = int(cursor.lastrowid or 0)
+        conn.commit()
+        return jsonify(
+            {
+                "success": True,
+                "mensaje": {
+                    "id": msg_id,
+                    "remitente_tipo": remitente,
+                    "mensaje": mensaje,
+                },
+            }
+        )
+    except Exception as e:
+        if conn:
+            conn.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:

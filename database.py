@@ -7764,6 +7764,32 @@ def migrar_db():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_pedido_chat (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                origen_tipo TEXT NOT NULL DEFAULT 'venta',
+                origen_id INTEGER NOT NULL,
+                cliente_email TEXT NOT NULL DEFAULT '',
+                cliente_telefono TEXT NOT NULL DEFAULT '',
+                remitente_tipo TEXT NOT NULL DEFAULT 'cliente',
+                mensaje TEXT NOT NULL DEFAULT '',
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_pedido_chat_origen
+            ON tienda_pedido_chat(origen_tipo, origen_id, id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_pedido_chat_cliente
+            ON tienda_pedido_chat(cliente_email, cliente_telefono, creado_en DESC)
+            """
+        )
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_ventas_canal_id
             ON ventas(canal_venta, id)
             """

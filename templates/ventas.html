@@ -3552,6 +3552,8 @@
                 const direccionEntrega = String(p.direccion_entrega || '').trim();
                 const despachoMonto = Number(p.despacho_monto || 0);
                 const btnEntregadoTxt = entregaTipo === 'despacho' ? 'Confirmar entrega' : 'Confirmar retiro';
+                const emailEnc = encodeURIComponent(email);
+                const telEnc = encodeURIComponent(telefono);
                 return `
                     <div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
                         <div style="font-weight:800;color:#1f2937;">Pedido #${p.id || '?'} ${idx === total - 1 ? '(nuevo)' : ''}</div>
@@ -3569,11 +3571,129 @@
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'preparando')" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Preparando</button>
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo</button>
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'entregado')" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">${btnEntregadoTxt}</button>
+                            <button type="button" onclick="_abrirChatPedidoOnline(${Number(p.id || 0)}, '${emailEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Chat cliente</button>
                         </div>
                     </div>
                 `;
             }).join('');
         }
+
+        let _pedidoChatAdminCtx = null;
+        let _pedidoChatAdminPollTimer = null;
+
+        function _ensurePedidoChatAdminPanel() {
+            let wrap = document.getElementById('pedido-chat-admin-wrap');
+            if (wrap) return wrap;
+            wrap = document.createElement('div');
+            wrap.id = 'pedido-chat-admin-wrap';
+            wrap.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:9999;width:min(420px,92vw);background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 14px 32px rgba(2,6,23,.25);display:none;';
+            wrap.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #e2e8f0;">
+                    <strong style="color:#0f172a;">Chat pedido</strong>
+                    <button type="button" id="pedido-chat-admin-close" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">Cerrar</button>
+                </div>
+                <div id="pedido-chat-admin-meta" style="padding:8px 10px;font-size:.82rem;color:#475569;">-</div>
+                <div id="pedido-chat-admin-list" style="margin:0 10px 10px;max-height:260px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#f8fafc;display:grid;gap:6px;"></div>
+                <div style="display:flex;gap:6px;padding:0 10px 10px;">
+                    <input id="pedido-chat-admin-input" type="text" maxlength="1000" placeholder="Responder al cliente..." style="flex:1;">
+                    <button type="button" id="pedido-chat-admin-send" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:8px;padding:7px 10px;font-weight:700;cursor:pointer;">Enviar</button>
+                </div>`;
+            document.body.appendChild(wrap);
+            wrap.querySelector('#pedido-chat-admin-close')?.addEventListener('click', () => {
+                wrap.style.display = 'none';
+                _pedidoChatAdminCtx = null;
+                if (_pedidoChatAdminPollTimer) { clearInterval(_pedidoChatAdminPollTimer); _pedidoChatAdminPollTimer = null; }
+            });
+            wrap.querySelector('#pedido-chat-admin-send')?.addEventListener('click', _enviarChatPedidoOnlineAdmin);
+            wrap.querySelector('#pedido-chat-admin-input')?.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    _enviarChatPedidoOnlineAdmin();
+                }
+            });
+            return wrap;
+        }
+
+        function _renderChatPedidoOnlineAdminMensajes(mensajes) {
+            const list = document.getElementById('pedido-chat-admin-list');
+            if (!list) return;
+            const arr = Array.isArray(mensajes) ? mensajes : [];
+            if (!arr.length) {
+                list.innerHTML = '<div style="font-size:.82rem;color:#64748b;">Sin mensajes aun.</div>';
+                return;
+            }
+            list.innerHTML = arr.map((m) => {
+                const tipo = String(m.remitente_tipo || '').toLowerCase();
+                const admin = tipo === 'pasteleria';
+                const txt = String(m.mensaje || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
+                const fecha = String(m.creado_en || '').replace('T',' ').slice(0,16);
+                return `<div style="display:grid;gap:2px;justify-items:${admin ? 'end' : 'start'};">
+                    <div style="max-width:92%;padding:7px 8px;border-radius:9px;border:1px solid ${admin ? '#93c5fd' : '#bbf7d0'};background:${admin ? '#eff6ff' : '#f0fdf4'};font-size:.85rem;color:#0f172a;">${txt}</div>
+                    <div style="font-size:.72rem;color:#64748b;">${admin ? 'Pasteleria' : 'Cliente'} · ${fecha}</div>
+                </div>`;
+            }).join('');
+            list.scrollTop = list.scrollHeight;
+        }
+
+        async function _pollChatPedidoOnlineAdmin() {
+            if (!_pedidoChatAdminCtx) return;
+            try {
+                const res = await fetch(`/api/tienda/chat/venta/${Number(_pedidoChatAdminCtx.id || 0)}?role=admin`, { headers: { Accept: 'application/json' } });
+                const data = await res.json();
+                if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar chat');
+                const meta = document.getElementById('pedido-chat-admin-meta');
+                if (meta) {
+                    meta.textContent = `Pedido #${Number(_pedidoChatAdminCtx.id || 0)} · ${String(data.chat_activo ? 'Chat activo' : 'Chat cerrado')}`;
+                    meta.style.color = data.chat_activo ? '#166534' : '#b45309';
+                }
+                _renderChatPedidoOnlineAdminMensajes(data.mensajes || []);
+                const input = document.getElementById('pedido-chat-admin-input');
+                const send = document.getElementById('pedido-chat-admin-send');
+                if (input) input.disabled = !data.chat_activo;
+                if (send) send.disabled = !data.chat_activo;
+            } catch (err) {
+                const meta = document.getElementById('pedido-chat-admin-meta');
+                if (meta) {
+                    meta.textContent = String(err?.message || 'No se pudo cargar chat');
+                    meta.style.color = '#b91c1c';
+                }
+            }
+        }
+
+        async function _enviarChatPedidoOnlineAdmin() {
+            if (!_pedidoChatAdminCtx) return;
+            const input = document.getElementById('pedido-chat-admin-input');
+            const texto = String(input?.value || '').trim();
+            if (!texto) return;
+            try {
+                const res = await fetch(`/api/tienda/chat/venta/${Number(_pedidoChatAdminCtx.id || 0)}/enviar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ role: 'admin', mensaje: texto }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo enviar');
+                if (input) input.value = '';
+                await _pollChatPedidoOnlineAdmin();
+            } catch (err) {
+                if (window.AppUX?.toastError) window.AppUX.toastError(err.message || 'No se pudo enviar mensaje');
+            }
+        }
+
+        function _abrirChatPedidoOnline(ventaId, emailEnc, telEnc) {
+            const wrap = _ensurePedidoChatAdminPanel();
+            _pedidoChatAdminCtx = {
+                id: Number(ventaId || 0),
+                email: decodeURIComponent(String(emailEnc || '')),
+                telefono: decodeURIComponent(String(telEnc || '')),
+            };
+            if (!Number(_pedidoChatAdminCtx.id || 0)) return;
+            wrap.style.display = 'block';
+            _pollChatPedidoOnlineAdmin();
+            if (_pedidoChatAdminPollTimer) clearInterval(_pedidoChatAdminPollTimer);
+            _pedidoChatAdminPollTimer = setInterval(_pollChatPedidoOnlineAdmin, 5000);
+        }
+        window._abrirChatPedidoOnline = _abrirChatPedidoOnline;
 
         async function _actualizarEstadoPedidoOnline(ventaId, estado) {
             const idNum = Number(ventaId || 0);

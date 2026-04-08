@@ -2922,6 +2922,15 @@
                     <button type="button" id="pedido-activo-ver" class="btn-primary">Ver detalle</button>
                     <button type="button" id="pedido-activo-cerrar" class="btn-muted">Cerrar</button>
                 </div>
+                <div id="pedido-chat-box" style="display:none;margin-top:10px;border:1px solid #c7d2fe;background:#ffffff;border-radius:10px;padding:8px;">
+                    <div style="font-weight:700;color:#1e293b;font-size:.88rem;">Chat con pasteleria</div>
+                    <div id="pedido-chat-status" style="margin-top:4px;font-size:.78rem;color:#475569;">Cargando chat...</div>
+                    <div id="pedido-chat-list" style="margin-top:6px;max-height:170px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#f8fafc;display:grid;gap:6px;"></div>
+                    <div style="display:flex;gap:6px;margin-top:6px;">
+                        <input type="text" id="pedido-chat-input" maxlength="1000" placeholder="Escribe tu mensaje..." style="flex:1;">
+                        <button type="button" id="pedido-chat-send" class="btn-primary">Enviar</button>
+                    </div>
+                </div>
             </div>
         </aside>
     </main>
@@ -3322,6 +3331,11 @@
         const pedidoActivoMetaEl = document.getElementById("pedido-activo-meta");
         const pedidoActivoVerEl = document.getElementById("pedido-activo-ver");
         const pedidoActivoCerrarEl = document.getElementById("pedido-activo-cerrar");
+        const pedidoChatBoxEl = document.getElementById("pedido-chat-box");
+        const pedidoChatStatusEl = document.getElementById("pedido-chat-status");
+        const pedidoChatListEl = document.getElementById("pedido-chat-list");
+        const pedidoChatInputEl = document.getElementById("pedido-chat-input");
+        const pedidoChatSendEl = document.getElementById("pedido-chat-send");
         const ofertasPrevBtnEl = document.getElementById("ofertas-prev");
         const ofertasNextBtnEl = document.getElementById("ofertas-next");
         const secOfertasEl = document.getElementById("sec-ofertas");
@@ -3477,6 +3491,9 @@
         let agendaCakeCategoryGroup = "all";
         let agendaCakeCategorySearch = "";
         let agendaCakeCategoryExpanded = false;
+        let pedidoChatContext = null;
+        let pedidoChatPollTimer = null;
+        let pedidoChatLastMsgId = 0;
         let cuentaModo = "register";
         const PEDIDO_FINAL_VISIBLE_MS = 24 * 60 * 60 * 1000;
         const PEDIDO_ACTIVO_DISMISS_KEY = "tienda_pedido_activo_dismissed_id";
@@ -4046,10 +4063,19 @@
             if (!pedidoActivoBoxEl) return;
             const p = ultimoComprobantePedido;
             if (!_debeMostrarPedidoActivo(p)) {
+                const ctxTmp = _buildPedidoChatContext();
+                if (ctxTmp && String(ctxTmp.origen_tipo) === "agenda") {
+                    pedidoActivoBoxEl.style.display = "";
+                    if (pedidoActivoTextoEl) pedidoActivoTextoEl.textContent = `Reserva agenda #${Number(ctxTmp.origen_id || 0)} - Chat activo`;
+                    if (pedidoActivoMetaEl) pedidoActivoMetaEl.textContent = "Puedes coordinar detalles con pasteleria aqui.";
+                    _syncPedidoChatContext();
+                    return;
+                }
                 pedidoActivoBoxEl.style.display = "none";
                 if (p && _estadoPedidoFinal(p.estado) && !_debeMostrarPedidoActivo(p)) {
                     try { localStorage.removeItem("tienda_ultimo_pedido"); } catch (_) {}
                 }
+                _stopPedidoChatPoll();
                 return;
             }
             pedidoActivoBoxEl.style.display = "";
@@ -4059,6 +4085,134 @@
             if (pedidoActivoMetaEl) {
                 const estadoAct = String(p.estado_actualizado || "").trim();
                 pedidoActivoMetaEl.textContent = estadoAct ? `Actualizado: ${estadoAct}` : "";
+            }
+            _syncPedidoChatContext();
+        }
+
+        function _buildPedidoChatContext() {
+            const cli = clienteRegistrado;
+            if (!cli || !cli.email || !cli.telefono) return null;
+            const v = ultimoComprobantePedido;
+            if (_debeMostrarPedidoActivo(v) && Number(v?.venta_id || 0) > 0 && !_estadoPedidoFinal(v?.estado)) {
+                return { origen_tipo: "venta", origen_id: Number(v.venta_id), email: String(cli.email || ""), telefono: String(cli.telefono || "") };
+            }
+            try {
+                const raw = localStorage.getItem("tienda_ultima_reserva_chat");
+                if (!raw) return null;
+                const obj = JSON.parse(raw || "{}");
+                const rid = Number(obj?.reserva_id || 0);
+                const email = normalizarEmailCliente(obj?.email || "");
+                const tel8 = normalizarTelefono8(obj?.telefono || "");
+                if (rid > 0 && email && tel8) {
+                    return { origen_tipo: "agenda", origen_id: rid, email, telefono: `+569${tel8}` };
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        function _renderPedidoChatMensajes(mensajes) {
+            if (!pedidoChatListEl) return;
+            const arr = Array.isArray(mensajes) ? mensajes : [];
+            if (!arr.length) {
+                pedidoChatListEl.innerHTML = `<div style="font-size:.8rem;color:#64748b;">Sin mensajes aun.</div>`;
+                return;
+            }
+            pedidoChatListEl.innerHTML = arr.map((m) => {
+                const tipo = String(m.remitente_tipo || "cliente").trim().toLowerCase();
+                const isCli = tipo === "cliente";
+                const texto = esc(String(m.mensaje || ""));
+                const fecha = esc(String(m.creado_en || "").replace("T", " ").slice(0, 16));
+                return `<div style="display:grid;gap:2px;justify-items:${isCli ? "end" : "start"};">
+                    <div style="max-width:92%;padding:6px 8px;border-radius:9px;border:1px solid ${isCli ? "#93c5fd" : "#bbf7d0"};background:${isCli ? "#eff6ff" : "#f0fdf4"};font-size:.82rem;color:#0f172a;">${texto}</div>
+                    <div style="font-size:.7rem;color:#64748b;">${isCli ? "Tu" : "Pasteleria"} · ${fecha}</div>
+                </div>`;
+            }).join("");
+            try { pedidoChatListEl.scrollTop = pedidoChatListEl.scrollHeight; } catch (_) {}
+            pedidoChatLastMsgId = Number(arr[arr.length - 1]?.id || pedidoChatLastMsgId || 0);
+        }
+
+        async function _pollPedidoChat() {
+            const ctx = pedidoChatContext;
+            if (!ctx || !pedidoChatBoxEl) return;
+            try {
+                const url = `/api/tienda/chat/${encodeURIComponent(ctx.origen_tipo)}/${Number(ctx.origen_id || 0)}?role=cliente&email=${encodeURIComponent(ctx.email)}&telefono=${encodeURIComponent(ctx.telefono)}`;
+                const res = await fetch(url, { headers: { Accept: "application/json" } });
+                const data = await res.json();
+                if (!res.ok || !data?.success) throw new Error(data?.error || "No se pudo cargar chat");
+                pedidoChatBoxEl.style.display = "";
+                _renderPedidoChatMensajes(data.mensajes || []);
+                const activo = Boolean(data.chat_activo);
+                if (pedidoChatStatusEl) {
+                    pedidoChatStatusEl.textContent = activo ? "Chat activo mientras se prepara el pedido." : "Chat cerrado: pedido/reserva finalizado.";
+                    pedidoChatStatusEl.style.color = activo ? "#166534" : "#b45309";
+                }
+                if (pedidoChatInputEl) pedidoChatInputEl.disabled = !activo;
+                if (pedidoChatSendEl) pedidoChatSendEl.disabled = !activo;
+                if (!activo && String(ctx.origen_tipo) === "agenda") {
+                    try { localStorage.removeItem("tienda_ultima_reserva_chat"); } catch (_) {}
+                }
+            } catch (e) {
+                if (pedidoChatStatusEl) {
+                    pedidoChatStatusEl.textContent = String(e?.message || "No se pudo cargar chat");
+                    pedidoChatStatusEl.style.color = "#b91c1c";
+                }
+            }
+        }
+
+        function _stopPedidoChatPoll() {
+            if (pedidoChatPollTimer) {
+                clearInterval(pedidoChatPollTimer);
+                pedidoChatPollTimer = null;
+            }
+        }
+
+        function _syncPedidoChatContext() {
+            if (!pedidoChatBoxEl) return;
+            const nextCtx = _buildPedidoChatContext();
+            const prevKey = pedidoChatContext ? `${pedidoChatContext.origen_tipo}:${pedidoChatContext.origen_id}` : "";
+            const nextKey = nextCtx ? `${nextCtx.origen_tipo}:${nextCtx.origen_id}` : "";
+            pedidoChatContext = nextCtx;
+            if (!pedidoChatContext) {
+                _stopPedidoChatPoll();
+                pedidoChatLastMsgId = 0;
+                pedidoChatBoxEl.style.display = "none";
+                return;
+            }
+            if (prevKey !== nextKey) {
+                pedidoChatLastMsgId = 0;
+                if (pedidoChatListEl) pedidoChatListEl.innerHTML = `<div style="font-size:.8rem;color:#64748b;">Cargando mensajes...</div>`;
+            }
+            _pollPedidoChat();
+            if (!pedidoChatPollTimer) {
+                pedidoChatPollTimer = setInterval(_pollPedidoChat, 5000);
+            }
+        }
+
+        async function _enviarMensajePedidoChatCliente() {
+            const ctx = pedidoChatContext;
+            if (!ctx) return;
+            const texto = String(pedidoChatInputEl?.value || "").trim();
+            if (!texto) return;
+            if (pedidoChatSendEl) pedidoChatSendEl.disabled = true;
+            try {
+                const res = await fetch(`/api/tienda/chat/${encodeURIComponent(ctx.origen_tipo)}/${Number(ctx.origen_id || 0)}/enviar`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify({
+                        role: "cliente",
+                        email: ctx.email,
+                        telefono: ctx.telefono,
+                        mensaje: texto,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data?.success) throw new Error(data?.error || "No se pudo enviar mensaje");
+                if (pedidoChatInputEl) pedidoChatInputEl.value = "";
+                await _pollPedidoChat();
+            } catch (e) {
+                msg(String(e?.message || "No se pudo enviar mensaje"), true);
+            } finally {
+                if (pedidoChatSendEl) pedidoChatSendEl.disabled = false;
             }
         }
 
@@ -4104,6 +4258,7 @@
                 agendaDireccionPin = { lat: Number(clienteRegistrado.direccion_lat), lng: Number(clienteRegistrado.direccion_lng) };
             }
             renderCategoriasMenu();
+            _syncPedidoChatContext();
         }
 
         function _setCuentaModo(mode) {
@@ -4148,6 +4303,10 @@
             historialComprasCliente = [];
             cuponesClienteDisponibles = [];
             try { localStorage.removeItem("tienda_cliente_reg"); } catch (_) {}
+            try { localStorage.removeItem("tienda_ultima_reserva_chat"); } catch (_) {}
+            pedidoChatContext = null;
+            _stopPedidoChatPoll();
+            if (pedidoChatBoxEl) pedidoChatBoxEl.style.display = "none";
             if (cuentaHistorialEl) cuentaHistorialEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay compras registradas.</div>`;
             if (cuentaHistorialAgendaEl) cuentaHistorialAgendaEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay reservas registradas.</div>`;
             if (cuentaCuponesEl) cuentaCuponesEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>`;
@@ -6268,6 +6427,13 @@
                     shipping_quote: reserva.shipping_quote || payload.shipping_quote || null,
                 };
                 const pdfInfo = _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
+                try {
+                    localStorage.setItem("tienda_ultima_reserva_chat", JSON.stringify({
+                        reserva_id: Number(reserva.id || 0),
+                        email: String(payloadFinal.email || "").trim().toLowerCase(),
+                        telefono: String(payloadFinal.telefono || "").trim(),
+                    }));
+                } catch (_) {}
                 if (!pdfInfo || !pdfInfo.blobUrl) {
                     waStatusText = "No se pudo preparar la vista previa del PDF en esta pestaña, pero puedes descargarlo nuevamente desde aqui o reintentar.";
                 }
@@ -6317,6 +6483,7 @@
                 }
                 await cargarAgendaDisponibilidad(true);
                 _renderAgendaDiaHora();
+                _renderPedidoActivoTienda();
             } catch (e) {
                 _agendaMsg(e.message || "No se pudo reservar", "err");
                 const contactoErr = String(payload?.nombre || payload?.email || "cliente").trim();
@@ -8088,6 +8255,13 @@
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
         pedidoActivoCerrarEl?.addEventListener("click", cerrarPedidoActivoBanner);
+        pedidoChatSendEl?.addEventListener("click", _enviarMensajePedidoChatCliente);
+        pedidoChatInputEl?.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") {
+                ev.preventDefault();
+                _enviarMensajePedidoChatCliente();
+            }
+        });
         document.getElementById("modal-cuenta-cerrar")?.addEventListener("click", cerrarModalCuenta);
         document.getElementById("cuenta-guardar")?.addEventListener("click", registrarCuentaCliente);
         cuentaBuscarMapaEl?.addEventListener("click", _buscarDireccionCuentaEnMapa);
