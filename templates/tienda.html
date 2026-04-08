@@ -4162,7 +4162,12 @@
         }
 
         function msg(text, isErr = false) {
-            msgEl.textContent = text || "";
+            const safeText = String(text || "");
+            if (/^pedido\s+recibido\b/i.test(safeText)) {
+                msgEl.textContent = "";
+                return;
+            }
+            msgEl.textContent = safeText;
             msgEl.style.color = isErr ? "#b91c1c" : "#6b7280";
         }
 
@@ -7644,8 +7649,37 @@
             return `https://wa.me/${telefonoDestino}?text=${encodeURIComponent(mensaje)}`;
         }
 
+        function _abrirVentanaResumenPedidoFallback(p) {
+            try {
+                const ventaId = Number(p?.venta_id || 0);
+                const entrega = String(p?.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
+                const hora = String(p?.hora_retiro || "").trim();
+                const direccion = String(p?.direccion_entrega || "").trim() || "-";
+                const subtotal = money.format(Number(p?.subtotal || 0));
+                const descuento = money.format(Number(p?.descuento || 0));
+                const despacho = money.format(Number(p?.despacho_monto || 0));
+                const total = money.format(Number(p?.total || 0));
+                const wa = _buildWhatsappPedidoLink(p);
+                const w = window.open("", "_blank", "noopener,noreferrer");
+                if (!w) return;
+                const items = Array.isArray(p?.items) ? p.items : [];
+                const itemsHtml = items.map((it) => `<li>${esc(String(it.nombre || ""))} x${Number(it.cantidad || 0)} - ${money.format(Number(it.subtotal || 0))}</li>`).join("");
+                w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pedido #${ventaId || "-"}</title><style>body{font-family:Segoe UI,Tahoma,sans-serif;background:#f8fafc;color:#0f172a;padding:16px}.card{max-width:760px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:grid;gap:10px}.chip{display:inline-block;padding:6px 10px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-weight:800}.row{display:flex;justify-content:space-between;gap:8px}.btn{display:inline-block;text-decoration:none;padding:9px 12px;border-radius:8px;border:1px solid #cbd5e1;color:#0f172a;background:#fff;font-weight:700}.btnp{background:#2563eb;color:#fff;border-color:#2563eb}.btnw{background:#16a34a;color:#fff;border-color:#16a34a}</style></head><body><div class="card"><h2 style="margin:0">Pedido recibido</h2><div class="chip">Pedido #${ventaId || "-"}</div><div><strong>Entrega:</strong> ${esc(entrega)} ${hora ? `· <strong>Hora:</strong> ${esc(hora)}` : ""}</div>${entrega === "Despacho" ? `<div><strong>Direccion:</strong> ${esc(direccion)}</div>` : ""}<ul style="margin:0;padding-left:18px;">${itemsHtml || "<li>Sin detalle</li>"}</ul><div class="row"><span>Subtotal</span><strong>${subtotal}</strong></div><div class="row"><span>Descuento</span><strong>-${descuento}</strong></div>${entrega === "Despacho" ? `<div class="row"><span>Despacho</span><strong>${despacho}</strong></div>` : ""}<div class="row"><span>Total</span><strong>${total}</strong></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btnp" onclick="window.opener && window.opener.descargarComprobanteUltimoPedido && window.opener.descargarComprobanteUltimoPedido()">Descargar PDF</button><a class="btn btnw" href="${wa}" target="_blank" rel="noopener">WhatsApp pasteleria</a><a class="btn" href="/tienda">Volver</a></div></div></body></html>`);
+                w.document.close();
+            } catch (_) {}
+        }
+
         function abrirModalExito(texto) {
             const p = ultimoComprobantePedido || {};
+            if (!modalExitoEl || !modalExitoTextoEl || !modalExitoDetalleEl) {
+                _abrirVentanaResumenPedidoFallback(p);
+                return;
+            }
+            if (msgEl) {
+                msgEl.textContent = "";
+                msgEl.style.display = "none";
+            }
+            if (modalCheckoutResumenEl) modalCheckoutResumenEl.classList.remove("active");
             const pedidoNum = Number(p.venta_id || 0);
             if (modalExitoOrderChipEl) {
                 modalExitoOrderChipEl.textContent = `Pedido #${pedidoNum || "-"}`;
@@ -7696,12 +7730,15 @@
                 };
             }
             modalExitoEl.classList.add("active");
+            modalExitoEl.style.display = "flex";
             _renderPedidoActivoTienda();
             _startPedidoEstadoPoll();
         }
 
         function cerrarModalExito() {
             modalExitoEl.classList.remove("active");
+            modalExitoEl.style.display = "";
+            if (msgEl) msgEl.style.display = "";
         }
 
         function verDetallePedidoActivo() {
