@@ -1293,7 +1293,7 @@
             font-size: 0.82rem;
             color: #6b7280;
         }
-        .quick-add {
+        .photo-add {
             position: absolute;
             right: 8px;
             bottom: 8px;
@@ -1301,23 +1301,24 @@
             height: 34px;
             border-radius: 999px;
             border: 1px solid #fb923c;
-            background: linear-gradient(180deg, #ffedd5, #fed7aa);
-            font-size: 1.08rem;
+            background: #ffffff;
+            font-size: 1.35rem;
             line-height: 1;
             cursor: pointer;
             color: #9a3412;
-            font-weight: 700;
+            font-weight: 900;
             box-shadow: 0 6px 14px rgba(249, 115, 22, .32);
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            z-index: 5;
         }
-        .quick-add:disabled {
+        .photo-add:disabled {
             opacity: .45;
             cursor: not-allowed;
         }
-        .quick-add .quick-add-glyph {
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .20));
+        .photo-add .plus {
+            transform: translateY(-1px);
         }
         .cart-panel {
             position: sticky;
@@ -1915,7 +1916,7 @@
             line-height: 1;
         }
         body.mobile-ui .stock { font-size: 0.82rem; }
-        body.mobile-ui .quick-add { width: var(--mobile-quick-add-size); height: var(--mobile-quick-add-size); font-size: var(--mobile-quick-add-font); box-shadow: 0 8px 20px rgba(249, 115, 22, .38); }
+        body.mobile-ui .photo-add { width: var(--mobile-quick-add-size); height: var(--mobile-quick-add-size); font-size: var(--mobile-quick-add-font); box-shadow: 0 8px 20px rgba(249, 115, 22, .38); }
         body.mobile-ui .ofertas-track .item-card { flex: 0 0 min(84px, 46vw); width: min(84px, 46vw); }
         body.mobile-ui .section h2 { font-size: 2.2rem; margin-bottom: 12px; }
         body.mobile-ui .tienda-estado-banner { font-size: 0.7rem; padding: 8px 9px; }
@@ -2383,7 +2384,7 @@
             .item-name { font-size: .98rem; min-height: 32px; }
             .item-desc { font-size: .79rem; min-height: 22px; }
             .item-body { padding: 8px 8px 10px; }
-            .quick-add { width: 31px; height: 31px; font-size: 1.08rem; }
+            .photo-add { width: 31px; height: 31px; font-size: 1.08rem; }
             .ofertas-track .item-card { flex: 0 0 min(240px, 78vw); width: min(240px, 78vw); }
             .agenda-form .grid2 { grid-template-columns: 1fr; }
             .agenda-cake-wrap { grid-template-columns: 1fr; }
@@ -3852,7 +3853,11 @@
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
                     ${badgeOn ? `<span class="offer-custom-badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
                     ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
-                    <div class="item-photo">${fotoHtml(p)}${agotado ? `<span class="agotado-overlay">Agotado</span>` : ""}</div>
+                    <div class="item-photo">
+                        ${fotoHtml(p)}
+                        ${agotado ? `<span class="agotado-overlay">Agotado</span>` : ""}
+                        <button class="photo-add" type="button" onclick="event.stopPropagation();agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : "title=\"Agregar al carrito\""}><span class="plus" aria-hidden="true">+</span></button>
+                    </div>
                     <div class="item-body">
                         <div class="item-name">${esc(p.nombre)}</div>
                         <div class="price-row">
@@ -3864,7 +3869,6 @@
                         <div class="item-desc">${esc(desc || "Sin descripcion")}</div>
                         <div class="stock">Disponible: ${stock} unidad(es)</div>
                     </div>
-                    <button class="quick-add" type="button" onclick="event.stopPropagation();agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : "title=\"Agregar al carrito\""}><span class="quick-add-glyph" aria-hidden="true">&#128722;</span></button>
                 </article>
             `;
         }
