@@ -80,7 +80,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/admin/login", "/admin/logout", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
     if ruta.startswith("/api/tienda/"):
         return True
