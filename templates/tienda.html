@@ -2721,7 +2721,20 @@
             </div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-cliente-cancel">Cancelar</button>
-                <button class="btn-primary" type="button" id="modal-cliente-ok">Enviar pedido</button>
+                <button class="btn-primary" type="button" id="modal-cliente-ok">Ver resumen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-checkout-resumen">
+        <div class="modal">
+            <h3>Resumen de compra</h3>
+            <div style="font-size:.9rem;color:#64748b;">Revisa el detalle antes de confirmar el pedido.</div>
+            <div id="modal-checkout-cliente" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-top:8px;"></div>
+            <div id="modal-checkout-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:280px;overflow:auto;margin-top:8px;"></div>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="modal-checkout-cancel">Volver</button>
+                <button class="btn-primary" type="button" id="modal-checkout-confirm">Confirmar compra</button>
             </div>
         </div>
     </div>
@@ -2874,6 +2887,9 @@
         const clienteNombreEl = document.getElementById("cliente-nombre");
         const clienteEmailEl = document.getElementById("cliente-email");
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
+        const modalCheckoutResumenEl = document.getElementById("modal-checkout-resumen");
+        const modalCheckoutClienteEl = document.getElementById("modal-checkout-cliente");
+        const modalCheckoutDetalleEl = document.getElementById("modal-checkout-detalle");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
         const modalExitoEstadoEl = document.getElementById("modal-exito-estado");
@@ -3043,6 +3059,7 @@
         let tiendaEstadoMensaje = "";
         let mensajePostPedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.";
         let ultimoComprobantePedido = null;
+        let checkoutClientePendiente = null;
         let pedidoEstadoPollTimer = null;
         let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
@@ -6797,6 +6814,75 @@
             msg(`Repeticion aplicada: ${agregados} unidad(es) agregadas${omitidos > 0 ? `, ${omitidos} omitidas por stock` : ""}.`, omitidos > 0 && agregados === 0);
         }
 
+        function _normalizarDatosCheckoutCliente(datosCliente) {
+            const nombre = String(datosCliente?.nombre || "").trim();
+            const email = normalizarEmailCliente(datosCliente?.email);
+            const telefono = String(datosCliente?.telefono || "").trim();
+            if (nombre.length < 2) return { ok: false, error: "Ingresa un nombre valido." };
+            if (!email) return { ok: false, error: "Ingresa un correo valido." };
+            if (!/^\+569\d{8}$/.test(telefono)) return { ok: false, error: "Telefono invalido." };
+            return { ok: true, value: { nombre, email, telefono } };
+        }
+
+        function abrirModalCheckoutResumen(datosCliente) {
+            if (!modalCheckoutResumenEl || !modalCheckoutClienteEl || !modalCheckoutDetalleEl) return;
+            if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            const norm = _normalizarDatosCheckoutCliente(datosCliente);
+            if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
+            checkoutClientePendiente = norm.value;
+            const items = carrito.map((it) => ({
+                nombre: String(it.nombre || ""),
+                cantidad: Number(it.cantidad || 0),
+                subtotal: Number(it.cantidad || 0) * Number(it.precio_unitario || 0),
+            }));
+            const subtotal = items.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
+            const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const total = Math.max(0, subtotal - descuento);
+            modalCheckoutClienteEl.innerHTML = `
+                <div><strong>Cliente:</strong> ${esc(norm.value.nombre)}</div>
+                <div><strong>Correo:</strong> ${esc(norm.value.email)}</div>
+                <div><strong>Telefono:</strong> ${esc(norm.value.telefono)}</div>
+            `;
+            const itemsHtml = items.map((it) => `
+                <div style="display:flex;justify-content:space-between;gap:8px;">
+                    <span>${esc(it.nombre)} x${Number(it.cantidad || 0)}</span>
+                    <span>${money.format(Number(it.subtotal || 0))}</span>
+                </div>
+            `).join("");
+            modalCheckoutDetalleEl.innerHTML = `
+                <div style="display:grid;gap:6px;">${itemsHtml || "<div>Sin detalle de productos.</div>"}</div>
+                <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+                <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong>${money.format(subtotal)}</strong></div>
+                <div style="display:flex;justify-content:space-between;color:#b91c1c;"><span>Descuento</span><strong>-${money.format(descuento)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${money.format(total)}</strong></div>
+            `;
+            cerrarModalCliente();
+            modalCheckoutResumenEl.classList.add("active");
+        }
+
+        function cerrarModalCheckoutResumen() {
+            if (!modalCheckoutResumenEl) return;
+            modalCheckoutResumenEl.classList.remove("active");
+            checkoutClientePendiente = null;
+        }
+
+        async function confirmarCheckoutDesdeResumen() {
+            if (!checkoutClientePendiente) return msg("No hay datos de cliente para confirmar.", true);
+            const btnConfirm = document.getElementById("modal-checkout-confirm");
+            if (btnConfirm) {
+                btnConfirm.disabled = true;
+                btnConfirm.textContent = "Enviando...";
+            }
+            try {
+                return await enviarCheckoutCliente(checkoutClientePendiente);
+            } finally {
+                if (btnConfirm) {
+                    btnConfirm.disabled = false;
+                    btnConfirm.textContent = "Confirmar compra";
+                }
+            }
+        }
+
         async function enviarCheckoutCliente(datosCliente) {
             msg("Procesando compra...");
             const itemsSnapshot = carrito.map((it) => ({
@@ -6817,9 +6903,8 @@
                 cliente_telefono: String(datosCliente?.telefono || "").trim(),
                 fecha_venta: new Date().toISOString().slice(0, 10)
             };
-            if (payload.cliente_nombre.length < 2) return msg("Ingresa un nombre valido.", true);
-            if (!payload.cliente_email) return msg("Ingresa un correo valido.", true);
-            if (!/^\+569\d{8}$/.test(payload.cliente_telefono)) return msg("Telefono invalido.", true);
+            const norm = _normalizarDatosCheckoutCliente(datosCliente);
+            if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             try {
                 const res = await fetch("/api/tienda/checkout", {
                     method: "POST",
@@ -6851,6 +6936,8 @@
                 cuponAplicado = { codigo: "", descuento_monto: 0 };
                 renderCart();
                 cerrarModalCliente();
+                cerrarModalCheckoutResumen();
+                checkoutClientePendiente = null;
                 abrirModalExito();
                 msg("");
                 _trackTienda("checkout");
@@ -6867,7 +6954,7 @@
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
             document.body.classList.remove("cart-open");
             if (clienteRegistrado && normalizarEmailCliente(clienteRegistrado.email) && /^\+569\d{8}$/.test(String(clienteRegistrado.telefono || ""))) {
-                return enviarCheckoutCliente(clienteRegistrado);
+                return abrirModalCheckoutResumen(clienteRegistrado);
             }
             modalClienteEl.classList.add("active");
         }
@@ -7113,7 +7200,7 @@
             if (!telefonoDig || telefonoDig.length !== 8) {
                 return msg("El telefono debe tener exactamente 8 digitos.", true);
             }
-            return enviarCheckoutCliente({
+            return abrirModalCheckoutResumen({
                 nombre,
                 email,
                 telefono,
@@ -7210,6 +7297,8 @@
         });
         document.getElementById("modal-cliente-cancel").addEventListener("click", cerrarModalCliente);
         document.getElementById("modal-cliente-ok").addEventListener("click", confirmarCheckoutDesdeModal);
+        document.getElementById("modal-checkout-cancel")?.addEventListener("click", cerrarModalCheckoutResumen);
+        document.getElementById("modal-checkout-confirm")?.addEventListener("click", confirmarCheckoutDesdeResumen);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
@@ -7224,6 +7313,7 @@
         btnRegistrarCuentaEl?.addEventListener("click", () => abrirModalCuenta("register"));
         btnCerrarSesionEl?.addEventListener("click", cerrarSesionCliente);
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
+        modalCheckoutResumenEl?.addEventListener("click", (ev) => { if (ev.target === modalCheckoutResumenEl) cerrarModalCheckoutResumen(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
         agendaCakeOpenCartEl?.addEventListener("click", _abrirModalAgendaCakeCart);
