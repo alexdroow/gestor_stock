@@ -1490,6 +1490,31 @@
             gap: 10px !important;
             box-shadow: 0 20px 60px rgba(2, 6, 23, .28);
         }
+        #modal-exito-pedido .success-order-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 800;
+            font-size: .84rem;
+        }
+        #modal-exito-pedido .success-summary-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            font-size: .9rem;
+            color: #334155;
+        }
+        #modal-exito-pedido .btn-whatsapp {
+            background: #16a34a !important;
+            border-color: #16a34a !important;
+            color: #fff !important;
+        }
         #modal-exito-pedido h3 {
             margin: 0;
             color: #0f172a;
@@ -2252,6 +2277,10 @@
             font-size: 0.9rem;
             padding: 9px 12px;
             min-width: 132px;
+        }
+        body.mobile-ui #modal-exito-pedido .success-order-chip {
+            font-size: .8rem;
+            padding: 5px 8px;
         }
         body.mobile-ui #modal-checkout-resumen .modal {
             width: min(460px, 94vw);
@@ -3074,7 +3103,8 @@
     <div class="modal-overlay" id="modal-exito-pedido">
         <div class="modal">
             <h3>Pedido recibido</h3>
-            <div id="modal-exito-texto" style="font-size:.92rem;color:#374151;"></div>
+            <div id="modal-exito-order-chip" class="success-order-chip">Pedido #-</div>
+            <div id="modal-exito-texto" class="success-summary-box"></div>
             <div id="modal-exito-estado" style="font-size:.9rem;color:#334155;font-weight:700;"></div>
             <div class="pedido-steps" id="modal-exito-steps">
                 <div class="pedido-step" data-step="aceptado">Aceptado</div>
@@ -3084,6 +3114,7 @@
             <div id="modal-exito-detalle" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:260px;overflow:auto;"></div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-exito-pdf">Descargar comprobante PDF</button>
+                <button class="btn-primary btn-whatsapp" type="button" id="modal-exito-whatsapp">Enviar mensaje por WhatsApp</button>
                 <button class="btn-primary" type="button" id="modal-exito-cerrar">Entendido</button>
             </div>
         </div>
@@ -3235,10 +3266,12 @@
         const checkoutShippingWarningEl = document.getElementById("checkout-shipping-warning");
         const checkoutDespachoNoticeEl = document.getElementById("checkout-despacho-notice");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
+        const modalExitoOrderChipEl = document.getElementById("modal-exito-order-chip");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
         const modalExitoEstadoEl = document.getElementById("modal-exito-estado");
         const modalExitoStepsEl = document.getElementById("modal-exito-steps");
         const modalExitoDetalleEl = document.getElementById("modal-exito-detalle");
+        const modalExitoWhatsappEl = document.getElementById("modal-exito-whatsapp");
         const modalCuentaEl = document.getElementById("modal-cuenta");
         const cuentaEstadoEl = document.getElementById("cuenta-estado");
         const cuentaNombreEl = document.getElementById("cuenta-nombre");
@@ -7595,16 +7628,41 @@
             modalClienteEl.classList.remove("active");
         }
 
+        function _buildWhatsappPedidoLink(p) {
+            const telefonoDestino = "56964330546";
+            const ventaId = Number(p?.venta_id || 0);
+            const cliente = String(p?.cliente_nombre || "").trim();
+            const total = money.format(Number(p?.total || 0));
+            const entrega = String(p?.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
+            const hora = String(p?.hora_retiro || "").trim();
+            const mensaje = [
+                `Hola Pasteleria Sucrée, soy ${cliente || "cliente"}.`,
+                `Consulta por mi pedido #${ventaId || "-"}.`,
+                `Total: ${total}.`,
+                `Entrega: ${entrega}${hora ? ` (${hora})` : ""}.`,
+            ].join(" ");
+            return `https://wa.me/${telefonoDestino}?text=${encodeURIComponent(mensaje)}`;
+        }
+
         function abrirModalExito(texto) {
-            modalExitoTextoEl.textContent = texto || mensajePostPedido || "Pedido ingresado correctamente. Te contactaremos a la brevedad.";
+            const p = ultimoComprobantePedido || {};
+            const pedidoNum = Number(p.venta_id || 0);
+            if (modalExitoOrderChipEl) {
+                modalExitoOrderChipEl.textContent = `Pedido #${pedidoNum || "-"}`;
+            }
+            const entregaTxt = String(p.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
+            modalExitoTextoEl.innerHTML = `
+                <div><strong>Compra confirmada correctamente.</strong></div>
+                <div>Guarda tu numero de pedido para seguimiento: <strong>#${pedidoNum || "-"}</strong>.</div>
+                <div>Entrega: <strong>${esc(entregaTxt)}</strong>${String(p.hora_retiro || "").trim() ? ` · Hora: <strong>${esc(String(p.hora_retiro || ""))}</strong>` : ""}</div>
+            `;
             if (modalExitoEstadoEl) {
-                const estadoInicial = String((ultimoComprobantePedido && ultimoComprobantePedido.estado) || "recibido");
+                const estadoInicial = String((p && p.estado) || "recibido");
                 modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estadoInicial)}`;
                 _renderPedidoSteps(estadoInicial);
             }
             if (modalExitoDetalleEl) {
-                if (ultimoComprobantePedido) {
-                    const p = ultimoComprobantePedido;
+                if (p && Object.keys(p).length) {
                     const itemsHtml = (p.items || []).map((it) => `
                         <div style="display:flex;justify-content:space-between;gap:8px;">
                             <span>${esc(it.nombre)} x${Number(it.cantidad || 0)}</span>
@@ -7630,6 +7688,12 @@
                 } else {
                     modalExitoDetalleEl.innerHTML = `<div style="color:#64748b;">No hay detalle disponible.</div>`;
                 }
+            }
+            if (modalExitoWhatsappEl) {
+                modalExitoWhatsappEl.onclick = () => {
+                    const link = _buildWhatsappPedidoLink(ultimoComprobantePedido || {});
+                    window.open(link, "_blank", "noopener,noreferrer");
+                };
             }
             modalExitoEl.classList.add("active");
             _renderPedidoActivoTienda();
