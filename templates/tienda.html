@@ -1905,6 +1905,27 @@
             text-align: center;
             padding: 0 6px;
         }
+        .pedido-chat-toast {
+            position: fixed;
+            right: 14px;
+            bottom: calc(var(--mobile-fab-bottom) + 152px);
+            z-index: 80;
+            background: #111827;
+            color: #fff;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: .8rem;
+            font-weight: 700;
+            box-shadow: 0 10px 24px rgba(0,0,0,.28);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(8px);
+            transition: opacity .22s ease, transform .22s ease;
+        }
+        .pedido-chat-toast.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
         .wa-fab {
             position: fixed;
             right: 16px;
@@ -2466,6 +2487,29 @@
             font-size: .85rem !important;
             padding: 8px 9px !important;
         }
+        body.mobile-ui #mobile-order-modal .modal {
+            width: min(420px, 94vw);
+            padding: 8px;
+            gap: 6px;
+            max-height: 82vh;
+        }
+        body.mobile-ui #mobile-order-modal h3 {
+            font-size: .95rem !important;
+        }
+        body.mobile-ui #mobile-order-status,
+        body.mobile-ui #mobile-order-meta {
+            font-size: .62rem !important;
+        }
+        body.mobile-ui #mobile-order-modal .btn-primary,
+        body.mobile-ui #mobile-order-modal .btn-muted {
+            font-size: .74rem !important;
+            padding: 6px 8px !important;
+        }
+        body.mobile-ui .pedido-chat-toast {
+            font-size: .72rem;
+            right: 12px;
+            bottom: calc(var(--mobile-fab-bottom) + 132px);
+        }
         body.mobile-ui .agenda-pastel-modal .modal {
             width: calc(100vw - 10px);
             max-width: calc(100vw - 10px);
@@ -2993,6 +3037,7 @@
     <a class="wa-fab" id="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
         <img id="wa-fab-icon" src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
     </a>
+    <div class="pedido-chat-toast" id="pedido-chat-toast">Nuevo mensaje en tu pedido</div>
     <button type="button" class="mobile-order-fab" id="mobile-order-fab">
         Mi pedido
         <span class="badge" id="mobile-order-chat-badge"></span>
@@ -3410,6 +3455,7 @@
         const mobileOrderMetaEl = document.getElementById("mobile-order-meta");
         const mobileOrderViewEl = document.getElementById("mobile-order-view");
         const mobileOrderChatEl = document.getElementById("mobile-order-chat");
+        const pedidoChatToastEl = document.getElementById("pedido-chat-toast");
         const mobileCatsBubbleEl = document.getElementById("mobile-cats-bubble");
         const mobileCatsBubbleListEl = document.getElementById("mobile-cats-bubble-list");
         const mobileCatsBubbleCloseEl = document.getElementById("mobile-cats-bubble-close");
@@ -3596,6 +3642,7 @@
         let pedidoChatModalOpen = false;
         let pedidoChatUnreadCount = 0;
         let pedidoChatLastNotifiedId = 0;
+        let pedidoChatToastTimer = null;
         let cuentaModo = "register";
         const PEDIDO_FINAL_VISIBLE_MS = 24 * 60 * 60 * 1000;
         const PEDIDO_ACTIVO_DISMISS_KEY = "tienda_pedido_activo_dismissed_id";
@@ -4283,12 +4330,18 @@
         function _notifyPedidoChatNuevoMensaje(unreadCount) {
             const unread = Math.max(0, Number(unreadCount || 0));
             if (unread <= 0) return;
+            _showPedidoChatToast(unread);
             try {
                 if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
                     new Notification("Nuevo mensaje de Pasteleria Sucree", {
                         body: unread > 1 ? `Tienes ${unread} mensajes nuevos en tu pedido.` : "Tienes un mensaje nuevo en tu pedido.",
                         tag: "tienda-pedido-chat",
                     });
+                }
+            } catch (_) {}
+            try {
+                if (navigator && typeof navigator.vibrate === "function") {
+                    navigator.vibrate([80, 50, 80]);
                 }
             } catch (_) {}
             try {
@@ -4307,6 +4360,22 @@
                     setTimeout(() => { try { ctx.close(); } catch (_) {} }, 180);
                 }
             } catch (_) {}
+        }
+
+        function _showPedidoChatToast(unreadCount) {
+            if (!pedidoChatToastEl) return;
+            const unread = Math.max(0, Number(unreadCount || 0));
+            pedidoChatToastEl.textContent = unread > 1
+                ? `Tienes ${unread} mensajes nuevos en tu pedido`
+                : "Nuevo mensaje en tu pedido";
+            pedidoChatToastEl.classList.add("active");
+            if (pedidoChatToastTimer) {
+                clearTimeout(pedidoChatToastTimer);
+                pedidoChatToastTimer = null;
+            }
+            pedidoChatToastTimer = setTimeout(() => {
+                try { pedidoChatToastEl.classList.remove("active"); } catch (_) {}
+            }, 2600);
         }
 
         function _renderPedidoChatMensajes(mensajes) {
