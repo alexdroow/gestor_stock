@@ -3444,6 +3444,7 @@
         let checkoutDireccionPin = { lat: -33.510911, lng: -70.784909 };
         let checkoutShippingQuote = null;
         let checkoutShippingError = "";
+        let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
         let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
@@ -4163,6 +4164,7 @@
 
         function msg(text, isErr = false) {
             const safeText = String(text || "");
+            if (!isErr && Date.now() < suppressInfoMsgUntil) return;
             const normText = safeText.replace(/\s+/g, " ").trim().toLowerCase();
             if (
                 normText.includes("pedido recibido")
@@ -7659,6 +7661,64 @@
             return `https://wa.me/${telefonoDestino}?text=${encodeURIComponent(mensaje)}`;
         }
 
+        function _renderPostCheckoutPopup(p) {
+            const ventaId = Number(p?.venta_id || 0);
+            const entrega = String(p?.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
+            const hora = String(p?.hora_retiro || "").trim();
+            const direccion = String(p?.direccion_entrega || "").trim() || "-";
+            const subtotal = money.format(Number(p?.subtotal || 0));
+            const descuento = money.format(Number(p?.descuento || 0));
+            const despacho = money.format(Number(p?.despacho_monto || 0));
+            const total = money.format(Number(p?.total || 0));
+            const wa = _buildWhatsappPedidoLink(p);
+            const items = Array.isArray(p?.items) ? p.items : [];
+            const itemsHtml = items.map((it) => `
+                <div style="display:flex;justify-content:space-between;gap:8px;">
+                    <span>${esc(String(it.nombre || ""))} x${Number(it.cantidad || 0)}</span>
+                    <strong>${money.format(Number(it.subtotal || 0))}</strong>
+                </div>
+            `).join("");
+            return `
+                <div id="post-checkout-popup-overlay" style="position:fixed;inset:0;z-index:100000;background:rgba(2,6,23,.58);display:flex;align-items:center;justify-content:center;padding:14px;">
+                    <div style="width:min(560px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:14px;display:grid;gap:10px;box-shadow:0 20px 60px rgba(2,6,23,.28);">
+                        <h3 style="margin:0;color:#0f172a;">Pedido recibido</h3>
+                        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:800;font-size:.84rem;width:max-content;">Pedido #${ventaId || "-"}</div>
+                        <div style="border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;padding:10px;color:#334155;font-size:.92rem;">
+                            <div><strong>Compra confirmada correctamente.</strong></div>
+                            <div>Guarda tu numero de pedido para seguimiento: <strong>#${ventaId || "-"}</strong>.</div>
+                            <div>Entrega: <strong>${esc(entrega)}</strong>${hora ? ` · Hora: <strong>${esc(hora)}</strong>` : ""}</div>
+                            ${entrega === "Despacho" ? `<div>Direccion: <strong>${esc(direccion)}</strong></div>` : ""}
+                        </div>
+                        <div style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;display:grid;gap:7px;">
+                            ${itemsHtml || "<div>Sin detalle de productos.</div>"}
+                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:2px 0;">
+                            <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong>${subtotal}</strong></div>
+                            <div style="display:flex;justify-content:space-between;color:#b91c1c;"><span>Descuento</span><strong>-${descuento}</strong></div>
+                            ${entrega === "Despacho" ? `<div style="display:flex;justify-content:space-between;"><span>Despacho</span><strong>${despacho}</strong></div>` : ""}
+                            <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${total}</strong></div>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            <button type="button" id="post-checkout-pdf" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Descargar ticket PDF</button>
+                            <a href="${wa}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;">Enviar WhatsApp pasteleria</a>
+                            <button type="button" id="post-checkout-close" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Entendido</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function _abrirPostCheckoutPopup(p) {
+            const old = document.getElementById("post-checkout-popup-overlay");
+            if (old) old.remove();
+            document.body.insertAdjacentHTML("beforeend", _renderPostCheckoutPopup(p));
+            const overlay = document.getElementById("post-checkout-popup-overlay");
+            const btnPdf = document.getElementById("post-checkout-pdf");
+            const btnClose = document.getElementById("post-checkout-close");
+            btnPdf?.addEventListener("click", () => window.descargarComprobanteUltimoPedido && window.descargarComprobanteUltimoPedido());
+            btnClose?.addEventListener("click", () => overlay?.remove());
+            overlay?.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+        }
+
         function _abrirVentanaResumenPedidoFallback(p) {
             try {
                 const ventaId = Number(p?.venta_id || 0);
@@ -7681,72 +7741,14 @@
 
         function abrirModalExito(texto) {
             const p = ultimoComprobantePedido || {};
-            if (!modalExitoEl || !modalExitoTextoEl || !modalExitoDetalleEl) {
-                _abrirVentanaResumenPedidoFallback(p);
-                return;
-            }
+            suppressInfoMsgUntil = Date.now() + 30000;
             if (msgEl) {
                 msgEl.textContent = "";
                 msgEl.style.display = "none";
             }
             if (modalCheckoutResumenEl) modalCheckoutResumenEl.classList.remove("active");
-            modalExitoEl.style.setProperty("display", "flex", "important");
-            modalExitoEl.style.setProperty("position", "fixed", "important");
-            modalExitoEl.style.setProperty("inset", "0", "important");
-            modalExitoEl.style.setProperty("z-index", "99999", "important");
-            modalExitoEl.style.setProperty("background", "rgba(17, 24, 39, .55)", "important");
-            modalExitoEl.style.setProperty("align-items", "center", "important");
-            modalExitoEl.style.setProperty("justify-content", "center", "important");
-            const pedidoNum = Number(p.venta_id || 0);
-            if (modalExitoOrderChipEl) {
-                modalExitoOrderChipEl.textContent = `Pedido #${pedidoNum || "-"}`;
-            }
-            const entregaTxt = String(p.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
-            modalExitoTextoEl.innerHTML = `
-                <div><strong>Compra confirmada correctamente.</strong></div>
-                <div>Guarda tu numero de pedido para seguimiento: <strong>#${pedidoNum || "-"}</strong>.</div>
-                <div>Entrega: <strong>${esc(entregaTxt)}</strong>${String(p.hora_retiro || "").trim() ? ` · Hora: <strong>${esc(String(p.hora_retiro || ""))}</strong>` : ""}</div>
-            `;
-            if (modalExitoEstadoEl) {
-                const estadoInicial = String((p && p.estado) || "recibido");
-                modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estadoInicial)}`;
-                _renderPedidoSteps(estadoInicial);
-            }
-            if (modalExitoDetalleEl) {
-                if (p && Object.keys(p).length) {
-                    const itemsHtml = (p.items || []).map((it) => `
-                        <div style="display:flex;justify-content:space-between;gap:8px;">
-                            <span>${esc(it.nombre)} x${Number(it.cantidad || 0)}</span>
-                            <span>${money.format(Number(it.subtotal || 0))}</span>
-                        </div>
-                    `).join("");
-                    modalExitoDetalleEl.innerHTML = `
-                        <div><strong>Pedido #${Number(p.venta_id || 0)}</strong></div>
-                        <div style="color:#64748b;">${esc(p.fecha_hora_local || "")}</div>
-                        <div style="color:#334155;">
-                            <strong>Entrega:</strong> ${esc(String(p.entrega_tipo || "retiro").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda")}
-                            ${String(p.hora_retiro || "").trim() ? ` · <strong>Hora:</strong> ${esc(String(p.hora_retiro || ""))}` : ""}
-                        </div>
-                        ${String(p.entrega_tipo || "").toLowerCase() === "despacho" ? `<div style="color:#334155;"><strong>Direccion:</strong> ${esc(String(p.direccion_entrega || "-"))}</div>` : ""}
-                        <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
-                        <div style="display:grid;gap:6px;">${itemsHtml || "<div>Sin detalle de productos.</div>"}</div>
-                        <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
-                        <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong>${money.format(Number(p.subtotal || 0))}</strong></div>
-                        <div style="display:flex;justify-content:space-between;color:#b91c1c;"><span>Descuento</span><strong>-${money.format(Number(p.descuento || 0))}</strong></div>
-                        ${String(p.entrega_tipo || "").toLowerCase() === "despacho" ? `<div style="display:flex;justify-content:space-between;"><span>Despacho</span><strong>${money.format(Number(p.despacho_monto || 0))}</strong></div>` : ""}
-                        <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${money.format(Number(p.total || 0))}</strong></div>
-                    `;
-                } else {
-                    modalExitoDetalleEl.innerHTML = `<div style="color:#64748b;">No hay detalle disponible.</div>`;
-                }
-            }
-            if (modalExitoWhatsappEl) {
-                modalExitoWhatsappEl.onclick = () => {
-                    const link = _buildWhatsappPedidoLink(ultimoComprobantePedido || {});
-                    window.open(link, "_blank", "noopener,noreferrer");
-                };
-            }
-            modalExitoEl.classList.add("active");
+            if (modalExitoEl) modalExitoEl.classList.remove("active");
+            _abrirPostCheckoutPopup(p);
             _renderPedidoActivoTienda();
             _startPedidoEstadoPoll();
         }
