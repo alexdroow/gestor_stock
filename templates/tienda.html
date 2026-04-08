@@ -1615,12 +1615,6 @@
         .checkout-ticket-total.final strong {
             font-size: 1.08rem;
         }
-        .checkout-ticket-total.iva {
-            color: #475569;
-        }
-        .checkout-ticket-total.iva strong {
-            color: #334155;
-        }
         .checkout-delivery-wrap {
             border: 1px solid #e5e7eb;
             border-radius: 10px;
@@ -7259,17 +7253,14 @@
 
         function _renderTotalesResumenCheckout() {
             const totals = _checkoutCalcularTotales();
-            const ivaIncluido = Math.max(0, totals.total * (19 / 119));
             const subEl = document.getElementById("checkout-ticket-subtotal");
             const descEl = document.getElementById("checkout-ticket-descuento");
-            const ivaEl = document.getElementById("checkout-ticket-iva");
             const shipRowEl = document.getElementById("checkout-ticket-despacho-row");
             const shipEl = document.getElementById("checkout-ticket-despacho");
             const totalEl = document.getElementById("checkout-ticket-total");
             const headTotalEl = document.getElementById("checkout-ticket-head-total");
             if (subEl) subEl.textContent = money.format(totals.subtotal);
             if (descEl) descEl.textContent = `-${money.format(totals.descuento)}`;
-            if (ivaEl) ivaEl.textContent = money.format(ivaIncluido);
             if (shipRowEl) shipRowEl.style.display = (checkoutEntregaTipo === "despacho") ? "" : "none";
             if (shipEl) shipEl.textContent = money.format(totals.despacho);
             if (totalEl) totalEl.textContent = money.format(totals.total);
@@ -7462,7 +7453,6 @@
                 <div class="checkout-ticket-totals">
                     <div class="checkout-ticket-total"><span>Subtotal</span><strong id="checkout-ticket-subtotal">${money.format(subtotal)}</strong></div>
                     <div class="checkout-ticket-total discount"><span>Descuento</span><strong id="checkout-ticket-descuento">-${money.format(descuento)}</strong></div>
-                    <div class="checkout-ticket-total iva"><span>IVA incluido (19%)</span><strong id="checkout-ticket-iva">${money.format(0)}</strong></div>
                     <div class="checkout-ticket-total" id="checkout-ticket-despacho-row" style="display:none;"><span>Despacho</span><strong id="checkout-ticket-despacho">${money.format(0)}</strong></div>
                     <div class="checkout-ticket-total final"><span>Total</span><strong id="checkout-ticket-total">${money.format(total)}</strong></div>
                 </div>
