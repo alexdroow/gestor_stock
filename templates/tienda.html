@@ -1874,6 +1874,37 @@
             box-shadow: 0 10px 24px rgba(0,0,0,.28);
             cursor: pointer;
         }
+        .mobile-order-fab {
+            display: none;
+            position: fixed;
+            right: 14px;
+            bottom: calc(var(--mobile-fab-bottom) + 86px);
+            z-index: 56;
+            border: 0;
+            border-radius: 999px;
+            background: #2563eb;
+            color: #fff;
+            padding: 10px 14px;
+            font-weight: 800;
+            font-size: .88rem;
+            box-shadow: 0 10px 24px rgba(37,99,235,.32);
+            cursor: pointer;
+            align-items: center;
+            gap: 7px;
+        }
+        .mobile-order-fab .badge {
+            display: none;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            background: #ef4444;
+            color: #fff;
+            font-size: .73rem;
+            font-weight: 800;
+            line-height: 20px;
+            text-align: center;
+            padding: 0 6px;
+        }
         .wa-fab {
             position: fixed;
             right: 16px;
@@ -2115,6 +2146,10 @@
             display: none !important;
         }
         body.mobile-ui .mobile-agenda-summary-fab.active {
+            display: inline-flex;
+            align-items: center;
+        }
+        body.mobile-ui .mobile-order-fab.active {
             display: inline-flex;
             align-items: center;
         }
@@ -2760,6 +2795,10 @@
                 display: inline-flex;
                 align-items: center;
             }
+            .mobile-order-fab.active {
+                display: inline-flex;
+                align-items: center;
+            }
             .agenda-cake-modal .modal {
                 width: min(96vw, 96vw);
             }
@@ -2954,6 +2993,10 @@
     <a class="wa-fab" id="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
         <img id="wa-fab-icon" src="{{ url_for('static', filename='whatsapp_icon.png') }}" alt="WhatsApp">
     </a>
+    <button type="button" class="mobile-order-fab" id="mobile-order-fab">
+        Mi pedido
+        <span class="badge" id="mobile-order-chat-badge"></span>
+    </button>
     <button type="button" class="mobile-agenda-summary-fab" id="mobile-agenda-summary-fab" aria-hidden="true">Resumen</button>
     <button type="button" class="mobile-menu-fab" id="mobile-menu-fab" onclick="abrirCategoriasMobile()">Menu</button>
     <div class="mobile-cats-bubble" id="mobile-cats-bubble" aria-hidden="true">
@@ -3001,6 +3044,21 @@
             </div>
             <button class="checkout-btn" id="mobile-btn-checkout" type="button">Confirmar compra</button>
             <button class="clear-cart-btn" id="mobile-btn-clear-cart" type="button">Vaciar carrito</button>
+        </div>
+    </div>
+    <div class="modal-overlay" id="mobile-order-modal">
+        <div class="modal" style="width:min(420px,94vw);padding:12px;gap:8px;max-height:86vh;overflow:auto;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <h3 style="margin:0;">Tu pedido activo</h3>
+                <button type="button" id="mobile-order-close" class="btn-muted">Cerrar</button>
+            </div>
+            <div id="mobile-order-status" style="font-size:.86rem;color:#1f2937;"></div>
+            <div id="mobile-order-meta" style="font-size:.78rem;color:#64748b;"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" id="mobile-order-view" class="btn-primary">Ver detalle</button>
+                <button type="button" id="mobile-order-chat" class="btn-primary">Abrir chat</button>
+            </div>
+            <div style="font-size:.76rem;color:#64748b;">Recibiras avisos aqui cuando lleguen mensajes nuevos de pasteleria.</div>
         </div>
     </div>
 
@@ -3344,6 +3402,14 @@
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
         const mobileMenuFabEl = document.getElementById("mobile-menu-fab");
         const mobileAgendaSummaryFabEl = document.getElementById("mobile-agenda-summary-fab");
+        const mobileOrderFabEl = document.getElementById("mobile-order-fab");
+        const mobileOrderChatBadgeEl = document.getElementById("mobile-order-chat-badge");
+        const mobileOrderModalEl = document.getElementById("mobile-order-modal");
+        const mobileOrderCloseEl = document.getElementById("mobile-order-close");
+        const mobileOrderStatusEl = document.getElementById("mobile-order-status");
+        const mobileOrderMetaEl = document.getElementById("mobile-order-meta");
+        const mobileOrderViewEl = document.getElementById("mobile-order-view");
+        const mobileOrderChatEl = document.getElementById("mobile-order-chat");
         const mobileCatsBubbleEl = document.getElementById("mobile-cats-bubble");
         const mobileCatsBubbleListEl = document.getElementById("mobile-cats-bubble-list");
         const mobileCatsBubbleCloseEl = document.getElementById("mobile-cats-bubble-close");
@@ -3529,6 +3595,7 @@
         let pedidoChatLastMsgId = 0;
         let pedidoChatModalOpen = false;
         let pedidoChatUnreadCount = 0;
+        let pedidoChatLastNotifiedId = 0;
         let cuentaModo = "register";
         const PEDIDO_FINAL_VISIBLE_MS = 24 * 60 * 60 * 1000;
         const PEDIDO_ACTIVO_DISMISS_KEY = "tienda_pedido_activo_dismissed_id";
@@ -4103,10 +4170,15 @@
                     pedidoActivoBoxEl.style.display = "";
                     if (pedidoActivoTextoEl) pedidoActivoTextoEl.textContent = `Reserva agenda #${Number(ctxTmp.origen_id || 0)} - Chat activo`;
                     if (pedidoActivoMetaEl) pedidoActivoMetaEl.textContent = "Puedes coordinar detalles con pasteleria aqui.";
+                    if (mobileOrderFabEl) mobileOrderFabEl.classList.add("active");
+                    if (mobileOrderStatusEl) mobileOrderStatusEl.textContent = `Reserva agenda #${Number(ctxTmp.origen_id || 0)} · Chat activo`;
+                    if (mobileOrderMetaEl) mobileOrderMetaEl.textContent = "Puedes coordinar detalles desde chat.";
                     _syncPedidoChatContext();
                     return;
                 }
                 pedidoActivoBoxEl.style.display = "none";
+                if (mobileOrderFabEl) mobileOrderFabEl.classList.remove("active");
+                if (mobileOrderModalEl) mobileOrderModalEl.style.display = "none";
                 if (p && _estadoPedidoFinal(p.estado) && !_debeMostrarPedidoActivo(p)) {
                     try { localStorage.removeItem("tienda_ultimo_pedido"); } catch (_) {}
                 }
@@ -4120,6 +4192,14 @@
             if (pedidoActivoMetaEl) {
                 const estadoAct = String(p.estado_actualizado || "").trim();
                 pedidoActivoMetaEl.textContent = estadoAct ? `Actualizado: ${estadoAct}` : "";
+            }
+            if (mobileOrderFabEl) mobileOrderFabEl.classList.add("active");
+            if (mobileOrderStatusEl) {
+                mobileOrderStatusEl.textContent = `Pedido #${Number(p.venta_id || 0)} · ${_labelPedidoEstado(p.estado || "recibido")}`;
+            }
+            if (mobileOrderMetaEl) {
+                const estadoAct = String(p.estado_actualizado || "").trim();
+                mobileOrderMetaEl.textContent = estadoAct ? `Actualizado: ${estadoAct}` : "";
             }
             _syncPedidoChatContext();
         }
@@ -4170,14 +4250,63 @@
             if (!pedidoActivoChatToggleEl) return;
             const show = Boolean(pedidoChatContext);
             pedidoActivoChatToggleEl.style.display = show ? "" : "none";
-            if (!show || !pedidoChatBadgeEl) return;
+            if (mobileOrderFabEl) mobileOrderFabEl.classList.toggle("active", show);
+            if (!show) {
+                if (pedidoChatBadgeEl) {
+                    pedidoChatBadgeEl.style.display = "none";
+                    pedidoChatBadgeEl.textContent = "";
+                }
+                if (mobileOrderChatBadgeEl) {
+                    mobileOrderChatBadgeEl.style.display = "none";
+                    mobileOrderChatBadgeEl.textContent = "";
+                }
+                return;
+            }
+            if (!pedidoChatBadgeEl) return;
             if (pedidoChatUnreadCount > 0) {
                 pedidoChatBadgeEl.style.display = "";
                 pedidoChatBadgeEl.textContent = String(Math.min(99, pedidoChatUnreadCount));
+                if (mobileOrderChatBadgeEl) {
+                    mobileOrderChatBadgeEl.style.display = "";
+                    mobileOrderChatBadgeEl.textContent = String(Math.min(99, pedidoChatUnreadCount));
+                }
             } else {
                 pedidoChatBadgeEl.style.display = "none";
                 pedidoChatBadgeEl.textContent = "";
+                if (mobileOrderChatBadgeEl) {
+                    mobileOrderChatBadgeEl.style.display = "none";
+                    mobileOrderChatBadgeEl.textContent = "";
+                }
             }
+        }
+
+        function _notifyPedidoChatNuevoMensaje(unreadCount) {
+            const unread = Math.max(0, Number(unreadCount || 0));
+            if (unread <= 0) return;
+            try {
+                if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+                    new Notification("Nuevo mensaje de Pasteleria Sucree", {
+                        body: unread > 1 ? `Tienes ${unread} mensajes nuevos en tu pedido.` : "Tienes un mensaje nuevo en tu pedido.",
+                        tag: "tienda-pedido-chat",
+                    });
+                }
+            } catch (_) {}
+            try {
+                if (window.AudioContext || window.webkitAudioContext) {
+                    const Ctx = window.AudioContext || window.webkitAudioContext;
+                    const ctx = new Ctx();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.value = 880;
+                    gain.gain.value = 0.02;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.08);
+                    setTimeout(() => { try { ctx.close(); } catch (_) {} }, 180);
+                }
+            } catch (_) {}
         }
 
         function _renderPedidoChatMensajes(mensajes) {
@@ -4238,6 +4367,10 @@
                         if (tipo === "pasteleria" && mid > seenId) unread += 1;
                     }
                     pedidoChatUnreadCount = unread;
+                    if (lastPasteleriaId > 0 && lastPasteleriaId !== pedidoChatLastNotifiedId && unread > 0) {
+                        pedidoChatLastNotifiedId = lastPasteleriaId;
+                        _notifyPedidoChatNuevoMensaje(unread);
+                    }
                 }
                 _renderPedidoChatBadge();
                 if (pedidoChatStatusEl) {
@@ -4292,6 +4425,11 @@
 
         function _abrirModalPedidoChat() {
             if (!pedidoChatContext || !pedidoChatModalEl) return;
+            try {
+                if ("Notification" in window && Notification.permission === "default") {
+                    Notification.requestPermission().catch(() => {});
+                }
+            } catch (_) {}
             pedidoChatModalEl.style.display = "flex";
             pedidoChatModalOpen = true;
             pedidoChatUnreadCount = 0;
@@ -4306,6 +4444,32 @@
             if (!pedidoChatModalEl) return;
             pedidoChatModalEl.style.display = "none";
             pedidoChatModalOpen = false;
+        }
+
+        function abrirPedidoActivoMobile() {
+            const p = ultimoComprobantePedido;
+            const ctx = _buildPedidoChatContext();
+            if (!_debeMostrarPedidoActivo(p) && !ctx) return;
+            if (mobileOrderModalEl) mobileOrderModalEl.style.display = "flex";
+            if (mobileOrderChatEl) {
+                mobileOrderChatEl.style.display = ctx ? "" : "none";
+            }
+            if (mobileOrderStatusEl) {
+                if (_debeMostrarPedidoActivo(p)) {
+                    mobileOrderStatusEl.textContent = `Pedido #${Number(p.venta_id || 0)} · ${_labelPedidoEstado(p.estado || "recibido")}`;
+                } else if (ctx && String(ctx.origen_tipo) === "agenda") {
+                    mobileOrderStatusEl.textContent = `Reserva agenda #${Number(ctx.origen_id || 0)} · Chat activo`;
+                } else {
+                    mobileOrderStatusEl.textContent = "Sin pedido activo.";
+                }
+            }
+            if (mobileOrderMetaEl) {
+                mobileOrderMetaEl.textContent = String(p?.estado_actualizado || "");
+            }
+        }
+
+        function cerrarPedidoActivoMobile() {
+            if (mobileOrderModalEl) mobileOrderModalEl.style.display = "none";
         }
 
         async function _enviarMensajePedidoChatCliente() {
@@ -4428,6 +4592,8 @@
             pedidoChatUnreadCount = 0;
             _stopPedidoChatPoll();
             if (pedidoChatModalEl) pedidoChatModalEl.style.display = "none";
+            if (mobileOrderModalEl) mobileOrderModalEl.style.display = "none";
+            if (mobileOrderFabEl) mobileOrderFabEl.classList.remove("active");
             pedidoChatModalOpen = false;
             _renderPedidoChatBadge();
             if (cuentaHistorialEl) cuentaHistorialEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No hay compras registradas.</div>`;
@@ -8379,6 +8545,16 @@
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
         pedidoActivoChatToggleEl?.addEventListener("click", _abrirModalPedidoChat);
         pedidoActivoCerrarEl?.addEventListener("click", cerrarPedidoActivoBanner);
+        mobileOrderFabEl?.addEventListener("click", abrirPedidoActivoMobile);
+        mobileOrderCloseEl?.addEventListener("click", cerrarPedidoActivoMobile);
+        mobileOrderViewEl?.addEventListener("click", () => {
+            verDetallePedidoActivo();
+            cerrarPedidoActivoMobile();
+        });
+        mobileOrderChatEl?.addEventListener("click", () => {
+            _abrirModalPedidoChat();
+            cerrarPedidoActivoMobile();
+        });
         pedidoChatCloseEl?.addEventListener("click", _cerrarModalPedidoChat);
         pedidoChatSendEl?.addEventListener("click", _enviarMensajePedidoChatCliente);
         pedidoChatInputEl?.addEventListener("keydown", (ev) => {
@@ -8400,6 +8576,7 @@
         modalCheckoutResumenEl?.addEventListener("click", (ev) => { if (ev.target === modalCheckoutResumenEl) cerrarModalCheckoutResumen(); });
         modalExitoEl.addEventListener("click", (ev) => { if (ev.target === modalExitoEl) cerrarModalExito(); });
         modalCuentaEl?.addEventListener("click", (ev) => { if (ev.target === modalCuentaEl) cerrarModalCuenta(); });
+        mobileOrderModalEl?.addEventListener("click", (ev) => { if (ev.target === mobileOrderModalEl) cerrarPedidoActivoMobile(); });
         pedidoChatModalEl?.addEventListener("click", (ev) => { if (ev.target === pedidoChatModalEl) _cerrarModalPedidoChat(); });
         agendaCakeOpenCartEl?.addEventListener("click", _abrirModalAgendaCakeCart);
         mobileAgendaSummaryFabEl?.addEventListener("click", _abrirModalAgendaCakeCart);
