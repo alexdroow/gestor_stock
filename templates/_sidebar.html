@@ -90,6 +90,16 @@
             box-shadow: 0 10px 24px rgba(37,99,235,.35);
             display: none;
         }
+        .sucree-pedidos-fab.attention {
+            border-color: #dc2626;
+            background: #ef4444;
+            box-shadow: 0 12px 28px rgba(220,38,38,.45);
+            animation: sucreeFabPulse 1.35s infinite;
+        }
+        @keyframes sucreeFabPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+        }
         .sucree-pedidos-hub {
             position: fixed;
             right: 18px;
@@ -134,12 +144,37 @@
             box-shadow: 0 28px 48px rgba(0,0,0,.35);
             padding: 16px;
         }
+        .sucree-pedido-pendiente {
+            border-color: #fecaca !important;
+            background: #fff1f2;
+        }
+        .sucree-pedido-pendiente-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 800;
+            color: #991b1b;
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+        }
         body.dark-mode .sucree-pedidos-hub,
         body.dark-mode .sucree-pedidos-chat,
         body.dark-mode .sucree-pedidos-alert-panel {
             background: #0f172a;
             border-color: #334155;
             color: #e2e8f0;
+        }
+        body.dark-mode .sucree-pedido-pendiente {
+            border-color: #7f1d1d !important;
+            background: #3f1d1d;
+        }
+        body.dark-mode .sucree-pedido-pendiente-badge {
+            color: #fecaca;
+            background: #7f1d1d;
+            border-color: #b91c1c;
         }
     </style>
 
@@ -286,6 +321,7 @@
             let nuevosPendientes = [];
             let chatCtx = null;
             let chatTimer = null;
+            let pendingReminderTimer = null;
             let initNuevos = false;
             let lastId = Number(localStorage.getItem(LAST_ID_KEY) || 0) || 0;
 
@@ -313,6 +349,30 @@
                     osc.stop(ctx.currentTime + 0.16);
                     setTimeout(() => { try { ctx.close(); } catch (_) {} }, 260);
                 } catch (_) {}
+            }
+
+            function esPendienteConfirmacion(estadoRaw) {
+                return String(estadoRaw || '').trim().toLowerCase() === 'recibido';
+            }
+
+            function setFabAttention(pendientesCount) {
+                const fab = ensureFab();
+                fab.classList.toggle('attention', Number(pendientesCount || 0) > 0);
+            }
+
+            function startPendingReminder(pendientesCount) {
+                const hasPending = Number(pendientesCount || 0) > 0;
+                if (!hasPending) {
+                    if (pendingReminderTimer) {
+                        clearInterval(pendingReminderTimer);
+                        pendingReminderTimer = null;
+                    }
+                    return;
+                }
+                if (pendingReminderTimer) return;
+                pendingReminderTimer = setInterval(() => {
+                    try { beep(); } catch (_) {}
+                }, 25000);
             }
 
             function ensureFab() {
@@ -466,7 +526,12 @@
                 const fab = ensureFab();
                 const hub = ensureHub();
                 fab.style.display = '';
-                fab.textContent = `Pedidos activos (${pedidosActivos.length})`;
+                const pendientes = pedidosActivos.filter((p) => esPendienteConfirmacion(p?.pedido_estado)).length;
+                fab.textContent = pendientes > 0
+                    ? `Pedidos activos (${pedidosActivos.length}) • Pendientes ${pendientes}`
+                    : `Pedidos activos (${pedidosActivos.length})`;
+                setFabAttention(pendientes);
+                startPendingReminder(pendientes);
                 const list = hub.querySelector('#sucree-pedidos-hub-list');
                 if (!list) return;
                 if (!pedidosActivos.length) {
@@ -479,10 +544,14 @@
                     const em = esc(String(p.cliente_email || '').trim() || '-');
                     const tel = esc(String(p.cliente_telefono || '').trim() || '-');
                     const estado = labelEstado(p.pedido_estado);
+                    const pendiente = esPendienteConfirmacion(p.pedido_estado);
                     const entrega = String(p.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'Despacho' : 'Retiro';
                     const hora = esc(String(p.hora_retiro || '').trim());
-                    return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
-                        <div style="font-weight:800;color:#0f172a;">Pedido #${id}</div>
+                    return `<div class="${pendiente ? 'sucree-pedido-pendiente' : ''}" style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                            <div style="font-weight:800;color:#0f172a;">Pedido #${id}</div>
+                            ${pendiente ? '<span class="sucree-pedido-pendiente-badge">Pendiente confirmar</span>' : ''}
+                        </div>
                         <div style="font-size:.85rem;color:#475569;">${nom}</div>
                         <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
                         <div style="font-size:.8rem;color:#334155;">${estado} · ${entrega}${hora ? ` · ${hora}` : ''}</div>
@@ -584,6 +653,11 @@
                         const fab = ensureFab();
                         const hub = ensureHub();
                         if (fab) fab.textContent = 'Pedidos activos (0)';
+                        if (fab) fab.classList.remove('attention');
+                        if (pendingReminderTimer) {
+                            clearInterval(pendingReminderTimer);
+                            pendingReminderTimer = null;
+                        }
                         const list = hub?.querySelector?.('#sucree-pedidos-hub-list');
                         if (list) {
                             list.innerHTML = '<div style="font-size:.85rem;color:#b45309;">No se pudieron cargar pedidos activos temporalmente.</div>';
@@ -638,7 +712,8 @@
             }
 
             // Mantener UI visible aunque el endpoint falle temporalmente.
-            ensureFab();
+            const __fabInit = ensureFab();
+            if (__fabInit) __fabInit.style.display = '';
             ensureHub();
             pollActivos();
             pollNuevos();
