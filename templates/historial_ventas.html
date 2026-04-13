@@ -1103,6 +1103,32 @@
             `;
         }
 
+        function renderChatHistorial(mensajes) {
+            const arr = Array.isArray(mensajes) ? mensajes : [];
+            if (!arr.length) {
+                return '<div class="detalle-item"><span>Sin mensajes de chat registrados para este pedido.</span></div>';
+            }
+            return `
+                <div class="detalle-insumos-list">
+                    ${arr.map((m) => {
+                        const admin = String(m.remitente_tipo || '').toLowerCase() === 'pasteleria';
+                        const origen = admin ? 'Pasteleria' : 'Cliente';
+                        const fecha = escapeHtml(String(m.creado_en || '').replace('T', ' ').slice(0, 19) || '-');
+                        const texto = escapeHtml(String(m.mensaje || ''));
+                        return `
+                            <div class="detalle-insumo-item" style="border-left:4px solid ${admin ? '#2563eb' : '#16a34a'};">
+                                <div class="detalle-insumo-head">
+                                    <span class="detalle-insumo-nombre">${escapeHtml(origen)}</span>
+                                    <span class="detalle-insumo-total">${fecha}</span>
+                                </div>
+                                <div style="margin-top:8px;white-space:pre-wrap;word-break:break-word;color:#334155;">${texto}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
         function verDetalle(ventaId) {
             fetch(`/api/venta/${ventaId}`)
                 .then(r => r.json())
@@ -1120,6 +1146,7 @@
                     const horaRetiro = String(data.venta?.hora_retiro || '').trim();
                     const direccionEntrega = String(data.venta?.direccion_entrega || '').trim();
                     const despachoMonto = Number(data.venta?.despacho_monto || 0);
+                    const chatHistorial = renderChatHistorial(data.chat_mensajes || []);
 
                     document.getElementById('detalle-contenido').innerHTML = `
                         <div style="margin-bottom: 16px; color: #64748b;">
@@ -1144,6 +1171,8 @@
                         ${mostrarPrecios ? `<button class="btn btn-secondary btn-sm" onclick="generarTicketPdf()">Descargar ticket PDF</button>` : ''}
                         <h4 style="margin-bottom: 12px; font-size: 14px; color: #64748b;">PRODUCTOS Y TRAZABILIDAD:</h4>
                         ${items || '<div class="detalle-item"><span>Sin productos</span></div>'}
+                        <h4 style="margin:16px 0 12px; font-size: 14px; color: #64748b;">CHAT DEL PEDIDO:</h4>
+                        ${chatHistorial}
                     `;
                     document.getElementById('modal-detalle').classList.add('active');
                 });

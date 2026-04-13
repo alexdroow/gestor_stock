@@ -5740,7 +5740,7 @@ def api_tienda_admin_pedidos_chat_activos():
                    v.hora_retiro
             FROM ventas v
             WHERE v.canal_venta = 'tienda_online'
-              AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo', 'entregado')
+              AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
             ORDER BY v.id DESC
             LIMIT 40
             """
@@ -9963,10 +9963,33 @@ def detalle_venta(venta_id):
         if not str(venta_payload.get("codigo_operacion") or "").strip():
             venta_payload["codigo_operacion"] = obtener_codigo_operacion_venta(venta_id)
         codigo_op = str(venta_payload.get("codigo_operacion") or "").strip()
+        chat_mensajes = []
+        try:
+            conn_chat = get_db()
+            cur_chat = conn_chat.cursor()
+            cur_chat.execute(
+                """
+                SELECT id, remitente_tipo, mensaje, creado_en
+                FROM tienda_pedido_chat
+                WHERE origen_tipo = 'venta' AND origen_id = ?
+                ORDER BY id ASC
+                LIMIT 500
+                """,
+                (int(venta_id),),
+            )
+            chat_mensajes = [dict(r) for r in cur_chat.fetchall()]
+        except Exception:
+            chat_mensajes = []
+        finally:
+            try:
+                conn_chat.close()
+            except Exception:
+                pass
         return jsonify({
             'success': True,
             'venta': venta_payload,
             'items': [dict(item) for item in items],
+            'chat_mensajes': chat_mensajes,
             'timeline_url': f"/api/operaciones/{codigo_op}/timeline" if codigo_op else None,
         })
     except Exception as e:
