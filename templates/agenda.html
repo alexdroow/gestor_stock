@@ -3622,8 +3622,18 @@
             const contenedor = document.getElementById('eventos-pasados');
             if (!contenedor) return;
 
+            // Mostrar solo eventos pasados del mes visible en calendario.
+            // De esta forma no se arrastran eventos de meses anteriores cuando avanzas de mes.
+            const mesVisible = Number(fechaActual.getMonth());
+            const anioVisible = Number(fechaActual.getFullYear());
+
             const pasados = eventos
-                .filter(e => esEventoPasado(e))
+                .filter(e => {
+                    if (!esEventoPasado(e)) return false;
+                    const fecha = parseFechaISO(e.fecha);
+                    if (!fecha) return false;
+                    return fecha.getMonth() === mesVisible && fecha.getFullYear() === anioVisible;
+                })
                 .sort((a, b) => {
                     const fechaA = parseFechaISO(a.fecha);
                     const fechaB = parseFechaISO(b.fecha);
