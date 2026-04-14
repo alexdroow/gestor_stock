@@ -227,6 +227,94 @@
             grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
             gap: 12px;
         }
+        .inicio-dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            align-items: start;
+        }
+        .inicio-panel-col {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 12px;
+            min-height: 220px;
+        }
+        .inicio-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .inicio-panel-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .inicio-panel-sub {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .inicio-notas-grid.compacto {
+            grid-template-columns: 1fr;
+            max-height: 300px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        .inicio-eventos-list {
+            display: grid;
+            gap: 8px;
+            max-height: 180px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        .inicio-evento-item {
+            border: 1px solid #dbeafe;
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+        .inicio-evento-item:hover {
+            border-color: #93c5fd;
+            background: #eff6ff;
+        }
+        .inicio-evento-item.active {
+            border-color: #3b82f6;
+            background: #dbeafe;
+        }
+        .inicio-evento-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 2px;
+        }
+        .inicio-evento-meta {
+            font-size: 12px;
+            color: #475569;
+        }
+        .inicio-evento-detalle {
+            margin-top: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 10px;
+            min-height: 98px;
+        }
+        .inicio-evento-detalle-titulo {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+        .inicio-evento-detalle-linea {
+            font-size: 12px;
+            color: #334155;
+            margin-bottom: 3px;
+            line-height: 1.4;
+        }
 
         .inicio-nota {
             border-radius: 12px;
@@ -470,11 +558,38 @@
             background: #1e293b;
             border-color: #334155;
         }
+        body.dark-mode .inicio-panel-col,
+        body.dark-mode .inicio-evento-detalle {
+            background: #1e293b;
+            border-color: #334155;
+        }
 
         body.dark-mode .inicio-notas-title,
         body.dark-mode .stat-value,
         body.dark-mode .chart-title {
             color: #f1f5f9;
+        }
+        body.dark-mode .inicio-panel-title,
+        body.dark-mode .inicio-evento-detalle-titulo,
+        body.dark-mode .inicio-evento-title {
+            color: #f1f5f9;
+        }
+        body.dark-mode .inicio-panel-sub,
+        body.dark-mode .inicio-evento-meta,
+        body.dark-mode .inicio-evento-detalle-linea {
+            color: #cbd5e1;
+        }
+        body.dark-mode .inicio-evento-item {
+            border-color: #334155;
+            background: #0f172a;
+        }
+        body.dark-mode .inicio-evento-item:hover {
+            border-color: #1d4ed8;
+            background: #1e293b;
+        }
+        body.dark-mode .inicio-evento-item.active {
+            border-color: #3b82f6;
+            background: #1e3a8a;
         }
 
         body.dark-mode .inicio-notas-link {
@@ -545,6 +660,7 @@
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
             .charts-grid { grid-template-columns: 1fr; }
             .quick-actions { grid-template-columns: 1fr; }
+            .inicio-dashboard-grid { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 768px) {
@@ -573,11 +689,31 @@
 
             <section class="inicio-notas" id="inicio-notas-wrap">
                 <div class="inicio-notas-head">
-                    <div class="inicio-notas-title">&#128204; Notas fijadas</div>
+                    <div class="inicio-notas-title">&#128204; Notas y eventos cercanos</div>
                     <a href="/agenda" class="inicio-notas-link">Abrir agenda</a>
                 </div>
-                <div class="inicio-notas-grid" id="inicio-notas-grid">
-                    <div class="inicio-nota-empty">Cargando notas fijadas...</div>
+                <div class="inicio-dashboard-grid">
+                    <section class="inicio-panel-col">
+                        <div class="inicio-panel-head">
+                            <div class="inicio-panel-title">Notas fijadas</div>
+                            <div class="inicio-panel-sub">Solo fijadas (compacto)</div>
+                        </div>
+                        <div class="inicio-notas-grid compacto" id="inicio-notas-grid">
+                            <div class="inicio-nota-empty">Cargando notas fijadas...</div>
+                        </div>
+                    </section>
+                    <section class="inicio-panel-col">
+                        <div class="inicio-panel-head">
+                            <div class="inicio-panel-title">Próximos eventos agenda</div>
+                            <div class="inicio-panel-sub">Haz click para ver detalle</div>
+                        </div>
+                        <div class="inicio-eventos-list" id="inicio-eventos-list">
+                            <div class="inicio-nota-empty">Cargando eventos...</div>
+                        </div>
+                        <div class="inicio-evento-detalle" id="inicio-evento-detalle">
+                            <div class="inicio-evento-detalle-linea">Selecciona un evento para ver su información.</div>
+                        </div>
+                    </section>
                 </div>
             </section>
 
@@ -677,6 +813,8 @@
     <script>
     let ventasChartInstance = null;
     let productosChartInstance = null;
+    let inicioEventosProximos = [];
+    let inicioEventoSeleccionadoId = null;
 
     if (localStorage.getItem('darkMode') === 'true') {
         document.body.classList.add('dark-mode');
@@ -723,13 +861,30 @@
         return String(numero);
     }
 
+    function formatearFechaEventoAgenda(fecha, hora) {
+        const f = String(fecha || '').trim();
+        if (!f) return '';
+        const h = String(hora || '').trim();
+        const dt = new Date(`${f}T${h || '00:00'}:00`);
+        if (Number.isNaN(dt.getTime())) {
+            return `${f}${h ? ` ${h}` : ''}`;
+        }
+        return dt.toLocaleString('es-CL', {
+            weekday: 'short',
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }
+
     function renderNotasFijadasInicio(notas) {
         const grid = document.getElementById('inicio-notas-grid');
         if (!grid) return;
 
         const fijadas = (Array.isArray(notas) ? notas : [])
             .filter(n => Boolean(n && n.fijada) && (n.estado || 'activa') === 'activa')
-            .slice(0, 6);
+            .slice(0, 5);
 
         if (!fijadas.length) {
             grid.innerHTML = '<div class="inicio-nota-empty">No hay notas fijadas activas. Puedes fijarlas desde Agenda.</div>';
@@ -749,6 +904,79 @@
                 </article>
             `;
         }).join('');
+    }
+
+    function renderDetalleEventoInicio(evento) {
+        const box = document.getElementById('inicio-evento-detalle');
+        if (!box) return;
+        if (!evento) {
+            box.innerHTML = '<div class="inicio-evento-detalle-linea">Selecciona un evento para ver su información.</div>';
+            return;
+        }
+        const titulo = escapeHtml(evento.titulo || 'Evento');
+        const fecha = escapeHtml(formatearFechaEventoAgenda(evento.fecha, evento.hora_inicio));
+        const tipo = escapeHtml(evento.tipo || 'evento');
+        const cliente = escapeHtml(evento.cliente || '-');
+        const telefono = escapeHtml(evento.telefono || '-');
+        const estado = escapeHtml(evento.estado || 'pendiente');
+        box.innerHTML = `
+            <div class="inicio-evento-detalle-titulo">${titulo}</div>
+            <div class="inicio-evento-detalle-linea"><strong>Fecha:</strong> ${fecha || '-'}</div>
+            <div class="inicio-evento-detalle-linea"><strong>Tipo:</strong> ${tipo}</div>
+            <div class="inicio-evento-detalle-linea"><strong>Cliente:</strong> ${cliente}</div>
+            <div class="inicio-evento-detalle-linea"><strong>Teléfono:</strong> ${telefono}</div>
+            <div class="inicio-evento-detalle-linea"><strong>Estado:</strong> ${estado}</div>
+        `;
+    }
+
+    function renderEventosAgendaInicio(eventos) {
+        const list = document.getElementById('inicio-eventos-list');
+        if (!list) return;
+        const items = (Array.isArray(eventos) ? eventos : []).slice(0, 12);
+        inicioEventosProximos = items;
+        if (!items.length) {
+            list.innerHTML = '<div class="inicio-nota-empty">No hay eventos próximos pendientes.</div>';
+            inicioEventoSeleccionadoId = null;
+            renderDetalleEventoInicio(null);
+            return;
+        }
+
+        if (!inicioEventoSeleccionadoId || !items.some(e => String(e.id) === String(inicioEventoSeleccionadoId))) {
+            inicioEventoSeleccionadoId = items[0].id;
+        }
+
+        list.innerHTML = items.map((ev) => {
+            const active = String(ev.id) === String(inicioEventoSeleccionadoId) ? 'active' : '';
+            return `
+                <article class="inicio-evento-item ${active}" data-evento-id="${escapeHtml(ev.id)}">
+                    <div class="inicio-evento-title">${escapeHtml(ev.titulo || 'Evento')}</div>
+                    <div class="inicio-evento-meta">${escapeHtml(formatearFechaEventoAgenda(ev.fecha, ev.hora_inicio))}</div>
+                </article>
+            `;
+        }).join('');
+
+        list.querySelectorAll('.inicio-evento-item').forEach((el) => {
+            el.addEventListener('click', () => {
+                inicioEventoSeleccionadoId = el.getAttribute('data-evento-id');
+                renderEventosAgendaInicio(inicioEventosProximos);
+            });
+        });
+        const selected = items.find(e => String(e.id) === String(inicioEventoSeleccionadoId)) || items[0];
+        renderDetalleEventoInicio(selected);
+    }
+
+    function cargarEventosAgendaInicio() {
+        fetch('/api/agenda/eventos/proximos')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) throw new Error(data.error || 'No se pudieron cargar eventos');
+                renderEventosAgendaInicio(data.eventos || []);
+            })
+            .catch(() => {
+                const list = document.getElementById('inicio-eventos-list');
+                if (list) list.innerHTML = '<div class="inicio-nota-empty">No se pudieron cargar los eventos próximos.</div>';
+                renderDetalleEventoInicio(null);
+            });
     }
 
     function cargarNotasFijadasInicio() {
@@ -950,6 +1178,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         cargarNotasFijadasInicio();
+        cargarEventosAgendaInicio();
         cargarEstadisticas();
         cargarAvisoDesactivacionesPendientes();
         cargarContadorAlertas();
