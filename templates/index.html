@@ -936,18 +936,6 @@
                 </div>
             </section>
 
-            <div class="alerta-vencimiento" id="alerta-vencimiento">
-                <span id="alerta-vencimiento-texto"></span>
-            </div>
-
-            <div class="alerta-desactivacion" id="alerta-desactivacion-manual">
-                <div class="alerta-desactivacion-head">
-                    <span id="alerta-desactivacion-texto"></span>
-                    <a href="/ventas?filtro=baja_porcion" class="alerta-desactivacion-link">Ir a ventas</a>
-                </div>
-                <div class="alerta-desactivacion-lista" id="alerta-desactivacion-lista"></div>
-            </div>
-
             <section class="agotarse-wrap" id="inicio-agotarse-wrap">
                 <div class="agotarse-head">
                     <div>
@@ -1252,55 +1240,12 @@
                 document.getElementById('stat-alertas').textContent = data.alertas ?? 0;
                 document.getElementById('stat-ventas').textContent = formatearEntero(data.ventas_hoy || 0);
 
-                if (Number(data.por_vencer || 0) > 0) {
-                    const alerta = document.getElementById('alerta-vencimiento');
-                    const texto = document.getElementById('alerta-vencimiento-texto');
-                    if (alerta && texto) {
-                        alerta.style.display = 'block';
-                        texto.textContent = `Tienes ${data.por_vencer} productos por vencer en los proximos dias.`;
-                    }
-                }
             })
             .catch(() => {
                 document.getElementById('stat-productos').textContent = '0';
                 document.getElementById('stat-insumos').textContent = '0';
                 document.getElementById('stat-alertas').textContent = '0';
                 document.getElementById('stat-ventas').textContent = '0';
-            });
-    }
-
-    function cargarAvisoDesactivacionesPendientes() {
-        fetch('/api/ventas/desactivaciones-pendientes')
-            .then(r => r.json())
-            .then(data => {
-                const box = document.getElementById('alerta-desactivacion-manual');
-                const texto = document.getElementById('alerta-desactivacion-texto');
-                const lista = document.getElementById('alerta-desactivacion-lista');
-                if (!box || !texto || !lista) return;
-                if (!data.success) {
-                    box.style.display = 'none';
-                    return;
-                }
-
-                const pendientes = Array.isArray(data.pendientes) ? data.pendientes : [];
-                if (!pendientes.length) {
-                    box.style.display = 'none';
-                    return;
-                }
-
-                const total = Number(data.total || pendientes.length || 0);
-                texto.textContent = `Tienes ${total} producto(s) critico(s) pendiente(s) de desactivacion manual.`;
-                const nombres = pendientes
-                    .slice(0, 4)
-                    .map((p) => String(p.nombre || 'Producto').trim())
-                    .filter(Boolean);
-                const extra = total > nombres.length ? ` +${total - nombres.length} mas` : '';
-                lista.textContent = `Pendientes: ${nombres.join(', ')}${extra}`;
-                box.style.display = 'block';
-            })
-            .catch(() => {
-                const box = document.getElementById('alerta-desactivacion-manual');
-                if (box) box.style.display = 'none';
             });
     }
 
@@ -1561,7 +1506,6 @@
         cargarNotasFijadasInicio();
         cargarEventosAgendaInicio();
         cargarEstadisticas();
-        cargarAvisoDesactivacionesPendientes();
         cargarProductosPorAgotarInicio();
         cargarProductosPorVencerInicio();
         cargarContadorAlertas();
