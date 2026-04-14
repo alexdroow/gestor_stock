@@ -4148,9 +4148,37 @@
         function _parseFechaMs(raw) {
             const txt = String(raw || "").trim();
             if (!txt) return 0;
+            const sqliteLike = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/;
+            if (sqliteLike.test(txt)) {
+                const normalized = txt.replace(" ", "T");
+                const withSeconds = normalized.length === 16 ? `${normalized}:00` : normalized;
+                const msUtc = Date.parse(`${withSeconds}Z`);
+                if (Number.isFinite(msUtc)) return msUtc;
+            }
             const normalized = txt.includes("T") ? txt : txt.replace(" ", "T");
             const ms = Date.parse(normalized);
             return Number.isFinite(ms) ? ms : 0;
+        }
+
+        function _formatFechaHoraChile(raw) {
+            const txt = String(raw || "").trim();
+            if (!txt) return "";
+            const ms = _parseFechaMs(txt);
+            if (!(ms > 0)) return txt;
+            try {
+                return new Intl.DateTimeFormat("es-CL", {
+                    timeZone: "America/Santiago",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: false,
+                }).format(new Date(ms)).replace(",", "");
+            } catch (_) {
+                return txt;
+            }
         }
 
         function _pedidoEstadoRefMs(p) {
@@ -4243,7 +4271,7 @@
                 pedidoActivoTextoEl.textContent = `Pedido #${Number(p.venta_id || 0)} - Estado: ${_labelPedidoEstado(p.estado || "recibido")}`;
             }
             if (pedidoActivoMetaEl) {
-                const estadoAct = String(p.estado_actualizado || "").trim();
+                const estadoAct = _formatFechaHoraChile(p.estado_actualizado);
                 const partes = [];
                 if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
                 const timerTxt = _resumenTimerPedido(p);
@@ -4255,7 +4283,7 @@
                 mobileOrderStatusEl.textContent = `Pedido #${Number(p.venta_id || 0)} · ${_labelPedidoEstado(p.estado || "recibido")}`;
             }
             if (mobileOrderMetaEl) {
-                const estadoAct = String(p.estado_actualizado || "").trim();
+                const estadoAct = _formatFechaHoraChile(p.estado_actualizado);
                 const partes = [];
                 if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
                 const timerTxt = _resumenTimerPedido(p);
@@ -4597,7 +4625,7 @@
             }
             if (mobileOrderMetaEl) {
                 const partes = [];
-                const estadoAct = String(p?.estado_actualizado || "").trim();
+                const estadoAct = _formatFechaHoraChile(p?.estado_actualizado);
                 if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
                 const timerTxt = _resumenTimerPedido(p);
                 if (timerTxt) partes.push(timerTxt);
@@ -7429,7 +7457,7 @@
                 const fecha = String(v.fecha_hora || "");
                 const estado = String(v.pedido_estado || "recibido").trim().toLowerCase();
                 const estadoTxt = _labelPedidoEstado(estado);
-                const estadoActualizado = String(v.pedido_estado_actualizado || "").trim();
+                const estadoActualizado = _formatFechaHoraChile(v.pedido_estado_actualizado);
                 const desc = (Array.isArray(v.items) ? v.items : []).map((it) => `${esc(it.producto_nombre || ("#"+it.producto_id))} x${Number(it.cantidad || 0)}`).join(", ");
                 return `
                     <div data-venta-id="${vid}" style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:6px;">
