@@ -2000,7 +2000,7 @@
         <div class="modal" style="max-width: 640px;">
             <h3 class="modal-title" style="text-align:left; margin-bottom: 8px;">Editor rapido de producto</h3>
             <p class="modal-text" style="text-align:left; margin-bottom: 10px;">
-                Ajusta nombre y precio desde ventas. Se sincroniza con tienda y admin catalogo.
+                Ajusta nombre, precio y stock desde ventas. Se sincroniza con tienda, productos y admin catalogo.
             </p>
             <div class="editor-rapido-grid">
                 <div class="editor-rapido-field">
@@ -2010,6 +2010,10 @@
                 <div class="editor-rapido-field">
                     <label for="editor-rapido-precio">Precio base ($)</label>
                     <input id="editor-rapido-precio" type="number" min="0" step="1" placeholder="0">
+                </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-stock">Stock actual</label>
+                    <input id="editor-rapido-stock" type="number" min="0" step="0.01" placeholder="0">
                 </div>
             </div>
             <div class="editor-rapido-note">
@@ -3010,8 +3014,10 @@
             _editorRapidoProductoId = pid;
             const nombreEl = document.getElementById('editor-rapido-nombre');
             const precioEl = document.getElementById('editor-rapido-precio');
+            const stockEl = document.getElementById('editor-rapido-stock');
             if (nombreEl) nombreEl.value = String(info.nombre || '').trim();
             if (precioEl) precioEl.value = String(normalizarPrecio(info.precio || 0));
+            if (stockEl) stockEl.value = String(Number(info.stock || 0));
             const modal = document.getElementById('modal-editor-producto-rapido');
             if (modal) modal.classList.add('active');
             window.setTimeout(() => { try { nombreEl?.focus(); nombreEl?.select(); } catch (_) {} }, 50);
@@ -3023,21 +3029,35 @@
             _editorRapidoProductoId = 0;
         }
 
-        function sincronizarProductoEnCarrito(id, nombre, precio) {
+        function sincronizarProductoEnCarrito(id, nombre, precio, porcionesDisponibles) {
             const pid = Number(id || 0);
             if (!pid) return;
             const nuevoNombre = String(nombre || '').trim();
             const nuevoPrecio = normalizarPrecio(precio || 0);
+            const maxPorciones = Math.max(0, Number(porcionesDisponibles || 0));
             let tocado = false;
-            carrito.forEach((item) => {
+            let removido = false;
+            carrito = (Array.isArray(carrito) ? carrito : []).filter((item) => {
                 if (Number(item.id || 0) !== pid) return;
+                if (maxPorciones <= 0) {
+                    removido = true;
+                    tocado = true;
+                    return false;
+                }
                 item.nombre = nuevoNombre || item.nombre || 'Producto';
                 item.precio_unitario = nuevoPrecio;
+                if (Number(item.cantidad || 0) > maxPorciones) {
+                    item.cantidad = maxPorciones;
+                }
                 tocado = true;
+                return true;
             });
             if (tocado) {
                 actualizarCarrito();
                 saveCarritoToStorage();
+                if (removido && window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess('Producto quitado del carrito: stock en 0.');
+                }
             }
         }
 
@@ -3046,15 +3066,21 @@
             if (!pid || !productosData[pid]) return;
             const nombreEl = document.getElementById('editor-rapido-nombre');
             const precioEl = document.getElementById('editor-rapido-precio');
+            const stockEl = document.getElementById('editor-rapido-stock');
             const btn = document.getElementById('btn-editor-rapido-guardar');
             const nombre = String(nombreEl?.value || '').trim();
             const precio = normalizarPrecio(precioEl?.value || 0);
+            const stock = Number(stockEl?.value || 0);
             if (nombre.length < 2) {
                 alert('El nombre debe tener al menos 2 caracteres.');
                 return;
             }
             if (precio < 0) {
                 alert('El precio no puede ser negativo.');
+                return;
+            }
+            if (!Number.isFinite(stock) || stock < 0) {
+                alert('El stock debe ser un numero valido mayor o igual a 0.');
                 return;
             }
             const txtPrev = btn ? btn.textContent : '';
@@ -3066,7 +3092,7 @@
                 const response = await fetch(`/api/producto/${pid}/actualizar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ nombre, precio }),
+                    body: JSON.stringify({ nombre, precio, stock }),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) {
@@ -3075,14 +3101,46 @@
                 const prodSrv = data.producto || {};
                 productosData[pid].nombre = String(prodSrv.nombre || nombre).trim() || nombre;
                 productosData[pid].precio = normalizarPrecio(prodSrv.precio ?? precio);
+                productosData[pid].stock = Number(prodSrv.stock ?? stock);
+                productosData[pid].stock_visual = Number(prodSrv.stock_visual ?? productosData[pid].stock);
+                productosData[pid].stock_visual_unidad = prodSrv.stock_visual_unidad || prodSrv.unidad || productosData[pid].stock_visual_unidad || productosData[pid].unidad || 'unidad';
+                productosData[pid].unidad = prodSrv.unidad || productosData[pid].unidad || 'unidad';
+                productosData[pid].porcion_cantidad = Number(prodSrv.porcion_cantidad || productosData[pid].porcion_cantidad || 1);
+                productosData[pid].porcion_unidad = prodSrv.porcion_unidad || productosData[pid].porcion_unidad || 'unidad';
+                if (prodSrv.porciones_disponibles !== undefined && prodSrv.porciones_disponibles !== null) {
+                    productosData[pid].porciones_disponibles = Number(prodSrv.porciones_disponibles || 0);
+                } else {
+                    const porcionBase = Number(productosData[pid].porcion_cantidad || 1);
+                    productosData[pid].porciones_disponibles = porcionBase > 0
+                        ? Math.max(0, Math.floor((Number(productosData[pid].stock_visual || 0) + 1e-9) / porcionBase))
+                        : Math.max(0, Math.floor(Number(productosData[pid].stock_visual || 0)));
+                }
+                if (Number(productosData[pid].stock_visual || 0) <= 0 || Number(productosData[pid].porciones_disponibles || 0) <= 0) {
+                    productosData[pid].sin_porcion_disponible = true;
+                    productosData[pid].baja_porcion = true;
+                }
+                if (prodSrv.desactivacion_manual_confirmada !== undefined) {
+                    productosData[pid].desactivacion_manual_confirmada = Boolean(prodSrv.desactivacion_manual_confirmada);
+                }
+                if (prodSrv.desactivacion_manual_requiere_confirmacion !== undefined) {
+                    productosData[pid].desactivacion_manual_requiere_confirmacion = Boolean(prodSrv.desactivacion_manual_requiere_confirmacion);
+                }
                 const card = document.querySelector(`.producto-card[data-id="${pid}"]`);
                 if (card) card.setAttribute('data-nombre', productosData[pid].nombre);
                 actualizarTarjetaProducto(pid);
-                sincronizarProductoEnCarrito(pid, productosData[pid].nombre, productosData[pid].precio);
+                sincronizarProductoEnCarrito(
+                    pid,
+                    productosData[pid].nombre,
+                    productosData[pid].precio,
+                    productosData[pid].porciones_disponibles
+                );
                 filtrarProductos();
                 cerrarEditorRapidoProducto();
                 if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
-                    window.AppUX.toastSuccess('Producto actualizado y sincronizado.');
+                    const msgStock = Number(productosData[pid].stock_visual || 0) <= 0
+                        ? 'Producto actualizado. Stock en 0: quedo apagado en tienda.'
+                        : 'Producto actualizado y sincronizado.';
+                    window.AppUX.toastSuccess(msgStock);
                 }
             } catch (err) {
                 alert(err.message || 'No se pudo guardar');
