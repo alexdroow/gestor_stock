@@ -4190,6 +4190,10 @@
                     subtotal: Number(obj?.subtotal || 0),
                     descuento: Number(obj?.descuento || 0),
                     total: Number(obj?.total || 0),
+                    timer_minutos: Number(obj?.timer_minutos || 0) || null,
+                    timer_label: String(obj?.timer_label || ""),
+                    timer_inicio: String(obj?.timer_inicio || ""),
+                    timer_restante_segundos: Number.isFinite(Number(obj?.timer_restante_segundos)) ? Number(obj?.timer_restante_segundos) : null,
                     items: Array.isArray(obj?.items) ? obj.items : [],
                     estado_actualizado: String(obj?.estado_actualizado || ""),
                 };
@@ -4240,7 +4244,11 @@
             }
             if (pedidoActivoMetaEl) {
                 const estadoAct = String(p.estado_actualizado || "").trim();
-                pedidoActivoMetaEl.textContent = estadoAct ? `Actualizado: ${estadoAct}` : "";
+                const partes = [];
+                if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
+                const timerTxt = _resumenTimerPedido(p);
+                if (timerTxt) partes.push(timerTxt);
+                pedidoActivoMetaEl.textContent = partes.join(" · ");
             }
             if (mobileOrderFabEl) mobileOrderFabEl.classList.add("active");
             if (mobileOrderStatusEl) {
@@ -4248,7 +4256,11 @@
             }
             if (mobileOrderMetaEl) {
                 const estadoAct = String(p.estado_actualizado || "").trim();
-                mobileOrderMetaEl.textContent = estadoAct ? `Actualizado: ${estadoAct}` : "";
+                const partes = [];
+                if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
+                const timerTxt = _resumenTimerPedido(p);
+                if (timerTxt) partes.push(timerTxt);
+                mobileOrderMetaEl.textContent = partes.join(" · ");
             }
             _syncPedidoChatContext();
         }
@@ -4584,7 +4596,12 @@
                 }
             }
             if (mobileOrderMetaEl) {
-                mobileOrderMetaEl.textContent = String(p?.estado_actualizado || "");
+                const partes = [];
+                const estadoAct = String(p?.estado_actualizado || "").trim();
+                if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
+                const timerTxt = _resumenTimerPedido(p);
+                if (timerTxt) partes.push(timerTxt);
+                mobileOrderMetaEl.textContent = partes.join(" · ");
             }
         }
 
@@ -7668,6 +7685,10 @@
                     venta_id: Number(v.id || 0),
                     estado: String(v.pedido_estado || "recibido"),
                     estado_actualizado: String(v.pedido_estado_actualizado || ""),
+                    timer_minutos: Number(v.timer_minutos || 0) || null,
+                    timer_label: String(v.timer_label || ""),
+                    timer_inicio: String(v.timer_inicio || ""),
+                    timer_restante_segundos: Number.isFinite(Number(v.timer_restante_segundos)) ? Number(v.timer_restante_segundos) : null,
                     fecha_hora_local: String(v.fecha_hora || ""),
                 }));
             if (!vigente) {
@@ -7686,6 +7707,10 @@
                     fecha_hora_local: String(vigente?.fecha_hora || ""),
                     estado: String(vigente?.pedido_estado || "recibido"),
                     estado_actualizado: String(vigente?.pedido_estado_actualizado || ""),
+                    timer_minutos: Number(vigente?.timer_minutos || 0) || null,
+                    timer_label: String(vigente?.timer_label || ""),
+                    timer_inicio: String(vigente?.timer_inicio || ""),
+                    timer_restante_segundos: Number.isFinite(Number(vigente?.timer_restante_segundos)) ? Number(vigente?.timer_restante_segundos) : null,
                     total: Number(vigente?.total_monto || 0),
                     subtotal: Number(vigente?.total_monto || 0),
                     descuento: Number(vigente?.descuento_monto || 0),
@@ -7699,6 +7724,12 @@
             } else {
                 ultimoComprobantePedido.estado = String(vigente?.pedido_estado || ultimoComprobantePedido.estado || "recibido");
                 ultimoComprobantePedido.estado_actualizado = String(vigente?.pedido_estado_actualizado || ultimoComprobantePedido.estado_actualizado || "");
+                ultimoComprobantePedido.timer_minutos = Number(vigente?.timer_minutos || 0) || null;
+                ultimoComprobantePedido.timer_label = String(vigente?.timer_label || ultimoComprobantePedido.timer_label || "");
+                ultimoComprobantePedido.timer_inicio = String(vigente?.timer_inicio || ultimoComprobantePedido.timer_inicio || "");
+                ultimoComprobantePedido.timer_restante_segundos = Number.isFinite(Number(vigente?.timer_restante_segundos))
+                    ? Number(vigente?.timer_restante_segundos)
+                    : (Number.isFinite(Number(ultimoComprobantePedido.timer_restante_segundos)) ? Number(ultimoComprobantePedido.timer_restante_segundos) : null);
             }
             guardarUltimoPedidoLocal();
             _renderPedidoActivoTienda();
@@ -7727,6 +7758,12 @@
                     mapa.set(Number(p.id || 0), {
                         estado: String(p.estado || "recibido"),
                         estado_actualizado: String(p.estado_actualizado || ""),
+                        timer_minutos: Number(p.timer_minutos || 0) || null,
+                        timer_label: String(p.timer_label || ""),
+                        timer_inicio: String(p.timer_inicio || ""),
+                        timer_restante_segundos: Number.isFinite(Number(p.timer_restante_segundos))
+                            ? Number(p.timer_restante_segundos)
+                            : null,
                     });
                 }
                 let hayCambio = false;
@@ -7735,13 +7772,23 @@
                     const info = mapa.get(vid);
                     if (!info) return v;
                     const estadoPrevio = String(v.pedido_estado || "recibido");
-                    if (estadoPrevio !== info.estado || String(v.pedido_estado_actualizado || "") !== info.estado_actualizado) {
+                    if (
+                        estadoPrevio !== info.estado
+                        || String(v.pedido_estado_actualizado || "") !== info.estado_actualizado
+                        || Number(v.timer_minutos || 0) !== Number(info.timer_minutos || 0)
+                        || String(v.timer_inicio || "") !== String(info.timer_inicio || "")
+                        || Number(v.timer_restante_segundos || -1) !== Number(info.timer_restante_segundos || -1)
+                    ) {
                         hayCambio = true;
                     }
                     return {
                         ...v,
                         pedido_estado: info.estado,
                         pedido_estado_actualizado: info.estado_actualizado,
+                        timer_minutos: info.timer_minutos,
+                        timer_label: info.timer_label,
+                        timer_inicio: info.timer_inicio,
+                        timer_restante_segundos: info.timer_restante_segundos,
                     };
                 });
                 if (hayCambio) {
@@ -8229,6 +8276,10 @@
                     hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
                     direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
                     despacho_monto: Number(data.despacho_monto || despachoSnapshot || 0),
+                    timer_minutos: Number(data.timer_minutos || 0) || null,
+                    timer_label: String(data.timer_label || ""),
+                    timer_inicio: String(data.timer_inicio || ""),
+                    timer_restante_segundos: Number.isFinite(Number(data.timer_restante_segundos)) ? Number(data.timer_restante_segundos) : null,
                     items: itemsSnapshot,
                 };
                 guardarUltimoPedidoLocal();
@@ -8404,6 +8455,30 @@
             return map[String(estado || "").toLowerCase()] || "Recibido";
         }
 
+        function _labelPedidoTimer(minsRaw) {
+            const mins = Number(minsRaw || 0);
+            if (!Number.isFinite(mins) || mins <= 0) return "";
+            if (mins >= 45) return "+30 min";
+            return `${mins} min`;
+        }
+
+        function _formatPedidoTimerRestante(segRaw) {
+            const s = Number(segRaw);
+            if (!Number.isFinite(s)) return "";
+            if (s <= 0) return "Listo muy pronto";
+            const m = Math.floor(s / 60);
+            const ss = Math.max(0, s % 60);
+            return `${m}m ${String(ss).padStart(2, "0")}s`;
+        }
+
+        function _resumenTimerPedido(pedidoLike) {
+            const mins = Number(pedidoLike?.timer_minutos || 0);
+            if (!mins) return "";
+            const label = String(pedidoLike?.timer_label || _labelPedidoTimer(mins)).trim();
+            const rest = _formatPedidoTimerRestante(pedidoLike?.timer_restante_segundos);
+            return rest ? `Tiempo estimado: ${label} · Restante: ${rest}` : `Tiempo estimado: ${label}`;
+        }
+
         function _renderPedidoSteps(estadoRaw) {
             if (!modalExitoStepsEl) return;
             const estado = String(estadoRaw || "").toLowerCase();
@@ -8454,10 +8529,23 @@
                 if (!res.ok || !data.success) return;
                 const estado = String(((data.pedido || {}).estado) || "recibido");
                 const estadoActualizado = String(((data.pedido || {}).estado_actualizado) || "");
+                const timerMinutos = Number((data.pedido || {}).timer_minutos || 0) || null;
+                const timerLabel = String((data.pedido || {}).timer_label || "");
+                const timerInicio = String((data.pedido || {}).timer_inicio || "");
+                const timerRestante = Number.isFinite(Number((data.pedido || {}).timer_restante_segundos))
+                    ? Number((data.pedido || {}).timer_restante_segundos)
+                    : null;
                 p.estado = estado;
                 p.estado_actualizado = estadoActualizado;
+                p.timer_minutos = timerMinutos;
+                p.timer_label = timerLabel;
+                p.timer_inicio = timerInicio;
+                p.timer_restante_segundos = timerRestante;
                 if (modalExitoEstadoEl) {
-                    modalExitoEstadoEl.textContent = `Estado del pedido: ${_labelPedidoEstado(estado)}`;
+                    const timerTxt = _resumenTimerPedido(p);
+                    modalExitoEstadoEl.textContent = timerTxt
+                        ? `Estado del pedido: ${_labelPedidoEstado(estado)} · ${timerTxt}`
+                        : `Estado del pedido: ${_labelPedidoEstado(estado)}`;
                 }
                 _renderPedidoSteps(estado);
                 if (Array.isArray(historialComprasCliente) && historialComprasCliente.length) {
@@ -8467,6 +8555,10 @@
                             ...v,
                             pedido_estado: estado,
                             pedido_estado_actualizado: estadoActualizado,
+                            timer_minutos: timerMinutos,
+                            timer_label: timerLabel,
+                            timer_inicio: timerInicio,
+                            timer_restante_segundos: timerRestante,
                         };
                     });
                     if (modalCuentaEl?.classList.contains("active")) {

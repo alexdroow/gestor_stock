@@ -3567,6 +3567,7 @@
         let _pedidoAlertTone = String(localStorage.getItem(PEDIDO_ALERT_TONE_KEY) || 'sirena_corta').trim() || 'sirena_corta';
         let _tiendaConfigCache = null;
         let _actividadTiendaPollTimer = null;
+        let _pedidoTimerDefaultMinutos = 25;
 
         function _labelEstadoPedido(estado) {
             const map = {
@@ -3578,6 +3579,93 @@
                 cancelado: 'Cancelado',
             };
             return map[String(estado || '').toLowerCase()] || 'Recibido';
+        }
+
+        function _timerPedidoLabel(mins) {
+            const n = Number(mins || 0);
+            if (!n) return '';
+            if (n >= 45) return '+30 min';
+            return `${n} min`;
+        }
+
+        function _timerPedidoRestanteTexto(segundos) {
+            const s = Number(segundos);
+            if (!Number.isFinite(s)) return '';
+            if (s <= 0) return 'Listo muy pronto';
+            const min = Math.floor(s / 60);
+            const sec = Math.max(0, s % 60);
+            return `${min}m ${String(sec).padStart(2, '0')}s`;
+        }
+
+        function _timerPedidoRenderHtml(pedido) {
+            const mins = Number(pedido?.timer_minutos || 0);
+            if (!mins) return '';
+            const restante = _timerPedidoRestanteTexto(pedido?.timer_restante_segundos);
+            const label = _timerPedidoLabel(mins);
+            const danger = mins >= 45;
+            const color = danger ? '#b91c1c' : '#065f46';
+            const bg = danger ? '#fef2f2' : '#ecfdf5';
+            const border = danger ? '#fecaca' : '#a7f3d0';
+            const tail = restante ? ` · Restante: ${restante}` : '';
+            return `<div style="margin-top:6px;font-size:.84rem;border:1px solid ${border};background:${bg};color:${color};padding:5px 8px;border-radius:8px;font-weight:700;">Temporizador: ${label}${tail}</div>`;
+        }
+
+        function _ensurePedidoTimerPicker() {
+            let overlay = document.getElementById('pedido-timer-picker');
+            if (overlay) return overlay;
+            overlay = document.createElement('div');
+            overlay.id = 'pedido-timer-picker';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:10050;background:rgba(2,6,23,.45);display:none;align-items:center;justify-content:center;padding:14px;';
+            overlay.innerHTML = `
+                <div style="width:min(440px,96vw);background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 16px 36px rgba(2,6,23,.28);padding:12px;">
+                    <div style="font-weight:800;color:#0f172a;font-size:1rem;">Selecciona tiempo estimado</div>
+                    <div style="font-size:.86rem;color:#475569;margin-top:2px;">Este tiempo se vera en tiempo real por el cliente.</div>
+                    <div id="pedido-timer-picker-options" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;"></div>
+                    <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+                        <button type="button" id="pedido-timer-picker-cancel" style="border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:7px 10px;font-weight:700;cursor:pointer;">Cancelar</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            return overlay;
+        }
+
+        async function _seleccionarTemporizadorPedido(defaultValue) {
+            const overlay = _ensurePedidoTimerPicker();
+            const optionsWrap = overlay.querySelector('#pedido-timer-picker-options');
+            const cancelBtn = overlay.querySelector('#pedido-timer-picker-cancel');
+            if (!optionsWrap || !cancelBtn) return null;
+            const options = [10, 15, 25, 30, 45];
+            optionsWrap.innerHTML = options.map((m) => {
+                const isDanger = m >= 45;
+                const active = Number(defaultValue || 0) === m;
+                return `<button type="button" data-min="${m}" style="border:1px solid ${isDanger ? '#fca5a5' : '#bfdbfe'};background:${active ? (isDanger ? '#fee2e2' : '#dbeafe') : (isDanger ? '#fff1f2' : '#eff6ff')};color:${isDanger ? '#b91c1c' : '#1d4ed8'};border-radius:10px;padding:10px 8px;font-weight:800;cursor:pointer;">${_timerPedidoLabel(m)}</button>`;
+            }).join('');
+            overlay.style.display = 'flex';
+            return await new Promise((resolve) => {
+                const onClick = (ev) => {
+                    const btn = ev.target?.closest?.('button[data-min]');
+                    if (!btn) return;
+                    const v = Number(btn.getAttribute('data-min') || 0);
+                    cleanup();
+                    resolve(v || null);
+                };
+                const onCancel = () => {
+                    cleanup();
+                    resolve(null);
+                };
+                const onBackdrop = (ev) => {
+                    if (ev.target === overlay) onCancel();
+                };
+                const cleanup = () => {
+                    overlay.style.display = 'none';
+                    optionsWrap.removeEventListener('click', onClick);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    overlay.removeEventListener('click', onBackdrop);
+                };
+                optionsWrap.addEventListener('click', onClick);
+                cancelBtn.addEventListener('click', onCancel);
+                overlay.addEventListener('click', onBackdrop);
+            });
         }
 
         function _setVentasOnlineIndicator(online, detalle) {
@@ -3820,6 +3908,7 @@
                 const btnEntregadoTxt = entregaTipo === 'despacho' ? 'Confirmar entrega' : 'Confirmar retiro';
                 const emailEnc = encodeURIComponent(email);
                 const telEnc = encodeURIComponent(telefono);
+                const timerHtml = _timerPedidoRenderHtml(p);
                 return `
                     <div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
                         <div style="font-weight:800;color:#1f2937;">Pedido #${p.id || '?'} ${idx === total - 1 ? '(nuevo)' : ''}</div>
@@ -3831,6 +3920,7 @@
                         ${entregaTipo === 'despacho' ? `<div style="font-size:.9rem;color:#334155;">Despacho: <strong>$${Math.round(despachoMonto).toLocaleString('es-CL')}</strong></div>` : ''}
                         <div style="font-size:.9rem;color:#334155;margin-top:6px;"><strong>Productos:</strong> ${productos}</div>
                         <div style="font-size:.9rem;color:#0f172a;margin-top:6px;"><strong>Estado:</strong> ${estadoTxt}</div>
+                        ${timerHtml}
                         <div style="font-size:.92rem;color:#111827;font-weight:700;">Total: $${Math.round(totalMonto).toLocaleString('es-CL')}</div>
                         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'confirmado')" style="border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Aceptar</button>
@@ -3993,10 +4083,17 @@
             };
             const nuevoEstado = estadoMap[tipoNorm] || 'confirmado';
             try {
+                const payloadEstado = { estado: nuevoEstado };
+                if (nuevoEstado === 'confirmado') {
+                    const sel = await _seleccionarTemporizadorPedido(_pedidoTimerDefaultMinutos);
+                    if (sel === null) return;
+                    payloadEstado.timer_minutos = sel;
+                    _pedidoTimerDefaultMinutos = Number(sel || 25) || 25;
+                }
                 const r1 = await fetch(`/api/tienda/admin/pedido/${idNum}/estado`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ estado: nuevoEstado }),
+                    body: JSON.stringify(payloadEstado),
                 });
                 const d1 = await r1.json();
                 if (!r1.ok || !d1?.success) throw new Error(d1?.error || 'No se pudo actualizar estado');
@@ -4072,6 +4169,16 @@
                 const data = await res.json();
                 if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar chats');
                 const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                if (_pedidosPendientesAtencion.length) {
+                    const mapa = new Map(pedidos.map((p) => [Number(p.id || 0), p]));
+                    _pedidosPendientesAtencion = _pedidosPendientesAtencion.map((p) => {
+                        const id = Number(p.id || 0);
+                        const live = mapa.get(id);
+                        if (!live) return p;
+                        return { ...p, ...live };
+                    });
+                    _renderPedidoAlert();
+                }
                 const fab = _ensureChatsHubFab();
                 if (fab) fab.textContent = `Pedidos activos (${pedidos.length})`;
                 const list = document.getElementById('ventas-chat-hub-list');
@@ -4086,15 +4193,21 @@
                     const em = String(p.cliente_email || '').trim() || '-';
                     const tel = String(p.cliente_telefono || '').trim() || '-';
                     const estado = _labelEstadoPedido(String(p.pedido_estado || 'recibido'));
+                    const estadoRaw = String(p.pedido_estado || 'recibido').toLowerCase();
                     const entrega = String(p.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'Despacho' : 'Retiro';
                     const hora = String(p.hora_retiro || '').trim();
                     const emEnc = encodeURIComponent(em);
                     const telEnc = encodeURIComponent(tel);
+                    const timerHtml = _timerPedidoRenderHtml(p);
+                    const pendingBadge = estadoRaw === 'recibido'
+                        ? '<span style="margin-left:6px;font-size:.72rem;color:#b91c1c;border:1px solid #fecaca;background:#fef2f2;border-radius:999px;padding:1px 6px;font-weight:800;">Pendiente</span>'
+                        : '';
                     return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
-                        <div style="font-weight:800;color:#0f172a;">Pedido #${id}</div>
+                        <div style="font-weight:800;color:#0f172a;">Pedido #${id}${pendingBadge}</div>
                         <div style="font-size:.85rem;color:#475569;">${nom}</div>
                         <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
                         <div style="font-size:.8rem;color:#334155;">${estado} · ${entrega}${hora ? ` · ${hora}` : ''}</div>
+                        ${timerHtml}
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_abrirChatPedidoOnline(${id}, '${emEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
                             <button type="button" id="pedido-quick-toggle-${id}" onclick="_toggleMensajesRapidos(${id})" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Mostrar mensajes</button>
@@ -4115,16 +4228,33 @@
             const idNum = Number(ventaId || 0);
             if (!idNum) return;
             try {
+                const estadoNorm = String(estado || '').toLowerCase();
+                const payloadEstado = { estado: estadoNorm };
+                if (estadoNorm === 'confirmado') {
+                    const sel = await _seleccionarTemporizadorPedido(_pedidoTimerDefaultMinutos);
+                    if (sel === null) return;
+                    payloadEstado.timer_minutos = sel;
+                    _pedidoTimerDefaultMinutos = Number(sel || 25) || 25;
+                }
                 const response = await fetch(`/api/tienda/admin/pedido/${idNum}/estado`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ estado }),
+                    body: JSON.stringify(payloadEstado),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar estado');
                 _pedidosPendientesAtencion = _pedidosPendientesAtencion.map((p) => {
                     if (Number(p.id || 0) !== idNum) return p;
-                    return { ...p, pedido_estado: String(data.estado || estado) };
+                    return {
+                        ...p,
+                        pedido_estado: String(data.estado || estadoNorm),
+                        timer_minutos: Number(data.timer_minutos || 0) || null,
+                        timer_label: String(data.timer_label || ''),
+                        timer_inicio: String(data.timer_inicio || ''),
+                        timer_restante_segundos: Number.isFinite(Number(data.timer_restante_segundos))
+                            ? Number(data.timer_restante_segundos)
+                            : null,
+                    };
                 });
                 _renderPedidoAlert();
                 if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {

@@ -7193,6 +7193,8 @@ def migrar_db():
         _ensure_column(conn, "ventas", "descuento_monto", "REAL DEFAULT 0")
         _ensure_column(conn, "ventas", "pedido_estado", "TEXT DEFAULT 'recibido'")
         _ensure_column(conn, "ventas", "pedido_estado_actualizado", "TEXT")
+        _ensure_column(conn, "ventas", "pedido_timer_minutos", "INTEGER")
+        _ensure_column(conn, "ventas", "pedido_timer_inicio", "TEXT")
         _ensure_column(conn, "ventas", "entrega_tipo", "TEXT DEFAULT 'retiro'")
         _ensure_column(conn, "ventas", "hora_retiro", "TEXT")
         _ensure_column(conn, "ventas", "direccion_entrega", "TEXT")

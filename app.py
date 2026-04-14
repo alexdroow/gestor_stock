@@ -1555,6 +1555,57 @@ def _pedido_estado_label(estado):
     return labels.get(est, "Recibido")
 
 
+PEDIDO_TIMER_OPCIONES_MIN = (10, 15, 25, 30, 45)
+
+
+def _normalizar_pedido_timer_minutos(raw):
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value in PEDIDO_TIMER_OPCIONES_MIN else None
+
+
+def _pedido_timer_label(minutos):
+    mins = _normalizar_pedido_timer_minutos(minutos)
+    if mins is None:
+        return ""
+    if mins >= 45:
+        return "+30 min"
+    return f"{mins} min"
+
+
+def _pedido_timer_restante_segundos(estado_raw, minutos_raw, inicio_raw):
+    estado = _normalizar_pedido_estado(estado_raw)
+    if estado not in {"confirmado", "preparando"}:
+        return None
+    mins = _normalizar_pedido_timer_minutos(minutos_raw)
+    if mins is None:
+        return None
+    inicio_dt = _parse_sqlite_datetime_safe(inicio_raw)
+    if not inicio_dt:
+        return None
+    limite = inicio_dt + timedelta(minutes=mins)
+    restante = int((limite - datetime.now()).total_seconds())
+    return max(0, restante)
+
+
+def _pedido_timer_payload(estado_raw, minutos_raw, inicio_raw):
+    mins = _normalizar_pedido_timer_minutos(minutos_raw)
+    restante = _pedido_timer_restante_segundos(estado_raw, mins, inicio_raw)
+    return {
+        "timer_minutos": mins,
+        "timer_label": _pedido_timer_label(mins),
+        "timer_inicio": str(inicio_raw or "").strip(),
+        "timer_restante_segundos": restante,
+        "timer_activo": restante is not None,
+        "timer_opciones": [
+            {"value": int(v), "label": _pedido_timer_label(v), "warning": bool(int(v) >= 45)}
+            for v in PEDIDO_TIMER_OPCIONES_MIN
+        ],
+    }
+
+
 def _chat_origen_tipo(raw):
     v = str(raw or "").strip().lower()
     if v in {"venta", "agenda"}:
@@ -4126,7 +4177,8 @@ def api_tienda_clientes_historial():
             """
             SELECT id, fecha_hora, codigo_pedido, codigo_operacion, total_monto, descuento_codigo, descuento_monto,
                    COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
-                   pedido_estado_actualizado
+                   pedido_estado_actualizado,
+                   pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
             WHERE canal_venta = 'tienda_online'
               AND LOWER(TRIM(COALESCE(cliente_email, ''))) = LOWER(TRIM(?))
@@ -4172,6 +4224,13 @@ def api_tienda_clientes_historial():
                 for it in items
                 if int(it.get("producto_id") or 0) > 0 and int(it.get("cantidad") or 0) > 0
             ]
+            venta.update(
+                _pedido_timer_payload(
+                    venta.get("pedido_estado"),
+                    venta.get("pedido_timer_minutos"),
+                    venta.get("pedido_timer_inicio"),
+                )
+            )
             ventas.append(venta)
 
         cursor.execute(
@@ -4324,7 +4383,8 @@ def api_tienda_clientes_pedidos_estados():
             f"""
             SELECT id,
                    COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
-                   pedido_estado_actualizado
+                   pedido_estado_actualizado,
+                   pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
             WHERE canal_venta = 'tienda_online'
               AND LOWER(TRIM(COALESCE(cliente_email, ''))) = LOWER(TRIM(?))
@@ -4343,6 +4403,11 @@ def api_tienda_clientes_pedidos_estados():
                     "estado": estado,
                     "estado_label": _pedido_estado_label(estado),
                     "estado_actualizado": item.get("pedido_estado_actualizado"),
+                    **_pedido_timer_payload(
+                        estado,
+                        item.get("pedido_timer_minutos"),
+                        item.get("pedido_timer_inicio"),
+                    ),
                 }
             )
         return jsonify({"success": True, "pedidos": pedidos})
@@ -4529,7 +4594,8 @@ def api_tienda_admin_cliente_detalle(cliente_id):
         cursor.execute(
             """
             SELECT id, fecha_hora, codigo_pedido, codigo_operacion, total_monto, descuento_codigo, descuento_monto,
-                   COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado, pedido_estado_actualizado
+                   COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado, pedido_estado_actualizado,
+                   pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
             WHERE canal_venta='tienda_online'
               AND LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?))
@@ -4575,6 +4641,13 @@ def api_tienda_admin_cliente_detalle(cliente_id):
                 for it in items
                 if int(it.get("cantidad") or 0) > 0 and (str(it.get("producto_nombre") or "").strip() or int(it.get("producto_id") or 0) > 0)
             ]
+            venta.update(
+                _pedido_timer_payload(
+                    venta.get("pedido_estado"),
+                    venta.get("pedido_timer_minutos"),
+                    venta.get("pedido_timer_inicio"),
+                )
+            )
             ventas.append(venta)
         cursor.execute(
             """
@@ -6040,6 +6113,7 @@ def api_tienda_admin_pedidos_nuevos():
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.codigo_pedido,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
+                   v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
                    v.hora_retiro,
                    v.direccion_entrega,
@@ -6058,7 +6132,17 @@ def api_tienda_admin_pedidos_nuevos():
             """,
             (since_id,),
         )
-        rows = [dict(r) for r in cursor.fetchall()]
+        rows = []
+        for r in cursor.fetchall():
+            item = dict(r)
+            item.update(
+                _pedido_timer_payload(
+                    item.get("pedido_estado"),
+                    item.get("pedido_timer_minutos"),
+                    item.get("pedido_timer_inicio"),
+                )
+            )
+            rows.append(item)
         max_id = max(since_id, max_online_id)
         return jsonify({"success": True, "pedidos": rows, "max_id": max_id})
     except Exception as e:
@@ -6081,6 +6165,7 @@ def api_tienda_admin_pedidos_chat_activos():
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
+                   v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
                    v.hora_retiro
             FROM ventas v
@@ -6090,7 +6175,17 @@ def api_tienda_admin_pedidos_chat_activos():
             LIMIT 40
             """
         )
-        rows = [dict(r) for r in cursor.fetchall()]
+        rows = []
+        for r in cursor.fetchall():
+            item = dict(r)
+            item.update(
+                _pedido_timer_payload(
+                    item.get("pedido_estado"),
+                    item.get("pedido_timer_minutos"),
+                    item.get("pedido_timer_inicio"),
+                )
+            )
+            rows.append(item)
         rows = [
             r for r in rows
             if _chat_estado_activo("venta", r.get("pedido_estado"), r.get("pedido_estado_actualizado"))
@@ -6111,20 +6206,101 @@ def api_tienda_admin_pedido_estado(venta_id):
     try:
         data = request.get_json(silent=True) or {}
         nuevo_estado = _normalizar_pedido_estado(data.get("estado"))
+        raw_timer = data.get("timer_minutos")
+        timer_in_payload = raw_timer is not None and str(raw_timer).strip() != ""
+        timer_minutos = _normalizar_pedido_timer_minutos(raw_timer) if timer_in_payload else None
+        if timer_in_payload and timer_minutos is None:
+            return jsonify({"success": False, "error": "Temporizador invalido. Usa: 10, 15, 25, 30 o +30"}), 400
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
             """
-            UPDATE ventas
-            SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP
+            SELECT id, pedido_timer_minutos, pedido_timer_inicio
+            FROM ventas
             WHERE id = ? AND canal_venta = 'tienda_online'
+            LIMIT 1
             """,
-            (nuevo_estado, int(venta_id)),
+            (int(venta_id),),
         )
-        if cursor.rowcount <= 0:
+        actual = cursor.fetchone()
+        if not actual:
             return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+        actual = dict(actual)
+        actual_timer = _normalizar_pedido_timer_minutos(actual.get("pedido_timer_minutos"))
+        actual_inicio = actual.get("pedido_timer_inicio")
+
+        set_inicio_now = False
+        guardar_timer = actual_timer
+        guardar_inicio = actual_inicio
+
+        if nuevo_estado == "confirmado":
+            guardar_timer = timer_minutos if timer_minutos is not None else (actual_timer if actual_timer is not None else 25)
+            guardar_inicio = None
+            set_inicio_now = True
+        elif nuevo_estado == "preparando":
+            if timer_minutos is not None:
+                guardar_timer = timer_minutos
+                guardar_inicio = None
+                set_inicio_now = True
+            elif actual_timer is None:
+                guardar_timer = 25
+                guardar_inicio = None
+                set_inicio_now = True
+        elif nuevo_estado in {"listo", "entregado", "cancelado"}:
+            guardar_timer = None
+            guardar_inicio = None
+            set_inicio_now = False
+        elif nuevo_estado == "recibido":
+            guardar_timer = None
+            guardar_inicio = None
+            set_inicio_now = False
+
+        if set_inicio_now:
+            cursor.execute(
+                """
+                UPDATE ventas
+                SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP,
+                    pedido_timer_minutos = ?, pedido_timer_inicio = CURRENT_TIMESTAMP
+                WHERE id = ? AND canal_venta = 'tienda_online'
+                """,
+                (nuevo_estado, guardar_timer, int(venta_id)),
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE ventas
+                SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP,
+                    pedido_timer_minutos = ?, pedido_timer_inicio = ?
+                WHERE id = ? AND canal_venta = 'tienda_online'
+                """,
+                (nuevo_estado, guardar_timer, guardar_inicio, int(venta_id)),
+            )
         conn.commit()
-        return jsonify({"success": True, "estado": nuevo_estado, "estado_label": _pedido_estado_label(nuevo_estado)})
+        cursor.execute(
+            """
+            SELECT COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
+                   pedido_timer_minutos, pedido_timer_inicio
+            FROM ventas
+            WHERE id = ? AND canal_venta = 'tienda_online'
+            LIMIT 1
+            """,
+            (int(venta_id),),
+        )
+        row = cursor.fetchone()
+        rowd = dict(row) if row else {}
+        timer_payload = _pedido_timer_payload(
+            rowd.get("pedido_estado") or nuevo_estado,
+            rowd.get("pedido_timer_minutos"),
+            rowd.get("pedido_timer_inicio"),
+        )
+        return jsonify(
+            {
+                "success": True,
+                "estado": nuevo_estado,
+                "estado_label": _pedido_estado_label(nuevo_estado),
+                **timer_payload,
+            }
+        )
     except Exception as e:
         if conn:
             conn.rollback()
@@ -6144,7 +6320,8 @@ def api_tienda_pedido_estado(venta_id):
             """
             SELECT id, fecha_hora, total_monto,
                    COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
-                   pedido_estado_actualizado
+                   pedido_estado_actualizado,
+                   pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
             WHERE id = ? AND canal_venta = 'tienda_online'
             LIMIT 1
@@ -6156,6 +6333,11 @@ def api_tienda_pedido_estado(venta_id):
             return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
         item = dict(row)
         estado = _normalizar_pedido_estado(item.get("pedido_estado"))
+        timer_payload = _pedido_timer_payload(
+            estado,
+            item.get("pedido_timer_minutos"),
+            item.get("pedido_timer_inicio"),
+        )
         return jsonify(
             {
                 "success": True,
@@ -6166,6 +6348,7 @@ def api_tienda_pedido_estado(venta_id):
                     "estado_actualizado": item.get("pedido_estado_actualizado"),
                     "fecha_hora": item.get("fecha_hora"),
                     "total_monto": float(item.get("total_monto") or 0),
+                    **timer_payload,
                 },
             }
         )
@@ -10444,6 +10627,7 @@ def api_tienda_checkout():
                 UPDATE ventas
                 SET cliente_nombre = ?, cliente_email = ?, cliente_telefono = ?, descuento_codigo = ?, descuento_monto = ?, total_monto = ?,
                     pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP,
+                    pedido_timer_minutos = NULL, pedido_timer_inicio = NULL,
                     entrega_tipo = ?, hora_retiro = ?, direccion_entrega = ?, entrega_lat = ?, entrega_lng = ?, despacho_monto = ?, entrega_detalle_json = ?
                 WHERE id = ?
                 """,
