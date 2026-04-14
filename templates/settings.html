@@ -394,6 +394,38 @@
             border-top: 1px solid #e2e8f0;
             padding-top: 14px;
         }
+        .admin-users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .admin-users-list {
+            display: grid;
+            gap: 10px;
+        }
+        .admin-user-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            display: grid;
+            gap: 8px;
+        }
+        .admin-user-title {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 14px;
+        }
+        .admin-user-meta {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .admin-user-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
 
         .recordatorios-title {
             font-size: 15px;
@@ -479,7 +511,8 @@
 
         body.dark-mode .config-item,
         body.dark-mode .config-select-card,
-        body.dark-mode .alerta-item {
+        body.dark-mode .alerta-item,
+        body.dark-mode .admin-user-item {
             background: #334155;
             border-color: #475569;
         }
@@ -489,7 +522,8 @@
         }
 
         body.dark-mode .config-item-title,
-        body.dark-mode .recordatorios-title {
+        body.dark-mode .recordatorios-title,
+        body.dark-mode .admin-user-title {
             color: #f1f5f9;
         }
 
@@ -654,6 +688,37 @@
                         <button type="button" class="btn btn-secondary" onclick="aplicarActualizacion()">Instalar ahora</button>
                     </div>
                     <div class="updater-status" id="upd-status">Versión instalada: v{{ app_version }}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">&#128274; Usuarios admin de panel</h3>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom:10px;color:#64748b;font-size:13px;">
+                        Legacy activo: <strong>{{ admin_legacy_user }}</strong> + PIN. Recomendado: usar usuarios dedicados.
+                    </p>
+                    <div class="admin-users-grid">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Usuario</label>
+                            <input type="text" id="admin-user-username" class="form-control" placeholder="ej: alexis.admin">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Nombre visible</label>
+                            <input type="text" id="admin-user-display" class="form-control" placeholder="Ej: Alexis Admin">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Clave (min 6)</label>
+                            <input type="password" id="admin-user-password" class="form-control" placeholder="********">
+                        </div>
+                    </div>
+                    <div class="updater-actions" style="margin-bottom:8px;">
+                        <button type="button" class="btn btn-primary" onclick="crearUsuarioAdmin()">Crear usuario admin</button>
+                        <button type="button" class="btn btn-secondary" onclick="cargarUsuariosAdmin()">Recargar lista</button>
+                    </div>
+                    <div id="admin-users-status" class="updater-status"></div>
+                    <div id="admin-users-list" class="admin-users-list"></div>
                 </div>
             </div>
 
@@ -1090,6 +1155,124 @@
                 .catch(err => setUpdaterStatus('[ERROR] ' + err.message, false));
         }
 
+        function setAdminUsersStatus(text, ok = null) {
+            const box = document.getElementById('admin-users-status');
+            if (!box) return;
+            box.textContent = text || '';
+            if (ok === true) box.style.color = '#10b981';
+            else if (ok === false) box.style.color = '#ef4444';
+            else box.style.color = '';
+        }
+
+        function renderAdminUsers(items) {
+            const wrap = document.getElementById('admin-users-list');
+            if (!wrap) return;
+            const rows = Array.isArray(items) ? items : [];
+            if (!rows.length) {
+                wrap.innerHTML = '<div class="admin-user-item"><div class="admin-user-meta">Sin usuarios admin.</div></div>';
+                return;
+            }
+            wrap.innerHTML = rows.map((u) => `
+                <div class="admin-user-item">
+                    <div class="admin-user-title">${u.display_name || u.username} (${u.username})</div>
+                    <div class="admin-user-meta">
+                        Estado: <strong>${u.activo ? 'Activo' : 'Inactivo'}</strong>
+                        ${u.last_login_at ? ` · Último login: ${u.last_login_at}` : ''}
+                        ${u.last_login_ip ? ` · IP: ${u.last_login_ip}` : ''}
+                    </div>
+                    <div class="admin-user-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="toggleUsuarioAdmin(${u.id})">${u.activo ? 'Desactivar' : 'Activar'}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="cambiarClaveAdmin(${u.id})">Cambiar clave</button>
+                        <button class="btn btn-secondary btn-sm" onclick="eliminarUsuarioAdmin(${u.id})">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function cargarUsuariosAdmin() {
+            setAdminUsersStatus('Cargando usuarios admin...');
+            fetch('/api/admin/users')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo cargar usuarios');
+                    renderAdminUsers(data.items || []);
+                    setAdminUsersStatus(`Usuarios cargados: ${(data.items || []).length}`, true);
+                })
+                .catch(err => setAdminUsersStatus('[ERROR] ' + err.message, false));
+        }
+
+        function crearUsuarioAdmin() {
+            const username = (document.getElementById('admin-user-username').value || '').trim();
+            const display_name = (document.getElementById('admin-user-display').value || '').trim();
+            const password = (document.getElementById('admin-user-password').value || '').trim();
+            if (username.length < 3) {
+                setAdminUsersStatus('Usuario inválido (mínimo 3).', false);
+                return;
+            }
+            if (password.length < 6) {
+                setAdminUsersStatus('Clave inválida (mínimo 6).', false);
+                return;
+            }
+            setAdminUsersStatus('Creando usuario admin...');
+            fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, display_name, password }),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo crear usuario');
+                    document.getElementById('admin-user-password').value = '';
+                    setAdminUsersStatus('Usuario admin creado.', true);
+                    cargarUsuariosAdmin();
+                })
+                .catch(err => setAdminUsersStatus('[ERROR] ' + err.message, false));
+        }
+
+        function toggleUsuarioAdmin(id) {
+            fetch(`/api/admin/users/${id}/toggle`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo cambiar estado');
+                    setAdminUsersStatus('Estado de usuario actualizado.', true);
+                    cargarUsuariosAdmin();
+                })
+                .catch(err => setAdminUsersStatus('[ERROR] ' + err.message, false));
+        }
+
+        function cambiarClaveAdmin(id) {
+            const pass = prompt('Ingresa nueva clave admin (mínimo 6 caracteres):');
+            if (pass === null) return;
+            const password = String(pass || '').trim();
+            if (password.length < 6) {
+                setAdminUsersStatus('Clave inválida (mínimo 6).', false);
+                return;
+            }
+            fetch(`/api/admin/users/${id}/password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo cambiar clave');
+                    setAdminUsersStatus('Clave actualizada.', true);
+                })
+                .catch(err => setAdminUsersStatus('[ERROR] ' + err.message, false));
+        }
+
+        function eliminarUsuarioAdmin(id) {
+            if (!confirm('¿Eliminar este usuario admin?')) return;
+            fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo eliminar');
+                    setAdminUsersStatus('Usuario eliminado.', true);
+                    cargarUsuariosAdmin();
+                })
+                .catch(err => setAdminUsersStatus('[ERROR] ' + err.message, false));
+        }
+
         // Cargar datos
         fetch('/api/estadisticas')
             .then(r => r.json())
@@ -1111,6 +1294,7 @@
         actualizarRutasBackup();
         cargarConfigUpdater();
         cargarConfigClimaSidebar(true);
+        cargarUsuariosAdmin();
     </script>
 
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>

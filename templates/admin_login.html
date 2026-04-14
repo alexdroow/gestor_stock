@@ -47,7 +47,8 @@
             font-weight: 600;
             font-size: 0.95rem;
         }
-        input[type="password"] {
+        input[type="password"],
+        input[type="text"] {
             width: 100%;
             border: 1px solid #334155;
             background: #0b1220;
@@ -57,7 +58,8 @@
             font-size: 1rem;
             margin-bottom: 14px;
         }
-        input[type="password"]:focus {
+        input[type="password"]:focus,
+        input[type="text"]:focus {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 2px rgba(249, 115, 22, .2);
@@ -98,13 +100,19 @@
 <body>
     <form class="panel" method="post" action="{{ url_for('admin_login') }}">
         <h1>Acceso administrador</h1>
-        <p>Ingresa PIN para abrir la zona de gestion interna.</p>
+        <p>Ingresa usuario y clave para abrir la zona de gestion interna.</p>
         {% if error %}
             <div class="error">{{ error }}</div>
         {% endif %}
+        {% if blocked_seconds and blocked_seconds > 0 %}
+            <div class="error">Bloqueo temporal activo: {{ blocked_seconds }} segundos.</div>
+        {% endif %}
         <input type="hidden" name="next" value="{{ next_url or '/' }}">
-        <label for="pin">PIN</label>
+        <label for="username">Usuario</label>
+        <input id="username" name="username" type="text" autocomplete="username" placeholder="Ej: {{ legacy_user or 'admin' }}" required>
+        <label for="pin">Clave</label>
         <input id="pin" name="pin" type="password" autocomplete="current-password" required>
+        <p style="font-size:.85rem;margin-top:-4px;margin-bottom:10px;color:#94a3b8;">Acceso legacy: usuario <strong>{{ legacy_user or 'admin' }}</strong> + PIN (si sigue habilitado).</p>
         <div class="actions">
             <button type="submit">Entrar</button>
             <a href="{{ url_for('tienda_publica') }}">Ir a tienda</a>

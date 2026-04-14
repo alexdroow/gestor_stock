@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from io import BytesIO, StringIO
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 from camera_hub import CameraHub
 try:
     from reportlab.pdfgen import canvas
@@ -55,10 +56,22 @@ else:
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 CAMERA_HUB = CameraHub()
 app.secret_key = os.environ.get("GESTIONSTOCK_SECRET_KEY", "gestor_stock_dev_secret_change_me")
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = str(os.environ.get("GESTIONSTOCK_SESSION_SECURE") or "0").strip().lower() in {"1", "true", "yes", "on"}
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
 
 ADMIN_PIN_ENV = "GESTIONSTOCK_ADMIN_PIN"
 DEFAULT_ADMIN_PIN = "1234"
+ADMIN_LEGACY_USER_ENV = "GESTIONSTOCK_ADMIN_USER"
+DEFAULT_ADMIN_LEGACY_USER = "admin"
 _ADMIN_SESSION_KEY = "admin_autenticado"
+_ADMIN_USER_ID_SESSION_KEY = "admin_user_id"
+_ADMIN_USER_NAME_SESSION_KEY = "admin_user_name"
+
+_ADMIN_LOGIN_ATTEMPTS = {}
+_ADMIN_LOGIN_MAX_FAILS = 6
+_ADMIN_LOGIN_BLOCK_SECONDS = 300
 
 if not str(os.environ.get(ADMIN_PIN_ENV) or "").strip():
     print(
@@ -72,6 +85,125 @@ def _obtener_admin_pin():
     if pin:
         return pin
     return DEFAULT_ADMIN_PIN
+
+
+def _obtener_admin_legacy_username():
+    user = str(os.environ.get(ADMIN_LEGACY_USER_ENV) or "").strip()
+    if user:
+        return user
+    return DEFAULT_ADMIN_LEGACY_USER
+
+
+def _admin_client_ip():
+    xff = str(request.headers.get("X-Forwarded-For") or "").strip()
+    if xff:
+        return xff.split(",")[0].strip()
+    return str(request.remote_addr or "0.0.0.0").strip()
+
+
+def _admin_login_state(ip):
+    now = time.time()
+    state = _ADMIN_LOGIN_ATTEMPTS.get(ip) or {"fails": 0, "blocked_until": 0}
+    blocked_until = float(state.get("blocked_until") or 0)
+    if blocked_until and now >= blocked_until:
+        state = {"fails": 0, "blocked_until": 0}
+        _ADMIN_LOGIN_ATTEMPTS[ip] = state
+    return state
+
+
+def _admin_login_is_blocked(ip):
+    state = _admin_login_state(ip)
+    blocked_until = float(state.get("blocked_until") or 0)
+    if blocked_until > time.time():
+        return True, int(max(1, blocked_until - time.time()))
+    return False, 0
+
+
+def _admin_login_register_fail(ip):
+    state = _admin_login_state(ip)
+    fails = int(state.get("fails") or 0) + 1
+    state["fails"] = fails
+    if fails >= _ADMIN_LOGIN_MAX_FAILS:
+        state["blocked_until"] = time.time() + _ADMIN_LOGIN_BLOCK_SECONDS
+    _ADMIN_LOGIN_ATTEMPTS[ip] = state
+    return state
+
+
+def _admin_login_register_success(ip):
+    _ADMIN_LOGIN_ATTEMPTS.pop(ip, None)
+
+
+def _admin_users_count(conn=None):
+    propia = conn is None
+    if propia:
+        conn = get_db()
+    try:
+        row = conn.execute("SELECT COUNT(*) AS c FROM admin_users WHERE COALESCE(activo,1)=1").fetchone()
+        return int((row["c"] if row else 0) or 0)
+    except Exception:
+        return 0
+    finally:
+        if propia and conn is not None:
+            conn.close()
+
+
+def _admin_find_user(username, conn=None):
+    uname = str(username or "").strip().lower()
+    if not uname:
+        return None
+    propia = conn is None
+    if propia:
+        conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, username, display_name, password_hash, activo FROM admin_users WHERE LOWER(username)=? LIMIT 1",
+            (uname,),
+        ).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
+    finally:
+        if propia and conn is not None:
+            conn.close()
+
+
+def _admin_audit_login(username, success, reason="", ip_addr=None):
+    try:
+        conn = get_db()
+        conn.execute(
+            """
+            INSERT INTO admin_login_audit (username, success, reason, ip_address)
+            VALUES (?, ?, ?, ?)
+            """,
+            (str(username or "").strip()[:80], 1 if success else 0, str(reason or "").strip()[:180], str(ip_addr or _admin_client_ip())[:80]),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _admin_ensure_bootstrap_user():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        row = cursor.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()
+        total = int((row["c"] if row else 0) or 0)
+        if total <= 0:
+            uname = _obtener_admin_legacy_username().strip().lower()
+            if len(uname) < 3:
+                uname = DEFAULT_ADMIN_LEGACY_USER
+            cursor.execute(
+                """
+                INSERT INTO admin_users (username, display_name, password_hash, activo)
+                VALUES (?, ?, ?, 1)
+                """,
+                (uname, "Administrador", generate_password_hash(_obtener_admin_pin())),
+            )
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[WARN] No se pudo crear usuario admin bootstrap: {e}")
 
 
 def _ruta_es_publica(path):
@@ -221,6 +353,7 @@ try:
     migrar_db()
 except Exception as _migrar_err:
     print(f"[WARN] migrar_db omitida por error: {_migrar_err}")
+_admin_ensure_bootstrap_user()
 
 FACTURAS_DIR = os.path.join(DATA_DIR, "facturas")
 ALLOWED_FACTURA_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
@@ -794,7 +927,14 @@ def api_disponibilidad_producto(producto_id):
 
 @app.route('/')
 def index():
+    if session.get(_ADMIN_SESSION_KEY):
+        return render_template('index.html')
     return redirect(url_for("tienda_publica"))
+
+
+@app.route('/inicio')
+def inicio_dashboard():
+    return redirect(url_for('index'))
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
@@ -803,21 +943,81 @@ def admin_login():
         return redirect(url_for("agenda"))
 
     error = None
+    blocked_seconds = 0
     if request.method == 'POST':
+        ip_addr = _admin_client_ip()
+        blocked, wait = _admin_login_is_blocked(ip_addr)
+        if blocked:
+            blocked_seconds = wait
+            error = f"Demasiados intentos fallidos. Espera {wait}s."
+            next_url = _normalizar_next_admin(request.form.get('next'))
+            return render_template(
+                'admin_login.html',
+                error=error,
+                next_url=next_url,
+                blocked_seconds=blocked_seconds,
+                legacy_user=_obtener_admin_legacy_username(),
+            )
+
+        username = str(request.form.get('username') or '').strip()
         pin = str(request.form.get('pin') or '').strip()
         next_url = _normalizar_next_admin(request.form.get('next'))
-        if pin == _obtener_admin_pin():
+        ok = False
+        reason = "invalid_credentials"
+        user_row = _admin_find_user(username)
+        if user_row and int(user_row.get("activo") or 0) == 1:
+            if check_password_hash(str(user_row.get("password_hash") or ""), pin):
+                ok = True
+                reason = "ok_user_pass"
+                session[_ADMIN_USER_ID_SESSION_KEY] = int(user_row.get("id") or 0)
+                session[_ADMIN_USER_NAME_SESSION_KEY] = str(user_row.get("display_name") or user_row.get("username") or "admin")
+                try:
+                    conn = get_db()
+                    conn.execute(
+                        """
+                        UPDATE admin_users
+                        SET last_login_at=CURRENT_TIMESTAMP, last_login_ip=?, actualizado_en=CURRENT_TIMESTAMP
+                        WHERE id=?
+                        """,
+                        (ip_addr, int(user_row.get("id") or 0)),
+                    )
+                    conn.commit()
+                    conn.close()
+                except Exception:
+                    pass
+
+        legacy_user = _obtener_admin_legacy_username()
+        if (not ok) and pin == _obtener_admin_pin() and str(username or "").strip().lower() == legacy_user.lower():
+            ok = True
+            reason = "ok_legacy_pin"
+            session[_ADMIN_USER_ID_SESSION_KEY] = 0
+            session[_ADMIN_USER_NAME_SESSION_KEY] = legacy_user
+
+        if ok:
+            session.permanent = True
             session[_ADMIN_SESSION_KEY] = True
+            _admin_login_register_success(ip_addr)
+            _admin_audit_login(username=username, success=True, reason=reason, ip_addr=ip_addr)
             return redirect(next_url)
-        error = "PIN incorrecto."
+        _admin_login_register_fail(ip_addr)
+        _admin_audit_login(username=username, success=False, reason=reason, ip_addr=ip_addr)
+        error = "Usuario o clave incorrectos."
 
     next_url = _normalizar_next_admin(request.args.get('next'))
-    return render_template('admin_login.html', error=error, next_url=next_url)
+    return render_template(
+        'admin_login.html',
+        error=error,
+        next_url=next_url,
+        blocked_seconds=blocked_seconds,
+        legacy_user=_obtener_admin_legacy_username(),
+    )
 
 
 @app.route('/admin/logout', methods=['GET', 'POST'])
 def admin_logout():
     session.pop(_ADMIN_SESSION_KEY, None)
+    session.pop(_ADMIN_USER_ID_SESSION_KEY, None)
+    session.pop(_ADMIN_USER_NAME_SESSION_KEY, None)
     return redirect(url_for('admin_login'))
 
 
@@ -8903,6 +9103,14 @@ def _armar_producto_base_para_venta(data):
     item["stock_visual_dependencia_nombre"] = None
     item["stock_visual_label"] = _formatear_numero_simple(stock_visual)
     item["icono"] = _normalizar_icono_producto(item.get("icono"))
+    foto_rel = str(item.get("foto") or "").strip()
+    if foto_rel:
+        try:
+            item["foto_url"] = url_for('static', filename=foto_rel)
+        except Exception:
+            item["foto_url"] = f"/static/{foto_rel}"
+    else:
+        item["foto_url"] = ""
     tipo_dep = str(item.get("stock_dependencia_tipo") or "").strip().lower()
     if tipo_dep not in {"producto", "insumo"}:
         tipo_dep = None
@@ -12796,11 +13004,147 @@ def settings():
         config_alertas=config_alertas,
         config_clima_sidebar=config_clima_sidebar,
         config_updater=config_updater,
+        admin_users_count=_admin_users_count(),
+        admin_legacy_user=_obtener_admin_legacy_username(),
         app_version=APP_VERSION,
         recordatorios=recordatorios,
         data_dir=DATA_DIR,
         backup_dir=BACKUP_DIR,
     )
+
+
+def _sanitize_admin_username(valor):
+    raw = str(valor or "").strip().lower()
+    raw = re.sub(r"[^a-z0-9._-]", "", raw)
+    return raw[:50]
+
+
+def _sanitize_admin_display_name(valor):
+    return str(valor or "").strip()[:80]
+
+
+@app.route('/api/admin/users', methods=['GET'])
+def api_admin_users_list():
+    try:
+        conn = get_db()
+        rows = conn.execute(
+            """
+            SELECT id, username, display_name, activo, creado_en, actualizado_en, last_login_at, last_login_ip
+            FROM admin_users
+            ORDER BY id ASC
+            """
+        ).fetchall()
+        conn.close()
+        users = []
+        for row in rows:
+            item = dict(row)
+            item["activo"] = bool(item.get("activo"))
+            users.append(item)
+        return jsonify({
+            "success": True,
+            "legacy_user": _obtener_admin_legacy_username(),
+            "legacy_pin_enabled": True,
+            "items": users,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "items": []}), 500
+
+
+@app.route('/api/admin/users', methods=['POST'])
+def api_admin_users_create():
+    try:
+        payload = request.get_json(silent=True) or {}
+        username = _sanitize_admin_username(payload.get("username"))
+        display_name = _sanitize_admin_display_name(payload.get("display_name") or username)
+        password = str(payload.get("password") or "").strip()
+        if len(username) < 3:
+            return jsonify({"success": False, "error": "Usuario invalido (minimo 3 caracteres)."}), 400
+        if len(password) < 6:
+            return jsonify({"success": False, "error": "Clave invalida (minimo 6 caracteres)."}), 400
+
+        conn = get_db()
+        exists = conn.execute("SELECT id FROM admin_users WHERE LOWER(username)=? LIMIT 1", (username.lower(),)).fetchone()
+        if exists:
+            conn.close()
+            return jsonify({"success": False, "error": "Ese usuario ya existe."}), 400
+        hashed = generate_password_hash(password)
+        conn.execute(
+            """
+            INSERT INTO admin_users (username, display_name, password_hash, activo)
+            VALUES (?, ?, ?, 1)
+            """,
+            (username, display_name, hashed),
+        )
+        conn.commit()
+        conn.close()
+        _admin_audit_login(username=username, success=True, reason="admin_user_created")
+        return jsonify({"success": True, "message": "Usuario admin creado."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/admin/users/<int:user_id>/password', methods=['POST'])
+def api_admin_users_change_password(user_id):
+    try:
+        payload = request.get_json(silent=True) or {}
+        password = str(payload.get("password") or "").strip()
+        if len(password) < 6:
+            return jsonify({"success": False, "error": "Clave invalida (minimo 6 caracteres)."}), 400
+        conn = get_db()
+        row = conn.execute("SELECT id, username FROM admin_users WHERE id=? LIMIT 1", (user_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "error": "Usuario no encontrado."}), 404
+        conn.execute(
+            "UPDATE admin_users SET password_hash=?, actualizado_en=CURRENT_TIMESTAMP WHERE id=?",
+            (generate_password_hash(password), user_id),
+        )
+        conn.commit()
+        conn.close()
+        _admin_audit_login(username=str(row["username"]), success=True, reason="admin_user_password_changed")
+        return jsonify({"success": True, "message": "Clave actualizada."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/admin/users/<int:user_id>/toggle', methods=['POST'])
+def api_admin_users_toggle(user_id):
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT id, username, activo FROM admin_users WHERE id=? LIMIT 1", (user_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "error": "Usuario no encontrado."}), 404
+        nuevo = 0 if int(row["activo"] or 0) == 1 else 1
+        conn.execute("UPDATE admin_users SET activo=?, actualizado_en=CURRENT_TIMESTAMP WHERE id=?", (nuevo, user_id))
+        conn.commit()
+        conn.close()
+        _admin_audit_login(username=str(row["username"]), success=True, reason=f"admin_user_toggle_{nuevo}")
+        return jsonify({"success": True, "activo": bool(nuevo)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+def api_admin_users_delete(user_id):
+    try:
+        conn = get_db()
+        total_row = conn.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()
+        total = int((total_row["c"] if total_row else 0) or 0)
+        row = conn.execute("SELECT id, username FROM admin_users WHERE id=? LIMIT 1", (user_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "error": "Usuario no encontrado."}), 404
+        if total <= 1:
+            conn.close()
+            return jsonify({"success": False, "error": "Debe quedar al menos un usuario admin activo."}), 400
+        conn.execute("DELETE FROM admin_users WHERE id=?", (user_id,))
+        conn.commit()
+        conn.close()
+        _admin_audit_login(username=str(row["username"]), success=True, reason="admin_user_deleted")
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 _GITHUB_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")

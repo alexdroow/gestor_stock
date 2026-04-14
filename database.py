@@ -758,6 +758,34 @@ def init_db():
             )
         ''')
 
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                display_name TEXT,
+                password_hash TEXT NOT NULL,
+                activo INTEGER NOT NULL DEFAULT 1,
+                last_login_at TEXT,
+                last_login_ip TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS admin_login_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                success INTEGER NOT NULL DEFAULT 0,
+                reason TEXT,
+                ip_address TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
+
         # Insumos que se descuentan automáticamente al vender un producto
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS producto_insumos_venta (
@@ -7548,6 +7576,42 @@ def migrar_db():
                 config_json TEXT NOT NULL DEFAULT '{}',
                 creado_en TEXT DEFAULT CURRENT_TIMESTAMP
             )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                display_name TEXT,
+                password_hash TEXT NOT NULL,
+                activo INTEGER NOT NULL DEFAULT 1,
+                last_login_at TEXT,
+                last_login_ip TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_login_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                success INTEGER NOT NULL DEFAULT 0,
+                reason TEXT,
+                ip_address TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            UPDATE admin_users
+            SET username = LOWER(TRIM(username)),
+                display_name = COALESCE(NULLIF(TRIM(display_name), ''), username),
+                activo = CASE WHEN activo IS NULL OR activo = 0 THEN 0 ELSE 1 END,
+                actualizado_en = CURRENT_TIMESTAMP
             """
         )
         conn.execute(
