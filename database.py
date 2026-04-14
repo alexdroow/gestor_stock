@@ -7650,10 +7650,16 @@ def migrar_db():
                 evento TEXT NOT NULL DEFAULT 'view',
                 pagina TEXT DEFAULT '/tienda',
                 ip_address TEXT,
+                cliente_email TEXT,
+                cliente_telefono TEXT,
+                cliente_registrado INTEGER DEFAULT 0,
                 creado_en TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        _ensure_column(conn, "tienda_visitas_eventos", "cliente_email", "TEXT")
+        _ensure_column(conn, "tienda_visitas_eventos", "cliente_telefono", "TEXT")
+        _ensure_column(conn, "tienda_visitas_eventos", "cliente_registrado", "INTEGER DEFAULT 0")
         _ensure_column(conn, "tienda_visitas", "ip_address", "TEXT")
         conn.execute(
             """
@@ -7842,6 +7848,12 @@ def migrar_db():
             """
             CREATE INDEX IF NOT EXISTS idx_tienda_visitas_eventos_tipo
             ON tienda_visitas_eventos(evento, creado_en)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_visitas_eventos_reg
+            ON tienda_visitas_eventos(cliente_registrado, creado_en)
             """
         )
         conn.execute(

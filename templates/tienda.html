@@ -4979,6 +4979,9 @@
                     pagina: "/tienda",
                     carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
                     carrito_total: Math.max(0, Number(total || 0)),
+                    cliente_registrado: Boolean(clienteRegistrado && clienteRegistrado.email),
+                    cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
+                    cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
                 };
                 fetch("/api/tienda/track", {
                     method: "POST",
@@ -4998,6 +5001,9 @@
                     pagina: "/tienda",
                     carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
                     carrito_total: Math.max(0, Number(total || 0)),
+                    cliente_registrado: Boolean(clienteRegistrado && clienteRegistrado.email),
+                    cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
+                    cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
                 };
                 if (navigator.sendBeacon) {
                     const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });

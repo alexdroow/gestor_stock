@@ -684,6 +684,125 @@
             gap: 16px;
         }
 
+        .modal-visitas-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+            padding: 20px;
+        }
+
+        .modal-visitas-card {
+            width: min(900px, 96vw);
+            max-height: 85vh;
+            overflow: auto;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        .modal-visitas-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .modal-visitas-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .modal-visitas-close {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #0f172a;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .modal-visitas-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(120px, 1fr));
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .modal-visitas-kpi {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 8px;
+        }
+
+        .modal-visitas-kpi .k {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .modal-visitas-kpi .v {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .modal-visitas-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .modal-visitas-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fff;
+            min-height: 180px;
+        }
+
+        .modal-visitas-box h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #0f172a;
+        }
+
+        .modal-visitas-list {
+            max-height: 280px;
+            overflow: auto;
+            font-size: 13px;
+            color: #334155;
+        }
+
+        .modal-visitas-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            border-bottom: 1px dashed #e2e8f0;
+            padding: 6px 0;
+        }
+
+        .modal-visitas-row:last-child {
+            border-bottom: none;
+        }
+
+        .modal-visitas-foot {
+            margin-top: 10px;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 8px;
+            font-size: 13px;
+            color: #334155;
+        }
+
         .action-btn {
             background: white;
             border: 1px solid #e2e8f0;
@@ -893,6 +1012,33 @@
             border-color: #334155;
             color: #94a3b8;
         }
+        body.dark-mode .modal-visitas-card,
+        body.dark-mode .modal-visitas-box {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        body.dark-mode .modal-visitas-title,
+        body.dark-mode .modal-visitas-kpi .v,
+        body.dark-mode .modal-visitas-box h4 {
+            color: #f8fafc;
+        }
+        body.dark-mode .modal-visitas-kpi {
+            background: #0f172a;
+            border-color: #334155;
+        }
+        body.dark-mode .modal-visitas-kpi .k,
+        body.dark-mode .modal-visitas-list,
+        body.dark-mode .modal-visitas-foot {
+            color: #cbd5e1;
+        }
+        body.dark-mode .modal-visitas-row {
+            border-color: #334155;
+        }
+        body.dark-mode .modal-visitas-close {
+            background: #0f172a;
+            border-color: #475569;
+            color: #f8fafc;
+        }
 
         @media (max-width: 1024px) {
             .sidebar { width: 240px; }
@@ -901,6 +1047,8 @@
             .charts-grid { grid-template-columns: 1fr; }
             .quick-actions { grid-template-columns: 1fr; }
             .inicio-dashboard-grid { grid-template-columns: 1fr; }
+            .modal-visitas-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+            .modal-visitas-cols { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 768px) {
@@ -952,7 +1100,7 @@
                     <div class="stat-value warning" id="stat-total-ventas-dia">-</div>
                     <div class="stat-sub">Click para ver ventas de los últimos 7 días</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card clickable" id="stat-card-visitas" title="Ver detalle de entradas web">
                     <div class="stat-header">
                         <span class="stat-label">Entradas web hoy</span>
                         <div class="stat-icon orange">&#128176;</div>
@@ -1055,6 +1203,32 @@
         </main>
     </div>
 
+    <div class="modal-visitas-overlay" id="modal-visitas-overlay">
+        <div class="modal-visitas-card">
+            <div class="modal-visitas-head">
+                <div class="modal-visitas-title">Entradas web de hoy</div>
+                <button type="button" class="modal-visitas-close" id="modal-visitas-close">Cerrar</button>
+            </div>
+            <div class="modal-visitas-grid">
+                <div class="modal-visitas-kpi"><div class="k">Entradas totales</div><div class="v" id="mv-kpi-total">0</div></div>
+                <div class="modal-visitas-kpi"><div class="k">Registrados</div><div class="v" id="mv-kpi-reg">0</div></div>
+                <div class="modal-visitas-kpi"><div class="k">Sin registro</div><div class="v" id="mv-kpi-anon">0</div></div>
+                <div class="modal-visitas-kpi"><div class="k">Clientes únicos</div><div class="v" id="mv-kpi-uniq">0</div></div>
+            </div>
+            <div class="modal-visitas-cols">
+                <section class="modal-visitas-box">
+                    <h4>Entradas por hora</h4>
+                    <div class="modal-visitas-list" id="mv-list-horas">Cargando...</div>
+                </section>
+                <section class="modal-visitas-box">
+                    <h4>Clientes registrados (hoy)</h4>
+                    <div class="modal-visitas-list" id="mv-list-clientes">Cargando...</div>
+                </section>
+            </div>
+            <div class="modal-visitas-foot" id="mv-foot-resumen">Registrados: 0 · Sin registro: 0</div>
+        </div>
+    </div>
+
     <button onclick="toggleDarkMode()" id="darkModeBtn" style="
         position: fixed;
         bottom: 24px;
@@ -1135,6 +1309,84 @@
         if (n > 0) return { txt: `↑ ${Math.abs(n).toFixed(1)}%`, cls: 'up' };
         if (n < 0) return { txt: `↓ ${Math.abs(n).toFixed(1)}%`, cls: 'down' };
         return { txt: '0%', cls: 'flat' };
+    }
+
+    function abrirModalVisitas() {
+        const modal = document.getElementById('modal-visitas-overlay');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        cargarDetalleVisitasHoy();
+    }
+
+    function cerrarModalVisitas() {
+        const modal = document.getElementById('modal-visitas-overlay');
+        if (!modal) return;
+        modal.style.display = 'none';
+    }
+
+    function renderListaVisitasHoras(items) {
+        const host = document.getElementById('mv-list-horas');
+        if (!host) return;
+        const rows = Array.isArray(items) ? items : [];
+        if (!rows.length) {
+            host.innerHTML = '<div class="modal-visitas-row"><span>Sin entradas hoy</span><strong>0</strong></div>';
+            return;
+        }
+        host.innerHTML = rows.map((r) => `
+            <div class="modal-visitas-row">
+                <span>${escapeHtml(r.hora || '--:--')}</span>
+                <strong>${formatearEntero(r.total || 0)}</strong>
+            </div>
+        `).join('');
+    }
+
+    function renderListaVisitasClientes(items) {
+        const host = document.getElementById('mv-list-clientes');
+        if (!host) return;
+        const rows = Array.isArray(items) ? items : [];
+        if (!rows.length) {
+            host.innerHTML = '<div class="modal-visitas-row"><span>Sin clientes registrados hoy</span><strong>0</strong></div>';
+            return;
+        }
+        host.innerHTML = rows.map((r) => `
+            <div class="modal-visitas-row">
+                <span>${escapeHtml(r.cliente || 'Cliente')}</span>
+                <strong>${formatearEntero(r.total || 0)}</strong>
+            </div>
+        `).join('');
+    }
+
+    function cargarDetalleVisitasHoy() {
+        fetch('/api/dashboard/visitas-detalle-hoy')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) throw new Error(data.error || 'No se pudo cargar');
+                const rs = data.resumen || {};
+                const regUniq = Number(rs.registrados_unicos_hoy || 0);
+                const anonUniq = Number(rs.anon_unicos_hoy || 0);
+                const uniqTotal = regUniq + anonUniq;
+                const regEvt = Number(rs.registrados_eventos_hoy || 0);
+                const anonEvt = Number(rs.anon_eventos_hoy || 0);
+                document.getElementById('mv-kpi-total').textContent = formatearEntero(rs.eventos_hoy || 0);
+                document.getElementById('mv-kpi-reg').textContent = formatearEntero(regEvt);
+                document.getElementById('mv-kpi-anon').textContent = formatearEntero(anonEvt);
+                document.getElementById('mv-kpi-uniq').textContent = formatearEntero(uniqTotal);
+                document.getElementById('mv-foot-resumen').textContent =
+                    `Clientes únicos con cuenta: ${formatearEntero(regUniq)} · Entradas sin registro: ${formatearEntero(anonEvt)}`;
+                renderListaVisitasHoras(data.por_hora || []);
+                renderListaVisitasClientes(data.top_registrados || []);
+            })
+            .catch(() => {
+                const ids = ['mv-kpi-total', 'mv-kpi-reg', 'mv-kpi-anon', 'mv-kpi-uniq'];
+                ids.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = '0';
+                });
+                renderListaVisitasHoras([]);
+                renderListaVisitasClientes([]);
+                const foot = document.getElementById('mv-foot-resumen');
+                if (foot) foot.textContent = 'No se pudo cargar detalle de entradas.';
+            });
     }
 
     function formatearFechaEventoAgenda(fecha, hora) {
@@ -1566,6 +1818,16 @@
             cardTotalVentas.addEventListener('click', () => {
                 const chart = document.getElementById('ventasChart');
                 if (chart) chart.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        }
+        const cardVisitas = document.getElementById('stat-card-visitas');
+        if (cardVisitas) cardVisitas.addEventListener('click', abrirModalVisitas);
+        const btnCloseVisitas = document.getElementById('modal-visitas-close');
+        if (btnCloseVisitas) btnCloseVisitas.addEventListener('click', cerrarModalVisitas);
+        const overlayVisitas = document.getElementById('modal-visitas-overlay');
+        if (overlayVisitas) {
+            overlayVisitas.addEventListener('click', (ev) => {
+                if (ev.target === overlayVisitas) cerrarModalVisitas();
             });
         }
         cargarNotasFijadasInicio();

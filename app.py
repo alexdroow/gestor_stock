@@ -5524,6 +5524,9 @@ def api_tienda_track():
         checkout_delta = 1 if evento == "checkout" else 0
         user_agent = str(request.headers.get("User-Agent") or "")[:260]
         ip_address = _obtener_ip_cliente()
+        cliente_email = _normalizar_email(data.get("cliente_email"))
+        cliente_telefono = str(data.get("cliente_telefono") or "").strip()[:24]
+        cliente_registrado = 1 if bool(data.get("cliente_registrado")) and bool(cliente_email) else 0
 
         conn = get_db()
         cursor = conn.cursor()
@@ -5531,10 +5534,12 @@ def api_tienda_track():
             try:
                 cursor.execute(
                     """
-                    INSERT INTO tienda_visitas_eventos (session_id, evento, pagina, ip_address, creado_en)
-                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    INSERT INTO tienda_visitas_eventos (
+                        session_id, evento, pagina, ip_address, cliente_email, cliente_telefono, cliente_registrado, creado_en
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """,
-                    (session_id, evento, pagina, ip_address),
+                    (session_id, evento, pagina, ip_address, cliente_email, cliente_telefono, cliente_registrado),
                 )
             except sqlite3.OperationalError:
                 pass
@@ -5599,6 +5604,135 @@ def api_tienda_track():
     except Exception as e:
         if conn:
             conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/dashboard/visitas-detalle-hoy', methods=['GET'])
+def api_dashboard_visitas_detalle_hoy():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(tienda_visitas_eventos)")
+        cols = {str(r["name"]).strip().lower() for r in (cursor.fetchall() or []) if r and r["name"]}
+        if "id" not in cols:
+            return jsonify(
+                {
+                    "success": True,
+                    "resumen": {
+                        "eventos_hoy": 0,
+                        "registrados_eventos_hoy": 0,
+                        "anon_eventos_hoy": 0,
+                        "registrados_unicos_hoy": 0,
+                        "anon_unicos_hoy": 0,
+                    },
+                    "por_hora": [],
+                    "top_registrados": [],
+                }
+            )
+
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tienda_visitas_eventos
+            WHERE evento IN ('view','enter')
+              AND date(creado_en, 'localtime') = date('now','localtime')
+            """
+        )
+        eventos_hoy = int(cursor.fetchone()["total"] or 0)
+
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tienda_visitas_eventos
+            WHERE evento IN ('view','enter')
+              AND COALESCE(cliente_registrado,0) = 1
+              AND date(creado_en, 'localtime') = date('now','localtime')
+            """
+        )
+        registrados_eventos_hoy = int(cursor.fetchone()["total"] or 0)
+        anon_eventos_hoy = max(0, eventos_hoy - registrados_eventos_hoy)
+
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT COALESCE(NULLIF(TRIM(cliente_email), ''), session_id)) AS total
+            FROM tienda_visitas_eventos
+            WHERE evento IN ('view','enter')
+              AND COALESCE(cliente_registrado,0) = 1
+              AND date(creado_en, 'localtime') = date('now','localtime')
+            """
+        )
+        registrados_unicos_hoy = int(cursor.fetchone()["total"] or 0)
+
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT session_id) AS total
+            FROM tienda_visitas_eventos
+            WHERE evento IN ('view','enter')
+              AND COALESCE(cliente_registrado,0) = 0
+              AND date(creado_en, 'localtime') = date('now','localtime')
+            """
+        )
+        anon_unicos_hoy = int(cursor.fetchone()["total"] or 0)
+
+        cursor.execute(
+            """
+            SELECT strftime('%H', datetime(creado_en, 'localtime')) AS hora,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN COALESCE(cliente_registrado,0)=1 THEN 1 ELSE 0 END) AS registrados,
+                   SUM(CASE WHEN COALESCE(cliente_registrado,0)=0 THEN 1 ELSE 0 END) AS anonimos
+            FROM tienda_visitas_eventos
+            WHERE evento IN ('view','enter')
+              AND date(creado_en, 'localtime') = date('now','localtime')
+            GROUP BY strftime('%H', datetime(creado_en, 'localtime'))
+            ORDER BY hora ASC
+            """
+        )
+        por_hora = [
+            {
+                "hora": f"{int(r['hora'] or 0):02d}:00",
+                "total": int(r["total"] or 0),
+                "registrados": int(r["registrados"] or 0),
+                "anonimos": int(r["anonimos"] or 0),
+            }
+            for r in cursor.fetchall()
+        ]
+
+        cursor.execute(
+            """
+            SELECT COALESCE(NULLIF(TRIM(cliente_email), ''), '(sin correo)') AS cliente,
+                   COUNT(*) AS total
+            FROM tienda_visitas_eventos
+            WHERE evento IN ('view','enter')
+              AND COALESCE(cliente_registrado,0) = 1
+              AND date(creado_en, 'localtime') = date('now','localtime')
+            GROUP BY COALESCE(NULLIF(TRIM(cliente_email), ''), '(sin correo)')
+            ORDER BY total DESC, cliente ASC
+            LIMIT 20
+            """
+        )
+        top_registrados = [{"cliente": str(r["cliente"]), "total": int(r["total"] or 0)} for r in cursor.fetchall()]
+
+        return jsonify(
+            {
+                "success": True,
+                "resumen": {
+                    "eventos_hoy": eventos_hoy,
+                    "registrados_eventos_hoy": registrados_eventos_hoy,
+                    "anon_eventos_hoy": anon_eventos_hoy,
+                    "registrados_unicos_hoy": registrados_unicos_hoy,
+                    "anon_unicos_hoy": anon_unicos_hoy,
+                },
+                "por_hora": por_hora,
+                "top_registrados": top_registrados,
+            }
+        )
+    except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
