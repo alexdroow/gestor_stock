@@ -9793,6 +9793,61 @@ def api_dashboard_producto_agregar_compra(producto_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/api/dashboard/productos-por-vencer', methods=['GET'])
+def api_dashboard_productos_por_vencer():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT
+                id,
+                nombre,
+                foto_url,
+                unidad,
+                stock,
+                fecha_vencimiento,
+                CAST(julianday(fecha_vencimiento) - julianday(date('now')) AS INTEGER) AS dias_restantes
+            FROM productos
+            WHERE COALESCE(eliminado, 0) = 0
+              AND fecha_vencimiento IS NOT NULL
+              AND TRIM(fecha_vencimiento) <> ''
+              AND date(fecha_vencimiento) <= date('now', '+7 day')
+            ORDER BY date(fecha_vencimiento) ASC, LOWER(nombre) ASC
+            """
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        items = []
+        for r in rows:
+            dias = int(r["dias_restantes"] or 0)
+            if dias < 0:
+                estado = "Vencido"
+            elif dias == 0:
+                estado = "Vence hoy"
+            elif dias == 1:
+                estado = "Vence mañana"
+            else:
+                estado = f"Vence en {dias} días"
+            items.append(
+                {
+                    "id": int(r["id"] or 0),
+                    "nombre": str(r["nombre"] or "Producto"),
+                    "foto_url": str(r["foto_url"] or "").strip(),
+                    "unidad": str(r["unidad"] or "unidad"),
+                    "stock_label": _formatear_numero_simple(r["stock"]),
+                    "fecha_vencimiento": str(r["fecha_vencimiento"] or "").strip(),
+                    "dias_restantes": dias,
+                    "estado_label": estado,
+                }
+            )
+
+        return jsonify({"success": True, "items": items, "total": len(items)})
+    except Exception as e:
+        return jsonify({"success": False, "items": [], "total": 0, "error": str(e)}), 500
+
+
 @app.route('/api/producto/<int:id>/desactivacion-manual', methods=['POST'])
 def api_toggle_desactivacion_manual_producto(id):
     conn = None

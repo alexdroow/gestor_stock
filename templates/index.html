@@ -340,6 +340,12 @@
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 10px;
         }
+        .agotarse-scroll {
+            max-height: 340px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+        }
         .agotarse-card {
             border: 1px solid #e2e8f0;
             background: #ffffff;
@@ -406,6 +412,70 @@
             background: #ffedd5;
         }
         .agotarse-empty {
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 13px;
+            color: #64748b;
+            background: #f8fafc;
+        }
+        .vencer-wrap {
+            margin-bottom: 20px;
+        }
+        .vencer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .vencer-card {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: 52px 1fr;
+            gap: 10px;
+        }
+        .vencer-thumb {
+            width: 52px;
+            height: 52px;
+            border-radius: 10px;
+            border: 1px solid #dbeafe;
+            object-fit: cover;
+            background: #f8fafc;
+        }
+        .vencer-thumb.placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            font-size: 18px;
+        }
+        .vencer-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.3;
+            margin-bottom: 2px;
+        }
+        .vencer-meta {
+            font-size: 12px;
+            color: #475569;
+            line-height: 1.35;
+        }
+        .vencer-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 3px 8px;
+            margin-bottom: 6px;
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .vencer-empty {
             border: 1px dashed #cbd5e1;
             border-radius: 10px;
             padding: 12px;
@@ -782,6 +852,26 @@
             border-color: #334155;
             color: #94a3b8;
         }
+        body.dark-mode .vencer-card {
+            background: #0f172a;
+            border-color: #334155;
+        }
+        body.dark-mode .vencer-name {
+            color: #f8fafc;
+        }
+        body.dark-mode .vencer-meta {
+            color: #cbd5e1;
+        }
+        body.dark-mode .vencer-badge {
+            background: #451a03;
+            border-color: #c2410c;
+            color: #fdba74;
+        }
+        body.dark-mode .vencer-empty {
+            background: #0f172a;
+            border-color: #334155;
+            color: #94a3b8;
+        }
 
         @media (max-width: 1024px) {
             .sidebar { width: 240px; }
@@ -866,8 +956,25 @@
                     </div>
                     <a href="/insumos?seccion=compras" class="inicio-notas-link">Ver lista de compra</a>
                 </div>
-                <div class="agotarse-grid" id="inicio-agotarse-list">
-                    <div class="agotarse-empty">Cargando productos...</div>
+                <div class="agotarse-scroll">
+                    <div class="agotarse-grid" id="inicio-agotarse-list">
+                        <div class="agotarse-empty">Cargando productos...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="vencer-wrap" id="inicio-vencer-wrap">
+                <div class="agotarse-head">
+                    <div>
+                        <div class="agotarse-title">&#9203; Próximos a vencer</div>
+                        <div class="agotarse-sub">Control preventivo de productos con fecha cercana</div>
+                    </div>
+                    <a href="/productos" class="inicio-notas-link">Abrir productos</a>
+                </div>
+                <div class="agotarse-scroll">
+                    <div class="vencer-grid" id="inicio-vencer-list">
+                        <div class="vencer-empty">Cargando productos...</div>
+                    </div>
                 </div>
             </section>
 
@@ -1269,6 +1376,50 @@
         });
     }
 
+    function renderProductosPorVencerInicio(items) {
+        const host = document.getElementById('inicio-vencer-list');
+        if (!host) return;
+        const rows = Array.isArray(items) ? items : [];
+        if (!rows.length) {
+            host.innerHTML = '<div class="vencer-empty">No hay productos próximos a vencer.</div>';
+            return;
+        }
+        host.innerHTML = rows.slice(0, 30).map((item) => {
+            const nombre = escapeHtml(item.nombre || 'Producto');
+            const unidad = escapeHtml(item.unidad || 'unidad');
+            const estado = escapeHtml(item.estado_label || 'Próximo a vencer');
+            const fecha = escapeHtml(item.fecha_vencimiento || '-');
+            const stockLabel = escapeHtml(item.stock_label || '0');
+            const foto = String(item.foto_url || '').trim();
+            const thumb = foto
+                ? `<img class="vencer-thumb" src="${escapeHtml(foto)}" alt="${nombre}" loading="lazy" referrerpolicy="no-referrer">`
+                : '<div class="vencer-thumb placeholder">&#128230;</div>';
+            return `
+                <article class="vencer-card">
+                    ${thumb}
+                    <div>
+                        <div class="vencer-badge">${estado}</div>
+                        <div class="vencer-name">${nombre}</div>
+                        <div class="vencer-meta">Stock: ${stockLabel} ${unidad}<br>Fecha vencimiento: ${fecha}</div>
+                    </div>
+                </article>
+            `;
+        }).join('');
+    }
+
+    function cargarProductosPorVencerInicio() {
+        fetch('/api/dashboard/productos-por-vencer')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) throw new Error(data.error || 'No se pudo cargar');
+                renderProductosPorVencerInicio(data.items || []);
+            })
+            .catch(() => {
+                const host = document.getElementById('inicio-vencer-list');
+                if (host) host.innerHTML = '<div class="vencer-empty">No se pudo cargar la lista de productos por vencer.</div>';
+            });
+    }
+
     function cargarProductosPorAgotarInicio() {
         fetch('/api/dashboard/productos-por-agotar')
             .then(r => r.json())
@@ -1412,6 +1563,7 @@
         cargarEstadisticas();
         cargarAvisoDesactivacionesPendientes();
         cargarProductosPorAgotarInicio();
+        cargarProductosPorVencerInicio();
         cargarContadorAlertas();
         cargarGraficoVentas();
         cargarGraficoProductos();
