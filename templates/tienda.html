@@ -3205,7 +3205,7 @@
                 </div>
                 <div class="checkout-delivery-time">
                     <label for="checkout-hora-retiro">Hora de retiro/entrega</label>
-                    <input id="checkout-hora-retiro" type="time" step="300">
+                    <select id="checkout-hora-retiro"></select>
                     <div id="checkout-hora-help"></div>
                 </div>
                 <div class="checkout-despacho-wrap" id="checkout-despacho-wrap">
@@ -7829,15 +7829,33 @@
             return sel.getTime() >= min.getTime();
         }
 
+        function _construirOpcionesHoraCheckout(minHora, preferida) {
+            if (!checkoutHoraRetiroEl) return;
+            const minStr = String(minHora || _horaMinimaCheckoutHHMM()).trim();
+            const preferidaStr = String(preferida || "").trim();
+            const m = minStr.match(/^(\d{2}):(\d{2})$/);
+            if (!m) return;
+            let inicioMin = (Number(m[1]) * 60) + Number(m[2]);
+            if (!Number.isFinite(inicioMin) || inicioMin < 0) inicioMin = 0;
+            if (inicioMin > (23 * 60 + 55)) inicioMin = 23 * 60 + 55;
+
+            let html = "";
+            for (let total = inicioMin; total <= (23 * 60 + 55); total += 5) {
+                const hh = String(Math.floor(total / 60)).padStart(2, "0");
+                const mm = String(total % 60).padStart(2, "0");
+                const hhmm = `${hh}:${mm}`;
+                html += `<option value="${hhmm}">${hhmm}</option>`;
+            }
+            checkoutHoraRetiroEl.innerHTML = html;
+            const seleccion = (_esHoraCheckoutValida(preferidaStr) && preferidaStr >= minStr) ? preferidaStr : minStr;
+            checkoutHoraRetiroEl.value = seleccion;
+        }
+
         function _aplicarMinimoHoraCheckout(forceDefault = false) {
             if (!checkoutHoraRetiroEl) return "";
             const minHora = _horaMinimaCheckoutHHMM();
-            checkoutHoraRetiroEl.min = minHora;
-            checkoutHoraRetiroEl.step = "300";
             const actual = String(checkoutHoraRetiroEl.value || "").trim();
-            if (forceDefault || !actual || !_esHoraCheckoutValida(actual)) {
-                checkoutHoraRetiroEl.value = minHora;
-            }
+            _construirOpcionesHoraCheckout(minHora, forceDefault ? "" : actual);
             return minHora;
         }
 
