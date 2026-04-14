@@ -9693,6 +9693,106 @@ def api_desactivaciones_pendientes_venta():
         return jsonify({"success": False, "pendientes": [], "total": 0, "error": str(e)}), 500
 
 
+@app.route('/api/dashboard/productos-por-agotar', methods=['GET'])
+def api_dashboard_productos_por_agotar():
+    try:
+        productos = _obtener_productos_para_venta()
+        items = []
+        for p in productos:
+            stock = float(p.get("stock") or 0)
+            stock_min = float(p.get("stock_minimo") or 0)
+            critico = bool(
+                p.get("bajo_minimo_total")
+                or p.get("baja_porcion_total")
+                or p.get("desactivacion_manual_requiere_confirmacion")
+                or stock <= 0
+            )
+            if not critico:
+                continue
+            faltante = max(0.0, stock_min - stock)
+            sugerido = faltante if faltante > 0 else max(1.0, float(p.get("porcion_cantidad") or 1))
+            items.append(
+                {
+                    "id": int(p.get("id") or 0),
+                    "nombre": str(p.get("nombre") or "Producto"),
+                    "foto_url": str(p.get("foto_url") or "").strip(),
+                    "stock": stock,
+                    "stock_label": p.get("stock_visual_label") or p.get("stock_label") or _formatear_numero_simple(stock),
+                    "stock_minimo": stock_min,
+                    "stock_minimo_label": _formatear_numero_simple(stock_min),
+                    "unidad": str(p.get("stock_visual_unidad") or p.get("unidad") or "unidad"),
+                    "sugerido_cantidad": round(float(sugerido), 3),
+                    "motivo": str(p.get("dependencias_alerta_texto") or "").strip(),
+                }
+            )
+        items.sort(key=lambda x: (x.get("stock", 0), str(x.get("nombre") or "").lower()))
+        return jsonify({"success": True, "items": items, "total": len(items)})
+    except Exception as e:
+        return jsonify({"success": False, "items": [], "total": 0, "error": str(e)}), 500
+
+
+@app.route('/api/dashboard/productos-por-agotar/<int:producto_id>/agregar-compra', methods=['POST'])
+def api_dashboard_producto_agregar_compra(producto_id):
+    try:
+        payload = request.get_json(silent=True) or {}
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, nombre, unidad, stock, stock_minimo
+            FROM productos
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (int(producto_id),),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return jsonify({"success": False, "error": "Producto no encontrado."}), 404
+
+        nombre = str(row["nombre"] or "Producto").strip()
+        unidad = str(row["unidad"] or "unidad").strip() or "unidad"
+        stock = float(row["stock"] or 0)
+        stock_min = float(row["stock_minimo"] or 0)
+        suggested = payload.get("cantidad")
+        try:
+            suggested = float(suggested) if suggested is not None else None
+        except (TypeError, ValueError):
+            suggested = None
+        if suggested is None or suggested <= 0:
+            suggested = max(1.0, stock_min - stock) if stock_min > 0 else 1.0
+            if suggested <= 0:
+                suggested = 1.0
+
+        resultado = agregar_lote_compras_pendientes(
+            [
+                {
+                    "nombre": nombre,
+                    "cantidad": round(float(suggested), 3),
+                    "unidad": unidad,
+                    "precio_unitario": 0,
+                    "precio_incluye_iva": True,
+                    "nota": "Generado desde Dashboard Inicio (productos por agotar)",
+                }
+            ],
+            combinar=True,
+        )
+        if not resultado.get("success"):
+            return jsonify({"success": False, "error": resultado.get("error") or "No se pudo agregar."}), 400
+        crear_backup()
+        resumen = obtener_compras_pendientes(incluir_comprados=True)
+        return jsonify(
+            {
+                "success": True,
+                "message": f"'{nombre}' agregado a lista de compra.",
+                "resumen": resumen.get("resumen") or {},
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/producto/<int:id>/desactivacion-manual', methods=['POST'])
 def api_toggle_desactivacion_manual_producto(id):
     conn = None
