@@ -7642,6 +7642,18 @@ def migrar_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_visitas_eventos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                evento TEXT NOT NULL DEFAULT 'view',
+                pagina TEXT DEFAULT '/tienda',
+                ip_address TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         _ensure_column(conn, "tienda_visitas", "ip_address", "TEXT")
         conn.execute(
             """
@@ -7818,6 +7830,18 @@ def migrar_db():
             """
             CREATE INDEX IF NOT EXISTS idx_tienda_visitas_carrito
             ON tienda_visitas(carrito_items, ultima_actividad)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_visitas_eventos_creado
+            ON tienda_visitas_eventos(creado_en)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_visitas_eventos_tipo
+            ON tienda_visitas_eventos(evento, creado_en)
             """
         )
         conn.execute(

@@ -5527,6 +5527,17 @@ def api_tienda_track():
 
         conn = get_db()
         cursor = conn.cursor()
+        if evento in {"view", "enter", "checkout"}:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO tienda_visitas_eventos (session_id, evento, pagina, ip_address, creado_en)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """,
+                    (session_id, evento, pagina, ip_address),
+                )
+            except sqlite3.OperationalError:
+                pass
         if evento in {"leave", "close", "salida"}:
             cursor.execute(
                 """
@@ -6832,12 +6843,28 @@ def estadisticas():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        
+
+        cursor.execute("PRAGMA table_info(productos)")
+        columnas_productos = {str(r["name"]).strip().lower() for r in (cursor.fetchall() or []) if r and r["name"]}
+        tiene_activo_tienda = "activo_tienda" in columnas_productos
+
         cursor.execute("SELECT COUNT(*) FROM productos WHERE COALESCE(eliminado, 0) = 0")
-        total_productos = cursor.fetchone()[0]
-        
+        total_productos = int(cursor.fetchone()[0] or 0)
+        if tiene_activo_tienda:
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM productos
+                WHERE COALESCE(eliminado, 0) = 0
+                  AND COALESCE(activo_tienda, 1) = 1
+                """
+            )
+            activos_tienda = int(cursor.fetchone()[0] or 0)
+        else:
+            activos_tienda = total_productos
+
         cursor.execute("SELECT COUNT(*) FROM insumos")
-        total_insumos = cursor.fetchone()[0]
+        total_insumos = int(cursor.fetchone()[0] or 0)
 
         alertas_productos = _obtener_alertas_productos(cursor)
         alertas_prod = len(alertas_productos["ids_union"])
@@ -6850,33 +6877,109 @@ def estadisticas():
               AND CAST(stock AS REAL) <= CAST(stock_minimo AS REAL)
             """
         )
-        alertas_ins = cursor.fetchone()[0]
-        haccp_vencidos = contar_haccp_vencidos(conn=conn)
-        
-        cursor.execute("SELECT COUNT(*) FROM ventas WHERE date(fecha_hora) = date('now')")
-        ventas_hoy = cursor.fetchone()[0]
-        
+        alertas_ins = int(cursor.fetchone()[0] or 0)
+        haccp_vencidos = int(contar_haccp_vencidos(conn=conn) or 0)
+
+        cursor.execute("SELECT COUNT(*) FROM ventas WHERE date(fecha_hora) = date('now','localtime')")
+        ventas_hoy = int(cursor.fetchone()[0] or 0)
+        cursor.execute("SELECT COUNT(*) FROM ventas WHERE date(fecha_hora) = date('now','-7 day','localtime')")
+        ventas_hoy_semana_pasada = int(cursor.fetchone()[0] or 0)
+
+        cursor.execute("SELECT COALESCE(SUM(COALESCE(total_monto,0)),0) FROM ventas WHERE date(fecha_hora) = date('now','localtime')")
+        monto_ventas_hoy = float(cursor.fetchone()[0] or 0)
+        cursor.execute("SELECT COALESCE(SUM(COALESCE(total_monto,0)),0) FROM ventas WHERE date(fecha_hora) = date('now','-7 day','localtime')")
+        monto_ventas_semana_pasada = float(cursor.fetchone()[0] or 0)
+
+        try:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM tienda_visitas_eventos
+                WHERE evento IN ('view', 'enter')
+                  AND date(creado_en, 'localtime') = date('now', 'localtime')
+                """
+            )
+            visitas_hoy = int(cursor.fetchone()["total"] or 0)
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM tienda_visitas_eventos
+                WHERE evento IN ('view', 'enter')
+                  AND date(creado_en, 'localtime') = date('now', '-7 day', 'localtime')
+                """
+            )
+            visitas_hoy_semana_pasada = int(cursor.fetchone()["total"] or 0)
+        except sqlite3.OperationalError:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM tienda_visitas
+                WHERE date(ultima_actividad, 'localtime') = date('now', 'localtime')
+                """
+            )
+            visitas_hoy = int(cursor.fetchone()["total"] or 0)
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM tienda_visitas
+                WHERE date(ultima_actividad, 'localtime') = date('now', '-7 day', 'localtime')
+                """
+            )
+            visitas_hoy_semana_pasada = int(cursor.fetchone()["total"] or 0)
+
+        def _pct(actual, previo):
+            a = float(actual or 0)
+            p = float(previo or 0)
+            if p <= 0:
+                return 100.0 if a > 0 else 0.0
+            return round(((a - p) / p) * 100.0, 1)
+
         cursor.execute("""
             SELECT COUNT(*) FROM productos 
             WHERE COALESCE(eliminado, 0) = 0
               AND fecha_vencimiento IS NOT NULL 
               AND fecha_vencimiento <= date('now', '+2 days')
         """)
-        por_vencer = cursor.fetchone()[0]
+        por_vencer = int(cursor.fetchone()[0] or 0)
         
         conn.close()
         
         return jsonify({
             'productos': total_productos,
+            'productos_activos_tienda': activos_tienda,
+            'productos_total_tienda': total_productos,
             'insumos': total_insumos,
             'alertas': alertas_prod + alertas_ins + haccp_vencidos,
             'haccp_vencidos': haccp_vencidos,
             'ventas_hoy': ventas_hoy,
+            'ventas_hoy_semana_pasada': ventas_hoy_semana_pasada,
+            'monto_ventas_hoy': round(monto_ventas_hoy, 2),
+            'monto_ventas_semana_pasada': round(monto_ventas_semana_pasada, 2),
+            'monto_ventas_hoy_pct': _pct(monto_ventas_hoy, monto_ventas_semana_pasada),
+            'visitas_hoy': visitas_hoy,
+            'visitas_hoy_semana_pasada': visitas_hoy_semana_pasada,
+            'visitas_hoy_pct': _pct(visitas_hoy, visitas_hoy_semana_pasada),
             'por_vencer': por_vencer
         })
     except Exception as e:
         print(f"Error estadisticas: {e}")
-        return jsonify({'productos': 0, 'insumos': 0, 'alertas': 0, 'haccp_vencidos': 0, 'ventas_hoy': 0, 'por_vencer': 0})
+        return jsonify({
+            'productos': 0,
+            'productos_activos_tienda': 0,
+            'productos_total_tienda': 0,
+            'insumos': 0,
+            'alertas': 0,
+            'haccp_vencidos': 0,
+            'ventas_hoy': 0,
+            'ventas_hoy_semana_pasada': 0,
+            'monto_ventas_hoy': 0,
+            'monto_ventas_semana_pasada': 0,
+            'monto_ventas_hoy_pct': 0,
+            'visitas_hoy': 0,
+            'visitas_hoy_semana_pasada': 0,
+            'visitas_hoy_pct': 0,
+            'por_vencer': 0,
+        })
 
 @app.route('/productos')
 def productos():
@@ -10632,7 +10735,7 @@ def reporte_ventas_semanal():
         cursor.execute("""
             SELECT 
                 substr(fecha_hora, 1, 10) as fecha,
-                COUNT(*) as total
+                SUM(COALESCE(total_monto, 0)) as total
             FROM ventas
             WHERE fecha_hora >= datetime('now', '-10 days')
             GROUP BY substr(fecha_hora, 1, 10)
@@ -10644,7 +10747,7 @@ def reporte_ventas_semanal():
         
         print(f"DEBUG - Filas encontradas: {len(rows)}")
         for row in rows:
-            print(f"  Fecha: {row['fecha']}, Ventas: {row['total']}")
+            print(f"  Fecha: {row['fecha']}, Monto: {row['total']}")
         
         # Construir array de 7 días centrado en las fechas con datos
         from datetime import datetime, timedelta
@@ -10666,7 +10769,7 @@ def reporte_ventas_semanal():
         # Mapear datos
         ventas_por_fecha = {}
         for row in rows:
-            ventas_por_fecha[row['fecha']] = row['total']
+            ventas_por_fecha[row['fecha']] = float(row['total'] or 0)
         
         # Construir respuesta
         labels = []

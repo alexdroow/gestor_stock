@@ -596,6 +596,9 @@
             border: 1px solid #e2e8f0;
             transition: all 0.2s ease;
         }
+        .stat-card.clickable {
+            cursor: pointer;
+        }
 
         .stat-card:hover {
             transform: translateY(-2px);
@@ -637,6 +640,22 @@
         }
 
         .stat-value.warning { color: #ef4444; }
+        .stat-sub {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.35;
+        }
+        .stat-sub strong {
+            color: #334155;
+        }
+        .stat-trend {
+            margin-left: 6px;
+            font-weight: 700;
+        }
+        .stat-trend.up { color: #16a34a; }
+        .stat-trend.down { color: #dc2626; }
+        .stat-trend.flat { color: #64748b; }
 
         .charts-grid {
             display: grid;
@@ -737,6 +756,8 @@
         body.dark-mode .chart-title {
             color: #f1f5f9;
         }
+        body.dark-mode .stat-sub { color: #94a3b8; }
+        body.dark-mode .stat-sub strong { color: #e2e8f0; }
         body.dark-mode .inicio-panel-title,
         body.dark-mode .inicio-evento-detalle-titulo,
         body.dark-mode .inicio-evento-title {
@@ -909,31 +930,35 @@
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-header">
-                        <span class="stat-label">Productos</span>
+                        <span class="stat-label">Productos activos tienda</span>
                         <div class="stat-icon blue">&#128202;</div>
                     </div>
                     <div class="stat-value" id="stat-productos">-</div>
+                    <div class="stat-sub" id="stat-productos-sub">Total catálogo: -</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-header">
-                        <span class="stat-label">Insumos</span>
+                        <span class="stat-label">Ventas registradas hoy</span>
                         <div class="stat-icon green">&#127806;</div>
                     </div>
-                    <div class="stat-value" id="stat-insumos">-</div>
+                    <div class="stat-value" id="stat-ventas-registradas">-</div>
+                    <div class="stat-sub" id="stat-ventas-registradas-sub">$0 · 0% vs semana pasada</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card clickable" id="stat-card-total-ventas" title="Ver estadística de ventas (7 días)">
                     <div class="stat-header">
-                        <span class="stat-label">Alertas</span>
+                        <span class="stat-label">Total ventas del día</span>
                         <div class="stat-icon red">&#128276;</div>
                     </div>
-                    <div class="stat-value warning" id="stat-alertas">-</div>
+                    <div class="stat-value warning" id="stat-total-ventas-dia">-</div>
+                    <div class="stat-sub">Click para ver ventas de los últimos 7 días</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-header">
-                        <span class="stat-label">Ventas Hoy</span>
+                        <span class="stat-label">Entradas web hoy</span>
                         <div class="stat-icon orange">&#128176;</div>
                     </div>
-                    <div class="stat-value" id="stat-ventas">-</div>
+                    <div class="stat-value" id="stat-visitas-hoy">-</div>
+                    <div class="stat-sub" id="stat-visitas-hoy-sub">0% vs semana pasada</div>
                 </div>
             </div>
 
@@ -1098,6 +1123,20 @@
         return String(numero);
     }
 
+    function formatCLP(valor) {
+        const num = Number(valor || 0);
+        if (!Number.isFinite(num)) return '$0';
+        return `$${num.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`;
+    }
+
+    function formatTrendPct(valor) {
+        const n = Number(valor || 0);
+        if (!Number.isFinite(n)) return { txt: '0%', cls: 'flat' };
+        if (n > 0) return { txt: `↑ ${Math.abs(n).toFixed(1)}%`, cls: 'up' };
+        if (n < 0) return { txt: `↓ ${Math.abs(n).toFixed(1)}%`, cls: 'down' };
+        return { txt: '0%', cls: 'flat' };
+    }
+
     function formatearFechaEventoAgenda(fecha, hora) {
         const f = String(fecha || '').trim();
         if (!f) return '';
@@ -1235,17 +1274,36 @@
         fetch('/api/estadisticas')
             .then(r => r.json())
             .then(data => {
-                document.getElementById('stat-productos').textContent = data.productos ?? 0;
-                document.getElementById('stat-insumos').textContent = data.insumos ?? 0;
-                document.getElementById('stat-alertas').textContent = data.alertas ?? 0;
-                document.getElementById('stat-ventas').textContent = formatearEntero(data.ventas_hoy || 0);
+                const activos = Number(data.productos_activos_tienda ?? data.productos ?? 0) || 0;
+                const total = Number(data.productos_total_tienda ?? data.productos ?? 0) || 0;
+                const ventasReg = Number(data.ventas_hoy || 0) || 0;
+                const montoHoy = Number(data.monto_ventas_hoy || 0) || 0;
+                const visitasHoy = Number(data.visitas_hoy || 0) || 0;
+                const trendMonto = formatTrendPct(data.monto_ventas_hoy_pct || 0);
+                const trendVisitas = formatTrendPct(data.visitas_hoy_pct || 0);
+
+                document.getElementById('stat-productos').textContent = formatearEntero(activos);
+                document.getElementById('stat-productos-sub').innerHTML = `<strong>Total catálogo:</strong> ${formatearEntero(total)} (activos + apagados)`;
+
+                document.getElementById('stat-ventas-registradas').textContent = formatearEntero(ventasReg);
+                document.getElementById('stat-ventas-registradas-sub').innerHTML =
+                    `${formatCLP(montoHoy)} <span class="stat-trend ${trendMonto.cls}">${trendMonto.txt}</span> vs semana pasada`;
+
+                document.getElementById('stat-total-ventas-dia').textContent = formatCLP(montoHoy);
+
+                document.getElementById('stat-visitas-hoy').textContent = formatearEntero(visitasHoy);
+                document.getElementById('stat-visitas-hoy-sub').innerHTML =
+                    `<span class="stat-trend ${trendVisitas.cls}">${trendVisitas.txt}</span> vs semana pasada`;
 
             })
             .catch(() => {
                 document.getElementById('stat-productos').textContent = '0';
-                document.getElementById('stat-insumos').textContent = '0';
-                document.getElementById('stat-alertas').textContent = '0';
-                document.getElementById('stat-ventas').textContent = '0';
+                document.getElementById('stat-productos-sub').textContent = 'Total catálogo: 0';
+                document.getElementById('stat-ventas-registradas').textContent = '0';
+                document.getElementById('stat-ventas-registradas-sub').textContent = '$0 · 0% vs semana pasada';
+                document.getElementById('stat-total-ventas-dia').textContent = '$0';
+                document.getElementById('stat-visitas-hoy').textContent = '0';
+                document.getElementById('stat-visitas-hoy-sub').textContent = '0% vs semana pasada';
             });
     }
 
@@ -1503,6 +1561,13 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        const cardTotalVentas = document.getElementById('stat-card-total-ventas');
+        if (cardTotalVentas) {
+            cardTotalVentas.addEventListener('click', () => {
+                const chart = document.getElementById('ventasChart');
+                if (chart) chart.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        }
         cargarNotasFijadasInicio();
         cargarEventosAgendaInicio();
         cargarEstadisticas();
