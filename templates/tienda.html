@@ -7797,10 +7797,20 @@
             msg(`Repeticion aplicada: ${agregados} unidad(es) agregadas${omitidos > 0 ? `, ${omitidos} omitidas por stock` : ""}.`, omitidos > 0 && agregados === 0);
         }
 
-        function _horaMinimaCheckoutHHMM() {
+        function _checkoutMinDateObj() {
             const d = new Date();
             d.setSeconds(0, 0);
             d.setMinutes(d.getMinutes() + 30);
+            // El input usa step=300 (5 min): redondeamos hacia arriba para evitar horas "invalidas".
+            const rem = d.getMinutes() % 5;
+            if (rem !== 0) {
+                d.setMinutes(d.getMinutes() + (5 - rem));
+            }
+            return d;
+        }
+
+        function _horaMinimaCheckoutHHMM() {
+            const d = _checkoutMinDateObj();
             const hh = String(d.getHours()).padStart(2, "0");
             const mm = String(d.getMinutes()).padStart(2, "0");
             return `${hh}:${mm}`;
@@ -7810,7 +7820,7 @@
             const h = String(hora || "").trim();
             if (!/^\d{2}:\d{2}$/.test(h)) return false;
             const now = new Date();
-            const min = new Date(now.getTime() + (30 * 60 * 1000));
+            const min = _checkoutMinDateObj();
             const parts = h.split(":");
             const hh = Number(parts[0] || 0);
             const mm = Number(parts[1] || 0);
@@ -7819,9 +7829,21 @@
             return sel.getTime() >= min.getTime();
         }
 
+        function _aplicarMinimoHoraCheckout(forceDefault = false) {
+            if (!checkoutHoraRetiroEl) return "";
+            const minHora = _horaMinimaCheckoutHHMM();
+            checkoutHoraRetiroEl.min = minHora;
+            checkoutHoraRetiroEl.step = "300";
+            const actual = String(checkoutHoraRetiroEl.value || "").trim();
+            if (forceDefault || !actual || !_esHoraCheckoutValida(actual)) {
+                checkoutHoraRetiroEl.value = minHora;
+            }
+            return minHora;
+        }
+
         function _actualizarAyudaHoraCheckout() {
             if (!checkoutHoraHelpEl) return;
-            const minHora = _horaMinimaCheckoutHHMM();
+            const minHora = _aplicarMinimoHoraCheckout(false) || _horaMinimaCheckoutHHMM();
             const horaSel = String(checkoutHoraRetiroEl?.value || "").trim();
             if (!horaSel) {
                 checkoutHoraHelpEl.textContent = `La hora minima disponible es ${minHora} (30 min desde ahora).`;
@@ -8090,7 +8112,7 @@
                 </div>
             `;
             if (checkoutHoraRetiroEl) {
-                checkoutHoraRetiroEl.value = _horaMinimaCheckoutHHMM();
+                _aplicarMinimoHoraCheckout(true);
             }
             _actualizarAyudaHoraCheckout();
             _setCheckoutEntregaTipo("retiro");
