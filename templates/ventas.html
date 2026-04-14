@@ -520,6 +520,23 @@
             color: #0f172a;
         }
 
+        .producto-badge-apagado {
+            display: none;
+            margin: 0 auto 6px;
+            width: fit-content;
+            max-width: 100%;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            line-height: 1.1;
+            color: #7f1d1d;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            text-transform: uppercase;
+        }
+
         .producto-precio {
             margin-top: 6px;
             font-size: 13px;
@@ -1340,6 +1357,12 @@
         body.dark-mode .producto-nombre {
             color: #f1f5f9;
         }
+
+        body.dark-mode .producto-badge-apagado {
+            color: #fecaca;
+            background: rgba(127, 29, 29, 0.35);
+            border-color: rgba(248, 113, 113, 0.45);
+        }
         
         body.dark-mode .producto-stock {
             color: #94a3b8;
@@ -1787,6 +1810,9 @@
                                 <input type="file" class="input-foto" id="foto-input-{{ p.id }}" accept="image/*" onchange="subirFotoProducto(event, {{ p.id }})">
                             </div>
                             <div class="producto-nombre">{{ p.nombre }}</div>
+                            <div class="producto-badge-apagado" style="{{ '' if ((p.stock_visual if p.stock_visual is defined else p.stock)|float <= 0) else 'display:none;' }}">
+                                Apagado en tienda
+                            </div>
                             <div class="producto-precio">
                                 Precio:
                                 <span class="precio-texto" ondblclick="activarEdicionPrecio(event, {{ p.id }})">
@@ -2513,6 +2539,7 @@
                 icono: {{ (p.icono or 'cupcake')|tojson }},
                 foto_url: {{ (url_for('static', filename=p.foto) if p.foto else '')|tojson }},
                 precio: {{ (p.precio or 0)|tojson }},
+                activo_tienda: {{ 'false' if (p.activo_tienda is defined and not p.activo_tienda) else 'true' }},
                 fecha_reposicion_tienda: {{ (p.fecha_reposicion_tienda or '')|tojson }},
                 stock: {{ p.stock|tojson }},
                 unidad: {{ (p.unidad or 'unidad')|tojson }},
@@ -2615,6 +2642,7 @@
 
             const stockNumerico = Number(info.stock_visual ?? info.stock ?? 0);
             const porciones = Number(info.porciones_disponibles || 0);
+            const apagadoEnTienda = (info.activo_tienda === false) || stockNumerico <= 0;
             const agotadoStockReal = stockNumerico <= 0 || porciones <= 0 || Boolean(info.sin_porcion_disponible);
             const esCritico =
                 porciones <= 0
@@ -2693,6 +2721,11 @@
             const precioTexto = card.querySelector('.precio-texto');
             if (precioTexto) {
                 precioTexto.textContent = formatearMonedaCLP(normalizarPrecio(info.precio || 0));
+            }
+            const badgeApagado = card.querySelector('.producto-badge-apagado');
+            if (badgeApagado) {
+                badgeApagado.style.display = apagadoEnTienda ? '' : 'none';
+                badgeApagado.textContent = 'Apagado en tienda';
             }
 
             const stockEl = card.querySelector('.producto-stock');
@@ -2776,6 +2809,7 @@
                 if (!id || !productosData[id]) return;
                 productosData[id] = {
                     ...productosData[id],
+                    activo_tienda: (item.activo_tienda !== undefined ? Boolean(item.activo_tienda) : productosData[id].activo_tienda),
                     stock: Number(item.stock || 0),
                     unidad: item.unidad || productosData[id].unidad || 'unidad',
                     fecha_reposicion_tienda: String(item.fecha_reposicion_tienda || productosData[id].fecha_reposicion_tienda || '').trim(),
@@ -3101,6 +3135,11 @@
                 const prodSrv = data.producto || {};
                 productosData[pid].nombre = String(prodSrv.nombre || nombre).trim() || nombre;
                 productosData[pid].precio = normalizarPrecio(prodSrv.precio ?? precio);
+                if (prodSrv.activo_tienda !== undefined) {
+                    productosData[pid].activo_tienda = Boolean(prodSrv.activo_tienda);
+                } else if (Number(prodSrv.stock ?? stock) <= 0) {
+                    productosData[pid].activo_tienda = false;
+                }
                 productosData[pid].stock = Number(prodSrv.stock ?? stock);
                 productosData[pid].stock_visual = Number(prodSrv.stock_visual ?? productosData[pid].stock);
                 productosData[pid].stock_visual_unidad = prodSrv.stock_visual_unidad || prodSrv.unidad || productosData[pid].stock_visual_unidad || productosData[pid].unidad || 'unidad';
