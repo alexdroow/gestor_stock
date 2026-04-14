@@ -9798,18 +9798,26 @@ def api_dashboard_productos_por_vencer():
     try:
         conn = get_db()
         cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(productos)")
+        cols = {str(r["name"]).strip().lower() for r in (cursor.fetchall() or []) if r and r["name"]}
+
+        sel_foto = "foto_url" if "foto_url" in cols else "'' AS foto_url"
+        sel_eliminado = "COALESCE(eliminado, 0) = 0" if "eliminado" in cols else "1=1"
+        sel_unidad = "unidad" if "unidad" in cols else "'unidad' AS unidad"
+        sel_stock = "stock" if "stock" in cols else "0 AS stock"
+
         cursor.execute(
-            """
+            f"""
             SELECT
                 id,
                 nombre,
-                foto_url,
-                unidad,
-                stock,
+                {sel_foto},
+                {sel_unidad},
+                {sel_stock},
                 fecha_vencimiento,
                 CAST(julianday(fecha_vencimiento) - julianday(date('now')) AS INTEGER) AS dias_restantes
             FROM productos
-            WHERE COALESCE(eliminado, 0) = 0
+            WHERE {sel_eliminado}
               AND fecha_vencimiento IS NOT NULL
               AND TRIM(fecha_vencimiento) <> ''
               AND date(fecha_vencimiento) <= date('now', '+7 day')
