@@ -3599,7 +3599,13 @@
 
         function _timerPedidoRenderHtml(pedido) {
             const mins = Number(pedido?.timer_minutos || 0);
-            if (!mins) return '';
+            const estado = String(pedido?.pedido_estado || '').toLowerCase();
+            if (!mins) {
+                if (estado === 'confirmado' || estado === 'preparando') {
+                    return '<div style="margin-top:6px;font-size:.84rem;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;padding:5px 8px;border-radius:8px;font-weight:700;">Sin tiempo estimado asignado</div>';
+                }
+                return '';
+            }
             const restante = _timerPedidoRestanteTexto(pedido?.timer_restante_segundos);
             const label = _timerPedidoLabel(mins);
             const danger = mins >= 45;

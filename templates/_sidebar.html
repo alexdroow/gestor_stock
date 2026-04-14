@@ -328,6 +328,7 @@
             let pendingReminderTimer = null;
             let initNuevos = false;
             let lastId = Number(localStorage.getItem(LAST_ID_KEY) || 0) || 0;
+            let pedidoTimerDefault = 25;
 
             function esc(v) {
                 return String(v || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
@@ -336,6 +337,85 @@
                 const est = String(raw || 'recibido').trim().toLowerCase();
                 const map = { recibido:'Recibido', confirmado:'Confirmado', preparando:'En preparacion', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
                 return map[est] || 'Recibido';
+            }
+            function timerLabel(raw) {
+                const mins = Number(raw || 0);
+                if (!mins) return '';
+                return mins >= 45 ? '+30 min' : `${mins} min`;
+            }
+            function timerRestanteTexto(rawSeg) {
+                const seg = Number(rawSeg);
+                if (!Number.isFinite(seg)) return '';
+                if (seg <= 0) return 'Listo muy pronto';
+                const m = Math.floor(seg / 60);
+                const s = Math.max(0, seg % 60);
+                return `${m}m ${String(s).padStart(2, '0')}s`;
+            }
+            function timerHtmlPedido(p) {
+                const mins = Number(p?.timer_minutos || 0);
+                if (!mins) return '<div style="margin-top:5px;font-size:.8rem;color:#b91c1c;">Sin tiempo estimado.</div>';
+                const rest = timerRestanteTexto(p?.timer_restante_segundos);
+                const danger = mins >= 45;
+                const color = danger ? '#b91c1c' : '#065f46';
+                const bg = danger ? '#fef2f2' : '#ecfdf5';
+                const border = danger ? '#fecaca' : '#a7f3d0';
+                return `<div style="margin-top:5px;font-size:.8rem;border:1px solid ${border};background:${bg};color:${color};padding:4px 7px;border-radius:8px;font-weight:700;">Tiempo estimado: ${timerLabel(mins)}${rest ? ` · Restante: ${rest}` : ''}</div>`;
+            }
+
+            function ensureTimerPicker() {
+                let ov = document.getElementById('sucree-pedidos-timer-picker');
+                if (ov) return ov;
+                ov = document.createElement('div');
+                ov.id = 'sucree-pedidos-timer-picker';
+                ov.style.cssText = 'position:fixed;inset:0;z-index:130000;background:rgba(2,6,23,.45);display:none;align-items:center;justify-content:center;padding:14px;';
+                ov.innerHTML = `
+                    <div style="width:min(420px,96vw);background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:12px;box-shadow:0 16px 36px rgba(2,6,23,.28);">
+                        <div style="font-size:1rem;font-weight:900;color:#0f172a;">Definir tiempo estimado</div>
+                        <div style="font-size:.84rem;color:#475569;margin-top:3px;">Este tiempo se sincroniza con la tienda del cliente.</div>
+                        <div id="sucree-pedidos-timer-options" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;"></div>
+                        <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+                            <button type="button" id="sucree-pedidos-timer-cancel" style="border:1px solid #cbd5e1;background:#fff;color:#334155;padding:7px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Cancelar</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(ov);
+                return ov;
+            }
+
+            async function seleccionarTimer(defaultValue) {
+                const ov = ensureTimerPicker();
+                const wrap = ov.querySelector('#sucree-pedidos-timer-options');
+                const cancel = ov.querySelector('#sucree-pedidos-timer-cancel');
+                if (!wrap || !cancel) return null;
+                const opciones = [10, 15, 25, 30, 45];
+                wrap.innerHTML = opciones.map((m) => {
+                    const danger = m >= 45;
+                    const act = Number(defaultValue || 0) === m;
+                    return `<button type="button" data-min="${m}" style="border:1px solid ${danger ? '#fca5a5' : '#bfdbfe'};background:${act ? (danger ? '#fee2e2' : '#dbeafe') : (danger ? '#fff1f2' : '#eff6ff')};color:${danger ? '#b91c1c' : '#1d4ed8'};border-radius:10px;padding:10px 8px;font-weight:800;cursor:pointer;">${timerLabel(m)}</button>`;
+                }).join('');
+                ov.style.display = 'flex';
+                return await new Promise((resolve) => {
+                    const onClick = (ev) => {
+                        const btn = ev.target?.closest?.('button[data-min]');
+                        if (!btn) return;
+                        const mins = Number(btn.getAttribute('data-min') || 0);
+                        cleanup();
+                        resolve(mins || null);
+                    };
+                    const onCancel = () => {
+                        cleanup();
+                        resolve(null);
+                    };
+                    const onBackdrop = (ev) => { if (ev.target === ov) onCancel(); };
+                    const cleanup = () => {
+                        ov.style.display = 'none';
+                        wrap.removeEventListener('click', onClick);
+                        cancel.removeEventListener('click', onCancel);
+                        ov.removeEventListener('click', onBackdrop);
+                    };
+                    wrap.addEventListener('click', onClick);
+                    cancel.addEventListener('click', onCancel);
+                    ov.addEventListener('click', onBackdrop);
+                });
             }
             function beep() {
                 try {
@@ -501,10 +581,17 @@
                 const estado = estadoMap[String(kind || '').toLowerCase()] || 'confirmado';
                 const mensaje = quickMsg(kind, id);
                 try {
+                    const payloadEstado = { estado };
+                    if (String(kind || '').toLowerCase() === 'recibido') {
+                        const sel = await seleccionarTimer(pedidoTimerDefault);
+                        if (sel === null) return;
+                        payloadEstado.timer_minutos = sel;
+                        pedidoTimerDefault = Number(sel || 25) || 25;
+                    }
                     const r1 = await fetch(`/api/tienda/admin/pedido/${id}/estado`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                        body: JSON.stringify({ estado }),
+                        body: JSON.stringify(payloadEstado),
                     });
                     const d1 = await r1.json();
                     if (!r1.ok || !d1?.success) throw new Error(d1?.error || 'No se pudo actualizar estado');
@@ -522,6 +609,47 @@
                 }
             }
             window._sucreeSendQuickPedido = sendQuick;
+
+            async function setTimerPedido(ventaId) {
+                const id = Number(ventaId || 0);
+                if (!id) return;
+                try {
+                    const sel = await seleccionarTimer(pedidoTimerDefault);
+                    if (sel === null) return;
+                    pedidoTimerDefault = Number(sel || 25) || 25;
+                    const r = await fetch(`/api/tienda/admin/pedido/${id}/estado`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        body: JSON.stringify({ estado: 'confirmado', timer_minutos: sel }),
+                    });
+                    const d = await r.json();
+                    if (!r.ok || !d?.success) throw new Error(d?.error || 'No se pudo guardar tiempo estimado');
+                    await pollActivos();
+                } catch (err) {
+                    alert(err.message || 'No se pudo guardar tiempo estimado');
+                }
+            }
+            window._sucreeSetTimerPedido = setTimerPedido;
+
+            async function setTimerPedidoDirecto(ventaId, minutos) {
+                const id = Number(ventaId || 0);
+                const mins = Number(minutos || 0);
+                if (!id || !mins) return;
+                try {
+                    pedidoTimerDefault = mins;
+                    const r = await fetch(`/api/tienda/admin/pedido/${id}/estado`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        body: JSON.stringify({ estado: 'confirmado', timer_minutos: mins }),
+                    });
+                    const d = await r.json();
+                    if (!r.ok || !d?.success) throw new Error(d?.error || 'No se pudo guardar tiempo estimado');
+                    await pollActivos();
+                } catch (err) {
+                    alert(err.message || 'No se pudo guardar tiempo estimado');
+                }
+            }
+            window._sucreeSetTimerPedidoDirecto = setTimerPedidoDirecto;
 
             function toggleQuick(id) {
                 const box = document.getElementById(`sucree-quick-${Number(id || 0)}`);
@@ -556,6 +684,17 @@
                     const pendiente = esPendienteConfirmacion(p.pedido_estado);
                     const entrega = String(p.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'Despacho' : 'Retiro';
                     const hora = esc(String(p.hora_retiro || '').trim());
+                    const timerHtml = timerHtmlPedido(p);
+                    const accionesTimerPendiente = pendiente ? `
+                        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                            <button type="button" onclick="_sucreeSetTimerPedido(${id});" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">Aceptar + tiempo</button>
+                            <button type="button" onclick="_sucreeSetTimerPedidoDirecto(${id}, 45);" style="border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">+30 (rojo)</button>
+                        </div>
+                    ` : `
+                        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                            <button type="button" onclick="_sucreeSetTimerPedido(${id})" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">Definir tiempo</button>
+                        </div>
+                    `;
                     return `<div class="${pendiente ? 'sucree-pedido-pendiente' : ''}" style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                             <div style="font-weight:800;color:#0f172a;">Pedido #${id}</div>
@@ -564,6 +703,8 @@
                         <div style="font-size:.85rem;color:#475569;">${nom}</div>
                         <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
                         <div style="font-size:.8rem;color:#334155;">${estado} · ${entrega}${hora ? ` · ${hora}` : ''}</div>
+                        ${timerHtml}
+                        ${accionesTimerPendiente}
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_sucreeAbrirChatPedido(${id})" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
                             <button type="button" id="sucree-quick-toggle-${id}" onclick="_sucreeToggleQuickPedido(${id})" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Mostrar mensajes</button>
