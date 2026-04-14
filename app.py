@@ -6973,8 +6973,9 @@ def api_actualizar_producto(id):
                 )
             data["productos_venta"] = productos_limpios
         actualizar_producto(id, data)
+        producto_actualizado = obtener_producto_detalle(id)
         crear_backup()
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'producto': producto_actualizado})
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:

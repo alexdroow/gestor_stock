@@ -1006,6 +1006,43 @@
         .modal-overlay.active .modal {
             transform: scale(1);
         }
+
+        .editor-rapido-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .editor-rapido-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .editor-rapido-field label {
+            font-size: .82rem;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .editor-rapido-field input {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: .95rem;
+        }
+
+        .editor-rapido-note {
+            margin-top: 10px;
+            font-size: .82rem;
+            color: #475569;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            text-align: left;
+        }
         
         .modal-icon {
             width: 64px;
@@ -1585,6 +1622,7 @@
             .productos-grid { grid-template-columns: repeat(2, 1fr); }
             .header-actions { flex-direction: column; }
             .ventas-status-tools { width: 100%; justify-content: flex-start; }
+            .editor-rapido-grid { grid-template-columns: 1fr; }
         }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
@@ -1736,6 +1774,8 @@
                              data-desactivacion-confirmada="{{ 1 if p.desactivacion_manual_confirmada else 0 }}"
                              data-porciones="{{ p.porciones_disponibles }}"
                              data-fecha-reposicion="{{ p.fecha_reposicion_tienda or '' }}"
+                             title="Click izquierdo: agregar al carrito · Click derecho: editar nombre/precio"
+                             oncontextmenu="abrirEditorRapidoProducto(event, {{ p.id }})"
                              onclick='agregarAlCarrito({{ p.id }})'>
                             <div class="producto-media">
                                 {% if p.foto %}
@@ -1952,6 +1992,32 @@
 
             <div class="modal-actions" style="margin-top: 14px;">
                 <button type="button" class="btn btn-secondary" onclick="cerrarModalVentasSemanales()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-editor-producto-rapido">
+        <div class="modal" style="max-width: 640px;">
+            <h3 class="modal-title" style="text-align:left; margin-bottom: 8px;">Editor rapido de producto</h3>
+            <p class="modal-text" style="text-align:left; margin-bottom: 10px;">
+                Ajusta nombre y precio desde ventas. Se sincroniza con tienda y admin catalogo.
+            </p>
+            <div class="editor-rapido-grid">
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-nombre">Nombre del producto</label>
+                    <input id="editor-rapido-nombre" type="text" maxlength="120" placeholder="Nombre">
+                </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-precio">Precio base ($)</label>
+                    <input id="editor-rapido-precio" type="number" min="0" step="1" placeholder="0">
+                </div>
+            </div>
+            <div class="editor-rapido-note">
+                Tip: en esta pantalla usa click derecho sobre cualquier tarjeta para abrir este editor al instante.
+            </div>
+            <div class="modal-actions" style="margin-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="cerrarEditorRapidoProducto()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn-editor-rapido-guardar" onclick="guardarEditorRapidoProducto()">Guardar cambios</button>
             </div>
         </div>
     </div>
@@ -2541,6 +2607,7 @@
             if (!card) return;
             const info = productosData[id];
             if (!info) return;
+            const nombreProducto = String(info.nombre || '').trim() || 'Producto';
 
             const stockNumerico = Number(info.stock_visual ?? info.stock ?? 0);
             const porciones = Number(info.porciones_disponibles || 0);
@@ -2574,6 +2641,7 @@
             card.setAttribute('data-desactivacion-confirmada', desactivacionConfirmada ? '1' : '0');
             card.setAttribute('data-porciones', String(porciones));
             card.setAttribute('data-fecha-reposicion', String(info.fecha_reposicion_tienda || '').trim());
+            card.setAttribute('data-nombre', nombreProducto);
             card.classList.toggle('agotado', esCritico && !desactivacionConfirmada);
             card.classList.toggle('bajo-minimo', Boolean(info.bajo_minimo));
             card.classList.toggle('cerca-minimo', esCercaMinimo);
@@ -2613,6 +2681,10 @@
             const precioInput = card.querySelector('.producto-precio input');
             if (precioInput) {
                 precioInput.value = String(Number(info.precio || 0));
+            }
+            const nombreEl = card.querySelector('.producto-nombre');
+            if (nombreEl) {
+                nombreEl.textContent = nombreProducto;
             }
             const precioTexto = card.querySelector('.precio-texto');
             if (precioTexto) {
@@ -2922,6 +2994,103 @@
         function detectarEnterPrecio(event, id) {
             if (event.key === 'Enter') {
                 finalizarEdicionPrecio(event, id);
+            }
+        }
+
+        let _editorRapidoProductoId = 0;
+
+        function abrirEditorRapidoProducto(event, id) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const pid = Number(id || 0);
+            const info = productosData[pid];
+            if (!pid || !info) return;
+            _editorRapidoProductoId = pid;
+            const nombreEl = document.getElementById('editor-rapido-nombre');
+            const precioEl = document.getElementById('editor-rapido-precio');
+            if (nombreEl) nombreEl.value = String(info.nombre || '').trim();
+            if (precioEl) precioEl.value = String(normalizarPrecio(info.precio || 0));
+            const modal = document.getElementById('modal-editor-producto-rapido');
+            if (modal) modal.classList.add('active');
+            window.setTimeout(() => { try { nombreEl?.focus(); nombreEl?.select(); } catch (_) {} }, 50);
+        }
+
+        function cerrarEditorRapidoProducto() {
+            const modal = document.getElementById('modal-editor-producto-rapido');
+            if (modal) modal.classList.remove('active');
+            _editorRapidoProductoId = 0;
+        }
+
+        function sincronizarProductoEnCarrito(id, nombre, precio) {
+            const pid = Number(id || 0);
+            if (!pid) return;
+            const nuevoNombre = String(nombre || '').trim();
+            const nuevoPrecio = normalizarPrecio(precio || 0);
+            let tocado = false;
+            carrito.forEach((item) => {
+                if (Number(item.id || 0) !== pid) return;
+                item.nombre = nuevoNombre || item.nombre || 'Producto';
+                item.precio_unitario = nuevoPrecio;
+                tocado = true;
+            });
+            if (tocado) {
+                actualizarCarrito();
+                saveCarritoToStorage();
+            }
+        }
+
+        async function guardarEditorRapidoProducto() {
+            const pid = Number(_editorRapidoProductoId || 0);
+            if (!pid || !productosData[pid]) return;
+            const nombreEl = document.getElementById('editor-rapido-nombre');
+            const precioEl = document.getElementById('editor-rapido-precio');
+            const btn = document.getElementById('btn-editor-rapido-guardar');
+            const nombre = String(nombreEl?.value || '').trim();
+            const precio = normalizarPrecio(precioEl?.value || 0);
+            if (nombre.length < 2) {
+                alert('El nombre debe tener al menos 2 caracteres.');
+                return;
+            }
+            if (precio < 0) {
+                alert('El precio no puede ser negativo.');
+                return;
+            }
+            const txtPrev = btn ? btn.textContent : '';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Guardando...';
+                }
+                const response = await fetch(`/api/producto/${pid}/actualizar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ nombre, precio }),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar el producto');
+                }
+                const prodSrv = data.producto || {};
+                productosData[pid].nombre = String(prodSrv.nombre || nombre).trim() || nombre;
+                productosData[pid].precio = normalizarPrecio(prodSrv.precio ?? precio);
+                const card = document.querySelector(`.producto-card[data-id="${pid}"]`);
+                if (card) card.setAttribute('data-nombre', productosData[pid].nombre);
+                actualizarTarjetaProducto(pid);
+                sincronizarProductoEnCarrito(pid, productosData[pid].nombre, productosData[pid].precio);
+                filtrarProductos();
+                cerrarEditorRapidoProducto();
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess('Producto actualizado y sincronizado.');
+                }
+            } catch (err) {
+                alert(err.message || 'No se pudo guardar');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = txtPrev || 'Guardar cambios';
+                }
             }
         }
 
@@ -4000,6 +4169,16 @@
         _ensureChatsHubVentas();
         _pollPedidosChatActivosVentas();
         setInterval(_pollPedidosChatActivosVentas, 10000);
+
+        const modalEditorRapido = document.getElementById('modal-editor-producto-rapido');
+        if (modalEditorRapido) {
+            modalEditorRapido.addEventListener('click', (ev) => {
+                if (ev.target === modalEditorRapido) cerrarEditorRapidoProducto();
+            });
+        }
+        document.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Escape') cerrarEditorRapidoProducto();
+        });
     </script>
 
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
