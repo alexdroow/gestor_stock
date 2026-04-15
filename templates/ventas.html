@@ -2837,7 +2837,8 @@
                 dependencias_alerta_texto: {{ (p.dependencias_alerta_texto or '')|tojson }},
                 dependencias_criticas: {{ 'true' if p.dependencias_criticas else 'false' }},
                 dependencias_baja_porcion: {{ 'true' if p.dependencias_baja_porcion else 'false' }},
-                dependencias_cerca_minimo: {{ 'true' if p.dependencias_cerca_minimo else 'false' }}
+                dependencias_cerca_minimo: {{ 'true' if p.dependencias_cerca_minimo else 'false' }},
+                ventas_totales: {{ (p.ventas_totales or 0)|int }}
             }{% if not loop.last %},{% endif %}
             {% endfor %}
         };
@@ -3016,6 +3017,7 @@
             const stockNumerico = Number(info.stock_visual ?? info.stock ?? 0);
             const porciones = Number(info.porciones_disponibles || 0);
             const apagadoEnTienda = (info.activo_tienda === false) || stockNumerico <= 0;
+            const activoConStock = (info.activo_tienda !== false) && stockNumerico > 0 && porciones > 0 && !Boolean(info.sin_porcion_disponible);
             const agotadoStockReal = stockNumerico <= 0 || porciones <= 0 || Boolean(info.sin_porcion_disponible);
             const esCritico =
                 porciones <= 0
@@ -3049,6 +3051,8 @@
             card.setAttribute('data-fecha-reposicion', String(info.fecha_reposicion_tienda || '').trim());
             card.setAttribute('data-nombre', nombreProducto);
             card.setAttribute('data-oferta-activa', ofertaActiva ? '1' : '0');
+            card.setAttribute('data-prioridad-activo', activoConStock ? '1' : '0');
+            card.setAttribute('data-ventas-totales', String(Math.max(0, Number(info.ventas_totales || 0))));
             card.classList.toggle('agotado', esCritico && !desactivacionConfirmada);
             card.classList.toggle('bajo-minimo', Boolean(info.bajo_minimo));
             card.classList.toggle('cerca-minimo', esCercaMinimo);
@@ -3235,6 +3239,7 @@
                     dependencias_criticas: Boolean(item.dependencias_criticas),
                     dependencias_baja_porcion: Boolean(item.dependencias_baja_porcion),
                     dependencias_cerca_minimo: Boolean(item.dependencias_cerca_minimo),
+                    ventas_totales: Number(item.ventas_totales ?? productosData[id].ventas_totales ?? 0),
                 };
                 categoriasTiendaEditorRapido.add(productosData[id].categoria_tienda);
                 productosData[id].porcion = construirDescripcionPorcion(productosData[id]);
@@ -3252,9 +3257,13 @@
             if (!grid) return;
             const cards = Array.from(grid.querySelectorAll('.producto-card'));
             cards.sort((a, b) => {
-                const aOferta = a.getAttribute('data-oferta-activa') === '1';
-                const bOferta = b.getAttribute('data-oferta-activa') === '1';
-                if (aOferta !== bOferta) return aOferta ? -1 : 1;
+                const aActivo = a.getAttribute('data-prioridad-activo') === '1';
+                const bActivo = b.getAttribute('data-prioridad-activo') === '1';
+                if (aActivo !== bActivo) return aActivo ? -1 : 1;
+
+                const aVentas = Number(a.getAttribute('data-ventas-totales') || 0);
+                const bVentas = Number(b.getAttribute('data-ventas-totales') || 0);
+                if (aVentas !== bVentas) return bVentas - aVentas;
 
                 const aReq = a.getAttribute('data-requiere-desactivacion') === '1';
                 const bReq = b.getAttribute('data-requiere-desactivacion') === '1';

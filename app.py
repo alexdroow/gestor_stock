@@ -9501,6 +9501,37 @@ def agregar_producto():
 def ventas():
     try:
         productos = _obtener_productos_para_venta(include_zero_stock=True)
+        ventas_totales_map = {}
+        conn_rank = None
+        try:
+            conn_rank = get_db()
+            cur_rank = conn_rank.cursor()
+            cur_rank.execute(
+                """
+                SELECT producto_id, COALESCE(SUM(cantidad), 0) AS total_vendido
+                FROM venta_items
+                GROUP BY producto_id
+                """
+            )
+            for row in cur_rank.fetchall():
+                try:
+                    pid = int(row["producto_id"] or 0)
+                except (TypeError, ValueError):
+                    pid = 0
+                if pid > 0:
+                    ventas_totales_map[pid] = int(row["total_vendido"] or 0)
+        except Exception:
+            ventas_totales_map = {}
+        finally:
+            if conn_rank:
+                conn_rank.close()
+
+        for p in productos:
+            try:
+                pid = int(p.get("id") or 0)
+            except (TypeError, ValueError):
+                pid = 0
+            p["ventas_totales"] = int(ventas_totales_map.get(pid, 0))
         categorias_tienda = _cargar_categorias_tienda()
         agenda_evento_id = request.args.get('agenda_evento', type=int)
         agenda_evento = obtener_evento_agenda_por_id(agenda_evento_id) if agenda_evento_id else None
