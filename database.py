@@ -2256,17 +2256,77 @@ def actualizar_producto(producto_id, data):
 
     if actual is not None and "stock" in data:
         stock_objetivo = float(data.get("stock") or 0)
-        stock_actual = float(actual["stock"] or 0)
-        delta = stock_objetivo - stock_actual
-        if abs(delta) > 0:
-            actualizar_stock_producto(
-                producto_id,
-                delta,
-                referencia_tipo="edicion_producto",
-                detalle="Sincronización de stock desde edición de producto",
-            )
+        fijar_stock_producto_absoluto(
+            producto_id,
+            stock_objetivo,
+            referencia_tipo="edicion_producto",
+            detalle="Ajuste absoluto de stock desde edicion de producto",
+            fecha_vencimiento=data.get("fecha_vencimiento", actual["fecha_vencimiento"]),
+        )
 
     return True
+
+
+def fijar_stock_producto_absoluto(
+    id_producto,
+    stock_objetivo,
+    referencia_tipo="ajuste_manual",
+    detalle=None,
+    fecha_vencimiento=None,
+):
+    """Fija el stock exacto del producto y alinea lotes con ese valor."""
+    target = float(stock_objetivo or 0)
+    if target < 0:
+        raise ValueError("El stock no puede ser negativo")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, stock, fecha_vencimiento FROM productos WHERE id = ?", (id_producto,))
+        producto = cursor.fetchone()
+        if not producto:
+            raise ValueError("Producto no encontrado")
+
+        stock_anterior = float(producto["stock"] or 0)
+        vencimiento_base = fecha_vencimiento if fecha_vencimiento is not None else producto["fecha_vencimiento"]
+        vencimiento_final = vencimiento_base if target > 0 else None
+
+        # El editor rapido define el stock absoluto: se recrean lotes en una sola base.
+        cursor.execute("DELETE FROM producto_lotes WHERE producto_id = ?", (id_producto,))
+        if target > 0:
+            cursor.execute(
+                """
+                INSERT INTO producto_lotes (producto_id, cantidad, fecha_vencimiento)
+                VALUES (?, ?, ?)
+                """,
+                (id_producto, target, vencimiento_final),
+            )
+
+        cursor.execute(
+            "UPDATE productos SET stock = ?, fecha_vencimiento = ? WHERE id = ?",
+            (target, vencimiento_final, id_producto),
+        )
+
+        if abs(target - stock_anterior) > 1e-9:
+            registrar_movimiento_stock(
+                "producto",
+                id_producto,
+                "ajuste_manual",
+                abs(target - stock_anterior),
+                stock_anterior=stock_anterior,
+                stock_nuevo=target,
+                referencia_tipo=referencia_tipo,
+                detalle=detalle or "Ajuste absoluto de stock",
+                conn=conn,
+            )
+
+        conn.commit()
+        return {"success": True, "nuevo_stock": target}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def _descontar_lotes_fifo_cursor(cursor, producto_id, cantidad_a_descontar):
     cursor.execute(
