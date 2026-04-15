@@ -2291,16 +2291,45 @@ def fijar_stock_producto_absoluto(
         vencimiento_base = fecha_vencimiento if fecha_vencimiento is not None else producto["fecha_vencimiento"]
         vencimiento_final = vencimiento_base if target > 0 else None
 
-        # El editor rapido define el stock absoluto: se recrean lotes en una sola base.
-        cursor.execute("DELETE FROM producto_lotes WHERE producto_id = ?", (id_producto,))
+        # El editor rapido define stock absoluto, pero sin borrar lotes historicos
+        # (pueden estar referenciados por trazabilidad/HACCP con FK).
+        cursor.execute(
+            """
+            UPDATE producto_lotes
+            SET cantidad = 0
+            WHERE producto_id = ?
+            """,
+            (id_producto,),
+        )
         if target > 0:
             cursor.execute(
                 """
-                INSERT INTO producto_lotes (producto_id, cantidad, fecha_vencimiento)
-                VALUES (?, ?, ?)
+                SELECT id
+                FROM producto_lotes
+                WHERE producto_id = ?
+                ORDER BY id DESC
+                LIMIT 1
                 """,
-                (id_producto, target, vencimiento_final),
+                (id_producto,),
             )
+            lote_existente = cursor.fetchone()
+            if lote_existente:
+                cursor.execute(
+                    """
+                    UPDATE producto_lotes
+                    SET cantidad = ?, fecha_vencimiento = ?
+                    WHERE id = ?
+                    """,
+                    (target, vencimiento_final, int(lote_existente["id"])),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO producto_lotes (producto_id, cantidad, fecha_vencimiento)
+                    VALUES (?, ?, ?)
+                    """,
+                    (id_producto, target, vencimiento_final),
+                )
 
         cursor.execute(
             "UPDATE productos SET stock = ?, fecha_vencimiento = ? WHERE id = ?",
