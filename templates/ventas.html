@@ -1043,7 +1043,8 @@
             font-weight: 700;
         }
 
-        .editor-rapido-field input {
+        .editor-rapido-field input,
+        .editor-rapido-field select {
             border: 1px solid #cbd5e1;
             border-radius: 8px;
             padding: 10px 12px;
@@ -2149,12 +2150,21 @@
         <div class="modal" style="max-width: 640px;">
             <h3 class="modal-title" style="text-align:left; margin-bottom: 8px;">Editor rapido de producto</h3>
             <p class="modal-text" style="text-align:left; margin-bottom: 10px;">
-                Ajusta nombre, precio y stock desde ventas. Se sincroniza con tienda, productos y admin catalogo.
+                Ajusta nombre, categoria, precio, stock y foto desde ventas. Se sincroniza con tienda, productos y admin catalogo.
             </p>
             <div class="editor-rapido-grid">
                 <div class="editor-rapido-field">
                     <label for="editor-rapido-nombre">Nombre del producto</label>
                     <input id="editor-rapido-nombre" type="text" maxlength="120" placeholder="Nombre">
+                </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-categoria">Categoria tienda</label>
+                    <select id="editor-rapido-categoria">
+                        <option value="">General</option>
+                        {% for c in (categorias_tienda or []) %}
+                        <option value="{{ c.nombre }}">{{ c.nombre }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="editor-rapido-field">
                     <label for="editor-rapido-precio">Precio base ($)</label>
@@ -2698,6 +2708,7 @@
             {{ p.id }}: {
                 nombre: {{ p.nombre|tojson }},
                 icono: {{ (p.icono or 'cupcake')|tojson }},
+                categoria_tienda: {{ (p.categoria_tienda or 'General')|tojson }},
                 foto_url: {{ (url_for('static', filename=p.foto) if p.foto else '')|tojson }},
                 foto_fit_tienda: {{ (p.foto_fit_tienda or 'cover')|tojson }},
                 foto_pos_tienda: {{ (p.foto_pos_tienda or 'center')|tojson }},
@@ -2730,6 +2741,27 @@
             }{% if not loop.last %},{% endif %}
             {% endfor %}
         };
+        const categoriasTiendaEditorRapido = new Set(
+            [
+                {% for c in (categorias_tienda or []) %}
+                {{ (c.nombre or '')|tojson }},
+                {% endfor %}
+            ].map((v) => String(v || '').trim()).filter(Boolean)
+        );
+
+        function _refrescarOpcionesCategoriaEditorRapido(valorActual = '') {
+            const sel = document.getElementById('editor-rapido-categoria');
+            if (!sel) return;
+            const actual = String(valorActual || sel.value || '').trim();
+            if (actual && actual.toLowerCase() !== 'general') categoriasTiendaEditorRapido.add(actual);
+            Object.values(productosData || {}).forEach((p) => {
+                const c = String(p?.categoria_tienda || '').trim();
+                if (c && c.toLowerCase() !== 'general') categoriasTiendaEditorRapido.add(c);
+            });
+            const opciones = Array.from(categoriasTiendaEditorRapido).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+            sel.innerHTML = `<option value="">General</option>` + opciones.map((c) => `<option value="${escapeHtmlLocal(c)}">${escapeHtmlLocal(c)}</option>`).join('');
+            sel.value = actual || '';
+        }
 
         function saveVentasUiState() {
             const buscadorInput = document.getElementById('buscador');
@@ -2994,6 +3026,7 @@
                 productosData[id] = {
                     ...productosData[id],
                     activo_tienda: (item.activo_tienda !== undefined ? Boolean(item.activo_tienda) : productosData[id].activo_tienda),
+                    categoria_tienda: String(item.categoria_tienda || productosData[id].categoria_tienda || 'General').trim() || 'General',
                     stock: Number(item.stock || 0),
                     unidad: item.unidad || productosData[id].unidad || 'unidad',
                     fecha_reposicion_tienda: String(item.fecha_reposicion_tienda || productosData[id].fecha_reposicion_tienda || '').trim(),
@@ -3021,9 +3054,11 @@
                     dependencias_baja_porcion: Boolean(item.dependencias_baja_porcion),
                     dependencias_cerca_minimo: Boolean(item.dependencias_cerca_minimo),
                 };
+                categoriasTiendaEditorRapido.add(productosData[id].categoria_tienda);
                 productosData[id].porcion = construirDescripcionPorcion(productosData[id]);
                 actualizarTarjetaProducto(id);
             });
+            _refrescarOpcionesCategoriaEditorRapido();
             ordenarTarjetasPorPrioridadDesactivacion();
             filtrarProductos();
             actualizarCarrito();
@@ -3418,9 +3453,12 @@
             if (!pid || !info) return;
             _editorRapidoProductoId = pid;
             const nombreEl = document.getElementById('editor-rapido-nombre');
+            const categoriaEl = document.getElementById('editor-rapido-categoria');
             const precioEl = document.getElementById('editor-rapido-precio');
             const stockEl = document.getElementById('editor-rapido-stock');
             if (nombreEl) nombreEl.value = String(info.nombre || '').trim();
+            _refrescarOpcionesCategoriaEditorRapido(String(info.categoria_tienda || '').trim());
+            if (categoriaEl) categoriaEl.value = String(info.categoria_tienda || '').trim();
             if (precioEl) precioEl.value = String(normalizarPrecio(info.precio || 0));
             if (stockEl) stockEl.value = String(Number(info.stock || 0));
             _renderEditorRapidoFotoPreview(pid);
@@ -3544,10 +3582,12 @@
             const pid = Number(_editorRapidoProductoId || 0);
             if (!pid || !productosData[pid]) return;
             const nombreEl = document.getElementById('editor-rapido-nombre');
+            const categoriaEl = document.getElementById('editor-rapido-categoria');
             const precioEl = document.getElementById('editor-rapido-precio');
             const stockEl = document.getElementById('editor-rapido-stock');
             const btn = document.getElementById('btn-editor-rapido-guardar');
             const nombre = String(nombreEl?.value || '').trim();
+            const categoria_tienda = String(categoriaEl?.value || '').trim().slice(0, 60);
             const precio = normalizarPrecio(precioEl?.value || 0);
             const stock = Number(stockEl?.value || 0);
             if (nombre.length < 2) {
@@ -3571,7 +3611,7 @@
                 const response = await fetch(`/api/producto/${pid}/actualizar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ nombre, precio, stock }),
+                    body: JSON.stringify({ nombre, categoria_tienda, precio, stock }),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) {
@@ -3579,6 +3619,8 @@
                 }
                 const prodSrv = data.producto || {};
                 productosData[pid].nombre = String(prodSrv.nombre || nombre).trim() || nombre;
+                productosData[pid].categoria_tienda = String(prodSrv.categoria_tienda || categoria_tienda || 'General').trim() || 'General';
+                categoriasTiendaEditorRapido.add(productosData[pid].categoria_tienda);
                 productosData[pid].precio = normalizarPrecio(prodSrv.precio ?? precio);
                 if (prodSrv.activo_tienda !== undefined) {
                     productosData[pid].activo_tienda = Boolean(prodSrv.activo_tienda);
@@ -3993,6 +4035,7 @@
             const idNum = Number(id || 0);
             if (idNum) actualizarTarjetaProducto(idNum);
         });
+        _refrescarOpcionesCategoriaEditorRapido();
         ordenarTarjetasPorPrioridadDesactivacion();
         filtrarProductos();
         restaurarCarritoPersistente();

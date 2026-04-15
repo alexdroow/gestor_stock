@@ -9497,9 +9497,15 @@ def agregar_producto():
 def ventas():
     try:
         productos = _obtener_productos_para_venta(include_zero_stock=True)
+        categorias_tienda = _cargar_categorias_tienda()
         agenda_evento_id = request.args.get('agenda_evento', type=int)
         agenda_evento = obtener_evento_agenda_por_id(agenda_evento_id) if agenda_evento_id else None
-        return render_template('ventas.html', productos=productos, agenda_evento=agenda_evento)
+        return render_template(
+            'ventas.html',
+            productos=productos,
+            agenda_evento=agenda_evento,
+            categorias_tienda=categorias_tienda,
+        )
     except Exception as e:
         print(f"Error en ventas: {e}")
         return f"Error: {str(e)}", 500
