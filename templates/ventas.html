@@ -363,6 +363,40 @@
             flex-wrap: wrap;
         }
 
+        .ofertas-resumen-box {
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            display: none;
+            gap: 8px;
+        }
+
+        .ofertas-resumen-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #9a3412;
+            text-transform: uppercase;
+            letter-spacing: .02em;
+        }
+
+        .ofertas-resumen-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .ofertas-resumen-item {
+            border: 1px solid #fdba74;
+            background: #fff;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #9a3412;
+        }
+
         .stock-filtro-btn {
             border: 1px solid #e2e8f0;
             background: #f8fafc;
@@ -573,6 +607,20 @@
         .producto-stock {
             font-size: 13px;
             color: #64748b;
+        }
+
+        .producto-oferta-chip {
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 800;
         }
 
         .producto-stock-ref {
@@ -1905,6 +1953,11 @@
                         <button type="button" class="stock-filtro-btn" data-filtro="baja_porcion" onclick="aplicarFiltroStock('baja_porcion')">Baja porci&oacute;n</button>
                         <button type="button" class="stock-filtro-btn" data-filtro="agotados" onclick="aplicarFiltroStock('agotados')">Agotados</button>
                     </div>
+
+                    <div class="ofertas-resumen-box" id="ofertas-resumen-box">
+                        <div class="ofertas-resumen-title">Productos en ofertas</div>
+                        <div class="ofertas-resumen-list" id="ofertas-resumen-list"></div>
+                    </div>
                     
                     <div class="productos-grid" id="productos-grid">
                         {% for p in productos %}
@@ -2190,6 +2243,18 @@
                         <option value="1">Visible en tienda</option>
                         <option value="0">Oculto (no aparece en tienda)</option>
                     </select>
+                </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-descuento">Descuento oferta (%)</label>
+                    <input id="editor-rapido-descuento" type="number" min="0" max="100" step="0.01" placeholder="0">
+                </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-oferta-inicio">Oferta inicio</label>
+                    <input id="editor-rapido-oferta-inicio" type="date">
+                </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-oferta-fin">Oferta fin</label>
+                    <input id="editor-rapido-oferta-fin" type="date">
                 </div>
                 <div class="editor-rapido-foto-box">
                     <div class="editor-rapido-foto-head">
@@ -2733,6 +2798,9 @@
                 foto_pos_y_tienda: {{ (p.foto_pos_y_tienda if p.foto_pos_y_tienda is not none else 50)|tojson }},
                 foto_zoom_tienda: {{ (p.foto_zoom_tienda if p.foto_zoom_tienda is not none else 100)|tojson }},
                 precio: {{ (p.precio or 0)|tojson }},
+                descuento_tienda_pct: {{ (p.descuento_tienda_pct or 0)|tojson }},
+                oferta_inicio_tienda: {{ (p.oferta_inicio_tienda or '')|tojson }},
+                oferta_fin_tienda: {{ (p.oferta_fin_tienda or '')|tojson }},
                 activo_tienda: {{ 'false' if (p.activo_tienda is defined and not p.activo_tienda) else 'true' }},
                 fecha_reposicion_tienda: {{ (p.fecha_reposicion_tienda or '')|tojson }},
                 stock: {{ p.stock|tojson }},
@@ -2842,6 +2910,46 @@
             return `${m[3]}-${m[2]}-${m[1]}`;
         }
 
+        function _hoyIsoLocal() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function _esOfertaActivaProducto(info) {
+            const pct = Number(info?.descuento_tienda_pct || 0);
+            if (!Number.isFinite(pct) || pct <= 0) return false;
+            const inicio = String(info?.oferta_inicio_tienda || '').trim();
+            const fin = String(info?.oferta_fin_tienda || '').trim();
+            if (!inicio && !fin) return true;
+            const hoy = _hoyIsoLocal();
+            if (inicio && hoy < inicio) return false;
+            if (fin && hoy > fin) return false;
+            return true;
+        }
+
+        function _renderProductosEnOfertaResumen() {
+            const box = document.getElementById('ofertas-resumen-box');
+            const list = document.getElementById('ofertas-resumen-list');
+            if (!box || !list) return;
+            const rows = Object.values(productosData || {})
+                .filter((p) => p?.activo_tienda !== false && _esOfertaActivaProducto(p))
+                .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es', { sensitivity: 'base' }));
+            if (!rows.length) {
+                box.style.display = 'none';
+                list.innerHTML = '';
+                return;
+            }
+            box.style.display = 'grid';
+            list.innerHTML = rows.map((p) => {
+                const nom = escapeHtmlLocal(String(p?.nombre || 'Producto'));
+                const pct = Math.max(0, Number(p?.descuento_tienda_pct || 0));
+                return `<span class="ofertas-resumen-item">${nom} · -${Math.round(pct)}%</span>`;
+            }).join('');
+        }
+
         function construirDescripcionPorcion(info) {
             const cantidad = formatearNumeroSimple(info.porcion_cantidad || 1);
             const unidad = info.porcion_unidad || 'unidad';
@@ -2895,6 +3003,7 @@
             const stockOrigen = String(info.stock_visual_origen || 'propio').toLowerCase();
             const stockDepNombre = String(info.stock_visual_dependencia_nombre || '').trim();
             const dependenciasTexto = String(info.dependencias_alerta_texto || '').trim();
+            const ofertaActiva = _esOfertaActivaProducto(info);
 
             card.setAttribute('data-stock', String(stockNumerico));
             card.setAttribute('data-bajo-minimo', info.bajo_minimo ? '1' : '0');
@@ -2906,6 +3015,7 @@
             card.setAttribute('data-porciones', String(porciones));
             card.setAttribute('data-fecha-reposicion', String(info.fecha_reposicion_tienda || '').trim());
             card.setAttribute('data-nombre', nombreProducto);
+            card.setAttribute('data-oferta-activa', ofertaActiva ? '1' : '0');
             card.classList.toggle('agotado', esCritico && !desactivacionConfirmada);
             card.classList.toggle('bajo-minimo', Boolean(info.bajo_minimo));
             card.classList.toggle('cerca-minimo', esCercaMinimo);
@@ -2961,6 +3071,23 @@
                 badgeApagado.textContent = (info.activo_tienda === false)
                     ? 'Oculto en tienda'
                     : 'Apagado en tienda';
+            }
+
+            let ofertaChip = card.querySelector('.producto-oferta-chip');
+            if (ofertaActiva) {
+                if (!ofertaChip) {
+                    ofertaChip = document.createElement('div');
+                    ofertaChip.className = 'producto-oferta-chip';
+                    const ref = card.querySelector('.producto-precio');
+                    if (ref && ref.parentNode) {
+                        ref.parentNode.insertBefore(ofertaChip, ref.nextSibling);
+                    } else {
+                        card.appendChild(ofertaChip);
+                    }
+                }
+                ofertaChip.textContent = `Oferta activa -${Math.round(Math.max(0, Number(info.descuento_tienda_pct || 0)))}%`;
+            } else if (ofertaChip) {
+                ofertaChip.remove();
             }
 
             const stockEl = card.querySelector('.producto-stock');
@@ -3046,6 +3173,9 @@
                     ...productosData[id],
                     activo_tienda: (item.activo_tienda !== undefined ? Boolean(item.activo_tienda) : productosData[id].activo_tienda),
                     categoria_tienda: String(item.categoria_tienda || productosData[id].categoria_tienda || 'General').trim() || 'General',
+                    descuento_tienda_pct: Number(item.descuento_tienda_pct ?? productosData[id].descuento_tienda_pct ?? 0),
+                    oferta_inicio_tienda: String(item.oferta_inicio_tienda || productosData[id].oferta_inicio_tienda || '').trim(),
+                    oferta_fin_tienda: String(item.oferta_fin_tienda || productosData[id].oferta_fin_tienda || '').trim(),
                     stock: Number(item.stock || 0),
                     unidad: item.unidad || productosData[id].unidad || 'unidad',
                     fecha_reposicion_tienda: String(item.fecha_reposicion_tienda || productosData[id].fecha_reposicion_tienda || '').trim(),
@@ -3078,6 +3208,7 @@
                 actualizarTarjetaProducto(id);
             });
             _refrescarOpcionesCategoriaEditorRapido();
+            _renderProductosEnOfertaResumen();
             ordenarTarjetasPorPrioridadDesactivacion();
             filtrarProductos();
             actualizarCarrito();
@@ -3088,6 +3219,10 @@
             if (!grid) return;
             const cards = Array.from(grid.querySelectorAll('.producto-card'));
             cards.sort((a, b) => {
+                const aOferta = a.getAttribute('data-oferta-activa') === '1';
+                const bOferta = b.getAttribute('data-oferta-activa') === '1';
+                if (aOferta !== bOferta) return aOferta ? -1 : 1;
+
                 const aReq = a.getAttribute('data-requiere-desactivacion') === '1';
                 const bReq = b.getAttribute('data-requiere-desactivacion') === '1';
                 if (aReq !== bReq) return aReq ? -1 : 1;
@@ -3477,6 +3612,9 @@
             const stockEl = document.getElementById('editor-rapido-stock');
             const unidadEl = document.getElementById('editor-rapido-unidad');
             const activoTiendaEl = document.getElementById('editor-rapido-activo-tienda');
+            const descuentoEl = document.getElementById('editor-rapido-descuento');
+            const ofertaInicioEl = document.getElementById('editor-rapido-oferta-inicio');
+            const ofertaFinEl = document.getElementById('editor-rapido-oferta-fin');
             if (nombreEl) nombreEl.value = String(info.nombre || '').trim();
             _refrescarOpcionesCategoriaEditorRapido(String(info.categoria_tienda || '').trim());
             if (categoriaEl) categoriaEl.value = String(info.categoria_tienda || '').trim();
@@ -3484,6 +3622,9 @@
             if (stockEl) stockEl.value = String(Number(info.stock || 0));
             if (unidadEl) unidadEl.value = String(info.unidad || 'unidad').trim().toLowerCase() || 'unidad';
             if (activoTiendaEl) activoTiendaEl.value = (info.activo_tienda === false ? '0' : '1');
+            if (descuentoEl) descuentoEl.value = String(Number(info.descuento_tienda_pct || 0));
+            if (ofertaInicioEl) ofertaInicioEl.value = String(info.oferta_inicio_tienda || '').trim();
+            if (ofertaFinEl) ofertaFinEl.value = String(info.oferta_fin_tienda || '').trim();
             _renderEditorRapidoFotoPreview(pid);
             _setEditorRapidoFotoMsg('', '');
             const modal = document.getElementById('modal-editor-producto-rapido');
@@ -3610,6 +3751,9 @@
             const stockEl = document.getElementById('editor-rapido-stock');
             const unidadEl = document.getElementById('editor-rapido-unidad');
             const activoTiendaEl = document.getElementById('editor-rapido-activo-tienda');
+            const descuentoEl = document.getElementById('editor-rapido-descuento');
+            const ofertaInicioEl = document.getElementById('editor-rapido-oferta-inicio');
+            const ofertaFinEl = document.getElementById('editor-rapido-oferta-fin');
             const btn = document.getElementById('btn-editor-rapido-guardar');
             const nombre = String(nombreEl?.value || '').trim();
             const categoria_tienda = String(categoriaEl?.value || '').trim().slice(0, 60);
@@ -3617,6 +3761,9 @@
             const stock = Number(stockEl?.value || 0);
             const unidad = String(unidadEl?.value || productosData[pid]?.unidad || 'unidad').trim().toLowerCase() || 'unidad';
             const activo_tienda = String(activoTiendaEl?.value || '1') === '1';
+            const descuento_tienda_pct = Number(descuentoEl?.value || 0);
+            const oferta_inicio_tienda = String(ofertaInicioEl?.value || '').trim();
+            const oferta_fin_tienda = String(ofertaFinEl?.value || '').trim();
             if (nombre.length < 2) {
                 alert('El nombre debe tener al menos 2 caracteres.');
                 return;
@@ -3629,6 +3776,14 @@
                 alert('El stock debe ser un numero valido mayor o igual a 0.');
                 return;
             }
+            if (!Number.isFinite(descuento_tienda_pct) || descuento_tienda_pct < 0 || descuento_tienda_pct > 100) {
+                alert('El descuento debe estar entre 0 y 100.');
+                return;
+            }
+            if (oferta_inicio_tienda && oferta_fin_tienda && oferta_fin_tienda < oferta_inicio_tienda) {
+                alert('La fecha fin de oferta no puede ser menor a la fecha inicio.');
+                return;
+            }
             const txtPrev = btn ? btn.textContent : '';
             try {
                 if (btn) {
@@ -3638,7 +3793,18 @@
                 const response = await fetch(`/api/producto/${pid}/actualizar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ nombre, categoria_tienda, precio, stock, unidad, porcion_unidad: unidad, activo_tienda }),
+                    body: JSON.stringify({
+                        nombre,
+                        categoria_tienda,
+                        precio,
+                        stock,
+                        unidad,
+                        porcion_unidad: unidad,
+                        activo_tienda,
+                        descuento_tienda_pct,
+                        oferta_inicio_tienda,
+                        oferta_fin_tienda,
+                    }),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) {
@@ -3649,6 +3815,9 @@
                 productosData[pid].categoria_tienda = String(prodSrv.categoria_tienda || categoria_tienda || 'General').trim() || 'General';
                 categoriasTiendaEditorRapido.add(productosData[pid].categoria_tienda);
                 productosData[pid].precio = normalizarPrecio(prodSrv.precio ?? precio);
+                productosData[pid].descuento_tienda_pct = Number(prodSrv.descuento_tienda_pct ?? descuento_tienda_pct);
+                productosData[pid].oferta_inicio_tienda = String(prodSrv.oferta_inicio_tienda || oferta_inicio_tienda || '').trim();
+                productosData[pid].oferta_fin_tienda = String(prodSrv.oferta_fin_tienda || oferta_fin_tienda || '').trim();
                 if (prodSrv.activo_tienda !== undefined) {
                     productosData[pid].activo_tienda = Boolean(prodSrv.activo_tienda);
                 } else if (Number(prodSrv.stock ?? stock) <= 0) {
@@ -3687,6 +3856,7 @@
                 const card = document.querySelector(`.producto-card[data-id="${pid}"]`);
                 if (card) card.setAttribute('data-nombre', productosData[pid].nombre);
                 actualizarTarjetaProducto(pid);
+                _renderProductosEnOfertaResumen();
                 sincronizarProductoEnCarrito(
                     pid,
                     productosData[pid].nombre,
@@ -4065,6 +4235,7 @@
             if (idNum) actualizarTarjetaProducto(idNum);
         });
         _refrescarOpcionesCategoriaEditorRapido();
+        _renderProductosEnOfertaResumen();
         ordenarTarjetasPorPrioridadDesactivacion();
         filtrarProductos();
         restaurarCarritoPersistente();
