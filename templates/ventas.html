@@ -2174,6 +2174,16 @@
                     <label for="editor-rapido-stock">Stock actual</label>
                     <input id="editor-rapido-stock" type="number" min="0" step="0.01" placeholder="0">
                 </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-unidad">Unidad de medida</label>
+                    <select id="editor-rapido-unidad">
+                        <option value="unidad">unidad</option>
+                        <option value="gr">gr</option>
+                        <option value="kg">kg</option>
+                        <option value="cc">cc</option>
+                        <option value="lt">lt</option>
+                    </select>
+                </div>
                 <div class="editor-rapido-foto-box">
                     <div class="editor-rapido-foto-head">
                         <strong style="font-size:.86rem;color:#334155;">Foto del producto</strong>
@@ -3456,11 +3466,13 @@
             const categoriaEl = document.getElementById('editor-rapido-categoria');
             const precioEl = document.getElementById('editor-rapido-precio');
             const stockEl = document.getElementById('editor-rapido-stock');
+            const unidadEl = document.getElementById('editor-rapido-unidad');
             if (nombreEl) nombreEl.value = String(info.nombre || '').trim();
             _refrescarOpcionesCategoriaEditorRapido(String(info.categoria_tienda || '').trim());
             if (categoriaEl) categoriaEl.value = String(info.categoria_tienda || '').trim();
             if (precioEl) precioEl.value = String(normalizarPrecio(info.precio || 0));
             if (stockEl) stockEl.value = String(Number(info.stock || 0));
+            if (unidadEl) unidadEl.value = String(info.unidad || 'unidad').trim().toLowerCase() || 'unidad';
             _renderEditorRapidoFotoPreview(pid);
             _setEditorRapidoFotoMsg('', '');
             const modal = document.getElementById('modal-editor-producto-rapido');
@@ -3585,11 +3597,13 @@
             const categoriaEl = document.getElementById('editor-rapido-categoria');
             const precioEl = document.getElementById('editor-rapido-precio');
             const stockEl = document.getElementById('editor-rapido-stock');
+            const unidadEl = document.getElementById('editor-rapido-unidad');
             const btn = document.getElementById('btn-editor-rapido-guardar');
             const nombre = String(nombreEl?.value || '').trim();
             const categoria_tienda = String(categoriaEl?.value || '').trim().slice(0, 60);
             const precio = normalizarPrecio(precioEl?.value || 0);
             const stock = Number(stockEl?.value || 0);
+            const unidad = String(unidadEl?.value || productosData[pid]?.unidad || 'unidad').trim().toLowerCase() || 'unidad';
             if (nombre.length < 2) {
                 alert('El nombre debe tener al menos 2 caracteres.');
                 return;
@@ -3611,7 +3625,7 @@
                 const response = await fetch(`/api/producto/${pid}/actualizar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ nombre, categoria_tienda, precio, stock }),
+                    body: JSON.stringify({ nombre, categoria_tienda, precio, stock, unidad, porcion_unidad: unidad }),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) {

@@ -4877,6 +4877,11 @@
             const hasDiscount = n(p.descuento_tienda_pct) > 0 && oldPrice > finalPrice;
             const desc = String(p.descripcion_tienda || "").trim();
             const stock = Math.max(0, Number(p.max_compra || 0));
+            const stockLabel = String(p.stock_visual_label || "").trim();
+            const stockUnidad = String(p.stock_visual_unidad || "unidad").trim().toLowerCase();
+            const stockTexto = (stockUnidad && stockUnidad !== "unidad" && stockLabel)
+                ? `${stockLabel} ${stockUnidad}`
+                : `${stock} unidad(es)`;
             const agotado = stock <= 0;
             const fechaReposicion = String(p.fecha_reposicion_tienda || "").trim();
             const agotadoText = fechaReposicion ? `Agotado hasta ${formatoAgotadoHasta(fechaReposicion)}` : "Agotado";
@@ -4905,7 +4910,7 @@
                             ${agotado ? `<span class="agotado-chip">${esc(agotadoText)}</span>` : ""}
                         </div>
                         <div class="item-desc">${esc(desc || "Sin descripcion")}</div>
-                        <div class="stock">Disponible: ${stock} unidad(es)</div>
+                        <div class="stock">Disponible: ${esc(stockTexto)}</div>
                     </div>
                 </article>
             `;
