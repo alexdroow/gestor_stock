@@ -7521,6 +7521,10 @@ def api_actualizar_producto(id):
             # Regla operativa: si el stock queda en 0, el producto debe quedar apagado en tienda.
             if float(data["stock"]) <= 0:
                 data["activo_tienda"] = False
+            # Si se repone stock desde ventas y no se envio el toggle manual,
+            # reactivar tienda automaticamente para evitar que quede oculto.
+            elif "activo_tienda" not in data:
+                data["activo_tienda"] = True
         if "oferta_inicio_tienda" in data:
             data["oferta_inicio_tienda"] = str(data.get("oferta_inicio_tienda") or "").strip() or None
         if "oferta_fin_tienda" in data:
@@ -7600,7 +7604,7 @@ def api_actualizar_producto(id):
                 )
             data["productos_venta"] = productos_limpios
         actualizar_producto(id, data)
-        producto_actualizado = obtener_producto_detalle(id)
+        producto_actualizado = calcular_disponibilidad_producto(id)
         crear_backup()
         return jsonify({'success': True, 'producto': producto_actualizado})
     except ValueError as e:
