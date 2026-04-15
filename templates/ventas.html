@@ -395,6 +395,19 @@
             font-size: 11px;
             font-weight: 700;
             color: #9a3412;
+            cursor: pointer;
+            transition: all .18s ease;
+        }
+
+        .ofertas-resumen-item:hover {
+            border-color: #fb923c;
+            background: #ffedd5;
+            transform: translateY(-1px);
+        }
+
+        .ofertas-resumen-item .time {
+            color: #7c2d12;
+            font-weight: 800;
         }
 
         .stock-filtro-btn {
@@ -2272,6 +2285,7 @@
                 Tip: en esta pantalla usa click derecho sobre cualquier tarjeta para abrir este editor al instante.
             </div>
             <div class="modal-actions" style="margin-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="apagarOfertaEditorRapido()">Apagar oferta ahora</button>
                 <button type="button" class="btn btn-secondary" onclick="cerrarEditorRapidoProducto()">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="btn-editor-rapido-guardar" onclick="guardarEditorRapidoProducto()">Guardar cambios</button>
             </div>
@@ -2788,6 +2802,7 @@
         const productosData = {
             {% for p in productos %}
             {{ p.id }}: {
+                id: {{ p.id }},
                 nombre: {{ p.nombre|tojson }},
                 icono: {{ (p.icono or 'cupcake')|tojson }},
                 categoria_tienda: {{ (p.categoria_tienda or 'General')|tojson }},
@@ -2930,6 +2945,22 @@
             return true;
         }
 
+        function _textoCuentaOferta(finIso) {
+            const fin = String(finIso || '').trim();
+            if (!fin) return 'Sin fecha limite';
+            const target = new Date(`${fin}T23:59:59`);
+            if (!(target instanceof Date) || Number.isNaN(target.getTime())) return 'Fin: ' + fin;
+            const delta = target.getTime() - Date.now();
+            if (delta <= 0) return 'Finaliza hoy';
+            const minTotal = Math.floor(delta / 60000);
+            const dias = Math.floor(minTotal / (60 * 24));
+            const horas = Math.floor((minTotal % (60 * 24)) / 60);
+            const mins = minTotal % 60;
+            if (dias > 0) return `${dias}d ${horas}h`;
+            if (horas > 0) return `${horas}h ${mins}m`;
+            return `${Math.max(1, mins)}m`;
+        }
+
         function _renderProductosEnOfertaResumen() {
             const box = document.getElementById('ofertas-resumen-box');
             const list = document.getElementById('ofertas-resumen-list');
@@ -2946,7 +2977,9 @@
             list.innerHTML = rows.map((p) => {
                 const nom = escapeHtmlLocal(String(p?.nombre || 'Producto'));
                 const pct = Math.max(0, Number(p?.descuento_tienda_pct || 0));
-                return `<span class="ofertas-resumen-item">${nom} · -${Math.round(pct)}%</span>`;
+                const pid = Number(p?.id || 0);
+                const time = escapeHtmlLocal(_textoCuentaOferta(p?.oferta_fin_tienda));
+                return `<button type="button" class="ofertas-resumen-item" onclick="abrirEditorRapidoProducto(event, ${pid})">${nom} · -${Math.round(pct)}% · <span class="time">${time}</span></button>`;
             }).join('');
         }
 
@@ -3639,6 +3672,18 @@
             _editorRapidoProductoId = 0;
         }
 
+        function apagarOfertaEditorRapido() {
+            const pid = Number(_editorRapidoProductoId || 0);
+            if (!pid || !productosData[pid]) return;
+            const descuentoEl = document.getElementById('editor-rapido-descuento');
+            const ofertaInicioEl = document.getElementById('editor-rapido-oferta-inicio');
+            const ofertaFinEl = document.getElementById('editor-rapido-oferta-fin');
+            if (descuentoEl) descuentoEl.value = '0';
+            if (ofertaInicioEl) ofertaInicioEl.value = '';
+            if (ofertaFinEl) ofertaFinEl.value = '';
+            guardarEditorRapidoProducto();
+        }
+
         (function initEditorRapidoFotoHandlers() {
             const input = document.getElementById('editor-rapido-foto-input');
             if (input) {
@@ -4236,6 +4281,7 @@
         });
         _refrescarOpcionesCategoriaEditorRapido();
         _renderProductosEnOfertaResumen();
+        window.setInterval(_renderProductosEnOfertaResumen, 30000);
         ordenarTarjetasPorPrioridadDesactivacion();
         filtrarProductos();
         restaurarCarritoPersistente();
