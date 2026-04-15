@@ -549,7 +549,27 @@ def init_db():
     """Inicializa la base de datos si no existe"""
     try:
         conn = sqlite3.connect(DB_PATH)
-        conn.execute("PRAGMA journal_mode=WAL")  # Activar WAL
+        # En algunos hostings (picos de I/O, cuota, fs temporal), WAL puede fallar.
+        # No debemos botar la app por eso durante el arranque.
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            try:
+                conn.execute("PRAGMA journal_mode=DELETE")
+            except sqlite3.OperationalError:
+                pass
+        try:
+            conn.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("PRAGMA busy_timeout=30000")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("PRAGMA foreign_keys=ON")
+        except sqlite3.OperationalError:
+            pass
         
         cursor = conn.cursor()  # <-- CREAR CURSOR AQUÍ
         
@@ -13896,4 +13916,3 @@ def obtener_resumen_ventas_vs_compras(fecha_desde=None, fecha_hasta=None, comisi
         "totales": totales,
         "semanas": semanas,
     }
-
