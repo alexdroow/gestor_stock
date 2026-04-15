@@ -2184,6 +2184,13 @@
                         <option value="lt">lt</option>
                     </select>
                 </div>
+                <div class="editor-rapido-field">
+                    <label for="editor-rapido-activo-tienda">Visibilidad en tienda</label>
+                    <select id="editor-rapido-activo-tienda">
+                        <option value="1">Visible en tienda</option>
+                        <option value="0">Oculto (no aparece en tienda)</option>
+                    </select>
+                </div>
                 <div class="editor-rapido-foto-box">
                     <div class="editor-rapido-foto-head">
                         <strong style="font-size:.86rem;color:#334155;">Foto del producto</strong>
@@ -2951,7 +2958,9 @@
             const badgeApagado = card.querySelector('.producto-badge-apagado');
             if (badgeApagado) {
                 badgeApagado.style.display = apagadoEnTienda ? '' : 'none';
-                badgeApagado.textContent = 'Apagado en tienda';
+                badgeApagado.textContent = (info.activo_tienda === false)
+                    ? 'Oculto en tienda'
+                    : 'Apagado en tienda';
             }
 
             const stockEl = card.querySelector('.producto-stock');
@@ -3467,12 +3476,14 @@
             const precioEl = document.getElementById('editor-rapido-precio');
             const stockEl = document.getElementById('editor-rapido-stock');
             const unidadEl = document.getElementById('editor-rapido-unidad');
+            const activoTiendaEl = document.getElementById('editor-rapido-activo-tienda');
             if (nombreEl) nombreEl.value = String(info.nombre || '').trim();
             _refrescarOpcionesCategoriaEditorRapido(String(info.categoria_tienda || '').trim());
             if (categoriaEl) categoriaEl.value = String(info.categoria_tienda || '').trim();
             if (precioEl) precioEl.value = String(normalizarPrecio(info.precio || 0));
             if (stockEl) stockEl.value = String(Number(info.stock || 0));
             if (unidadEl) unidadEl.value = String(info.unidad || 'unidad').trim().toLowerCase() || 'unidad';
+            if (activoTiendaEl) activoTiendaEl.value = (info.activo_tienda === false ? '0' : '1');
             _renderEditorRapidoFotoPreview(pid);
             _setEditorRapidoFotoMsg('', '');
             const modal = document.getElementById('modal-editor-producto-rapido');
@@ -3598,12 +3609,14 @@
             const precioEl = document.getElementById('editor-rapido-precio');
             const stockEl = document.getElementById('editor-rapido-stock');
             const unidadEl = document.getElementById('editor-rapido-unidad');
+            const activoTiendaEl = document.getElementById('editor-rapido-activo-tienda');
             const btn = document.getElementById('btn-editor-rapido-guardar');
             const nombre = String(nombreEl?.value || '').trim();
             const categoria_tienda = String(categoriaEl?.value || '').trim().slice(0, 60);
             const precio = normalizarPrecio(precioEl?.value || 0);
             const stock = Number(stockEl?.value || 0);
             const unidad = String(unidadEl?.value || productosData[pid]?.unidad || 'unidad').trim().toLowerCase() || 'unidad';
+            const activo_tienda = String(activoTiendaEl?.value || '1') === '1';
             if (nombre.length < 2) {
                 alert('El nombre debe tener al menos 2 caracteres.');
                 return;
@@ -3625,7 +3638,7 @@
                 const response = await fetch(`/api/producto/${pid}/actualizar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ nombre, categoria_tienda, precio, stock, unidad, porcion_unidad: unidad }),
+                    body: JSON.stringify({ nombre, categoria_tienda, precio, stock, unidad, porcion_unidad: unidad, activo_tienda }),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) {
@@ -3683,9 +3696,11 @@
                 filtrarProductos();
                 cerrarEditorRapidoProducto();
                 if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
-                    const msgStock = Number(productosData[pid].stock_visual || 0) <= 0
-                        ? 'Producto actualizado. Stock en 0: quedo apagado en tienda.'
-                        : 'Producto actualizado y sincronizado.';
+                    const msgStock = productosData[pid].activo_tienda === false
+                        ? 'Producto actualizado y oculto de tienda.'
+                        : (Number(productosData[pid].stock_visual || 0) <= 0
+                            ? 'Producto actualizado. Stock en 0: quedo apagado en tienda.'
+                            : 'Producto actualizado y sincronizado.');
                     window.AppUX.toastSuccess(msgStock);
                 }
             } catch (err) {
