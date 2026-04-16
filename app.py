@@ -6167,8 +6167,15 @@ def api_tienda_admin_pedidos_chat_activos():
                    v.pedido_estado_actualizado,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
-                   v.hora_retiro
+                   v.hora_retiro,
+                   COALESCE(vp.productos, '') AS productos
             FROM ventas v
+            LEFT JOIN (
+                SELECT venta_id,
+                       GROUP_CONCAT(producto_nombre || ' (x' || cantidad || ')', ', ') AS productos
+                FROM venta_items
+                GROUP BY venta_id
+            ) vp ON vp.venta_id = v.id
             WHERE v.canal_venta = 'tienda_online'
               AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
             ORDER BY v.id DESC
