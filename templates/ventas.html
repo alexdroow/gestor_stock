@@ -4663,7 +4663,12 @@
                 const btnEntregadoTxt = entregaTipo === 'despacho' ? 'Confirmar entrega' : 'Confirmar retiro';
                 const emailEnc = encodeURIComponent(email);
                 const telEnc = encodeURIComponent(telefono);
+                const nombreEnc = encodeURIComponent(nombre);
                 const timerHtml = _timerPedidoRenderHtml(p);
+                const waPhoneOk = Boolean(_normalizarTelefonoWhatsapp(telefono));
+                const waBtn = (waPhoneOk && (estado === 'confirmado' || estado === 'preparando'))
+                    ? `<button type="button" onclick="_abrirWhatsappPedidoCliente(${Number(p.id || 0)}, '${telEnc}', '${estado}', '${nombreEnc}')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">WhatsApp cliente</button>`
+                    : '';
                 const opcionesTimerPendiente = estado === 'recibido' ? `
                     <div style="margin-top:6px;padding:6px;border:1px dashed #fca5a5;border-radius:8px;background:#fff7ed;">
                         <div style="font-size:.78rem;color:#9a3412;font-weight:800;margin-bottom:4px;">Aceptar y definir tiempo:</div>
@@ -4696,6 +4701,7 @@
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo</button>
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'entregado')" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">${btnEntregadoTxt}</button>
                             <button type="button" onclick="_abrirChatPedidoOnline(${Number(p.id || 0)}, '${emailEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Chat cliente</button>
+                            ${waBtn}
                         </div>
                     </div>
                 `;
@@ -4818,6 +4824,38 @@
             _pedidoChatAdminPollTimer = setInterval(_pollChatPedidoOnlineAdmin, 5000);
         }
         window._abrirChatPedidoOnline = _abrirChatPedidoOnline;
+
+        function _normalizarTelefonoWhatsapp(raw) {
+            const digits = String(raw || '').replace(/\D+/g, '');
+            if (!digits) return '';
+            let num = digits;
+            if (num.startsWith('00')) num = num.slice(2);
+            if (num.startsWith('0')) num = num.replace(/^0+/, '');
+            if (!num.startsWith('56')) num = `56${num}`;
+            return num;
+        }
+
+        function _mensajeWhatsappPedidoBase(pedidoId, estadoRaw, nombreCliente) {
+            const estado = _labelEstadoPedido(String(estadoRaw || 'recibido'));
+            const nombre = String(nombreCliente || '').trim();
+            return `Hola ${nombre || ''}, te escribe Pasteleria Sucree. Pedido #${Number(pedidoId || 0)} en estado: ${estado}.`;
+        }
+
+        function _abrirWhatsappPedidoCliente(ventaId, telEnc, estadoRaw, nombreEnc) {
+            const idNum = Number(ventaId || 0);
+            const telefonoRaw = decodeURIComponent(String(telEnc || ''));
+            const nombre = decodeURIComponent(String(nombreEnc || ''));
+            const telefono = _normalizarTelefonoWhatsapp(telefonoRaw);
+            if (!idNum || !telefono) {
+                if (window.AppUX?.toastError) window.AppUX.toastError('Telefono de cliente invalido para WhatsApp.');
+                else alert('Telefono de cliente invalido para WhatsApp.');
+                return;
+            }
+            const texto = _mensajeWhatsappPedidoBase(idNum, estadoRaw, nombre);
+            const url = `https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`;
+            window.open(url, '_blank', 'noopener');
+        }
+        window._abrirWhatsappPedidoCliente = _abrirWhatsappPedidoCliente;
 
         function _mensajeRapidoPedido(tipo, pedidoId) {
             const id = Number(pedidoId || 0);
@@ -4966,6 +5004,7 @@
                     const hora = String(p.hora_retiro || '').trim();
                     const emEnc = encodeURIComponent(em);
                     const telEnc = encodeURIComponent(tel);
+                    const nomEnc = encodeURIComponent(nom);
                     const timerHtml = _timerPedidoRenderHtml(p);
                     const pendingBadge = estadoRaw === 'recibido'
                         ? '<span style="margin-left:6px;font-size:.72rem;color:#b91c1c;border:1px solid #fecaca;background:#fef2f2;border-radius:999px;padding:1px 6px;font-weight:800;">Pendiente</span>'
@@ -4979,6 +5018,10 @@
                             <button type="button" onclick="_aceptarPedidoConTimer(${id}, 45)" style="border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">+30</button>
                         </div>
                     ` : '';
+                    const waPhoneOk = Boolean(_normalizarTelefonoWhatsapp(tel));
+                    const waBtnHub = (waPhoneOk && (estadoRaw === 'confirmado' || estadoRaw === 'preparando'))
+                        ? `<button type="button" onclick="_abrirWhatsappPedidoCliente(${id}, '${telEnc}', '${estadoRaw}', '${nomEnc}')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">WhatsApp</button>`
+                        : '';
                     return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
                         <div style="font-weight:800;color:#0f172a;">Pedido #${id}${pendingBadge}</div>
                         <div style="font-size:.85rem;color:#475569;">${nom}</div>
@@ -4988,6 +5031,7 @@
                         ${quickTimerHub}
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_abrirChatPedidoOnline(${id}, '${emEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
+                            ${waBtnHub}
                             <button type="button" id="pedido-quick-toggle-${id}" onclick="_toggleMensajesRapidos(${id})" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Mostrar mensajes</button>
                         </div>
                         <div id="pedido-quick-${id}" style="display:none;grid-template-columns:1fr;gap:6px;margin-top:6px;">
