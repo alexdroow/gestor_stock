@@ -10540,7 +10540,9 @@ def api_tienda_checkout():
         if es_modo_presencial:
             entrega_tipo = "retiro"
         hora_retiro = str(data.get("hora_retiro") or "").strip()
-        if not _parse_hora_hhmm(hora_retiro):
+        if es_modo_presencial:
+            hora_retiro = ""
+        elif not _parse_hora_hhmm(hora_retiro):
             return jsonify({'success': False, 'error': 'Selecciona una hora valida para retiro/entrega (HH:MM).'}), 400
         direccion_entrega = str(data.get("direccion") or "").strip()[:240]
         direccion_confirmada = bool(data.get("direccion_confirmada"))
@@ -10551,14 +10553,15 @@ def api_tienda_checkout():
             entrega_lat, entrega_lng = None, None
 
         now_local = datetime.now(ZoneInfo("America/Santiago"))
-        min_retiro_dt = now_local + timedelta(minutes=30)
-        try:
-            hh, mm = [int(x) for x in hora_retiro.split(":")]
-            retiro_dt = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
-        except Exception:
-            return jsonify({'success': False, 'error': 'Hora de retiro invalida.'}), 400
-        if retiro_dt < min_retiro_dt:
-            return jsonify({'success': False, 'error': 'La hora de retiro/entrega debe ser al menos 30 minutos desde ahora.'}), 400
+        if not es_modo_presencial:
+            min_retiro_dt = now_local + timedelta(minutes=30)
+            try:
+                hh, mm = [int(x) for x in hora_retiro.split(":")]
+                retiro_dt = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            except Exception:
+                return jsonify({'success': False, 'error': 'Hora de retiro invalida.'}), 400
+            if retiro_dt < min_retiro_dt:
+                return jsonify({'success': False, 'error': 'La hora de retiro/entrega debe ser al menos 30 minutos desde ahora.'}), 400
 
         categorias = _cargar_categorias_tienda()
         categorias_map = {str(c.get("nombre") or "").strip().lower(): c for c in categorias}

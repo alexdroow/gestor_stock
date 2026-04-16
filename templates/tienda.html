@@ -3203,7 +3203,7 @@
                 <div class="checkout-despacho-notice" id="checkout-despacho-notice">
                     Los despachos se realizan por Uber Envíos.
                 </div>
-                <div class="checkout-delivery-time">
+                <div class="checkout-delivery-time" id="checkout-delivery-time-wrap">
                     <label for="checkout-hora-retiro">Hora de retiro/entrega</label>
                     <select id="checkout-hora-retiro"></select>
                     <div id="checkout-hora-help"></div>
@@ -3398,6 +3398,7 @@
         const modalCheckoutDetalleEl = document.getElementById("modal-checkout-detalle");
         const checkoutEntregaRetiroEl = document.getElementById("checkout-entrega-retiro");
         const checkoutEntregaDespachoEl = document.getElementById("checkout-entrega-despacho");
+        const checkoutDeliveryTimeWrapEl = document.getElementById("checkout-delivery-time-wrap");
         const checkoutHoraRetiroEl = document.getElementById("checkout-hora-retiro");
         const checkoutHoraHelpEl = document.getElementById("checkout-hora-help");
         const checkoutDespachoWrapEl = document.getElementById("checkout-despacho-wrap");
@@ -3669,6 +3670,7 @@
             if (checkoutEntregaDespachoEl) checkoutEntregaDespachoEl.style.display = "none";
             if (checkoutDespachoNoticeEl) checkoutDespachoNoticeEl.style.display = "none";
             if (checkoutDespachoWrapEl) checkoutDespachoWrapEl.style.display = "none";
+            if (checkoutDeliveryTimeWrapEl) checkoutDeliveryTimeWrapEl.style.display = "none";
             checkoutEntregaTipo = "retiro";
         }
         let pedidoChatLastMsgId = 0;
@@ -8280,9 +8282,11 @@
         async function confirmarCheckoutDesdeResumen() {
             if (!checkoutClientePendiente) return msg("No hay datos de cliente para confirmar.", true);
             const horaRetiro = String(checkoutHoraRetiroEl?.value || "").trim();
-            if (!_esHoraCheckoutValida(horaRetiro)) {
-                _actualizarAyudaHoraCheckout();
-                return msg("Debes seleccionar una hora valida (minimo 30 min desde ahora).", true);
+            if (!MODO_PRESENCIAL) {
+                if (!_esHoraCheckoutValida(horaRetiro)) {
+                    _actualizarAyudaHoraCheckout();
+                    return msg("Debes seleccionar una hora valida (minimo 30 min desde ahora).", true);
+                }
             }
             if (!MODO_PRESENCIAL && checkoutEntregaTipo === "despacho") {
                 const direccion = String(checkoutDireccionBuscarEl?.value || "").trim();
@@ -8329,7 +8333,7 @@
                 checkout_modo: MODO_PRESENCIAL ? "presencial" : "online",
                 fecha_venta: new Date().toISOString().slice(0, 10),
                 entrega_tipo: entregaCheckout,
-                hora_retiro: String(checkoutHoraRetiroEl?.value || "").trim(),
+                hora_retiro: MODO_PRESENCIAL ? "" : String(checkoutHoraRetiroEl?.value || "").trim(),
                 direccion: entregaCheckout === "despacho" ? String(checkoutDireccionBuscarEl?.value || "").trim() : "",
                 direccion_confirmada: entregaCheckout === "despacho" ? Boolean(checkoutDireccionConfirmada) : false,
                 lat: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lat || 0) : null,
