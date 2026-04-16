@@ -574,6 +574,42 @@
                 }
             }
 
+            function normalizarTelefonoWhatsapp(raw) {
+                const txt = String(raw || '').trim();
+                if (!txt) return '';
+                const dig = txt.replace(/[^\d+]/g, '');
+                if (dig.startsWith('+') && dig.length >= 11) return dig;
+                const only = dig.replace(/\D/g, '');
+                if (!only) return '';
+                if (only.startsWith('56') && only.length >= 11) return `+${only}`;
+                if (only.startsWith('9') && only.length === 9) return `+56${only}`;
+                if (only.startsWith('0') && only.length > 1) return `+56${only.slice(1)}`;
+                if (only.length >= 8) return `+${only}`;
+                return '';
+            }
+
+            function mensajeWhatsappPedido(estadoRaw, pedidoId, nombreRaw) {
+                const nombre = String(nombreRaw || '').trim() || 'cliente';
+                const estado = String(estadoRaw || '').trim().toLowerCase();
+                const base = quickMsg(estado, pedidoId) || quickMsg('confirmado', pedidoId) || `Hola ${nombre}, actualizamos su pedido #${Number(pedidoId || 0)}.`;
+                return `Hola ${nombre}. ${base}`;
+            }
+
+            function abrirWhatsappClientePedido(ventaId, telEnc, estadoRaw, nomEnc) {
+                const id = Number(ventaId || 0);
+                const telefonoRaw = decodeURIComponent(String(telEnc || ''));
+                const nombreRaw = decodeURIComponent(String(nomEnc || ''));
+                const tel = normalizarTelefonoWhatsapp(telefonoRaw);
+                if (!id || !tel) {
+                    alert('Telefono de cliente invalido para WhatsApp.');
+                    return;
+                }
+                const texto = mensajeWhatsappPedido(estadoRaw, id, nombreRaw);
+                const wa = `https://wa.me/${tel.replace('+', '')}?text=${encodeURIComponent(texto)}`;
+                window.open(wa, '_blank', 'noopener');
+            }
+            window._sucreeAbrirWhatsappPedido = abrirWhatsappClientePedido;
+
             async function sendQuick(ventaId, kind) {
                 const id = Number(ventaId || 0);
                 if (!id) return;
@@ -677,14 +713,20 @@
                 }
                 list.innerHTML = pedidosActivos.map((p) => {
                     const id = Number(p.id || 0);
-                    const nom = esc(String(p.cliente_nombre || '').trim() || 'sin nombre');
-                    const em = esc(String(p.cliente_email || '').trim() || '-');
-                    const tel = esc(String(p.cliente_telefono || '').trim() || '-');
-                    const estado = labelEstado(p.pedido_estado);
+                    const nomRaw = String(p.cliente_nombre || '').trim() || 'sin nombre';
+                    const emRaw = String(p.cliente_email || '').trim() || '-';
+                    const telRaw = String(p.cliente_telefono || '').trim() || '-';
+                    const nom = esc(nomRaw);
+                    const em = esc(emRaw);
+                    const tel = esc(telRaw);
+                    const estadoRaw = String(p.pedido_estado || 'recibido').trim().toLowerCase();
+                    const estado = labelEstado(estadoRaw);
                     const pendiente = esPendienteConfirmacion(p.pedido_estado);
                     const entrega = String(p.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'Despacho' : 'Retiro';
                     const hora = esc(String(p.hora_retiro || '').trim());
                     const timerHtml = timerHtmlPedido(p);
+                    const telEnc = encodeURIComponent(telRaw);
+                    const nomEnc = encodeURIComponent(nomRaw);
                     const accionesTimerPendiente = pendiente ? `
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_sucreeSetTimerPedido(${id});" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">Aceptar + tiempo</button>
@@ -707,6 +749,7 @@
                         ${accionesTimerPendiente}
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_sucreeAbrirChatPedido(${id})" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
+                            <button type="button" onclick="_sucreeAbrirWhatsappPedido(${id}, '${telEnc}', '${estadoRaw}', '${nomEnc}')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">WhatsApp</button>
                             <button type="button" id="sucree-quick-toggle-${id}" onclick="_sucreeToggleQuickPedido(${id})" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Mostrar mensajes</button>
                         </div>
                         <div id="sucree-quick-${id}" style="display:none;grid-template-columns:1fr;gap:6px;margin-top:6px;">
