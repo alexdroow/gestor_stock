@@ -3322,6 +3322,9 @@ def procesar_venta_con_insumos(
 
         if total_monto < 0:
             total_monto = 0.0
+        # En ventas por apps de delivery solo registramos items/stock; omitimos monto.
+        if canal in {"uber_eats", "pedidosya"}:
+            total_monto = 0.0
         cursor.execute(
             "UPDATE ventas SET total_monto = ? WHERE id = ?",
             (float(total_monto), venta_id),
@@ -4237,8 +4240,12 @@ def obtener_historial_ventas(fecha_desde=None, fecha_hasta=None):
             total_monto_calc = float(venta.get("total_monto_calc") or 0)
         except (TypeError, ValueError):
             total_monto_calc = 0.0
-        if total_monto <= 0 and total_monto_calc > 0:
+        canal_venta = str(venta.get("canal_venta") or "presencial").strip().lower()
+        omitir_total = canal_venta in {"uber_eats", "pedidosya"}
+        if (not omitir_total) and total_monto <= 0 and total_monto_calc > 0:
             venta["total_monto"] = total_monto_calc
+        elif omitir_total:
+            venta["total_monto"] = 0.0
         venta["pedido_estado"] = str(venta.get("pedido_estado_normalizado") or "recibido").strip().lower()
 
         try:
@@ -4403,8 +4410,12 @@ def obtener_detalle_venta(venta_id):
             total_actual = float(venta.get("total_monto") or 0)
         except (TypeError, ValueError):
             total_actual = 0.0
-        if total_actual <= 0 and total_monto_calc > 0:
+        canal_venta = str(venta.get("canal_venta") or "presencial").strip().lower()
+        omitir_total = canal_venta in {"uber_eats", "pedidosya"}
+        if (not omitir_total) and total_actual <= 0 and total_monto_calc > 0:
             venta["total_monto"] = float(total_monto_calc)
+        elif omitir_total:
+            venta["total_monto"] = 0.0
 
     conn.close()
     return venta, items
