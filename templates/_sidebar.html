@@ -588,12 +588,19 @@
                 return '';
             }
 
+            function normalizarNombreWhatsapp(nombreRaw) {
+                let nombre = String(nombreRaw || '').trim();
+                if (!nombre) return 'cliente';
+                nombre = nombre.replace(/^hola[\s,:\-]*/i, '').trim();
+                return nombre || 'cliente';
+            }
+
             function mensajeWhatsappPedido(pedidoId, nombreRaw, timerTxt, resumenPedido, totalTxt) {
-                const nombre = String(nombreRaw || '').trim() || 'cliente';
+                const nombre = normalizarNombreWhatsapp(nombreRaw);
                 const tiempo = String(timerTxt || '').trim() || 'sin tiempo definido';
                 const resumen = String(resumenPedido || '').trim() || '-';
                 const total = String(totalTxt || '').trim() || '-';
-                return `Hola ${nombre}, su pedido #${Number(pedidoId || 0)}. a sido confirmado y lo estamos preperando , tiene un tiempo aproximado de ${tiempo}, mientras el pedido es preparado te dejamos los datos de transferencia.\n\n*Resumen del pedido:* ${resumen}\n*TOTAL:* ${total}\n\n💳 Datos de Transferencia 💳\n\n⚠️ NUEVOS DATOS DE TRANSFERENCIA ⚠️\n(Si tienes registrada la cuenta "Banco Santander" debes añadir la nueva cuenta.)\n\nALEXIS JAVIER GUTIERREZ SALGADO\n18.121.947-5\nBci / Banco Crédito e Inversiones\nCuenta Vista\n777018121947\npasteleria.sucree@outlook.com\n\nTe avisaremos cuando tu pedido se encuentre listo para ser retirado/despachado\n\nMuchas gracias por preferir Pasteleria Sucrée`;
+                return `Hola ${nombre}, su pedido #${Number(pedidoId || 0)}. a sido confirmado y lo estamos preperando , tiene un tiempo aproximado de ${tiempo}, mientras el pedido es preparado te dejamos los datos de transferencia.\n\n*Resumen del pedido:*\n- ${resumen}\n- *TOTAL:* ${total}\n\n💳 Datos de Transferencia 💳\n\n⚠️ NUEVOS DATOS DE TRANSFERENCIA ⚠️\n(Si tienes registrada la cuenta "Banco Santander" debes añadir la nueva cuenta.)\n\nALEXIS JAVIER GUTIERREZ SALGADO\n18.121.947-5\nBci / Banco Crédito e Inversiones\nCuenta Vista\n777018121947\npasteleria.sucree@outlook.com\n\nTe avisaremos cuando tu pedido se encuentre listo para ser retirado/despachado\n\nMuchas gracias por preferir Pasteleria Sucrée`;
             }
 
             function abrirWhatsappClientePedido(ventaId, telEnc, nomEnc, timerEnc, resumenEnc, totalEnc) {
