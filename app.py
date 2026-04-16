@@ -1027,7 +1027,7 @@ def tienda_publica():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False)
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=False)
 
 
 @app.route('/tienda/agendar')
@@ -1036,7 +1036,16 @@ def tienda_publica_agendar():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True)
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False)
+
+
+@app.route('/tienda/presencial')
+def tienda_publica_presencial():
+    try:
+        personalizacion = _obtener_tienda_personalizacion()
+    except Exception:
+        personalizacion = _default_tienda_personalizacion()
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=True)
 
 
 @app.route('/tienda/preview')
@@ -1052,7 +1061,7 @@ def tienda_preview_admin():
             personalizacion = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template("tienda.html", tienda_personalizacion=personalizacion, force_agenda=force_agenda)
+    return render_template("tienda.html", tienda_personalizacion=personalizacion, force_agenda=force_agenda, modo_presencial=False)
 
 
 def _parse_fecha_yyyy_mm_dd(valor):
@@ -10509,18 +10518,26 @@ def api_tienda_checkout():
         cliente_nombre = str(data.get("cliente_nombre") or "").strip()
         if len(cliente_nombre) < 2:
             return jsonify({'success': False, 'error': 'Nombre invalido'}), 400
+        checkout_modo = str(data.get("checkout_modo") or "online").strip().lower()
+        es_modo_presencial = checkout_modo in {"presencial", "tablet", "local", "presencial_tablet"}
         cliente_email = str(data.get("cliente_email") or "").strip().lower()
         cliente_telefono = str(data.get("cliente_telefono") or "").strip()
-        if not cliente_email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", cliente_email):
-            return jsonify({'success': False, 'error': 'Correo electronico invalido'}), 400
         telefono_norm = _normalizar_telefono_cl(cliente_telefono)
         if not telefono_norm:
             return jsonify({'success': False, 'error': 'Telefono invalido. Debe tener 8 digitos.'}), 400
         cliente_telefono = telefono_norm
+        if es_modo_presencial:
+            tel_digits = re.sub(r"\D+", "", str(cliente_telefono or ""))
+            suffix = tel_digits[-8:] if tel_digits else "cliente"
+            cliente_email = f"presencial.{suffix}@local.sucree"
+        elif not cliente_email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", cliente_email):
+            return jsonify({'success': False, 'error': 'Correo electronico invalido'}), 400
         cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
         cliente_ref = _normalizar_cliente_ref(cliente_email, cliente_telefono)
         entrega_tipo = str(data.get("entrega_tipo") or "retiro").strip().lower()
         if entrega_tipo not in {"retiro", "despacho"}:
+            entrega_tipo = "retiro"
+        if es_modo_presencial:
             entrega_tipo = "retiro"
         hora_retiro = str(data.get("hora_retiro") or "").strip()
         if not _parse_hora_hhmm(hora_retiro):
@@ -10744,6 +10761,7 @@ def api_tienda_checkout():
         respuesta["cliente_email"] = cliente_email
         respuesta["cliente_telefono"] = cliente_telefono
         respuesta["entrega_tipo"] = entrega_tipo
+        respuesta["checkout_modo"] = ("presencial" if es_modo_presencial else "online")
         respuesta["hora_retiro"] = hora_retiro
         respuesta["direccion_entrega"] = (direccion_entrega if entrega_tipo == "despacho" else "")
         respuesta["despacho_monto"] = round(float(despacho_monto or 0), 2)

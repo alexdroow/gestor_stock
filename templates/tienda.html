@@ -3168,7 +3168,7 @@
     <div class="modal-overlay" id="modal-cliente">
         <div class="modal">
             <h3>Datos para confirmar pedido</h3>
-            <div style="font-size:.9rem;color:#64748b;">Necesitamos tu correo y telefono para contactarte.</div>
+            <div id="modal-cliente-ayuda" style="font-size:.9rem;color:#64748b;">Necesitamos tu correo y telefono para contactarte.</div>
             <input id="cliente-nombre" type="text" placeholder="Nombre completo">
             <div class="two">
                 <input id="cliente-email" type="email" placeholder="Correo electronico">
@@ -3389,6 +3389,7 @@
         const btnAplicarCuponEl = document.getElementById("btn-aplicar-cupon");
         const mobileBtnAplicarCuponEl = document.getElementById("mobile-btn-aplicar-cupon");
         const modalClienteEl = document.getElementById("modal-cliente");
+        const modalClienteAyudaEl = document.getElementById("modal-cliente-ayuda");
         const clienteNombreEl = document.getElementById("cliente-nombre");
         const clienteEmailEl = document.getElementById("cliente-email");
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
@@ -3581,10 +3582,14 @@
         const CAT_STORAGE_KEY = "tienda_categoria_activa";
         const _agendaUrlParamsInit = new URLSearchParams(window.location.search);
         const _forceAgendaFromServer = {{ 'true' if force_agenda else 'false' }};
+        const _modoPresencialFromServer = {{ 'true' if modo_presencial else 'false' }};
         const _forceAgendaFromQueryInit = ["agenda", "agendar", "reservas"].includes(String(_agendaUrlParamsInit.get("seccion") || "").trim().toLowerCase());
         const _forceAgendaFromHashInit = ["#agenda", "#agendar", "#reservas"].includes(String(window.location.hash || "").trim().toLowerCase());
         const _forceAgendaFromPathInit = String(window.location.pathname || "").toLowerCase().startsWith("/tienda/agendar");
         const _forceAgendaModeInit = Boolean(_forceAgendaFromServer || _forceAgendaFromQueryInit || _forceAgendaFromHashInit || _forceAgendaFromPathInit);
+        const _modoPresencialFromQueryInit = ["presencial", "local", "tablet"].includes(String(_agendaUrlParamsInit.get("modo") || "").trim().toLowerCase());
+        const _modoPresencialFromPathInit = String(window.location.pathname || "").toLowerCase().startsWith("/tienda/presencial");
+        const MODO_PRESENCIAL = Boolean(_modoPresencialFromServer || _modoPresencialFromQueryInit || _modoPresencialFromPathInit);
         const categoriaInicialGuardada = String(localStorage.getItem(CAT_STORAGE_KEY) || "TODOS");
         let categoriaActiva = _forceAgendaModeInit ? "AGENDA" : (categoriaInicialGuardada === "AGENDA" ? "TODOS" : categoriaInicialGuardada);
         if (!_forceAgendaModeInit && categoriaInicialGuardada === "AGENDA") {
@@ -3638,6 +3643,34 @@
         let agendaCakeCategoryExpanded = false;
         let pedidoChatContext = null;
         let pedidoChatPollTimer = null;
+
+        function _aplicarModoPresencialUI() {
+            if (!MODO_PRESENCIAL) return;
+            document.body.classList.add("modo-presencial");
+            if (brandTextEl) brandTextEl.textContent = "Modo presencial";
+            if (btnIniciarSesionEl) btnIniciarSesionEl.style.display = "none";
+            if (btnRegistrarCuentaEl) btnRegistrarCuentaEl.style.display = "none";
+            if (btnCuentaEl) btnCuentaEl.style.display = "none";
+            if (btnCerrarSesionEl) btnCerrarSesionEl.style.display = "none";
+            if (modalClienteAyudaEl) {
+                modalClienteAyudaEl.textContent = "Ingresa tu nombre y telefono para enviarte actualizaciones por WhatsApp.";
+            }
+            if (clienteEmailEl) {
+                clienteEmailEl.value = "";
+                clienteEmailEl.style.display = "none";
+                clienteEmailEl.disabled = true;
+            }
+            if (clienteTelefonoEl) {
+                clienteTelefonoEl.placeholder = "12345678";
+            }
+            if (clienteEmailEl?.parentElement) {
+                clienteEmailEl.parentElement.style.gridTemplateColumns = "1fr";
+            }
+            if (checkoutEntregaDespachoEl) checkoutEntregaDespachoEl.style.display = "none";
+            if (checkoutDespachoNoticeEl) checkoutDespachoNoticeEl.style.display = "none";
+            if (checkoutDespachoWrapEl) checkoutDespachoWrapEl.style.display = "none";
+            checkoutEntregaTipo = "retiro";
+        }
         let pedidoChatLastMsgId = 0;
         let pedidoChatModalOpen = false;
         let pedidoChatUnreadCount = 0;
@@ -4050,6 +4083,7 @@
             root.style.setProperty("--font-scale-desktop", `${Math.max(80, Math.min(140, Number(tiendaUiCfg.visual_font_scale_desktop || TIENDA_UI_DEFAULTS.visual_font_scale_desktop) || 100))}%`);
             root.style.setProperty("--font-scale-mobile", `${Math.max(70, Math.min(130, Number(tiendaUiCfg.visual_font_scale_mobile || TIENDA_UI_DEFAULTS.visual_font_scale_mobile) || 100))}%`);
 
+            _aplicarModoPresencialUI();
             _renderAgendaPastelResumen();
             if (tiendaCustomCssEl) {
                 const advCss = _buildVisualOverridesCss(tiendaUiCfg.visual_element_overrides || []);
@@ -4666,6 +4700,15 @@
         }
 
         function renderEstadoCuenta() {
+            if (MODO_PRESENCIAL) {
+                if (btnCuentaEl) btnCuentaEl.style.display = "none";
+                if (btnCerrarSesionEl) btnCerrarSesionEl.style.display = "none";
+                if (btnIniciarSesionEl) btnIniciarSesionEl.style.display = "none";
+                if (btnRegistrarCuentaEl) btnRegistrarCuentaEl.style.display = "none";
+                renderCategoriasMenu();
+                _syncPedidoChatContext();
+                return;
+            }
             const logged = Boolean(clienteRegistrado);
             if (btnCuentaEl) btnCuentaEl.style.display = logged ? "" : "none";
             if (btnCuentaEl) {
@@ -4974,7 +5017,9 @@
             if (mobileCatsBubbleListEl) {
                 const nombreCliente = String(clienteRegistrado?.nombre || "").trim();
                 const nombreCorto = nombreCliente ? nombreCliente.split(/\s+/)[0].slice(0, 20) : "Cliente";
-                const authItems = clienteRegistrado
+                const authItems = MODO_PRESENCIAL
+                    ? ""
+                    : (clienteRegistrado
                     ? `
                         <button type="button" class="mobile-cat-chip account-entry" onclick="abrirCuentaDesdeMenuMobile()">Bienvenido(a) ${esc(nombreCorto)}</button>
                         <button type="button" class="mobile-cat-chip logout-entry" onclick="cerrarSesionDesdeMenuMobile()">Cerrar sesion</button>
@@ -4982,7 +5027,7 @@
                     : `
                         <button type="button" class="mobile-cat-chip account-entry" onclick="abrirLoginDesdeMenuMobile()">Iniciar sesion</button>
                         <button type="button" class="mobile-cat-chip account-entry" onclick="abrirRegistroDesdeMenuMobile()">Registrar cuenta</button>
-                    `;
+                    `);
                 const agendaItem = agendaEnabled
                     ? `<button type="button" class="mobile-cat-chip agenda-entry ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
@@ -8027,7 +8072,8 @@
         }
 
         function _setCheckoutEntregaTipo(tipo) {
-            checkoutEntregaTipo = (String(tipo || "").trim().toLowerCase() === "despacho") ? "despacho" : "retiro";
+            const tipoNorm = String(tipo || "").trim().toLowerCase();
+            checkoutEntregaTipo = (MODO_PRESENCIAL || tipoNorm !== "despacho") ? "retiro" : "despacho";
             if (checkoutEntregaRetiroEl) checkoutEntregaRetiroEl.classList.toggle("active", checkoutEntregaTipo === "retiro");
             if (checkoutEntregaDespachoEl) checkoutEntregaDespachoEl.classList.toggle("active", checkoutEntregaTipo === "despacho");
             if (checkoutDespachoWrapEl) checkoutDespachoWrapEl.classList.toggle("active", checkoutEntregaTipo === "despacho");
@@ -8150,11 +8196,16 @@
 
         function _normalizarDatosCheckoutCliente(datosCliente) {
             const nombre = String(datosCliente?.nombre || "").trim();
-            const email = normalizarEmailCliente(datosCliente?.email);
             const telefono = String(datosCliente?.telefono || "").trim();
+            let email = normalizarEmailCliente(datosCliente?.email);
             if (nombre.length < 2) return { ok: false, error: "Ingresa un nombre valido." };
-            if (!email) return { ok: false, error: "Ingresa un correo valido." };
             if (!/^\+569\d{8}$/.test(telefono)) return { ok: false, error: "Telefono invalido." };
+            if (MODO_PRESENCIAL) {
+                const tel8 = String(telefono || "").replace(/\D+/g, "").slice(-8);
+                email = `presencial.${tel8 || "cliente"}@local.sucree`;
+            } else if (!email) {
+                return { ok: false, error: "Ingresa un correo valido." };
+            }
             return { ok: true, value: { nombre, email, telefono } };
         }
 
@@ -8188,7 +8239,7 @@
             const cuponTxt = String(cuponAplicado.codigo || "").trim();
             modalCheckoutClienteEl.innerHTML = `
                 <div><strong>Cliente:</strong> ${esc(norm.value.nombre)}</div>
-                <div><strong>Correo:</strong> ${esc(norm.value.email)}</div>
+                ${MODO_PRESENCIAL ? `<div><strong>Modo:</strong> Presencial en tienda</div>` : `<div><strong>Correo:</strong> ${esc(norm.value.email)}</div>`}
                 <div><strong>Telefono:</strong> ${esc(norm.value.telefono)}</div>
                 ${cuponTxt ? `<div><strong>Cupon:</strong> ${esc(cuponTxt)}</div>` : ""}
             `;
@@ -8233,7 +8284,7 @@
                 _actualizarAyudaHoraCheckout();
                 return msg("Debes seleccionar una hora valida (minimo 30 min desde ahora).", true);
             }
-            if (checkoutEntregaTipo === "despacho") {
+            if (!MODO_PRESENCIAL && checkoutEntregaTipo === "despacho") {
                 const direccion = String(checkoutDireccionBuscarEl?.value || "").trim();
                 if (direccion.length < 8) return msg("Ingresa una direccion valida para despacho.", true);
                 if (!checkoutDireccionConfirmada) return msg("Confirma la direccion con el pin del mapa.", true);
@@ -8257,6 +8308,7 @@
 
         async function enviarCheckoutCliente(datosCliente) {
             msg("Procesando compra...");
+            const entregaCheckout = MODO_PRESENCIAL ? "retiro" : checkoutEntregaTipo;
             const itemsSnapshot = carrito.map((it) => ({
                 id: it.id,
                 nombre: it.nombre,
@@ -8266,7 +8318,7 @@
             }));
             const subtotalSnapshot = itemsSnapshot.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
             const descuentoSnapshot = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const despachoSnapshot = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote?.shipping_fee || 0)) : 0;
+            const despachoSnapshot = (entregaCheckout === "despacho" && _checkoutShippingVisible()) ? Math.max(0, Number(checkoutShippingQuote?.shipping_fee || 0)) : 0;
             const totalSnapshot = Math.max(0, subtotalSnapshot - descuentoSnapshot + despachoSnapshot);
             const payload = {
                 items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
@@ -8274,14 +8326,15 @@
                 cliente_nombre: String(datosCliente?.nombre || "").trim(),
                 cliente_email: normalizarEmailCliente(datosCliente?.email),
                 cliente_telefono: String(datosCliente?.telefono || "").trim(),
+                checkout_modo: MODO_PRESENCIAL ? "presencial" : "online",
                 fecha_venta: new Date().toISOString().slice(0, 10),
-                entrega_tipo: checkoutEntregaTipo,
+                entrega_tipo: entregaCheckout,
                 hora_retiro: String(checkoutHoraRetiroEl?.value || "").trim(),
-                direccion: checkoutEntregaTipo === "despacho" ? String(checkoutDireccionBuscarEl?.value || "").trim() : "",
-                direccion_confirmada: checkoutEntregaTipo === "despacho" ? Boolean(checkoutDireccionConfirmada) : false,
-                lat: checkoutEntregaTipo === "despacho" ? Number(checkoutDireccionPin.lat || 0) : null,
-                lng: checkoutEntregaTipo === "despacho" ? Number(checkoutDireccionPin.lng || 0) : null,
-                shipping_quote: checkoutEntregaTipo === "despacho" ? (checkoutShippingQuote || null) : null,
+                direccion: entregaCheckout === "despacho" ? String(checkoutDireccionBuscarEl?.value || "").trim() : "",
+                direccion_confirmada: entregaCheckout === "despacho" ? Boolean(checkoutDireccionConfirmada) : false,
+                lat: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lat || 0) : null,
+                lng: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lng || 0) : null,
+                shipping_quote: entregaCheckout === "despacho" ? (checkoutShippingQuote || null) : null,
             };
             const norm = _normalizarDatosCheckoutCliente(datosCliente);
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
@@ -8341,6 +8394,12 @@
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
             document.body.classList.remove("cart-open");
+            if (MODO_PRESENCIAL) {
+                if (clienteNombreEl) clienteNombreEl.value = String(clienteNombreEl.value || "").trim();
+                if (clienteTelefonoEl) clienteTelefonoEl.value = String(clienteTelefonoEl.value || "").replace(/\D+/g, "").slice(0, 8);
+                if (modalClienteEl) modalClienteEl.classList.add("active");
+                return;
+            }
             if (clienteRegistrado && normalizarEmailCliente(clienteRegistrado.email) && /^\+569\d{8}$/.test(String(clienteRegistrado.telefono || ""))) {
                 return abrirModalCheckoutResumen(clienteRegistrado);
             }
@@ -8714,17 +8773,20 @@
             if (!tiendaAbierta) return msg("La tienda esta cerrada por el momento.", true);
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
             const nombre = String(clienteNombreEl.value || "").trim();
-            const email = normalizarEmailCliente(String(clienteEmailEl.value || "").trim().toLowerCase());
             const telefonoDig = normalizarTelefono8(String(clienteTelefonoEl.value || ""));
+            let email = normalizarEmailCliente(String(clienteEmailEl.value || "").trim().toLowerCase());
             const telefono = `+569${telefonoDig}`;
             if (nombre.length < 2) {
                 return msg("Ingresa tu nombre.", true);
             }
-            if (!email) {
+            if (!MODO_PRESENCIAL && !email) {
                 return msg("Ingresa un correo valido.", true);
             }
             if (!telefonoDig || telefonoDig.length !== 8) {
                 return msg("El telefono debe tener exactamente 8 digitos.", true);
+            }
+            if (MODO_PRESENCIAL) {
+                email = `presencial.${telefonoDig}@local.sucree`;
             }
             return abrirModalCheckoutResumen({
                 nombre,
@@ -9090,10 +9152,10 @@
         }
 
         aplicarPersonalizacionTienda(TIENDA_UI_INITIAL);
-        clienteRegistrado = cargarClienteLocal();
+        clienteRegistrado = MODO_PRESENCIAL ? null : cargarClienteLocal();
         ultimoComprobantePedido = cargarUltimoPedidoLocal();
         renderEstadoCuenta();
-        if (clienteRegistrado) cargarHistorialCliente();
+        if (clienteRegistrado && !MODO_PRESENCIAL) cargarHistorialCliente();
         _renderPedidoActivoTienda();
         _startPedidoEstadoPoll();
         _cargarCatalogoTortaAgenda();
