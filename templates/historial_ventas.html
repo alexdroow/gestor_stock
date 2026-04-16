@@ -285,6 +285,45 @@
             max-width: 300px;
             font-size: 13px;
             color: #374151;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .venta-productos-preview {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .venta-productos-details {
+            margin-top: 6px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .venta-productos-details > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #1d4ed8;
+        }
+
+        .venta-productos-details > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .venta-productos-list {
+            margin: 0;
+            padding: 0 12px 10px 24px;
+            font-size: 12px;
+            color: #334155;
+            display: grid;
+            gap: 4px;
         }
 
         .detalle-precio {
@@ -613,6 +652,19 @@
         body.dark-mode .venta-productos {
             color: #cbd5e1;
         }
+
+        body.dark-mode .venta-productos-details {
+            border-color: #475569;
+            background: #334155;
+        }
+
+        body.dark-mode .venta-productos-details > summary {
+            color: #93c5fd;
+        }
+
+        body.dark-mode .venta-productos-list {
+            color: #e2e8f0;
+        }
         
         body.dark-mode .btn-secondary {
             background: #334155;
@@ -787,7 +839,31 @@
                                 </td>
        
                                 <td>
-                                    <div class="venta-productos">{{ venta.productos or 'Sin productos' }}</div>
+                                    {% set productos_raw = (venta.productos or 'Sin productos') %}
+                                    {% if productos_raw != 'Sin productos' %}
+                                        {% set productos_lista = productos_raw.split(',') %}
+                                        {% set mostrar_toggle = (productos_lista|length > 4) or (productos_raw|length > 120) %}
+                                    {% else %}
+                                        {% set productos_lista = [] %}
+                                        {% set mostrar_toggle = false %}
+                                    {% endif %}
+                                    <div class="venta-productos">
+                                        {% if mostrar_toggle %}
+                                            <div class="venta-productos-preview">
+                                                {{ productos_lista[:3]|join(', ') }}
+                                            </div>
+                                            <details class="venta-productos-details">
+                                                <summary>Ver productos ({{ productos_lista|length }})</summary>
+                                                <ul class="venta-productos-list">
+                                                    {% for item in productos_lista %}
+                                                        <li>{{ item.strip() }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </details>
+                                        {% else %}
+                                            {{ productos_raw }}
+                                        {% endif %}
+                                    </div>
                                 </td>
                                 <td>
                                     <strong>{{ venta.total_items }}</strong> items
