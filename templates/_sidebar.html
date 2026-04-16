@@ -595,12 +595,23 @@
                 return nombre || 'cliente';
             }
 
+            function formatearResumenPedidoWhatsapp(resumenPedidoRaw) {
+                const raw = String(resumenPedidoRaw || '').trim();
+                if (!raw || raw === '-') return '- Sin detalle disponible';
+                const partes = raw
+                    .split(/\s*,\s*/)
+                    .map((s) => String(s || '').trim())
+                    .filter(Boolean);
+                if (!partes.length) return '- Sin detalle disponible';
+                return partes.map((item, i) => `${i + 1}. ${item}`).join('\n');
+            }
+
             function mensajeWhatsappPedido(pedidoId, nombreRaw, timerTxt, resumenPedido, totalTxt) {
                 const nombre = normalizarNombreWhatsapp(nombreRaw);
                 const tiempo = String(timerTxt || '').trim() || 'sin tiempo definido';
-                const resumen = String(resumenPedido || '').trim() || '-';
+                const resumenLista = formatearResumenPedidoWhatsapp(resumenPedido);
                 const total = String(totalTxt || '').trim() || '-';
-                return `Hola ${nombre}, su pedido #${Number(pedidoId || 0)}. a sido confirmado y lo estamos preperando , tiene un tiempo aproximado de ${tiempo}, mientras el pedido es preparado te dejamos los datos de transferencia.\n\n*Resumen del pedido:*\n- ${resumen}\n- *TOTAL:* ${total}\n\n💳 Datos de Transferencia 💳\n\n⚠️ NUEVOS DATOS DE TRANSFERENCIA ⚠️\n(Si tienes registrada la cuenta "Banco Santander" debes añadir la nueva cuenta.)\n\nALEXIS JAVIER GUTIERREZ SALGADO\n18.121.947-5\nBci / Banco Crédito e Inversiones\nCuenta Vista\n777018121947\npasteleria.sucree@outlook.com\n\nTe avisaremos cuando tu pedido se encuentre listo para ser retirado/despachado\n\nMuchas gracias por preferir Pasteleria Sucrée`;
+                return `Hola ${nombre}, su pedido #${Number(pedidoId || 0)}. a sido confirmado y lo estamos preperando , tiene un tiempo aproximado de ${tiempo}, mientras el pedido es preparado te dejamos los datos de transferencia.\n\n*Resumen del pedido:*\n${resumenLista}\n\n*TOTAL: ${total}*\n\n💳 Datos de Transferencia 💳\n\n⚠️ NUEVOS DATOS DE TRANSFERENCIA ⚠️\n(Si tienes registrada la cuenta "Banco Santander" debes añadir la nueva cuenta.)\n\nALEXIS JAVIER GUTIERREZ SALGADO\n18.121.947-5\nBci / Banco Crédito e Inversiones\nCuenta Vista\n777018121947\npasteleria.sucree@outlook.com\n\nTe avisaremos cuando tu pedido se encuentre listo para ser retirado/despachado\n\nMuchas gracias por preferir Pasteleria Sucrée`;
             }
 
             function abrirWhatsappClientePedido(ventaId, telEnc, nomEnc, timerEnc, resumenEnc, totalEnc) {
