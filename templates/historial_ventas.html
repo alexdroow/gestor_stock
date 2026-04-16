@@ -793,7 +793,8 @@
                                     <strong>{{ venta.total_items }}</strong> items
                                 </td>
                                 <td>
-                                    {% if (venta.canal_venta or 'presencial') == 'presencial' %}
+                                    {% set canal = (venta.canal_venta or 'presencial') %}
+                                    {% if canal not in ['uber_eats', 'pedidosya'] %}
                                         <strong>${{ '{:,.0f}'.format((venta.total_monto or 0)|float) }}</strong>
                                     {% else %}
                                         -
@@ -1137,8 +1138,8 @@
 
                     detalleVentaActual = data;
                     document.getElementById('detalle-venta-id').textContent = ventaId;
-                    const canal = String(data.venta?.canal_venta || 'presencial');
-                    const mostrarPrecios = canal === 'presencial';
+                    const canal = String(data.venta?.canal_venta || 'presencial').trim().toLowerCase();
+                    const mostrarPrecios = canal !== 'uber_eats' && canal !== 'pedidosya';
                     const items = (data.items || []).map((item, index) => renderDetalleProducto(item, index, mostrarPrecios)).join('');
                     const totalMonto = Number(data.venta?.total_monto || 0);
                     const entregaTipo = String(data.venta?.entrega_tipo || 'retiro').toLowerCase();
