@@ -8711,18 +8711,19 @@
         }
 
         function abrirMenuMobile() {
-            if (!leftNavEl || !mobileOverlayEl) return;
-            const isMobile = window.matchMedia("(max-width: 900px)").matches;
+            const isMobile = window.matchMedia("(max-width: 900px)").matches || document.body.classList.contains("mobile-ui");
+            renderCategoriasMenu();
             if (isMobile) {
-                if (document.body.classList.contains("mobile-ui") && mobileMenuModalEl) {
+                if (mobileMenuModalEl) {
                     mobileMenuModalEl.classList.add("active");
+                    if (mobileMenuListEl) mobileMenuListEl.scrollTop = 0;
                 } else {
-                    leftNavEl.classList.add("mobile-open");
-                    mobileOverlayEl.classList.add("active");
+                    if (leftNavEl) leftNavEl.classList.add("mobile-open");
+                    if (mobileOverlayEl) mobileOverlayEl.classList.add("active");
                 }
                 return;
             }
-            leftNavEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            if (leftNavEl) leftNavEl.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
         function abrirCategoriasMobile() {
