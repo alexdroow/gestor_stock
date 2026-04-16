@@ -8358,9 +8358,25 @@
             const total = money.format(Number(p?.total || 0));
             const entrega = String(p?.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
             const hora = String(p?.hora_retiro || "").trim();
+            const items = Array.isArray(p?.items) ? p.items : [];
+            const resumenItems = items
+                .map((it) => {
+                    const nombre = String(
+                        it?.nombre
+                        || it?.producto_nombre
+                        || it?.producto
+                        || ""
+                    ).trim();
+                    const cantidad = Math.max(0, Number(it?.cantidad || 0));
+                    if (!nombre || !cantidad) return "";
+                    return `${nombre} x${cantidad}`;
+                })
+                .filter(Boolean)
+                .join(", ");
             const mensaje = [
                 `Hola Pasteleria Sucrée, soy ${cliente || "cliente"}.`,
                 `Consulta por mi pedido #${ventaId || "-"}.`,
+                `Resumen del pedido: ${resumenItems || "sin detalle disponible"}.`,
                 `Total: ${total}.`,
                 `Entrega: ${entrega}${hora ? ` (${hora})` : ""}.`,
             ].join(" ");
