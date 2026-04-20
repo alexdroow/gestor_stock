@@ -76,6 +76,9 @@
         <main class="main">
             <h1 class="title">Finanzas</h1>
             <p class="subtitle">Panel simple y claro para controlar ventas, gastos y saldo a favor.</p>
+            <div class="panel-actions" style="margin-bottom:14px;">
+                <button type="button" class="btn btn-primary" id="fin-open-mov-modal">Agregar ingreso/egreso manual</button>
+            </div>
 
             <div class="card">
                 <div class="card-head">Rango de fechas</div>
@@ -140,6 +143,21 @@
                             <div class="stat-value" id="fin-saldo-favor">$0</div>
                             <div class="stat-meta">Ganado - gastado</div>
                         </div>
+                        <div class="stat">
+                            <div class="stat-label">Ingreso manual</div>
+                            <div class="stat-value" id="fin-ingreso-manual">$0</div>
+                            <div class="stat-meta">Ajustes extra</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Egreso manual</div>
+                            <div class="stat-value" id="fin-egreso-manual">$0</div>
+                            <div class="stat-meta">Ajustes extra</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Total finanzas</div>
+                            <div class="stat-value" id="fin-total-finanzas">$0</div>
+                            <div class="stat-meta">Saldo + ajustes manuales</div>
+                        </div>
                     </div>
 
                     <div class="panel-actions">
@@ -193,6 +211,46 @@
         </div>
     </div>
 
+    <div id="fin-mov-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-mov-modal-title">
+            <div class="modal-head">
+                <div id="fin-mov-modal-title" class="modal-title">Agregar ingreso/egreso manual</div>
+                <button type="button" class="btn btn-muted" id="fin-mov-close">Cerrar</button>
+            </div>
+            <form id="fin-mov-form" class="modal-body">
+                <div class="modal-grid">
+                    <div class="field">
+                        <label>Tipo</label>
+                        <select id="fin-mov-tipo" style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px;">
+                            <option value="ingreso">Ingreso</option>
+                            <option value="egreso">Egreso</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Monto ($)</label>
+                        <input type="number" min="1" step="1" id="fin-mov-monto" required>
+                    </div>
+                    <div class="field">
+                        <label>Fecha</label>
+                        <input type="date" id="fin-mov-fecha" required>
+                    </div>
+                    <div class="field">
+                        <label>Categoria</label>
+                        <input type="text" id="fin-mov-categoria" maxlength="80" placeholder="Ej: Gas, caja chica">
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Descripcion</label>
+                    <input type="text" id="fin-mov-descripcion" maxlength="300" placeholder="Detalle opcional">
+                </div>
+            </form>
+            <div class="modal-foot">
+                <button type="button" class="btn btn-muted" id="fin-mov-cancel">Cancelar</button>
+                <button type="submit" form="fin-mov-form" class="btn btn-primary" id="fin-mov-save">Guardar movimiento</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const initialData = {
             resumen: {{ (resumen_finanzas or {})|tojson }},
@@ -234,6 +292,9 @@
             document.getElementById('fin-gasto-general').textContent = money(resumen.gasto_general || 0);
             document.getElementById('fin-gastado-total').textContent = money(resumen.gastado_total || 0);
             document.getElementById('fin-saldo-favor').textContent = money(resumen.saldo_favor || 0);
+            document.getElementById('fin-ingreso-manual').textContent = money(resumen.ingreso_manual || 0);
+            document.getElementById('fin-egreso-manual').textContent = money(resumen.egreso_manual || 0);
+            document.getElementById('fin-total-finanzas').textContent = money(resumen.total_finanzas || 0);
         }
 
         function renderTable() {
@@ -257,6 +318,9 @@
                         <td>${money(row.gasto_general || 0)}</td>
                         <td>${money(row.gastado_total || 0)}</td>
                         <td><strong>${money(row.saldo_favor || 0)}</strong></td>
+                        <td>${money(row.ingreso_manual || 0)}</td>
+                        <td>${money(row.egreso_manual || 0)}</td>
+                        <td><strong>${money(row.total_finanzas || 0)}</strong></td>
                         <td><span class="pill ${loaded ? 'ok' : ''}">${loaded ? 'Cargado' : 'Pendiente'}</span></td>
                         <td><strong>${money(row.total_combinado || 0)}</strong></td>
                     </tr>
@@ -276,6 +340,9 @@
                             <th>Gasto general</th>
                             <th>Gastado total</th>
                             <th>Saldo a favor</th>
+                            <th>Ingreso manual</th>
+                            <th>Egreso manual</th>
+                            <th>Total finanzas</th>
                             <th>Estado</th>
                             <th>Total combinado</th>
                         </tr>
@@ -319,8 +386,8 @@
                             pointBackgroundColor: '#ef4444'
                         },
                         {
-                            label: 'Saldo a favor',
-                            data: rows.map((r) => Number(r.saldo_favor || 0)),
+                            label: 'Total finanzas',
+                            data: rows.map((r) => Number(r.total_finanzas || 0)),
                             borderColor: '#1d4ed8',
                             backgroundColor: 'rgba(29,78,216,.08)',
                             fill: false,
@@ -389,6 +456,20 @@
             modal.setAttribute('aria-hidden', 'true');
         }
 
+        function openMovModal() {
+            const modal = document.getElementById('fin-mov-modal');
+            const fecha = document.getElementById('fin-mov-fecha');
+            if (fecha) fecha.value = new Date().toISOString().slice(0, 10);
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeMovModal() {
+            const modal = document.getElementById('fin-mov-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
         async function saveManual(event) {
             event.preventDefault();
             const btn = document.getElementById('fin-save-modal');
@@ -421,6 +502,39 @@
             }
         }
 
+        async function saveMovement(event) {
+            event.preventDefault();
+            const btn = document.getElementById('fin-mov-save');
+            const backup = btn.textContent;
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+                const payload = {
+                    tipo: (document.getElementById('fin-mov-tipo').value || '').trim(),
+                    monto: Number(document.getElementById('fin-mov-monto').value || 0),
+                    fecha: (document.getElementById('fin-mov-fecha').value || '').trim(),
+                    categoria: (document.getElementById('fin-mov-categoria').value || '').trim(),
+                    descripcion: (document.getElementById('fin-mov-descripcion').value || '').trim()
+                };
+                const response = await fetch('/api/finanzas/movimientos-manuales', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar movimiento');
+                }
+                closeMovModal();
+                await loadData();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = backup;
+            }
+        }
+
         document.getElementById('fin-open-modal')?.addEventListener('click', openModal);
         document.getElementById('fin-refresh')?.addEventListener('click', () => {
             loadData().catch((error) => alert('[ERROR] ' + error.message));
@@ -431,6 +545,13 @@
             if (event.target?.id === 'fin-modal') closeModal();
         });
         document.getElementById('fin-form')?.addEventListener('submit', saveManual);
+        document.getElementById('fin-open-mov-modal')?.addEventListener('click', openMovModal);
+        document.getElementById('fin-mov-close')?.addEventListener('click', closeMovModal);
+        document.getElementById('fin-mov-cancel')?.addEventListener('click', closeMovModal);
+        document.getElementById('fin-mov-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-mov-modal') closeMovModal();
+        });
+        document.getElementById('fin-mov-form')?.addEventListener('submit', saveMovement);
 
         renderAll();
     </script>

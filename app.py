@@ -10350,6 +10350,39 @@ def _construir_reporte_version_prueba_canales(fecha_desde_raw=None, fecha_hasta_
                 continue
             item["gasto_general"] = float(item.get("gasto_general") or 0) + max(0.0, float(row["gasto_general"] or 0))
 
+        cursor.execute(
+            """
+            SELECT
+                date(fecha) AS fecha_base,
+                LOWER(TRIM(COALESCE(tipo, ''))) AS tipo,
+                COALESCE(SUM(monto), 0) AS monto_total
+            FROM finanzas_movimientos_manuales
+            WHERE date(fecha) >= date(?)
+              AND date(fecha) <= date(?)
+            GROUP BY date(fecha), LOWER(TRIM(COALESCE(tipo, '')))
+            """,
+            (fecha_desde.strftime("%Y-%m-%d"), fecha_hasta.strftime("%Y-%m-%d")),
+        )
+        mov_manual_rows = cursor.fetchall()
+        for row in mov_manual_rows:
+            fecha_base = str(row["fecha_base"] or "").strip()
+            if len(fecha_base) != 10:
+                continue
+            try:
+                fecha_obj = datetime.strptime(fecha_base, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            semana_inicio = _semana_lunes(fecha_obj).strftime("%Y-%m-%d")
+            item = semanas.get(semana_inicio)
+            if item is None:
+                continue
+            tipo = str(row["tipo"] or "").strip().lower()
+            monto = max(0.0, float(row["monto_total"] or 0))
+            if tipo == "ingreso":
+                item["ingreso_manual"] = float(item.get("ingreso_manual") or 0) + monto
+            elif tipo == "egreso":
+                item["egreso_manual"] = float(item.get("egreso_manual") or 0) + monto
+
         filas = []
         for key in sorted(semanas.keys()):
             item = semanas[key]
@@ -10364,6 +10397,10 @@ def _construir_reporte_version_prueba_canales(fecha_desde_raw=None, fecha_hasta_
             item["gasto_general"] = round(float(item.get("gasto_general") or 0), 2)
             item["gastado_total"] = round(item["gasto_insumos"] + item["gasto_general"], 2)
             item["saldo_favor"] = round(item["total_combinado"] - item["gastado_total"], 2)
+            item["ingreso_manual"] = round(float(item.get("ingreso_manual") or 0), 2)
+            item["egreso_manual"] = round(float(item.get("egreso_manual") or 0), 2)
+            item["ajuste_manual_neto"] = round(item["ingreso_manual"] - item["egreso_manual"], 2)
+            item["total_finanzas"] = round(item["saldo_favor"] + item["ajuste_manual_neto"], 2)
             filas.append(item)
 
         resumen = {
@@ -10381,6 +10418,10 @@ def _construir_reporte_version_prueba_canales(fecha_desde_raw=None, fecha_hasta_
             "gasto_general": round(sum(r["gasto_general"] for r in filas), 2),
             "gastado_total": round(sum(r["gastado_total"] for r in filas), 2),
             "saldo_favor": round(sum(r["saldo_favor"] for r in filas), 2),
+            "ingreso_manual": round(sum(r["ingreso_manual"] for r in filas), 2),
+            "egreso_manual": round(sum(r["egreso_manual"] for r in filas), 2),
+            "ajuste_manual_neto": round(sum(r["ajuste_manual_neto"] for r in filas), 2),
+            "total_finanzas": round(sum(r["total_finanzas"] for r in filas), 2),
             "operaciones_auto": int(sum(r["auto_operaciones"] for r in filas)),
         }
         return {"resumen": resumen, "semanas": filas}
@@ -10477,6 +10518,57 @@ def api_finanzas_resumen_canales_manual_apps():
         payload = request.get_json(silent=True) or {}
         registro = _guardar_resumen_manual_apps_semanal(payload)
         return jsonify({"success": True, "registro": registro})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/finanzas/movimientos-manuales', methods=['POST'])
+def api_finanzas_movimientos_manuales():
+    try:
+        payload = request.get_json(silent=True) or {}
+        fecha = _parse_fecha_iso_ymd(payload.get("fecha") or datetime.now().strftime("%Y-%m-%d"), "fecha").strftime("%Y-%m-%d")
+        tipo = str(payload.get("tipo") or "").strip().lower()
+        if tipo not in {"ingreso", "egreso"}:
+            return jsonify({"success": False, "error": "Tipo invalido. Usa ingreso o egreso"}), 400
+        monto = max(0.0, float(payload.get("monto") or 0))
+        if monto <= 0:
+            return jsonify({"success": False, "error": "Monto debe ser mayor a 0"}), 400
+        categoria = str(payload.get("categoria") or "").strip()[:80] or None
+        descripcion = str(payload.get("descripcion") or "").strip()[:300] or None
+
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO finanzas_movimientos_manuales (fecha, tipo, monto, categoria, descripcion)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (fecha, tipo, monto, categoria, descripcion),
+            )
+            mov_id = int(cursor.lastrowid or 0)
+            conn.commit()
+        finally:
+            conn.close()
+
+        try:
+            crear_backup()
+        except Exception as backup_error:
+            print(f"[WARN] No se pudo crear backup tras registrar movimiento manual de finanzas: {backup_error}")
+
+        return jsonify({
+            "success": True,
+            "movimiento": {
+                "id": mov_id,
+                "fecha": fecha,
+                "tipo": tipo,
+                "monto": round(monto, 2),
+                "categoria": categoria,
+                "descripcion": descripcion,
+            },
+        })
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:

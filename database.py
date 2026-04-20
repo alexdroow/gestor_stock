@@ -724,6 +724,19 @@ def init_db():
         )
         cursor.execute(
             '''
+            CREATE TABLE IF NOT EXISTS finanzas_movimientos_manuales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha TEXT NOT NULL,
+                tipo TEXT NOT NULL,
+                monto REAL NOT NULL DEFAULT 0,
+                categoria TEXT,
+                descripcion TEXT,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
+        cursor.execute(
+            '''
             CREATE TABLE IF NOT EXISTS resumen_mensual (
                 anio INTEGER NOT NULL,
                 mes INTEGER NOT NULL,
@@ -8775,6 +8788,19 @@ def migrar_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS finanzas_movimientos_manuales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha TEXT NOT NULL,
+                tipo TEXT NOT NULL,
+                monto REAL NOT NULL DEFAULT 0,
+                categoria TEXT,
+                descripcion TEXT,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         _ensure_column(conn, "ventas_semanales", "semana_fin", "TEXT")
         _ensure_column(conn, "ventas_semanales", "ventas_local", "REAL DEFAULT 0")
         _ensure_column(conn, "ventas_semanales", "ventas_uber", "REAL DEFAULT 0")
@@ -9024,6 +9050,8 @@ def migrar_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_facturas_sii_ajustes_mes ON facturas_sii_ajustes(mes_clave)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ventas_semanales_inicio ON ventas_semanales(semana_inicio)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ventas_semanales_fin ON ventas_semanales(semana_fin)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_finanzas_mov_fecha ON finanzas_movimientos_manuales(fecha)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_finanzas_mov_tipo ON finanzas_movimientos_manuales(tipo)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_resumen_mensual_clave ON resumen_mensual(anio, mes_clave)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_resumen_mensual_dirty ON resumen_mensual(dirty)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_producto_insumos_venta_producto ON producto_insumos_venta(producto_id)")
