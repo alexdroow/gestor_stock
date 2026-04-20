@@ -10297,34 +10297,6 @@ def _construir_reporte_version_prueba_canales(fecha_desde_raw=None, fecha_hasta_
         cursor.execute(
             """
             SELECT
-                date(actualizado) AS fecha_base,
-                COALESCE(SUM(COALESCE(cantidad, 0) * COALESCE(precio_unitario, 0)), 0) AS gasto_insumos
-            FROM compras_pendientes
-            WHERE LOWER(COALESCE(estado, '')) = 'completada'
-              AND date(actualizado) >= date(?)
-              AND date(actualizado) <= date(?)
-            GROUP BY date(actualizado)
-            """,
-            (fecha_desde.strftime("%Y-%m-%d"), fecha_hasta.strftime("%Y-%m-%d")),
-        )
-        gastos_insumos_rows = cursor.fetchall()
-        for row in gastos_insumos_rows:
-            fecha_base = str(row["fecha_base"] or "").strip()
-            if len(fecha_base) != 10:
-                continue
-            try:
-                fecha_obj = datetime.strptime(fecha_base, "%Y-%m-%d").date()
-            except ValueError:
-                continue
-            semana_inicio = _semana_lunes(fecha_obj).strftime("%Y-%m-%d")
-            item = semanas.get(semana_inicio)
-            if item is None:
-                continue
-            item["gasto_insumos"] = float(item.get("gasto_insumos") or 0) + max(0.0, float(row["gasto_insumos"] or 0))
-
-        cursor.execute(
-            """
-            SELECT
                 date(fecha_factura) AS fecha_base,
                 COALESCE(SUM(monto_total), 0) AS gasto_general
             FROM facturas_archivo
@@ -10393,14 +10365,13 @@ def _construir_reporte_version_prueba_canales(fecha_desde_raw=None, fecha_hasta_
             item["manual_pedidosya"] = round(item["manual_pedidosya"], 2)
             item["manual_apps_total"] = round(item["manual_apps_total"], 2)
             item["total_combinado"] = round(item["auto_total"] + item["manual_apps_total"], 2)
-            item["gasto_insumos"] = round(float(item.get("gasto_insumos") or 0), 2)
             item["gasto_general"] = round(float(item.get("gasto_general") or 0), 2)
-            item["gastado_total"] = round(item["gasto_insumos"] + item["gasto_general"], 2)
-            item["saldo_favor"] = round(item["total_combinado"] - item["gastado_total"], 2)
             item["ingreso_manual"] = round(float(item.get("ingreso_manual") or 0), 2)
             item["egreso_manual"] = round(float(item.get("egreso_manual") or 0), 2)
+            item["gastado_total"] = round(item["gasto_general"] + item["egreso_manual"], 2)
+            item["saldo_favor"] = round(item["total_combinado"] + item["ingreso_manual"] - item["gastado_total"], 2)
             item["ajuste_manual_neto"] = round(item["ingreso_manual"] - item["egreso_manual"], 2)
-            item["total_finanzas"] = round(item["saldo_favor"] + item["ajuste_manual_neto"], 2)
+            item["total_finanzas"] = item["saldo_favor"]
             filas.append(item)
 
         resumen = {
@@ -10414,7 +10385,7 @@ def _construir_reporte_version_prueba_canales(fecha_desde_raw=None, fecha_hasta_
             "manual_pedidosya": round(sum(r["manual_pedidosya"] for r in filas), 2),
             "manual_apps_total": round(sum(r["manual_apps_total"] for r in filas), 2),
             "total_combinado": round(sum(r["total_combinado"] for r in filas), 2),
-            "gasto_insumos": round(sum(r["gasto_insumos"] for r in filas), 2),
+            "gasto_insumos": 0.0,
             "gasto_general": round(sum(r["gasto_general"] for r in filas), 2),
             "gastado_total": round(sum(r["gastado_total"] for r in filas), 2),
             "saldo_favor": round(sum(r["saldo_favor"] for r in filas), 2),
