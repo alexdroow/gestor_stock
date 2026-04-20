@@ -10558,6 +10558,113 @@ def api_finanzas_apps_manuales_desglose():
         return jsonify({"success": False, "error": str(e), "rows": []}), 500
 
 
+@app.route('/api/finanzas/canal-historial', methods=['GET'])
+def api_finanzas_canal_historial():
+    try:
+        canal = str(request.args.get("canal") or "presencial").strip().lower()
+        agrupar = str(request.args.get("agrupar") or "semana").strip().lower()
+        if canal not in {"presencial", "tienda_online"}:
+            return jsonify({"success": False, "error": "canal invalido. Usa presencial o tienda_online", "rows": []}), 400
+        if agrupar not in {"semana", "mes"}:
+            return jsonify({"success": False, "error": "agrupar invalido. Usa semana o mes", "rows": []}), 400
+
+        fecha_hasta = _parse_fecha_iso_ymd(
+            request.args.get("hasta") or datetime.now().strftime("%Y-%m-%d"),
+            "fecha hasta",
+        )
+        fecha_desde = _parse_fecha_iso_ymd(
+            request.args.get("desde") or (fecha_hasta - timedelta(days=29)).strftime("%Y-%m-%d"),
+            "fecha desde",
+        )
+        if fecha_desde > fecha_hasta:
+            return jsonify({"success": False, "error": "fecha desde no puede ser mayor que fecha hasta", "rows": []}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            if canal == "tienda_online":
+                where_canal = "LOWER(TRIM(COALESCE(canal_venta, ''))) = 'tienda_online'"
+            else:
+                where_canal = """
+                    LOWER(TRIM(COALESCE(canal_venta, 'presencial'))) <> 'tienda_online'
+                    AND LOWER(TRIM(COALESCE(canal_venta, 'presencial'))) NOT IN ('uber_eats', 'pedidosya')
+                """
+
+            cursor.execute(
+                f"""
+                SELECT
+                    date(fecha_hora) AS fecha_base,
+                    COUNT(*) AS operaciones,
+                    COALESCE(SUM(COALESCE(total_monto, 0)), 0) AS total
+                FROM ventas
+                WHERE date(fecha_hora) >= date(?)
+                  AND date(fecha_hora) <= date(?)
+                  AND LOWER(COALESCE(estado, '')) NOT IN ('anulada', 'anulado', 'cancelada', 'cancelado')
+                  AND {where_canal}
+                GROUP BY date(fecha_hora)
+                ORDER BY date(fecha_hora) DESC
+                LIMIT 500
+                """,
+                (fecha_desde.strftime("%Y-%m-%d"), fecha_hasta.strftime("%Y-%m-%d")),
+            )
+            diarios = cursor.fetchall()
+        finally:
+            conn.close()
+
+        acumulado = {}
+        for row in diarios:
+            fecha_base = str(row["fecha_base"] or "").strip()
+            if len(fecha_base) != 10:
+                continue
+            try:
+                fecha_obj = datetime.strptime(fecha_base, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            operaciones = int(row["operaciones"] or 0)
+            total = round(max(0.0, float(row["total"] or 0)), 2)
+
+            if agrupar == "mes":
+                periodo_inicio_obj = fecha_obj.replace(day=1)
+                if periodo_inicio_obj.month == 12:
+                    prox_mes = periodo_inicio_obj.replace(year=periodo_inicio_obj.year + 1, month=1, day=1)
+                else:
+                    prox_mes = periodo_inicio_obj.replace(month=periodo_inicio_obj.month + 1, day=1)
+                periodo_fin_obj = prox_mes - timedelta(days=1)
+                periodo_etiqueta = periodo_inicio_obj.strftime("%Y-%m")
+            else:
+                periodo_inicio_obj = _semana_lunes(fecha_obj)
+                periodo_fin_obj = periodo_inicio_obj + timedelta(days=6)
+                periodo_etiqueta = f"Semana {periodo_inicio_obj.strftime('%d/%m')} - {periodo_fin_obj.strftime('%d/%m')}"
+
+            key = periodo_inicio_obj.strftime("%Y-%m-%d")
+            if key not in acumulado:
+                acumulado[key] = {
+                    "periodo_inicio": periodo_inicio_obj.strftime("%Y-%m-%d"),
+                    "periodo_fin": periodo_fin_obj.strftime("%Y-%m-%d"),
+                    "periodo_etiqueta": periodo_etiqueta,
+                    "operaciones": 0,
+                    "total": 0.0,
+                }
+            acumulado[key]["operaciones"] += operaciones
+            acumulado[key]["total"] = round(float(acumulado[key]["total"]) + total, 2)
+
+        rows = [acumulado[k] for k in sorted(acumulado.keys(), reverse=True)]
+        resumen = {
+            "canal": canal,
+            "agrupar": agrupar,
+            "desde": fecha_desde.strftime("%Y-%m-%d"),
+            "hasta": fecha_hasta.strftime("%Y-%m-%d"),
+            "registros": len(rows),
+            "operaciones": int(sum(int(x.get("operaciones") or 0) for x in rows)),
+            "total": round(sum(float(x.get("total") or 0) for x in rows), 2),
+        }
+        return jsonify({"success": True, "rows": rows, "resumen": resumen})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e), "rows": []}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "rows": []}), 500
+
+
 @app.route('/api/finanzas/movimientos-manuales', methods=['POST'])
 def api_finanzas_movimientos_manuales():
     try:

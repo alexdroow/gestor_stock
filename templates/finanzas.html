@@ -112,15 +112,15 @@
                     <p class="helper">Presencial + tienda online se calculan desde ventas. Uber Eats y PedidosYa se cargan manualmente por semana. Gastos se calculan desde facturas y egresos manuales.</p>
                     <div class="stats-split">
                         <div class="stats-col">
-                            <div class="stat">
+                            <div class="stat stat-clickable" id="fin-presencial-card">
                                 <div class="stat-label">Presencial</div>
                                 <div class="stat-value" id="fin-auto-presencial">$0</div>
-                                <div class="stat-meta" id="fin-auto-ops">0 operaciones</div>
+                                <div class="stat-meta" id="fin-auto-ops">Doble click para ver historial</div>
                             </div>
-                            <div class="stat">
+                            <div class="stat stat-clickable" id="fin-online-card">
                                 <div class="stat-label">Tienda online</div>
                                 <div class="stat-value" id="fin-auto-online">$0</div>
-                                <div class="stat-meta">Canal web</div>
+                                <div class="stat-meta">Doble click para ver historial</div>
                             </div>
                             <div class="stat stat-clickable" id="fin-apps-card">
                                 <div class="stat-label">Uber + Pedidos Ya</div>
@@ -339,12 +339,54 @@
         </div>
     </div>
 
+    <div id="fin-canal-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-canal-title" style="width:min(980px,100%);">
+            <div class="modal-head">
+                <div id="fin-canal-title" class="modal-title">Historial canal</div>
+                <button type="button" class="btn btn-muted" id="fin-canal-close">Cerrar</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-grid">
+                    <div class="field">
+                        <label>Filtro</label>
+                        <select id="fin-canal-filter-mode" style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px;">
+                            <option value="last30">Ultimos 30 dias</option>
+                            <option value="custom">Fecha personalizada</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Agrupar por</label>
+                        <select id="fin-canal-group-mode" style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px;">
+                            <option value="semana">Semanas</option>
+                            <option value="mes">Meses</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Desde</label>
+                        <input type="date" id="fin-canal-desde">
+                    </div>
+                    <div class="field">
+                        <label>Hasta</label>
+                        <input type="date" id="fin-canal-hasta">
+                    </div>
+                    <div class="field" style="display:flex; align-items:flex-end;">
+                        <button type="button" class="btn btn-primary" id="fin-canal-apply">Aplicar filtro</button>
+                    </div>
+                </div>
+                <div class="helper" id="fin-canal-summary">Cargando historial...</div>
+                <div class="table-wrap" id="fin-canal-table-root">
+                    <div class="empty">Cargando historial...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const initialData = {
             resumen: {{ (resumen_finanzas or {})|tojson }},
             semanas: {{ (semanas_finanzas or [])|tojson }}
         };
-        const state = { data: initialData, chart: null, egresos: [], appsRows: [] };
+        const state = { data: initialData, chart: null, egresos: [], appsRows: [], canalRows: [], canalActual: 'presencial' };
 
         function money(value) {
             const n = Number(value || 0);
@@ -371,7 +413,7 @@
             const resumen = state.data?.resumen || {};
             const semanas = Array.isArray(state.data?.semanas) ? state.data.semanas : [];
             document.getElementById('fin-auto-presencial').textContent = money(resumen.auto_presencial || 0);
-            document.getElementById('fin-auto-ops').textContent = `${Number(resumen.operaciones_auto || 0)} operaciones`;
+            document.getElementById('fin-auto-ops').textContent = `Doble click para ver historial (${Number(resumen.operaciones_auto || 0)} operaciones)`;
             document.getElementById('fin-auto-online').textContent = money(resumen.auto_tienda_online || 0);
             document.getElementById('fin-manual-apps').textContent = money(resumen.manual_apps_total || 0);
             document.getElementById('fin-total').textContent = money(resumen.total_combinado || 0);
@@ -611,6 +653,108 @@
             const modal = document.getElementById('fin-apps-modal');
             modal.classList.remove('active');
             modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function canalLabel(canal) {
+            return canal === 'tienda_online' ? 'Tienda online' : 'Presencial';
+        }
+
+        function openCanalModal(canal) {
+            const canalNormalizado = (canal === 'tienda_online') ? 'tienda_online' : 'presencial';
+            state.canalActual = canalNormalizado;
+            const modal = document.getElementById('fin-canal-modal');
+            const title = document.getElementById('fin-canal-title');
+            const mode = document.getElementById('fin-canal-filter-mode');
+            const group = document.getElementById('fin-canal-group-mode');
+            const desde = document.getElementById('fin-canal-desde');
+            const hasta = document.getElementById('fin-canal-hasta');
+            const now = new Date();
+            const end = now.toISOString().slice(0, 10);
+            const startDate = new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000));
+            const start = startDate.toISOString().slice(0, 10);
+            if (title) title.textContent = `Historial ${canalLabel(canalNormalizado)}`;
+            if (mode) mode.value = 'last30';
+            if (group) group.value = 'semana';
+            if (desde) desde.value = start;
+            if (hasta) hasta.value = end;
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            loadCanalHistory().catch((error) => {
+                const root = document.getElementById('fin-canal-table-root');
+                const summary = document.getElementById('fin-canal-summary');
+                if (summary) summary.textContent = 'No se pudo cargar historial del canal.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        }
+
+        function closeCanalModal() {
+            const modal = document.getElementById('fin-canal-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function renderCanalHistory() {
+            const root = document.getElementById('fin-canal-table-root');
+            const summary = document.getElementById('fin-canal-summary');
+            if (!root || !summary) return;
+            const rows = Array.isArray(state.canalRows) ? state.canalRows : [];
+            if (!rows.length) {
+                summary.textContent = `Sin registros para ${canalLabel(state.canalActual)} en el rango seleccionado.`;
+                root.innerHTML = '<div class="empty">No hay ventas en este periodo.</div>';
+                return;
+            }
+            const total = rows.reduce((s, r) => s + Number(r.total || 0), 0);
+            const operaciones = rows.reduce((s, r) => s + Number(r.operaciones || 0), 0);
+            summary.textContent = `${canalLabel(state.canalActual)} | Registros: ${rows.length} | Operaciones: ${operaciones} | Total: ${money(total)}`;
+            const body = rows.map((r) => `
+                <tr>
+                    <td><span class="week">${escapeHtml(r.periodo_etiqueta || '-')}</span><br><small>${escapeHtml(r.periodo_inicio || '-')} a ${escapeHtml(r.periodo_fin || '-')}</small></td>
+                    <td>${Number(r.operaciones || 0)}</td>
+                    <td><strong>${money(r.total || 0)}</strong></td>
+                </tr>
+            `).join('');
+            root.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Operaciones</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
+        async function loadCanalHistory() {
+            const mode = (document.getElementById('fin-canal-filter-mode')?.value || 'last30').trim();
+            const group = (document.getElementById('fin-canal-group-mode')?.value || 'semana').trim();
+            const desdeInput = document.getElementById('fin-canal-desde');
+            const hastaInput = document.getElementById('fin-canal-hasta');
+            const now = new Date();
+            const end = now.toISOString().slice(0, 10);
+            const startDate = new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000));
+            const start = startDate.toISOString().slice(0, 10);
+            let desde = start;
+            let hasta = end;
+            if (mode === 'custom') {
+                desde = (desdeInput?.value || '').trim() || start;
+                hasta = (hastaInput?.value || '').trim() || end;
+            } else {
+                if (desdeInput) desdeInput.value = start;
+                if (hastaInput) hastaInput.value = end;
+            }
+            const canal = state.canalActual === 'tienda_online' ? 'tienda_online' : 'presencial';
+            const response = await fetch(`/api/finanzas/canal-historial?canal=${encodeURIComponent(canal)}&agrupar=${encodeURIComponent(group)}&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`, {
+                headers: { Accept: 'application/json' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo cargar historial del canal');
+            }
+            state.canalRows = Array.isArray(data.rows) ? data.rows : [];
+            renderCanalHistory();
         }
 
         function renderAppsBreakdown() {
@@ -905,10 +1049,38 @@
             if (desde) desde.disabled = !isCustom;
             if (hasta) hasta.disabled = !isCustom;
         });
+        document.getElementById('fin-presencial-card')?.addEventListener('dblclick', () => openCanalModal('presencial'));
+        document.getElementById('fin-online-card')?.addEventListener('dblclick', () => openCanalModal('tienda_online'));
+        document.getElementById('fin-canal-close')?.addEventListener('click', closeCanalModal);
+        document.getElementById('fin-canal-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-canal-modal') closeCanalModal();
+        });
+        document.getElementById('fin-canal-apply')?.addEventListener('click', () => {
+            loadCanalHistory().catch((error) => {
+                const root = document.getElementById('fin-canal-table-root');
+                const summary = document.getElementById('fin-canal-summary');
+                if (summary) summary.textContent = 'No se pudo cargar historial del canal.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        });
+        document.getElementById('fin-canal-filter-mode')?.addEventListener('change', () => {
+            const isCustom = (document.getElementById('fin-canal-filter-mode')?.value || '') === 'custom';
+            const desde = document.getElementById('fin-canal-desde');
+            const hasta = document.getElementById('fin-canal-hasta');
+            if (desde) desde.disabled = !isCustom;
+            if (hasta) hasta.disabled = !isCustom;
+        });
         (() => {
             const isCustom = (document.getElementById('fin-apps-filter-mode')?.value || '') === 'custom';
             const desde = document.getElementById('fin-apps-desde');
             const hasta = document.getElementById('fin-apps-hasta');
+            if (desde) desde.disabled = !isCustom;
+            if (hasta) hasta.disabled = !isCustom;
+        })();
+        (() => {
+            const isCustom = (document.getElementById('fin-canal-filter-mode')?.value || '') === 'custom';
+            const desde = document.getElementById('fin-canal-desde');
+            const hasta = document.getElementById('fin-canal-hasta');
             if (desde) desde.disabled = !isCustom;
             if (hasta) hasta.disabled = !isCustom;
         })();
