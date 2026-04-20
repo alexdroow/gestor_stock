@@ -15,6 +15,67 @@
             background: rgba(100, 116, 139, 0.35);
             border-radius: 999px;
         }
+        .nav-group {
+            display: block;
+        }
+        .nav-group > summary {
+            list-style: none;
+        }
+        .nav-group > summary::-webkit-details-marker {
+            display: none;
+        }
+        .nav-group .nav-item {
+            width: 100%;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            background: transparent;
+        }
+        .nav-group .nav-item-main {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .nav-group .nav-caret {
+            font-size: 11px;
+            opacity: .8;
+            transition: transform .18s ease;
+        }
+        .nav-group[open] .nav-caret {
+            transform: rotate(180deg);
+        }
+        .nav-submenu {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin: 4px 0 6px 36px;
+            padding-left: 8px;
+            border-left: 2px dashed #cbd5e1;
+        }
+        .nav-subitem {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 8px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .nav-subitem:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        .nav-subitem.active {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
         .sidebar-tuya {
             margin: 2px 0 10px;
             padding: 0;
@@ -74,6 +135,20 @@
         }
         body.dark-mode .st-item.st-alert .st-value {
             color: #fecaca;
+        }
+        body.dark-mode .nav-submenu {
+            border-left-color: #475569;
+        }
+        body.dark-mode .nav-subitem {
+            color: #cbd5e1;
+        }
+        body.dark-mode .nav-subitem:hover {
+            background: #334155;
+            color: #f8fafc;
+        }
+        body.dark-mode .nav-subitem.active {
+            background: #475569;
+            color: #f8fafc;
         }
         .sucree-pedidos-fab {
             position: fixed;
@@ -209,10 +284,19 @@
             <span class="icon">&#129473;</span>
             <span>Productos</span>
         </a>
-        <a href="/insumos" class="nav-item">
-            <span class="icon">&#127793;</span>
-            <span>Insumos</span>
-        </a>
+        <details class="nav-group" id="nav-group-insumos">
+            <summary class="nav-item">
+                <span class="nav-item-main">
+                    <span class="icon">&#127793;</span>
+                    <span>Insumos</span>
+                </span>
+                <span class="nav-caret">&#9662;</span>
+            </summary>
+            <div class="nav-submenu">
+                <a href="/insumos" class="nav-subitem">Inventario</a>
+                <a href="/insumos?tab=calculadora" class="nav-subitem">Calculadora de insumos</a>
+            </div>
+        </details>
         <a href="/produccion" class="nav-item">
             <span class="icon">&#127859;</span>
             <span>Producci&oacute;n</span>
@@ -255,6 +339,15 @@
     <div class="sidebar-footer">v{{ app_version }} &bull; Sucr&eacute;e Pasteler&iacute;a</div>
 
     <script>
+        (function () {
+            const details = document.getElementById('nav-group-insumos');
+            if (!details) return;
+            const currentPath = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+            if (currentPath === '/insumos') {
+                details.open = true;
+            }
+        })();
+
         (function () {
             if (window.__sucreeSidebarTuyaInit) return;
             window.__sucreeSidebarTuyaInit = true;

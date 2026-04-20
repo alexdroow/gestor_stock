@@ -9,6 +9,7 @@
   var current = norm(window.location.pathname);
   var links = document.querySelectorAll(".nav-menu .nav-item");
   links.forEach(function (link) {
+    if (!link.getAttribute("href")) return;
     var href = norm(link.getAttribute("href"));
     var isHistorialVentas = current === "/historial-ventas" && href === "/ventas";
     var active = href === current || isHistorialVentas;
@@ -19,6 +20,27 @@
       link.removeAttribute("aria-current");
     }
   });
+
+  var subLinks = document.querySelectorAll(".nav-menu .nav-subitem");
+  var foundSubActive = false;
+  subLinks.forEach(function (link) {
+    var href = norm(link.getAttribute("href"));
+    var active = href === current;
+    link.classList.toggle("active", active);
+    if (active) {
+      foundSubActive = true;
+      link.setAttribute("aria-current", "page");
+      var group = link.closest(".nav-group");
+      if (group) group.open = true;
+    } else {
+      link.removeAttribute("aria-current");
+    }
+  });
+
+  if (foundSubActive) {
+    var insumosTop = document.querySelector(".nav-menu .nav-group > .nav-item");
+    if (insumosTop) insumosTop.classList.add("active");
+  }
 
   function updateAlertBadge() {
     var badge = document.getElementById("nav-alertas");

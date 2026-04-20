@@ -4349,6 +4349,17 @@ let insumosData = [
                 cargarComprasPendientes();
             }
         }
+
+        function tabInicialDesdeQuery() {
+            try {
+                const params = new URLSearchParams(window.location.search || '');
+                const tab = String(params.get('tab') || '').trim().toLowerCase();
+                if (tab === 'calculadora' || tab === 'inventario') {
+                    return tab;
+                }
+            } catch (_) {}
+            return '';
+        }
         // CALCULADORA DE COMPRAS
         function agregarFilaCalculo() {
             const container = document.getElementById('lista-calculo');
@@ -4800,6 +4811,10 @@ function calcularTotales() {
     cargarAjusteCosteoSeleccion();
     renderRecetasSeleccionCalculo();
     applyPendingInsumosUiState();
+    const tabQuery = tabInicialDesdeQuery();
+    if (tabQuery) {
+        mostrarTab(tabQuery);
+    }
     buscarInsumos();
     cargarComprasPendientes();
 </script>
