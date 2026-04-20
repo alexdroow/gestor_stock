@@ -45,7 +45,7 @@
         .stat-label { font-size:12px; color:#64748b; margin-bottom:8px; text-transform:uppercase; font-weight:700; }
         .stat-value { font-size:30px; font-weight:800; color:#0f172a; }
 
-        .tabs { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+        .tabs { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; position:sticky; top:10px; z-index:25; padding:8px; border:1px solid #e2e8f0; border-radius:12px; background:rgba(248,250,252,0.96); backdrop-filter:blur(4px); }
         .tab-btn { border:1px solid #e2e8f0; background:#f8fafc; color:#475569; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:700; cursor:pointer; }
         .tab-btn.active { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:white; border-color:transparent; }
         .tab-panel { display:none; }
@@ -121,6 +121,7 @@
         body.dark-mode .card, body.dark-mode .stat-card { background:#1e293b; border-color:#334155; }
         body.dark-mode .stat-label, body.dark-mode .page-subtitle, body.dark-mode .helper { color:#94a3b8; }
         body.dark-mode .stat-value { color:#f8fafc; }
+        body.dark-mode .tabs { background:rgba(30,41,59,0.96); border-color:#475569; }
         body.dark-mode .tab-btn { background:#334155; border-color:#475569; color:#cbd5e1; }
         body.dark-mode .data-table th { background:#334155; border-color:#475569; color:#94a3b8; }
         body.dark-mode .data-table td { border-color:#334155; color:#f1f5f9; }
@@ -169,6 +170,16 @@
         <main class="main-content">
             <h1 class="page-title">Reportes operativos</h1>
             <p class="page-subtitle">Producción, insumos, productos, merma, kardex y compras sugeridas en un solo panel.</p>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="tab-produccion">Produccion</button>
+                <button class="tab-btn" data-tab="tab-insumos">Insumos agregados</button>
+                <button class="tab-btn" data-tab="tab-productos">Productos agregados</button>
+                <button class="tab-btn" data-tab="tab-mermas">Mermas productos</button>
+                <button class="tab-btn" data-tab="tab-kardex">Kardex</button>
+                <button class="tab-btn" data-tab="tab-compras">Compras sugeridas</button>
+                <button class="tab-btn" data-tab="tab-version-prueba">Version prueba</button>
+            </div>
 
             <div class="card">
                 <div class="card-header">Filtros por rango</div>
@@ -329,16 +340,6 @@
             <div class="card">
                 <div class="card-header">Comparativo general</div>
                 <div class="card-body"><div style="height: 240px; position: relative;"><canvas id="totalesChart"></canvas></div></div>
-            </div>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="tab-produccion">Produccion</button>
-                <button class="tab-btn" data-tab="tab-insumos">Insumos agregados</button>
-                <button class="tab-btn" data-tab="tab-productos">Productos agregados</button>
-                <button class="tab-btn" data-tab="tab-mermas">Mermas productos</button>
-                <button class="tab-btn" data-tab="tab-kardex">Kardex</button>
-                <button class="tab-btn" data-tab="tab-compras">Compras sugeridas</button>
-                <button class="tab-btn" data-tab="tab-version-prueba">Version prueba</button>
             </div>
 
             <div id="tab-produccion" class="tab-panel active">
