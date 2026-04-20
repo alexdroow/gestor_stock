@@ -291,6 +291,7 @@ from database import (
     limpiar_producciones_antiguas, obtener_historial_produccion_semanal,
     obtener_plan_produccion_semanal, obtener_agenda_produccion_semanal,
     agendar_produccion_manual, eliminar_produccion_agendada,
+    obtener_requerimientos_agenda_produccion,
     obtener_producto_detalle, actualizar_producto,
     procesar_lote_rapido_insumos, actualizar_preferencias_scan_insumo,
     registrar_movimiento_stock,
@@ -8847,6 +8848,20 @@ def api_eliminar_agendado_produccion(agendado_id):
 
         msg = str(resultado.get('error') or '').lower()
         status = 404 if 'no encontrada' in msg or 'no encontrado' in msg else 400
+        return jsonify(resultado), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/produccion/agenda/<int:agendado_id>/requerimientos', methods=['GET'])
+def api_requerimientos_agenda_produccion(agendado_id):
+    try:
+        resultado = obtener_requerimientos_agenda_produccion(agendado_id)
+        if resultado.get('success'):
+            return jsonify(resultado)
+
+        msg = str(resultado.get('error') or '').lower()
+        status = 404 if 'no encontrado' in msg or 'no encontrada' in msg else 400
         return jsonify(resultado), status
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

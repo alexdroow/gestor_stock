@@ -6014,6 +6014,166 @@ def obtener_agenda_produccion_semanal(dias=7, fecha_base=None):
         conn.close()
 
 
+def obtener_requerimientos_agenda_produccion(agendado_id):
+    """
+    Retorna los requerimientos de componentes para un item agendado,
+    comparando contra stock actual y calculando faltantes por unidad.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        agendado_id_int = int(agendado_id or 0)
+        if agendado_id_int <= 0:
+            return {"success": False, "error": "Registro agendado invalido"}
+
+        cursor.execute(
+            """
+            SELECT
+                pa.id,
+                pa.fecha,
+                pa.receta_id,
+                COALESCE(r.nombre, pa.receta_nombre, 'Receta') AS receta_nombre,
+                COALESCE(pa.cantidad, 1) AS cantidad_lotes,
+                COALESCE(r.rendimiento, 1) AS rendimiento,
+                COALESCE(p.nombre, pa.producto_nombre, 'Sin producto asociado') AS producto_nombre
+            FROM produccion_agendada pa
+            LEFT JOIN recetas r ON r.id = pa.receta_id
+            LEFT JOIN productos p ON p.id = COALESCE(r.producto_id, pa.producto_id)
+            WHERE pa.id = ?
+            """,
+            (agendado_id_int,),
+        )
+        agenda = cursor.fetchone()
+        if not agenda:
+            return {"success": False, "error": "Registro agendado no encontrado"}
+
+        receta_id = int(agenda["receta_id"] or 0)
+        if receta_id <= 0:
+            return {"success": False, "error": "La agenda seleccionada no tiene receta asociada"}
+
+        cantidad_lotes = float(agenda["cantidad_lotes"] or 0)
+        if cantidad_lotes <= 0:
+            return {"success": False, "error": "La agenda seleccionada tiene cantidad de lotes invalida"}
+
+        cursor.execute(
+            """
+            SELECT
+                ri.id,
+                LOWER(TRIM(COALESCE(ri.tipo, 'insumo'))) AS tipo,
+                COALESCE(ri.cantidad, 0) AS cantidad_base,
+                COALESCE(NULLIF(TRIM(ri.unidad), ''), 'unidad') AS unidad_receta,
+                ri.insumo_id,
+                ri.producto_id,
+                i.nombre AS insumo_nombre,
+                COALESCE(i.stock, 0) AS insumo_stock,
+                COALESCE(NULLIF(TRIM(i.unidad), ''), 'unidad') AS insumo_unidad,
+                p.nombre AS producto_nombre_item,
+                COALESCE(p.stock, 0) AS producto_stock,
+                COALESCE(NULLIF(TRIM(p.unidad), ''), 'unidad') AS producto_unidad
+            FROM receta_items ri
+            LEFT JOIN insumos i ON i.id = ri.insumo_id
+            LEFT JOIN productos p ON p.id = ri.producto_id
+            WHERE ri.receta_id = ?
+            ORDER BY ri.id ASC
+            """,
+            (receta_id,),
+        )
+        rows = cursor.fetchall()
+
+        items = []
+        faltantes = 0
+        suficientes = 0
+        incompatibles = 0
+
+        for row in rows:
+            tipo = str(row["tipo"] or "insumo").strip().lower()
+            cantidad_base = float(row["cantidad_base"] or 0)
+            if cantidad_base <= 0:
+                continue
+
+            unidad_requerida = _normalizar_unidad_producto(row["unidad_receta"] or "unidad")
+            requerido = round(cantidad_base * cantidad_lotes, 6)
+
+            if tipo == "producto":
+                componente_id = int(row["producto_id"] or 0)
+                componente_nombre = str(row["producto_nombre_item"] or "Producto").strip() or "Producto"
+                stock_actual = float(row["producto_stock"] or 0)
+                unidad_stock = _normalizar_unidad_producto(row["producto_unidad"] or unidad_requerida)
+            else:
+                tipo = "insumo"
+                componente_id = int(row["insumo_id"] or 0)
+                componente_nombre = str(row["insumo_nombre"] or "Insumo").strip() or "Insumo"
+                stock_actual = float(row["insumo_stock"] or 0)
+                unidad_stock = _normalizar_unidad_producto(row["insumo_unidad"] or unidad_requerida)
+
+            disponible_convertido = stock_actual
+            conversion_ok = True
+            conversion_error = ""
+            if unidad_stock != unidad_requerida:
+                conversion = _convertir_cantidad_unidad_db(stock_actual, unidad_stock, unidad_requerida)
+                if conversion.get("success"):
+                    disponible_convertido = float(conversion.get("cantidad") or 0)
+                else:
+                    conversion_ok = False
+                    conversion_error = str(conversion.get("error") or "No se pudo convertir unidades")
+                    incompatibles += 1
+
+            if conversion_ok:
+                faltante = max(0.0, requerido - disponible_convertido)
+                hay_faltante = faltante > 1e-9
+                if hay_faltante:
+                    faltantes += 1
+                else:
+                    suficientes += 1
+            else:
+                faltante = None
+                hay_faltante = None
+
+            items.append(
+                {
+                    "item_id": int(row["id"] or 0),
+                    "tipo": tipo,
+                    "recurso_id": componente_id if componente_id > 0 else None,
+                    "nombre": componente_nombre,
+                    "unidad_requerida": unidad_requerida,
+                    "unidad_stock": unidad_stock,
+                    "cantidad_base": round(cantidad_base, 6),
+                    "cantidad_requerida": round(requerido, 6),
+                    "stock_actual": round(stock_actual, 6),
+                    "stock_disponible_convertido": round(disponible_convertido, 6) if conversion_ok else None,
+                    "conversion_ok": conversion_ok,
+                    "conversion_error": conversion_error,
+                    "faltante": round(faltante, 6) if faltante is not None else None,
+                    "hay_faltante": hay_faltante,
+                }
+            )
+
+        return {
+            "success": True,
+            "agenda": {
+                "id": int(agenda["id"] or 0),
+                "fecha": str(agenda["fecha"] or ""),
+                "receta_id": receta_id,
+                "receta_nombre": str(agenda["receta_nombre"] or "Receta"),
+                "producto_nombre": str(agenda["producto_nombre"] or "Sin producto asociado"),
+                "cantidad_lotes": round(cantidad_lotes, 6),
+                "rendimiento": float(agenda["rendimiento"] or 1),
+            },
+            "items": items,
+            "resumen": {
+                "total_componentes": len(items),
+                "componentes_suficientes": suficientes,
+                "componentes_con_faltante": faltantes,
+                "componentes_incompatibles": incompatibles,
+                "hay_faltantes": faltantes > 0 or incompatibles > 0,
+            },
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+
+
 def obtener_plan_produccion_semanal(dias_historial=28, dias_proyeccion=7):
     """
     Genera un plan sugerido por 7 dias (o el rango indicado) basado en:

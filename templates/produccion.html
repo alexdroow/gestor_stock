@@ -892,6 +892,18 @@
             padding-bottom: 6px;
         }
 
+        .plan-manual-item.plan-manual-item-clickable {
+            cursor: zoom-in;
+            border-radius: 8px;
+            padding: 6px;
+            margin: -2px -4px 0;
+            transition: background .15s ease;
+        }
+
+        .plan-manual-item.plan-manual-item-clickable:hover {
+            background: #ecfdf3;
+        }
+
         .plan-manual-item:last-child {
             border-bottom: none;
             padding-bottom: 0;
@@ -937,6 +949,59 @@
             font-size: 12px;
             color: #64748b;
             margin: -2px 0 10px;
+        }
+
+        .agenda-detalle-grid {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .agenda-detalle-row {
+            display: grid;
+            grid-template-columns: minmax(180px, 1.6fr) repeat(3, minmax(90px, 1fr));
+            gap: 8px;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 13px;
+        }
+
+        .agenda-detalle-row:last-child {
+            border-bottom: none;
+        }
+
+        .agenda-detalle-row.head {
+            background: #f8fafc;
+            font-weight: 700;
+            font-size: 12px;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+
+        .agenda-detalle-row .faltante-ok {
+            color: #166534;
+            font-weight: 700;
+        }
+
+        .agenda-detalle-row .faltante-alerta {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .agenda-detalle-meta {
+            margin: 8px 0 6px;
+            font-size: 13px;
+            color: #475569;
+        }
+
+        .agenda-detalle-resumen {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
         }
         
         .modal-overlay {
@@ -1385,6 +1450,10 @@
             border-bottom-color: #166534;
         }
 
+        body.dark-mode .plan-manual-item.plan-manual-item-clickable:hover {
+            background: rgba(34, 197, 94, 0.15);
+        }
+
         body.dark-mode .plan-manual-title {
             color: #dcfce7;
         }
@@ -1401,6 +1470,24 @@
 
         body.dark-mode .agenda-produccion-hint {
             color: #94a3b8;
+        }
+
+        body.dark-mode .agenda-detalle-grid {
+            border-color: #475569;
+        }
+
+        body.dark-mode .agenda-detalle-row {
+            border-bottom-color: #475569;
+            color: #e2e8f0;
+        }
+
+        body.dark-mode .agenda-detalle-row.head {
+            background: #0f172a;
+            color: #cbd5e1;
+        }
+
+        body.dark-mode .agenda-detalle-meta {
+            color: #cbd5e1;
         }
         
         body.dark-mode .modal {
@@ -1786,6 +1873,9 @@
                             <div class="plan-semanal-meta" id="agenda-produccion-meta">
                                 Cargando agenda de produccion...
                             </div>
+                            <div class="agenda-produccion-hint">
+                                Doble click en un item para ver insumos requeridos y faltantes de stock.
+                            </div>
                             <div class="plan-semanal-list" id="agenda-produccion-list">
                                 <div class="plan-semanal-empty">Cargando agenda de produccion...</div>
                             </div>
@@ -2027,6 +2117,22 @@
             </form>
         </div>
     </div>
+
+    <div class="modal-overlay" id="modal-agenda-detalle">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">&#129532; Insumos necesarios</h3>
+                <button class="btn-close" onclick="cerrarModalDetalleAgendaProduccion()">&#215;</button>
+            </div>
+            <div class="agenda-detalle-meta" id="agenda-detalle-meta">
+                Cargando detalle...
+            </div>
+            <div id="agenda-detalle-resumen" class="agenda-detalle-resumen"></div>
+            <div class="agenda-detalle-grid" id="agenda-detalle-grid">
+                <div class="plan-semanal-empty">Cargando detalle del evento...</div>
+            </div>
+        </div>
+    </div>
  
     <!-- Boton Modo Oscuro -->
     <button onclick="toggleDarkMode()" id="darkModeBtn" style="
@@ -2077,6 +2183,7 @@
         let historialSemanasPorPagina = 6;
         let historialHasMore = false;
         let agendaProduccionCargando = false;
+        let agendaDetalleCargando = false;
         let planSemanalCargando = false;
         let planSemanalRango = { desde: '', hasta: '' };
         const AGENDA_PRODUCCION_INICIAL = {{ (agenda_produccion_inicial or {"days": [], "resumen": {}, "fecha_desde": "", "fecha_hasta": ""})|tojson }};
@@ -2406,6 +2513,111 @@
             return `${partes[2]}/${partes[1]}`;
         }
 
+        function formatoCantidadUnidad(valor, unidad, maxDecimales = 2) {
+            const cantidad = formatoNumeroPlan(valor || 0, maxDecimales);
+            const unidadTxt = String(unidad || '').trim();
+            return unidadTxt ? `${cantidad} ${unidadTxt}` : cantidad;
+        }
+
+        function cerrarModalDetalleAgendaProduccion() {
+            const modal = document.getElementById('modal-agenda-detalle');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
+        function abrirModalDetalleAgendaProduccion(agendaId) {
+            const agendadoId = Number(agendaId || 0);
+            if (!Number.isFinite(agendadoId) || agendadoId <= 0) return;
+            if (agendaDetalleCargando) return;
+
+            const modal = document.getElementById('modal-agenda-detalle');
+            const meta = document.getElementById('agenda-detalle-meta');
+            const resumenWrap = document.getElementById('agenda-detalle-resumen');
+            const grid = document.getElementById('agenda-detalle-grid');
+            if (!modal || !meta || !resumenWrap || !grid) return;
+
+            modal.classList.add('active');
+            meta.textContent = 'Cargando requerimientos del evento...';
+            resumenWrap.innerHTML = '';
+            grid.innerHTML = '<div class="plan-semanal-empty">Cargando detalle del evento...</div>';
+            agendaDetalleCargando = true;
+
+            fetch(`/api/produccion/agenda/${agendadoId}/requerimientos?_ts=${Date.now()}`, {
+                cache: 'no-store'
+            })
+                .then(async (r) => {
+                    const data = await r.json().catch(() => ({}));
+                    if (!r.ok || !data.success) {
+                        throw new Error(data.error || 'No se pudo cargar el detalle del evento');
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    const agenda = data?.agenda || {};
+                    const resumen = data?.resumen || {};
+                    const items = Array.isArray(data?.items) ? data.items : [];
+
+                    const receta = String(agenda.receta_nombre || 'Receta');
+                    const lotes = formatoNumeroPlan(agenda.cantidad_lotes || 0);
+                    const producto = String(agenda.producto_nombre || '').trim();
+                    const fecha = formatearFechaPlan(agenda.fecha || '');
+                    meta.textContent = `${receta} · ${lotes} lote(s)${fecha ? ` · ${fecha}` : ''}${producto ? ` · ${producto}` : ''}`;
+
+                    resumenWrap.innerHTML = `
+                        <span class="plan-chip">Componentes: ${formatoNumeroPlan(resumen.total_componentes || 0, 0)}</span>
+                        <span class="plan-chip manual">Suficientes: ${formatoNumeroPlan(resumen.componentes_suficientes || 0, 0)}</span>
+                        <span class="plan-chip warning">Con faltante: ${formatoNumeroPlan(resumen.componentes_con_faltante || 0, 0)}</span>
+                        ${Number(resumen.componentes_incompatibles || 0) > 0 ? `<span class="plan-chip warning">Sin conversion: ${formatoNumeroPlan(resumen.componentes_incompatibles || 0, 0)}</span>` : ''}
+                    `;
+
+                    if (!items.length) {
+                        grid.innerHTML = '<div class="plan-semanal-empty">Esta receta no tiene componentes configurados.</div>';
+                        return;
+                    }
+
+                    const rows = items.map((item) => {
+                        const nombre = `${item.tipo === 'producto' ? 'Producto' : 'Insumo'}: ${item.nombre || '-'}`;
+                        const requerido = formatoCantidadUnidad(item.cantidad_requerida || 0, item.unidad_requerida || 'unidad');
+                        const disponible = item.conversion_ok
+                            ? formatoCantidadUnidad(item.stock_disponible_convertido || 0, item.unidad_requerida || 'unidad')
+                            : `No comparable (${item.unidad_stock || '-'})`;
+
+                        let estadoHtml = '<span class="faltante-ok">OK</span>';
+                        if (!item.conversion_ok) {
+                            estadoHtml = `<span class="faltante-alerta">${escapeHtml(item.conversion_error || 'No se pudo convertir unidades')}</span>`;
+                        } else if (Number(item.faltante || 0) > 0) {
+                            estadoHtml = `<span class="faltante-alerta">Faltan ${escapeHtml(formatoCantidadUnidad(item.faltante || 0, item.unidad_requerida || 'unidad'))}</span>`;
+                        }
+
+                        return `
+                            <div class="agenda-detalle-row">
+                                <div>${escapeHtml(nombre)}</div>
+                                <div>${escapeHtml(requerido)}</div>
+                                <div>${escapeHtml(disponible)}</div>
+                                <div>${estadoHtml}</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    grid.innerHTML = `
+                        <div class="agenda-detalle-row head">
+                            <div>Componente</div>
+                            <div>Requerido</div>
+                            <div>Disponible</div>
+                            <div>Estado</div>
+                        </div>
+                        ${rows}
+                    `;
+                })
+                .catch((error) => {
+                    meta.textContent = 'No se pudo obtener el detalle del evento.';
+                    grid.innerHTML = `<div class="plan-semanal-empty">${escapeHtml(error.message || 'Error inesperado')}</div>`;
+                })
+                .finally(() => {
+                    agendaDetalleCargando = false;
+                });
+        }
+
         function actualizarRangoAgendaProduccion(data) {
             const dias = Array.isArray(data?.days) ? data.days : [];
             const rango = { desde: '', hasta: '' };
@@ -2603,17 +2815,22 @@
             list.innerHTML = diasConItemsLista.map((dia) => {
                 const items = Array.isArray(dia.items) ? dia.items : [];
                 const rows = items.map((manual) => {
+                    const agendaId = Number(manual.id || 0);
                     const cantidad = formatoNumeroPlan(manual.cantidad || 0);
                     const producto = (manual.producto_nombre || '').trim();
                     const nota = (manual.nota || '').trim();
                     return `
-                        <div class="plan-manual-item">
+                        <div
+                            class="plan-manual-item plan-manual-item-clickable"
+                            ondblclick="abrirModalDetalleAgendaProduccion(${agendaId})"
+                            title="Doble click para ver insumos requeridos y faltantes"
+                        >
                             <div class="plan-manual-info">
                                 <div class="plan-manual-title">${escapeHtml(manual.receta_nombre || 'Receta')} - ${escapeHtml(cantidad)} lote(s)</div>
                                 ${producto ? `<div class="plan-manual-note">Producto: ${escapeHtml(producto)}</div>` : ''}
                                 ${nota ? `<div class="plan-manual-note">Nota: ${escapeHtml(nota)}</div>` : ''}
                             </div>
-                            <button type="button" class="btn-plan-remove" onclick="eliminarAgendaProduccion(${Number(manual.id || 0)})">Quitar</button>
+                            <button type="button" class="btn-plan-remove" onclick="eliminarAgendaProduccion(${agendaId})">Quitar</button>
                         </div>
                     `;
                 }).join('');
@@ -3373,7 +3590,7 @@
                     badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
                 });
 
-            ['modal-receta', 'modal-editar-receta', 'modal-producir', 'modal-ver-receta', 'modal-agendar-produccion'].forEach(id => {
+            ['modal-receta', 'modal-editar-receta', 'modal-producir', 'modal-ver-receta', 'modal-agendar-produccion', 'modal-agenda-detalle'].forEach(id => {
                 const modal = document.getElementById(id);
                 if (!modal) return;
                 modal.addEventListener('click', function(e) {
@@ -3383,6 +3600,7 @@
                     if (id === 'modal-producir') cerrarModalProducir();
                     if (id === 'modal-ver-receta') cerrarModalVerReceta();
                     if (id === 'modal-agendar-produccion') cerrarModalAgendaProduccion();
+                    if (id === 'modal-agenda-detalle') cerrarModalDetalleAgendaProduccion();
                 });
             });
 
@@ -3396,6 +3614,11 @@
                 const modalVer = document.getElementById('modal-ver-receta');
                 if (modalVer && modalVer.classList.contains('active')) {
                     cerrarModalVerReceta();
+                    return;
+                }
+                const modalDetalleAgenda = document.getElementById('modal-agenda-detalle');
+                if (modalDetalleAgenda && modalDetalleAgenda.classList.contains('active')) {
+                    cerrarModalDetalleAgendaProduccion();
                 }
             });
         });
