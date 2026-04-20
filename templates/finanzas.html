@@ -258,31 +258,70 @@
             if (!canvas) return;
             const rows = Array.isArray(state.data?.semanas) ? state.data.semanas : [];
             if (state.chart) state.chart.destroy();
+            const labels = rows.map((r) => String(r.semana_inicio || '').slice(5));
             state.chart = new Chart(canvas.getContext('2d'), {
-                type: 'bar',
+                type: 'line',
                 data: {
-                    labels: rows.map((r) => String(r.semana_inicio || '').slice(5)),
+                    labels,
                     datasets: [
                         {
-                            label: 'Presencial + online (auto)',
+                            label: 'Auto presencial + online',
                             data: rows.map((r) => Number(r.auto_total || 0)),
-                            backgroundColor: '#0ea5e9',
-                            stack: 'total',
-                            borderRadius: 6
+                            borderColor: '#0ea5e9',
+                            backgroundColor: 'rgba(14,165,233,.12)',
+                            fill: true,
+                            tension: .28,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#0ea5e9'
                         },
                         {
                             label: 'Uber + PedidosYa (manual)',
                             data: rows.map((r) => Number(r.manual_apps_total || 0)),
-                            backgroundColor: '#f59e0b',
-                            stack: 'total',
-                            borderRadius: 6
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245,158,11,.10)',
+                            fill: true,
+                            tension: .28,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#f59e0b',
+                            borderDash: [6, 4]
+                        },
+                        {
+                            label: 'Total combinado',
+                            data: rows.map((r) => Number(r.total_combinado || 0)),
+                            borderColor: '#1d4ed8',
+                            backgroundColor: 'rgba(29,78,216,.08)',
+                            fill: false,
+                            tension: .22,
+                            pointRadius: 4,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: '#1d4ed8',
+                            borderWidth: 3
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y || 0)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(148,163,184,.20)' } },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148,163,184,.20)' },
+                            ticks: {
+                                callback: (value) => money(value)
+                            }
+                        }
+                    }
                 }
             });
         }
