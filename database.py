@@ -12569,6 +12569,240 @@ def marcar_compras_pendientes_completadas():
         conn.close()
 
 
+def _resolver_insumo_desde_compra_cursor(cursor, item):
+    try:
+        insumo_id = int(item.get("insumo_id") or 0)
+    except (TypeError, ValueError):
+        insumo_id = 0
+
+    if insumo_id > 0:
+        cursor.execute("SELECT id, nombre, stock, unidad FROM insumos WHERE id = ?", (insumo_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row), "id"
+
+    nombre = str(item.get("nombre") or "").strip()
+    if not nombre:
+        return None, "sin_nombre"
+
+    cursor.execute(
+        """
+        SELECT id, nombre, stock, unidad
+        FROM insumos
+        WHERE lower(trim(nombre)) = lower(trim(?))
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (nombre,),
+    )
+    row = cursor.fetchone()
+    if row:
+        return dict(row), "nombre"
+    return None, "no_encontrado"
+
+
+def previsualizar_finalizacion_compras_pendientes():
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM compras_pendientes ORDER BY id ASC")
+        compras = [dict(r) for r in cursor.fetchall()]
+
+        items = []
+        omitidos = []
+        total_items = 0
+        total_aplicables = 0
+        total_omitidos = 0
+
+        for item in compras:
+            total_items += 1
+            cantidad = max(0.0, _parse_float(item.get("cantidad"), 0))
+            unidad_compra = _normalizar_unidad_producto(item.get("unidad") or "unidad")
+            resuelto, origen_resolucion = _resolver_insumo_desde_compra_cursor(cursor, item)
+
+            if cantidad <= 0:
+                total_omitidos += 1
+                omitidos.append(
+                    {
+                        "compra_id": int(item.get("id") or 0),
+                        "nombre": str(item.get("nombre") or "").strip() or "Insumo",
+                        "motivo": "Cantidad invalida o 0",
+                    }
+                )
+                continue
+
+            if not resuelto:
+                total_omitidos += 1
+                motivo = "No se encontro el insumo"
+                if origen_resolucion == "sin_nombre":
+                    motivo = "La compra no tiene nombre de insumo"
+                omitidos.append(
+                    {
+                        "compra_id": int(item.get("id") or 0),
+                        "nombre": str(item.get("nombre") or "").strip() or "Insumo",
+                        "motivo": motivo,
+                    }
+                )
+                continue
+
+            stock_actual = float(resuelto.get("stock") or 0)
+            unidad_stock = _normalizar_unidad_producto(resuelto.get("unidad") or "unidad")
+            conversion = _convertir_cantidad_unidad_db(cantidad, unidad_compra, unidad_stock)
+            if not conversion.get("success"):
+                total_omitidos += 1
+                omitidos.append(
+                    {
+                        "compra_id": int(item.get("id") or 0),
+                        "nombre": str(resuelto.get("nombre") or item.get("nombre") or "Insumo").strip(),
+                        "motivo": str(conversion.get("error") or "No se pudo convertir unidad"),
+                    }
+                )
+                continue
+
+            cantidad_stock = float(conversion.get("cantidad") or 0)
+            stock_nuevo = stock_actual + cantidad_stock
+            total_aplicables += 1
+            items.append(
+                {
+                    "compra_id": int(item.get("id") or 0),
+                    "insumo_id": int(resuelto.get("id") or 0),
+                    "insumo_nombre": str(resuelto.get("nombre") or item.get("nombre") or "Insumo").strip(),
+                    "origen_resolucion": origen_resolucion,
+                    "cantidad_compra": round(cantidad, 6),
+                    "unidad_compra": unidad_compra,
+                    "cantidad_en_stock": round(cantidad_stock, 6),
+                    "unidad_stock": unidad_stock,
+                    "stock_anterior": round(stock_actual, 6),
+                    "stock_nuevo": round(stock_nuevo, 6),
+                }
+            )
+
+        return {
+            "success": True,
+            "items": items,
+            "omitidos": omitidos,
+            "resumen": {
+                "total_items": total_items,
+                "aplicables": total_aplicables,
+                "omitidos": total_omitidos,
+            },
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e), "items": [], "omitidos": [], "resumen": {}}
+    finally:
+        conn.close()
+
+
+def finalizar_compras_pendientes_con_stock(aplicar_stock=True, factura_info=None):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        preview = previsualizar_finalizacion_compras_pendientes()
+        if not preview.get("success"):
+            return preview
+
+        codigo_operacion = _normalizar_codigo_operacion(prefijo="OPC")
+        aplicados = []
+        errores = []
+        ids_aplicados = []
+
+        if aplicar_stock:
+            cursor.execute("SELECT * FROM compras_pendientes ORDER BY id ASC")
+            compras = [dict(r) for r in cursor.fetchall()]
+            for item in compras:
+                compra_id = int(item.get("id") or 0)
+                cantidad = max(0.0, _parse_float(item.get("cantidad"), 0))
+                unidad_compra = _normalizar_unidad_producto(item.get("unidad") or "unidad")
+                if compra_id <= 0 or cantidad <= 0:
+                    continue
+
+                resuelto, _origen = _resolver_insumo_desde_compra_cursor(cursor, item)
+                if not resuelto:
+                    continue
+
+                insumo_id = int(resuelto.get("id") or 0)
+                if insumo_id <= 0:
+                    continue
+
+                try:
+                    calc = _sumar_stock_con_conversion_cursor(cursor, insumo_id, cantidad, unidad_compra)
+                    stock_anterior = float(calc.get("stock_anterior") or 0)
+                    stock_nuevo = float(calc.get("stock_nuevo") or stock_anterior)
+                    cantidad_stock = float(calc.get("cantidad_stock") or 0)
+                    unidad_stock = _normalizar_unidad_producto(calc.get("unidad_stock") or resuelto.get("unidad") or "unidad")
+
+                    registrar_movimiento_stock(
+                        "insumo",
+                        insumo_id,
+                        "compra_pendiente_finalizada",
+                        cantidad_stock,
+                        stock_anterior=stock_anterior,
+                        stock_nuevo=stock_nuevo,
+                        referencia_tipo="compras_pendientes",
+                        referencia_id=compra_id,
+                        detalle=f"Compra finalizada: {item.get('nombre') or resuelto.get('nombre') or 'Insumo'}",
+                        origen_modulo="compras_pendientes",
+                        codigo_operacion=codigo_operacion,
+                        unidad=unidad_stock,
+                        metadata={
+                            "compra_pendiente_id": compra_id,
+                            "cantidad_compra": cantidad,
+                            "unidad_compra": unidad_compra,
+                            "factura": factura_info or {},
+                        },
+                        conn=conn,
+                    )
+
+                    ids_aplicados.append(compra_id)
+                    aplicados.append(
+                        {
+                            "compra_id": compra_id,
+                            "insumo_id": insumo_id,
+                            "insumo_nombre": str(resuelto.get("nombre") or item.get("nombre") or "Insumo").strip(),
+                            "cantidad_compra": round(cantidad, 6),
+                            "unidad_compra": unidad_compra,
+                            "cantidad_en_stock": round(cantidad_stock, 6),
+                            "unidad_stock": unidad_stock,
+                            "stock_anterior": round(stock_anterior, 6),
+                            "stock_nuevo": round(stock_nuevo, 6),
+                        }
+                    )
+                except Exception as exc:
+                    errores.append(
+                        {
+                            "compra_id": compra_id,
+                            "nombre": str(item.get("nombre") or "").strip() or "Insumo",
+                            "error": str(exc),
+                        }
+                    )
+
+        if ids_aplicados:
+            placeholders = ",".join("?" for _ in ids_aplicados)
+            cursor.execute(f"DELETE FROM compras_pendientes WHERE id IN ({placeholders})", ids_aplicados)
+            eliminados = cursor.rowcount or 0
+        elif not aplicar_stock:
+            cursor.execute("DELETE FROM compras_pendientes")
+            eliminados = cursor.rowcount or 0
+        else:
+            eliminados = 0
+
+        conn.commit()
+        return {
+            "success": True,
+            "eliminados": eliminados,
+            "codigo_operacion": codigo_operacion,
+            "aplicados": aplicados,
+            "errores": errores,
+            "preview": preview,
+            "pendientes_no_aplicados": int((preview.get("resumen") or {}).get("total_items") or 0) - int(len(aplicados)),
+        }
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+
 def obtener_notas_agenda(incluir_completadas=False):
     conn = get_db()
     cursor = conn.cursor()

@@ -317,7 +317,8 @@ from database import (
     registrar_merma_producto, revertir_merma_producto,
     obtener_compras_pendientes, agregar_compra_pendiente, agregar_lote_compras_pendientes,
     actualizar_compra_pendiente, eliminar_compra_pendiente, limpiar_compras_pendientes,
-    marcar_compras_pendientes_completadas,
+    marcar_compras_pendientes_completadas, previsualizar_finalizacion_compras_pendientes,
+    finalizar_compras_pendientes_con_stock,
     registrar_historial_cambio, listar_historial_cambios, eliminar_historial_cambio,
     descartar_insumos_masivo,
     obtener_evento_agenda_por_id, actualizar_estado_evento_agenda,
@@ -8161,7 +8162,15 @@ def api_compras_pendientes_eliminar(item_id):
 @app.route('/api/compras-pendientes/finalizar', methods=['POST'])
 def api_compras_pendientes_finalizar():
     try:
-        resultado = marcar_compras_pendientes_completadas()
+        data = request.get_json(silent=True) or {}
+        aplicar_stock = bool(data.get('aplicar_stock', True))
+        factura_info = data.get('factura') if isinstance(data.get('factura'), dict) else None
+
+        if aplicar_stock:
+            resultado = finalizar_compras_pendientes_con_stock(aplicar_stock=True, factura_info=factura_info)
+        else:
+            resultado = marcar_compras_pendientes_completadas()
+
         if resultado.get('success'):
             crear_backup()
             resumen = obtener_compras_pendientes()
@@ -8171,6 +8180,17 @@ def api_compras_pendientes_finalizar():
         return jsonify(resultado), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/compras-pendientes/finalizar/preview', methods=['GET'])
+def api_compras_pendientes_finalizar_preview():
+    try:
+        resultado = previsualizar_finalizacion_compras_pendientes()
+        if resultado.get('success'):
+            return jsonify(resultado)
+        return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'items': [], 'omitidos': [], 'resumen': {}}), 500
 
 
 @app.route('/api/compras-pendientes/limpiar', methods=['POST'])

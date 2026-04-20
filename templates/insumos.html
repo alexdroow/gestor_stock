@@ -2012,6 +2012,79 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-finalizar-compras">
+        <div class="modal modal-lg">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                <h3 class="modal-title" style="text-align:left; margin:0;">&#128230; Confirmar subida de stock</h3>
+                <button type="button" class="btn btn-secondary btn-icon" onclick="cerrarModalFinalizarCompras()" title="Cerrar">&#215;</button>
+            </div>
+            <p class="modal-text" style="text-align:left; margin-bottom:10px;">
+                Revisa el stock actual y como quedara despues de aplicar la lista de compras.
+            </p>
+            <div id="finalizar-compras-resumen" class="modal-note">Cargando previsualizacion...</div>
+            <div style="max-height:320px; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; margin-top:10px;">
+                <table class="pendientes-tabla" style="min-width:780px;">
+                    <thead>
+                        <tr>
+                            <th>Insumo</th>
+                            <th>Cant. compra</th>
+                            <th>Se sumara</th>
+                            <th>Stock actual</th>
+                            <th>Stock final</th>
+                        </tr>
+                    </thead>
+                    <tbody id="finalizar-compras-body">
+                        <tr><td colspan="5" class="pendiente-empty">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="finalizar-compras-omitidos" class="modal-note" style="margin-top:10px; display:none;"></div>
+            <div id="finalizar-compras-factura-estado" class="modal-note" style="margin-top:10px;">Factura: no adjuntada (opcional).</div>
+            <div class="modal-actions" style="margin-top:14px;">
+                <button type="button" class="btn btn-warning" onclick="abrirModalFacturaCompra()">Adjuntar factura (opcional)</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalFinalizarCompras()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn-confirmar-finalizar-compras" onclick="confirmarFinalizarCompras()">Aplicar stock y finalizar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-factura-compra">
+        <div class="modal">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                <h3 class="modal-title" style="text-align:left; margin:0;">&#129534; Adjuntar factura</h3>
+                <button type="button" class="btn btn-secondary btn-icon" onclick="cerrarModalFacturaCompra()" title="Cerrar">&#215;</button>
+            </div>
+            <div class="form-group">
+                <label>Empresa / Proveedor</label>
+                <input type="text" id="factura-compra-proveedor" placeholder="Ej: Distribuidora XYZ SpA">
+            </div>
+            <div class="form-group">
+                <label>Folio / Numero factura (opcional)</label>
+                <input type="text" id="factura-compra-folio" placeholder="Ej: 0001234">
+            </div>
+            <div class="form-group">
+                <label>Fecha factura</label>
+                <input type="date" id="factura-compra-fecha">
+            </div>
+            <div class="form-group">
+                <label>Monto total (opcional)</label>
+                <input type="number" min="0" step="0.01" id="factura-compra-monto" placeholder="0">
+            </div>
+            <div class="form-group">
+                <label>Informacion empresa / Observacion (opcional)</label>
+                <textarea id="factura-compra-observacion" rows="2" placeholder="RUT, condiciones, comentario, etc."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Archivo (PDF o imagen)</label>
+                <input type="file" id="factura-compra-archivo" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*,application/pdf">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalFacturaCompra()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarDraftFacturaCompra()">Guardar factura</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Botón Modo Oscuro -->
     <button onclick="toggleDarkMode()" id="darkModeBtn" style="
         position: fixed;
@@ -2495,10 +2568,10 @@
                                     <div class="pendientes-title">&#129534; Pendiente Global de Compra</div>
                                 </div>
                                 <p class="pendientes-sub">
-                                    Lista acumulada y editable. Marcar "comprado" solo cambia el estado; no mueve stock automáticamente.
+                                    Lista acumulada y editable. Al finalizar, puedes aplicar stock automaticamente y adjuntar factura opcional.
                                 </p>
                                 <div class="pendientes-actions">
-                                    <button type="button" class="btn btn-primary" onclick="finalizarListaPendiente()">&#10003; Dar por terminada</button>
+                                    <button type="button" class="btn btn-primary" onclick="abrirModalFinalizarCompras()">&#10003; Dar por terminada y subir stock</button>
                                 </div>
 
                                 <div class="pendientes-resumen">
@@ -3597,6 +3670,12 @@
         document.getElementById('modal-descuento-rapido').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalDescuentoRapido();
         });
+        document.getElementById('modal-finalizar-compras').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModalFinalizarCompras();
+        });
+        document.getElementById('modal-factura-compra').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModalFacturaCompra();
+        });
 
         fetch('/api/alertas/contador')
             .then(r => r.json())
@@ -3643,6 +3722,8 @@ let insumosData = [
         });
         let recetasSeleccionCalculo = [];
         let comprasPendientesCache = [];
+        let previewFinalizarCompras = null;
+        let facturaCompraDraft = null;
 
         function filtrarRecetasCalculo() {
             const input = document.getElementById('calc-receta-buscar');
@@ -4295,19 +4376,235 @@ let insumosData = [
                 .catch(err => alert('[ERROR] ' + err.message));
         }
 
-        function finalizarListaPendiente() {
-            if (!confirm('¿Dar por terminada y vaciar toda la lista de compra?')) return;
-            fetch('/api/compras-pendientes/finalizar', {
+        function actualizarEstadoFacturaDraft() {
+            const target = document.getElementById('finalizar-compras-factura-estado');
+            if (!target) return;
+            if (!facturaCompraDraft) {
+                target.textContent = 'Factura: no adjuntada (opcional).';
+                return;
+            }
+            const proveedor = String(facturaCompraDraft.proveedor || '').trim() || 'Proveedor no definido';
+            const archivo = facturaCompraDraft.archivo ? ` · Archivo: ${facturaCompraDraft.archivo.name}` : '';
+            target.textContent = `Factura lista: ${proveedor}${archivo}`;
+        }
+
+        function formatoNumero(valor) {
+            const n = Number(valor || 0);
+            if (!Number.isFinite(n)) return '0';
+            return Number.isInteger(n)
+                ? n.toLocaleString('es-CL')
+                : n.toLocaleString('es-CL', { maximumFractionDigits: 3 });
+        }
+
+        function abrirModalFinalizarCompras() {
+            if (!comprasPendientesCache.length) {
+                alert('No hay compras pendientes para finalizar.');
+                return;
+            }
+            const modal = document.getElementById('modal-finalizar-compras');
+            if (!modal) return;
+            const resumenEl = document.getElementById('finalizar-compras-resumen');
+            const bodyEl = document.getElementById('finalizar-compras-body');
+            const omitidosEl = document.getElementById('finalizar-compras-omitidos');
+            if (resumenEl) resumenEl.textContent = 'Cargando previsualizacion...';
+            if (bodyEl) bodyEl.innerHTML = '<tr><td colspan="5" class="pendiente-empty">Cargando...</td></tr>';
+            if (omitidosEl) {
+                omitidosEl.style.display = 'none';
+                omitidosEl.textContent = '';
+            }
+            modal.classList.add('active');
+            actualizarEstadoFacturaDraft();
+
+            fetch('/api/compras-pendientes/finalizar/preview')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo generar previsualizacion.');
+                    previewFinalizarCompras = data;
+                    const resumen = data.resumen || {};
+                    if (resumenEl) {
+                        resumenEl.textContent = `Total lista: ${Number(resumen.total_items || 0)} · Aplicables: ${Number(resumen.aplicables || 0)} · Omitidos: ${Number(resumen.omitidos || 0)}`;
+                    }
+
+                    const items = Array.isArray(data.items) ? data.items : [];
+                    if (bodyEl) {
+                        if (!items.length) {
+                            bodyEl.innerHTML = '<tr><td colspan="5" class="pendiente-empty">No hay items aplicables para stock.</td></tr>';
+                        } else {
+                            bodyEl.innerHTML = items.map(item => `
+                                <tr>
+                                    <td>${escapeHtml(item.insumo_nombre || 'Insumo')}</td>
+                                    <td>${escapeHtml(formatoNumero(item.cantidad_compra || 0))} ${escapeHtml(item.unidad_compra || '')}</td>
+                                    <td>${escapeHtml(formatoNumero(item.cantidad_en_stock || 0))} ${escapeHtml(item.unidad_stock || '')}</td>
+                                    <td>${escapeHtml(formatoNumero(item.stock_anterior || 0))} ${escapeHtml(item.unidad_stock || '')}</td>
+                                    <td><strong>${escapeHtml(formatoNumero(item.stock_nuevo || 0))} ${escapeHtml(item.unidad_stock || '')}</strong></td>
+                                </tr>
+                            `).join('');
+                        }
+                    }
+
+                    const omitidos = Array.isArray(data.omitidos) ? data.omitidos : [];
+                    if (omitidosEl && omitidos.length) {
+                        omitidosEl.style.display = '';
+                        omitidosEl.innerHTML = '<strong>No aplicados:</strong> ' + omitidos.map(o => `${escapeHtml(o.nombre || 'Insumo')} (${escapeHtml(o.motivo || 'sin motivo')})`).join(' · ');
+                    }
+                })
+                .catch(err => {
+                    if (resumenEl) resumenEl.textContent = 'Error al cargar previsualizacion.';
+                    if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="5" class="pendiente-empty">${escapeHtml(err.message || 'Error inesperado')}</td></tr>`;
+                });
+        }
+
+        function cerrarModalFinalizarCompras() {
+            const modal = document.getElementById('modal-finalizar-compras');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
+        function abrirModalFacturaCompra() {
+            const modal = document.getElementById('modal-factura-compra');
+            if (!modal) return;
+            const hoy = new Date();
+            const fechaDefecto = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+            document.getElementById('factura-compra-proveedor').value = facturaCompraDraft?.proveedor || '';
+            document.getElementById('factura-compra-folio').value = facturaCompraDraft?.folio || '';
+            document.getElementById('factura-compra-fecha').value = facturaCompraDraft?.fecha_factura || fechaDefecto;
+            document.getElementById('factura-compra-monto').value = facturaCompraDraft?.monto_total || '';
+            document.getElementById('factura-compra-observacion').value = facturaCompraDraft?.observacion || '';
+            modal.classList.add('active');
+        }
+
+        function cerrarModalFacturaCompra() {
+            const modal = document.getElementById('modal-factura-compra');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
+        function guardarDraftFacturaCompra() {
+            const proveedor = String(document.getElementById('factura-compra-proveedor')?.value || '').trim();
+            const fechaFactura = String(document.getElementById('factura-compra-fecha')?.value || '').trim();
+            const folio = String(document.getElementById('factura-compra-folio')?.value || '').trim();
+            const monto = String(document.getElementById('factura-compra-monto')?.value || '').trim();
+            const observacion = String(document.getElementById('factura-compra-observacion')?.value || '').trim();
+            const archivo = document.getElementById('factura-compra-archivo')?.files?.[0] || null;
+
+            if (!proveedor) {
+                alert('Ingresa la empresa/proveedor para la factura.');
+                return;
+            }
+            if (!fechaFactura) {
+                alert('Ingresa fecha de factura.');
+                return;
+            }
+            if (!archivo) {
+                alert('Selecciona el archivo PDF o imagen de la factura.');
+                return;
+            }
+
+            facturaCompraDraft = {
+                proveedor: proveedor,
+                fecha_factura: fechaFactura,
+                folio: folio,
+                monto_total: monto,
+                observacion: observacion,
+                archivo: archivo,
+            };
+            actualizarEstadoFacturaDraft();
+            cerrarModalFacturaCompra();
+        }
+
+        async function subirFacturaDraftSiExiste() {
+            if (!facturaCompraDraft || !facturaCompraDraft.archivo) {
+                return { success: true, usada: false };
+            }
+
+            const fd = new FormData();
+            fd.append('proveedor', facturaCompraDraft.proveedor || '');
+            fd.append('fecha_factura', facturaCompraDraft.fecha_factura || '');
+            fd.append('numero_factura', facturaCompraDraft.folio || '');
+            fd.append('monto_total', facturaCompraDraft.monto_total || '0');
+            fd.append('observacion', facturaCompraDraft.observacion || '');
+            fd.append('archivos', facturaCompraDraft.archivo);
+
+            const response = await fetch('/api/facturas/subir', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) throw new Error(data.error || 'No se pudo finalizar la lista');
+                body: fd,
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo subir la factura');
+            }
+            return { success: true, usada: true, data: data };
+        }
+
+        async function confirmarFinalizarCompras() {
+            if (!previewFinalizarCompras) {
+                alert('Aun no termina de cargarse la previsualizacion.');
+                return;
+            }
+            const resumen = previewFinalizarCompras.resumen || {};
+            if (Number(resumen.aplicables || 0) <= 0) {
+                alert('No hay items aplicables para sumar stock.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-confirmar-finalizar-compras');
+            const txtOriginal = btn ? btn.textContent : '';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Procesando...';
+                }
+
+                let facturaSubida = null;
+                if (facturaCompraDraft && facturaCompraDraft.archivo) {
+                    facturaSubida = await subirFacturaDraftSiExiste();
+                }
+
+                const payload = {
+                    aplicar_stock: true,
+                    factura: facturaCompraDraft ? {
+                        proveedor: facturaCompraDraft.proveedor || '',
+                        fecha_factura: facturaCompraDraft.fecha_factura || '',
+                        numero_factura: facturaCompraDraft.folio || '',
+                        monto_total: facturaCompraDraft.monto_total || '',
+                        observacion: facturaCompraDraft.observacion || '',
+                        creada: !!(facturaSubida && facturaSubida.usada),
+                    } : null,
+                };
+
+                const response = await fetch('/api/compras-pendientes/finalizar', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo finalizar la lista');
+                }
+
                 renderComprasPendientes(data.items || [], data.resumen || resumenPendientesVacio());
-            })
-            .catch(err => alert('[ERROR] ' + err.message));
+                facturaCompraDraft = null;
+                previewFinalizarCompras = null;
+                const archivoInput = document.getElementById('factura-compra-archivo');
+                if (archivoInput) archivoInput.value = '';
+                cerrarModalFacturaCompra();
+                cerrarModalFinalizarCompras();
+
+                const aplicados = Array.isArray(data.aplicados) ? data.aplicados.length : 0;
+                const noAplicados = Number(data.pendientes_no_aplicados || 0);
+                alert(`Stock actualizado para ${aplicados} item(s). ${noAplicados > 0 ? `Quedaron ${noAplicados} item(s) sin aplicar en la lista.` : ''}`);
+            } catch (err) {
+                alert('[ERROR] ' + (err.message || 'No se pudo finalizar compras'));
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = txtOriginal || 'Aplicar stock y finalizar';
+                }
+            }
+        }
+
+        function finalizarListaPendiente() {
+            abrirModalFinalizarCompras();
         }
 
         // FUNCIONES DE PESTAÑAS
@@ -4823,5 +5120,3 @@ function calcularTotales() {
 <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
 </body>
 </html>
-
-
