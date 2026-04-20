@@ -122,10 +122,10 @@
                                 <div class="stat-value" id="fin-auto-online">$0</div>
                                 <div class="stat-meta">Canal web</div>
                             </div>
-                            <div class="stat">
+                            <div class="stat stat-clickable" id="fin-apps-card">
                                 <div class="stat-label">Uber + Pedidos Ya</div>
                                 <div class="stat-value" id="fin-manual-apps">$0</div>
-                                <div class="stat-meta">Carga semanal manual</div>
+                                <div class="stat-meta">Doble click para ver desglose</div>
                             </div>
                             <div class="stat">
                                 <div class="stat-label">Total</div>
@@ -304,12 +304,47 @@
         </div>
     </div>
 
+    <div id="fin-apps-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-apps-title" style="width:min(900px,100%);">
+            <div class="modal-head">
+                <div id="fin-apps-title" class="modal-title">Desglose Uber + Pedidos Ya</div>
+                <button type="button" class="btn btn-muted" id="fin-apps-close">Cerrar</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-grid">
+                    <div class="field">
+                        <label>Filtro</label>
+                        <select id="fin-apps-filter-mode" style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px;">
+                            <option value="last30">Ultimos 30 dias</option>
+                            <option value="custom">Fecha personalizada</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Desde</label>
+                        <input type="date" id="fin-apps-desde">
+                    </div>
+                    <div class="field">
+                        <label>Hasta</label>
+                        <input type="date" id="fin-apps-hasta">
+                    </div>
+                    <div class="field" style="display:flex; align-items:flex-end;">
+                        <button type="button" class="btn btn-primary" id="fin-apps-apply">Aplicar filtro</button>
+                    </div>
+                </div>
+                <div class="helper" id="fin-apps-summary">Cargando desglose...</div>
+                <div class="table-wrap" id="fin-apps-table-root">
+                    <div class="empty">Cargando desglose...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const initialData = {
             resumen: {{ (resumen_finanzas or {})|tojson }},
             semanas: {{ (semanas_finanzas or [])|tojson }}
         };
-        const state = { data: initialData, chart: null, egresos: [] };
+        const state = { data: initialData, chart: null, egresos: [], appsRows: [] };
 
         function money(value) {
             const n = Number(value || 0);
@@ -550,6 +585,99 @@
             modal.setAttribute('aria-hidden', 'true');
         }
 
+        function openAppsModal() {
+            const modal = document.getElementById('fin-apps-modal');
+            const mode = document.getElementById('fin-apps-filter-mode');
+            const desde = document.getElementById('fin-apps-desde');
+            const hasta = document.getElementById('fin-apps-hasta');
+            const now = new Date();
+            const end = now.toISOString().slice(0, 10);
+            const startDate = new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000));
+            const start = startDate.toISOString().slice(0, 10);
+            if (mode) mode.value = 'last30';
+            if (desde) desde.value = start;
+            if (hasta) hasta.value = end;
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            loadAppsBreakdown().catch((error) => {
+                const root = document.getElementById('fin-apps-table-root');
+                const summary = document.getElementById('fin-apps-summary');
+                if (summary) summary.textContent = 'No se pudo cargar desglose.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        }
+
+        function closeAppsModal() {
+            const modal = document.getElementById('fin-apps-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function renderAppsBreakdown() {
+            const root = document.getElementById('fin-apps-table-root');
+            const summary = document.getElementById('fin-apps-summary');
+            if (!root || !summary) return;
+            const rows = Array.isArray(state.appsRows) ? state.appsRows : [];
+            if (!rows.length) {
+                summary.textContent = 'Sin registros en el rango seleccionado.';
+                root.innerHTML = '<div class="empty">No hay registros de Uber/PedidosYa en este rango.</div>';
+                return;
+            }
+            const totalUber = rows.reduce((s, r) => s + Number(r.ventas_uber || 0), 0);
+            const totalPedidos = rows.reduce((s, r) => s + Number(r.ventas_pedidosya || 0), 0);
+            const total = rows.reduce((s, r) => s + Number(r.total_apps || 0), 0);
+            summary.textContent = `Registros: ${rows.length} | Uber: ${money(totalUber)} | Pedidos Ya: ${money(totalPedidos)} | Total: ${money(total)}`;
+            const body = rows.map((r) => `
+                <tr>
+                    <td><span class="week">${escapeHtml(r.semana_inicio || '-')}</span><br><small>${escapeHtml(r.semana_fin || '-')}</small></td>
+                    <td>${money(r.ventas_uber || 0)}</td>
+                    <td>${money(r.ventas_pedidosya || 0)}</td>
+                    <td><strong>${money(r.total_apps || 0)}</strong></td>
+                </tr>
+            `).join('');
+            root.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha / Semana</th>
+                            <th>Uber</th>
+                            <th>Pedidos Ya</th>
+                            <th>Total apps</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
+        async function loadAppsBreakdown() {
+            const mode = (document.getElementById('fin-apps-filter-mode')?.value || 'last30').trim();
+            const desdeInput = document.getElementById('fin-apps-desde');
+            const hastaInput = document.getElementById('fin-apps-hasta');
+            const now = new Date();
+            const end = now.toISOString().slice(0, 10);
+            const startDate = new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000));
+            const start = startDate.toISOString().slice(0, 10);
+            let desde = start;
+            let hasta = end;
+            if (mode === 'custom') {
+                desde = (desdeInput?.value || '').trim() || start;
+                hasta = (hastaInput?.value || '').trim() || end;
+            } else {
+                if (desdeInput) desdeInput.value = start;
+                if (hastaInput) hastaInput.value = end;
+            }
+            const response = await fetch(`/api/finanzas/apps-manuales-desglose?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`, {
+                headers: { Accept: 'application/json' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo cargar desglose de apps');
+            }
+            state.appsRows = Array.isArray(data.rows) ? data.rows : [];
+            renderAppsBreakdown();
+        }
+
         function renderEgresosHistory() {
             const root = document.getElementById('fin-egresos-table-root');
             if (!root) return;
@@ -757,6 +885,33 @@
             if (event.target?.id === 'fin-egresos-edit-modal') closeEgresosEditModal();
         });
         document.getElementById('fin-egresos-edit-form')?.addEventListener('submit', saveEgresoEdit);
+        document.getElementById('fin-apps-card')?.addEventListener('dblclick', openAppsModal);
+        document.getElementById('fin-apps-close')?.addEventListener('click', closeAppsModal);
+        document.getElementById('fin-apps-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-apps-modal') closeAppsModal();
+        });
+        document.getElementById('fin-apps-apply')?.addEventListener('click', () => {
+            loadAppsBreakdown().catch((error) => {
+                const root = document.getElementById('fin-apps-table-root');
+                const summary = document.getElementById('fin-apps-summary');
+                if (summary) summary.textContent = 'No se pudo cargar desglose.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        });
+        document.getElementById('fin-apps-filter-mode')?.addEventListener('change', () => {
+            const isCustom = (document.getElementById('fin-apps-filter-mode')?.value || '') === 'custom';
+            const desde = document.getElementById('fin-apps-desde');
+            const hasta = document.getElementById('fin-apps-hasta');
+            if (desde) desde.disabled = !isCustom;
+            if (hasta) hasta.disabled = !isCustom;
+        });
+        (() => {
+            const isCustom = (document.getElementById('fin-apps-filter-mode')?.value || '') === 'custom';
+            const desde = document.getElementById('fin-apps-desde');
+            const hasta = document.getElementById('fin-apps-hasta');
+            if (desde) desde.disabled = !isCustom;
+            if (hasta) hasta.disabled = !isCustom;
+        })();
 
         renderAll();
     </script>

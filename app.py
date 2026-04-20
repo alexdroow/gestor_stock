@@ -10495,6 +10495,69 @@ def api_finanzas_resumen_canales_manual_apps():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/api/finanzas/apps-manuales-desglose', methods=['GET'])
+def api_finanzas_apps_manuales_desglose():
+    try:
+        fecha_hasta = _parse_fecha_iso_ymd(
+            request.args.get("hasta") or datetime.now().strftime("%Y-%m-%d"),
+            "fecha hasta",
+        )
+        fecha_desde = _parse_fecha_iso_ymd(
+            request.args.get("desde") or (fecha_hasta - timedelta(days=29)).strftime("%Y-%m-%d"),
+            "fecha desde",
+        )
+        if fecha_desde > fecha_hasta:
+            return jsonify({"success": False, "error": "fecha desde no puede ser mayor que fecha hasta", "rows": []}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    semana_inicio,
+                    semana_fin,
+                    COALESCE(ventas_uber, 0) AS ventas_uber,
+                    COALESCE(ventas_pedidosya, 0) AS ventas_pedidosya
+                FROM ventas_semanales
+                WHERE date(semana_inicio) >= date(?)
+                  AND date(semana_inicio) <= date(?)
+                ORDER BY date(semana_inicio) DESC, id DESC
+                LIMIT 260
+                """,
+                (fecha_desde.strftime("%Y-%m-%d"), fecha_hasta.strftime("%Y-%m-%d")),
+            )
+            rows = []
+            for r in cursor.fetchall():
+                uber = round(max(0.0, float(r["ventas_uber"] or 0)), 2)
+                pedidos = round(max(0.0, float(r["ventas_pedidosya"] or 0)), 2)
+                rows.append(
+                    {
+                        "semana_inicio": r["semana_inicio"],
+                        "semana_fin": r["semana_fin"],
+                        "ventas_uber": uber,
+                        "ventas_pedidosya": pedidos,
+                        "total_apps": round(uber + pedidos, 2),
+                    }
+                )
+        finally:
+            conn.close()
+
+        resumen = {
+            "desde": fecha_desde.strftime("%Y-%m-%d"),
+            "hasta": fecha_hasta.strftime("%Y-%m-%d"),
+            "registros": len(rows),
+            "total_uber": round(sum(float(x.get("ventas_uber") or 0) for x in rows), 2),
+            "total_pedidosya": round(sum(float(x.get("ventas_pedidosya") or 0) for x in rows), 2),
+            "total_apps": round(sum(float(x.get("total_apps") or 0) for x in rows), 2),
+        }
+        return jsonify({"success": True, "rows": rows, "resumen": resumen})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e), "rows": []}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "rows": []}), 500
+
+
 @app.route('/api/finanzas/movimientos-manuales', methods=['POST'])
 def api_finanzas_movimientos_manuales():
     try:
