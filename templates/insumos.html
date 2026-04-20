@@ -1411,6 +1411,63 @@
             min-height: 42px;
         }
 
+        .calc-autocomplete-results {
+            margin-top: 8px;
+            max-height: 190px;
+            overflow: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
+            display: grid;
+            gap: 0;
+        }
+
+        .calc-autocomplete-option {
+            border: none;
+            border-bottom: 1px solid #f1f5f9;
+            background: transparent;
+            text-align: left;
+            width: 100%;
+            padding: 9px 10px;
+            font-size: 13px;
+            color: #334155;
+            cursor: pointer;
+        }
+
+        .calc-autocomplete-option:hover {
+            background: #fff7ed;
+            color: #9a3412;
+        }
+
+        .calc-autocomplete-option:last-child {
+            border-bottom: none;
+        }
+
+        .calc-selected-chip {
+            margin-top: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border: 1px solid #fed7aa;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .calc-selected-chip button {
+            border: none;
+            border-radius: 999px;
+            background: #fee2e2;
+            color: #991b1b;
+            cursor: pointer;
+            font-size: 11px;
+            padding: 2px 8px;
+            font-weight: 700;
+        }
+
         .recetas-calc-list {
             margin-top: 10px;
             display: flex;
@@ -1558,11 +1615,78 @@
     line-height: 1;
     margin: 0;
 }
+
+.insumo-calc-buscar {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    height: 44px;
+    box-sizing: border-box;
+    line-height: 1;
+    margin: 0;
+}
+
+.insumo-calc-sugerencias {
+    margin-top: 6px;
+    max-height: 150px;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.insumo-calc-sugerencias button {
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 7px 9px;
+    background: transparent;
+    font-size: 12px;
+    color: #334155;
+    cursor: pointer;
+}
+
+.insumo-calc-sugerencias button:last-child {
+    border-bottom: none;
+}
+
+.insumo-calc-sugerencias button:hover {
+    background: #fff7ed;
+    color: #9a3412;
+}
         
         body.dark-mode .select-insumo-calc {
             background: #334155;
             border-color: #475569;
             color: #f1f5f9;
+        }
+
+        body.dark-mode .calc-autocomplete-results,
+        body.dark-mode .insumo-calc-sugerencias {
+            background: #0f172a;
+            border-color: #334155;
+        }
+
+        body.dark-mode .calc-autocomplete-option,
+        body.dark-mode .insumo-calc-sugerencias button {
+            color: #e2e8f0;
+            border-color: #1e293b;
+        }
+
+        body.dark-mode .calc-autocomplete-option:hover,
+        body.dark-mode .insumo-calc-sugerencias button:hover {
+            background: #1e293b;
+            color: #fdba74;
+        }
+
+        body.dark-mode .calc-selected-chip {
+            background: #3f2b0a;
+            border-color: #92400e;
+            color: #fdba74;
         }
 
         .pendientes-card {
@@ -2443,7 +2567,9 @@
                                         <div class="form-group recetas-select-wrap" style="margin:0;">
                                             <label for="ajuste-costeo-buscar">Buscar insumo</label>
                                             <input type="text" id="ajuste-costeo-buscar" placeholder="Ej: azucar, harina, huevos..." oninput="filtrarAjusteCosteoInsumos()">
-                                            <select id="ajuste-costeo-select" style="margin-top:8px;" onchange="cargarAjusteCosteoSeleccion()"></select>
+                                            <input type="hidden" id="ajuste-costeo-insumo-id" value="">
+                                            <div id="ajuste-costeo-resultados" class="calc-autocomplete-results" style="display:none;"></div>
+                                            <div id="ajuste-costeo-seleccion" class="calc-selected-chip" style="display:none;"></div>
                                         </div>
                                     </div>
                                     <div class="costeo-ajuste-grid">
@@ -2492,7 +2618,9 @@
                                     <div class="form-group recetas-select-wrap" style="margin:0;">
                                         <label for="calc-receta-buscar">Buscar receta (palabra clave)</label>
                                         <input type="text" id="calc-receta-buscar" placeholder="Ej: queque, bizcocho, brownie..." oninput="filtrarRecetasCalculo()">
-                                        <select id="calc-receta-select" style="margin-top:8px;"></select>
+                                        <input type="hidden" id="calc-receta-id" value="">
+                                        <div id="calc-receta-resultados" class="calc-autocomplete-results" style="display:none;"></div>
+                                        <div id="calc-receta-seleccion" class="calc-selected-chip" style="display:none;"></div>
                                     </div>
                                     <div class="form-group" style="margin:0;">
                                         <label for="calc-receta-lotes">Lotes</label>
@@ -3725,21 +3853,80 @@ let insumosData = [
         let previewFinalizarCompras = null;
         let facturaCompraDraft = null;
 
+        function normalizarTextoBusqueda(valor) {
+            return String(valor || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+        }
+
         function filtrarRecetasCalculo() {
             const input = document.getElementById('calc-receta-buscar');
-            const select = document.getElementById('calc-receta-select');
-            if (!select) return;
-            const q = String(input ? input.value : '').trim().toLowerCase();
+            const resultadosWrap = document.getElementById('calc-receta-resultados');
+            if (!resultadosWrap) return;
+            const qRaw = String(input ? input.value : '').trim();
+            const q = normalizarTextoBusqueda(qRaw);
+            if (!q) {
+                resultadosWrap.style.display = 'none';
+                resultadosWrap.innerHTML = '';
+                return;
+            }
             const resultados = recetasCalculoData
-                .filter(r => {
-                    const nombre = String((r && r.nombre) || '').toLowerCase();
-                    return !q || nombre.includes(q);
-                })
+                .filter(r => normalizarTextoBusqueda((r && r.nombre) || '').includes(q))
                 .slice(0, 40);
 
-            let html = '<option value="">-- Seleccionar receta --</option>';
-            html += resultados.map(r => `<option value="${r.id}">${escapeHtml(r.nombre || ('Receta ' + r.id))}</option>`).join('');
-            select.innerHTML = html;
+            if (!resultados.length) {
+                resultadosWrap.style.display = 'grid';
+                resultadosWrap.innerHTML = '<button type="button" class="calc-autocomplete-option" disabled>Sin coincidencias</button>';
+                return;
+            }
+
+            resultadosWrap.style.display = 'grid';
+            resultadosWrap.innerHTML = resultados.map(r => `
+                <button type="button" class="calc-autocomplete-option" onclick="seleccionarRecetaCalculo(${Number(r.id || 0)})">
+                    ${escapeHtml(r.nombre || ('Receta ' + r.id))}
+                </button>
+            `).join('');
+        }
+
+        function limpiarSeleccionRecetaCalculo() {
+            const hidden = document.getElementById('calc-receta-id');
+            const wrap = document.getElementById('calc-receta-seleccion');
+            const input = document.getElementById('calc-receta-buscar');
+            if (hidden) hidden.value = '';
+            if (wrap) {
+                wrap.style.display = 'none';
+                wrap.innerHTML = '';
+            }
+            if (input) input.value = '';
+            const resultadosWrap = document.getElementById('calc-receta-resultados');
+            if (resultadosWrap) {
+                resultadosWrap.style.display = 'none';
+                resultadosWrap.innerHTML = '';
+            }
+        }
+
+        function seleccionarRecetaCalculo(recetaId) {
+            const receta = recetasCalculoMap[String(recetaId || '')];
+            if (!receta) return;
+            const hidden = document.getElementById('calc-receta-id');
+            const wrap = document.getElementById('calc-receta-seleccion');
+            const input = document.getElementById('calc-receta-buscar');
+            if (hidden) hidden.value = String(receta.id);
+            if (input) input.value = String(receta.nombre || '');
+            if (wrap) {
+                wrap.style.display = 'inline-flex';
+                wrap.innerHTML = `
+                    <span>${escapeHtml(receta.nombre || ('Receta ' + receta.id))}</span>
+                    <button type="button" onclick="limpiarSeleccionRecetaCalculo()">Cambiar</button>
+                `;
+            }
+            const resultadosWrap = document.getElementById('calc-receta-resultados');
+            if (resultadosWrap) {
+                resultadosWrap.style.display = 'none';
+                resultadosWrap.innerHTML = '';
+            }
         }
 
         function formatearCLP(valor) {
@@ -3940,32 +4127,78 @@ let insumosData = [
 
         function filtrarAjusteCosteoInsumos() {
             const input = document.getElementById('ajuste-costeo-buscar');
-            const select = document.getElementById('ajuste-costeo-select');
-            if (!select) return;
-            const q = String(input ? input.value : '').trim().toLowerCase();
-            const prev = String(select.value || '');
-            const lista = [...insumosData]
-                .filter(i => {
-                    const nombre = String(i.nombre || '').toLowerCase();
-                    return !q || nombre.includes(q);
-                })
-                .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
-                .slice(0, 120);
-
-            let html = '<option value="">-- Seleccionar insumo --</option>';
-            html += lista.map(i => `<option value="${i.id}">${escapeHtml(i.nombre || ('Insumo ' + i.id))}</option>`).join('');
-            select.innerHTML = html;
-            if (prev && [...select.options].some(o => String(o.value) === prev)) {
-                select.value = prev;
-            } else if (select.options.length > 1) {
-                select.selectedIndex = 1;
+            const resultadosWrap = document.getElementById('ajuste-costeo-resultados');
+            if (!resultadosWrap) return;
+            const qRaw = String(input ? input.value : '').trim();
+            const q = normalizarTextoBusqueda(qRaw);
+            if (!q) {
+                resultadosWrap.style.display = 'none';
+                resultadosWrap.innerHTML = '';
+                return;
             }
+            const lista = [...insumosData]
+                .filter(i => normalizarTextoBusqueda(i.nombre || '').includes(q))
+                .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
+                .slice(0, 60);
+            if (!lista.length) {
+                resultadosWrap.style.display = 'grid';
+                resultadosWrap.innerHTML = '<button type="button" class="calc-autocomplete-option" disabled>Sin coincidencias</button>';
+                return;
+            }
+            resultadosWrap.style.display = 'grid';
+            resultadosWrap.innerHTML = lista.map(i => `
+                <button type="button" class="calc-autocomplete-option" onclick="seleccionarAjusteCosteoInsumo(${Number(i.id || 0)})">
+                    ${escapeHtml(i.nombre || ('Insumo ' + i.id))}
+                </button>
+            `).join('');
+        }
+
+        function limpiarSeleccionAjusteCosteo() {
+            const hidden = document.getElementById('ajuste-costeo-insumo-id');
+            const wrap = document.getElementById('ajuste-costeo-seleccion');
+            const input = document.getElementById('ajuste-costeo-buscar');
+            const resultadosWrap = document.getElementById('ajuste-costeo-resultados');
+            if (hidden) hidden.value = '';
+            if (wrap) {
+                wrap.style.display = 'none';
+                wrap.innerHTML = '';
+            }
+            if (input) input.value = '';
+            if (resultadosWrap) {
+                resultadosWrap.style.display = 'none';
+                resultadosWrap.innerHTML = '';
+            }
+            setAjusteCosteoMsg('');
+        }
+
+        function seleccionarAjusteCosteoInsumo(insumoId) {
+            const ins = insumosData.find(i => Number(i.id) === Number(insumoId));
+            if (!ins) return;
+            const hidden = document.getElementById('ajuste-costeo-insumo-id');
+            const wrap = document.getElementById('ajuste-costeo-seleccion');
+            const input = document.getElementById('ajuste-costeo-buscar');
+            const resultadosWrap = document.getElementById('ajuste-costeo-resultados');
+            if (hidden) hidden.value = String(ins.id);
+            if (input) input.value = String(ins.nombre || '');
+            if (wrap) {
+                wrap.style.display = 'inline-flex';
+                wrap.innerHTML = `
+                    <span>${escapeHtml(ins.nombre || ('Insumo ' + ins.id))}</span>
+                    <button type="button" onclick="limpiarSeleccionAjusteCosteo()">Cambiar</button>
+                `;
+            }
+            if (resultadosWrap) {
+                resultadosWrap.style.display = 'none';
+                resultadosWrap.innerHTML = '';
+            }
+            cargarAjusteCosteoSeleccion();
         }
 
         function cargarAjusteCosteoSeleccion() {
-            const select = document.getElementById('ajuste-costeo-select');
-            if (!select || !select.value) return;
-            const ins = insumosData.find(i => Number(i.id) === Number(select.value));
+            const hidden = document.getElementById('ajuste-costeo-insumo-id');
+            const insumoId = Number((hidden && hidden.value) || 0);
+            if (!insumoId) return;
+            const ins = insumosData.find(i => Number(i.id) === insumoId);
             if (!ins) return;
             const precioEl = document.getElementById('ajuste-costeo-precio');
             const cantidadEl = document.getElementById('ajuste-costeo-cantidad');
@@ -4024,25 +4257,18 @@ let insumosData = [
         function refrescarOpcionesInsumoCalculo(insumoId) {
             const ins = insumosData.find(i => Number(i.id) === Number(insumoId));
             if (!ins) return;
-            const nuevoPrecio = precioUnitarioEfectivoCalculo(ins);
-            const unidad = ins.unidad_compra || ins.unidad || 'unidad';
-            const texto = `${ins.nombre} (${etiquetaPrecioInsumoCalculo(ins)})`;
-            document.querySelectorAll('.select-insumo-calc').forEach(sel => {
-                const op = [...sel.options].find(o => Number(o.value) === Number(insumoId));
-                if (!op) return;
-                op.dataset.precio = String(nuevoPrecio || 0);
-                op.dataset.unidad = unidad;
-                op.textContent = texto;
-                if (Number(sel.value) === Number(insumoId)) {
-                    const idx = Number(String(sel.id || '').replace('select-', ''));
-                    if (Number.isFinite(idx)) actualizarFilaCalculo(idx);
-                }
+            filasCalculo.forEach((fila, idx) => {
+                if (!fila || Number(fila.insumoId || 0) !== Number(insumoId)) return;
+                const input = document.getElementById('insumo-buscar-' + idx);
+                if (input) input.value = String(ins.nombre || '');
+                actualizarFilaCalculo(idx);
             });
         }
 
         async function guardarAjusteCosteoSeleccion() {
-            const select = document.getElementById('ajuste-costeo-select');
-            if (!select || !select.value) {
+            const hidden = document.getElementById('ajuste-costeo-insumo-id');
+            const insumoId = Number((hidden && hidden.value) || 0);
+            if (!insumoId) {
                 setAjusteCosteoMsg('Selecciona un insumo.', true);
                 return;
             }
@@ -4057,7 +4283,6 @@ let insumosData = [
                 setAjusteCosteoMsg('Precio no puede ser negativo.', true);
                 return;
             }
-            const insumoId = Number(select.value);
             try {
                 await guardarAjusteCosteoInsumo(insumoId, {
                     precio_unitario: precio,
@@ -4144,11 +4369,11 @@ let insumosData = [
         }
 
         function agregarRecetaSeleccionCalculo() {
-            const select = document.getElementById('calc-receta-select');
+            const recetaIdEl = document.getElementById('calc-receta-id');
             const lotesEl = document.getElementById('calc-receta-lotes');
-            if (!select || !lotesEl) return;
+            if (!recetaIdEl || !lotesEl) return;
 
-            const recetaId = String(select.value || '').trim();
+            const recetaId = String(recetaIdEl.value || '').trim();
             const receta = recetasCalculoMap[recetaId];
             if (!receta) {
                 setMensajeRecetasCalculo('Selecciona una receta valida.', true);
@@ -4174,6 +4399,7 @@ let insumosData = [
 
             renderRecetasSeleccionCalculo();
             setMensajeRecetasCalculo('Receta agregada a la planificacion.');
+            limpiarSeleccionRecetaCalculo();
         }
 
         function eliminarRecetaSeleccionCalculo(index) {
@@ -4205,11 +4431,7 @@ let insumosData = [
             let idx = buscarFilaActivaPorInsumo(insumoId);
             if (idx < 0) {
                 idx = agregarFilaCalculo();
-                const select = document.getElementById('select-' + idx);
-                if (select) {
-                    select.value = String(insumoId);
-                    actualizarFilaCalculo(idx);
-                }
+                seleccionarInsumoFila(idx, insumoId);
             }
             const cantidadInput = document.getElementById('cantidad-' + idx);
             if (!cantidadInput) return;
@@ -4658,6 +4880,72 @@ let insumosData = [
             return '';
         }
         // CALCULADORA DE COMPRAS
+        function buscarInsumosCalculadora(query, limit = 24) {
+            const q = normalizarTextoBusqueda(query);
+            if (!q) return [];
+            return [...insumosData]
+                .filter(ins => {
+                    const nombre = normalizarTextoBusqueda(ins.nombre || '');
+                    const codigo = normalizarTextoBusqueda(ins.codigo_barra || '');
+                    const unidad = normalizarTextoBusqueda(ins.unidad || '');
+                    return nombre.includes(q) || codigo.includes(q) || unidad.includes(q);
+                })
+                .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
+                .slice(0, limit);
+        }
+
+        function renderSugerenciasInsumoFila(index) {
+            const input = document.getElementById('insumo-buscar-' + index);
+            const wrap = document.getElementById('insumo-sugerencias-' + index);
+            if (!input || !wrap) return;
+            const q = String(input.value || '').trim();
+            if (!q) {
+                wrap.style.display = 'none';
+                wrap.innerHTML = '';
+                return;
+            }
+            const lista = buscarInsumosCalculadora(q, 20);
+            if (!lista.length) {
+                wrap.style.display = 'block';
+                wrap.innerHTML = '<button type="button" disabled>Sin coincidencias</button>';
+                return;
+            }
+            wrap.style.display = 'block';
+            wrap.innerHTML = lista.map(ins => `
+                <button type="button" onclick="seleccionarInsumoFila(${index}, ${Number(ins.id || 0)})">
+                    ${escapeHtml(ins.nombre || ('Insumo ' + ins.id))} (${escapeHtml(etiquetaPrecioInsumoCalculo(ins))})
+                </button>
+            `).join('');
+        }
+
+        function seleccionarInsumoFila(index, insumoId) {
+            const insumo = insumosData.find(i => Number(i.id) === Number(insumoId));
+            if (!insumo) return;
+            const hidden = document.getElementById('insumo-id-' + index);
+            const input = document.getElementById('insumo-buscar-' + index);
+            const wrap = document.getElementById('insumo-sugerencias-' + index);
+            if (hidden) hidden.value = String(insumo.id);
+            if (input) input.value = String(insumo.nombre || '');
+            if (wrap) {
+                wrap.style.display = 'none';
+                wrap.innerHTML = '';
+            }
+            actualizarFilaCalculo(index);
+        }
+
+        function limpiarInsumoFila(index) {
+            const hidden = document.getElementById('insumo-id-' + index);
+            const input = document.getElementById('insumo-buscar-' + index);
+            const wrap = document.getElementById('insumo-sugerencias-' + index);
+            if (hidden) hidden.value = '';
+            if (input) input.value = '';
+            if (wrap) {
+                wrap.style.display = 'none';
+                wrap.innerHTML = '';
+            }
+            actualizarFilaCalculo(index);
+        }
+
         function agregarFilaCalculo() {
             const container = document.getElementById('lista-calculo');
             const index = filasCalculo.length;
@@ -4666,22 +4954,11 @@ let insumosData = [
             fila.className = 'insumo-calc-row';
             fila.id = 'fila-calc-' + index;
             
-            // Crear opciones del select
-            let opciones = '<option value="">-- Seleccionar insumo --</option>';
-            insumosData.forEach(ins => {
-                const unidadCompra = ins.unidad_compra || ins.unidad || '';
-                const precioEfectivo = precioUnitarioEfectivoCalculo(ins);
-                const precioText = etiquetaPrecioInsumoCalculo(ins);
-                opciones += `<option value="${ins.id}" data-precio="${precioEfectivo || 0}" data-unidad="${escapeHtml(unidadCompra)}">
-                    ${escapeHtml(ins.nombre)} (${escapeHtml(precioText)})
-                </option>`;
-            });
-            
 fila.innerHTML = `
-    <div style="display: flex; flex-direction: column; justify-content: center; height: 44px;">
-        <select class="select-insumo-calc" onchange="actualizarFilaCalculo(${index})" id="select-${index}">
-            ${opciones}
-        </select>
+    <div style="display: flex; flex-direction: column; justify-content: center;">
+        <input type="hidden" id="insumo-id-${index}" value="">
+        <input type="text" class="insumo-calc-buscar" id="insumo-buscar-${index}" placeholder="Escribe nombre o palabra clave..." oninput="renderSugerenciasInsumoFila(${index})">
+        <div class="insumo-calc-sugerencias" id="insumo-sugerencias-${index}" style="display:none;"></div>
         <div class="insumo-calc-precio" id="precio-info-${index}" style="margin-top: 2px; font-size: 11px; line-height: 1.2;">Selecciona un insumo</div>
     </div>
 
@@ -4696,6 +4973,7 @@ fila.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: flex-end; height: 44px;" class="insumo-calc-total" id="total-${index}">
         $0
     </div>
+    <button onclick="limpiarInsumoFila(${index})" class="btn-fila-pendiente" title="Cambiar insumo">Cambiar</button>
     <button onclick="agregarFilaCalculoAPendientes(${index})" class="btn-fila-pendiente" title="Agregar a pendientes">+</button>
     <button onclick="eliminarFilaCalculo(${index})" class="btn-remove-calc" title="Eliminar">&#215;</button>
 `;
@@ -4706,11 +4984,12 @@ fila.innerHTML = `
         }
 
         function actualizarFilaCalculo(index) {
-            const select = document.getElementById('select-' + index);
-            const option = select.options[select.selectedIndex];
+            const hidden = document.getElementById('insumo-id-' + index);
             const infoEl = document.getElementById('precio-info-' + index);
-            
-            if (!option.value) {
+
+            const insumoId = Number((hidden && hidden.value) || 0);
+            const insumo = insumosData.find(i => Number(i.id) === insumoId);
+            if (!insumo) {
                 if (infoEl) {
                     infoEl.textContent = 'Selecciona un insumo';
                     infoEl.classList.remove('warn');
@@ -4720,13 +4999,9 @@ fila.innerHTML = `
                 calcularTotales();
                 return;
             }
-            
-            const insumoId = parseInt(option.value, 10);
-            const precio = parseFloat(option.dataset.precio) || 0;
-            const unidadCompra = option.dataset.unidad || '';
-            
-const insumo = insumosData.find(i => i.id === insumoId);
-const nombre = insumo ? insumo.nombre : option.textContent.trim();
+            const precio = Number(precioUnitarioEfectivoCalculo(insumo) || 0);
+            const unidadCompra = insumo.unidad_compra || insumo.unidad || '';
+            const nombre = insumo ? insumo.nombre : ('Insumo ' + insumoId);
 filasCalculo[index] = {
     ...filasCalculo[index],
     insumoId: insumoId,
