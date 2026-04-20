@@ -62,6 +62,11 @@
         .modal-body { padding:14px 15px; display:grid; gap:10px; }
         .modal-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; }
         .modal-foot { padding:12px 15px; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end; }
+        .mini-btn { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:5px 9px; font-size:12px; font-weight:700; cursor:pointer; }
+        .mini-btn.warn { border-color:#fca5a5; color:#b91c1c; background:#fff1f2; }
+        .mini-btn:hover { border-color:#94a3b8; }
+        .stat-clickable { cursor:pointer; user-select:none; }
+        .stat-clickable:active { transform:scale(.99); }
         body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
         body.dark-mode .logo-text { color:#f8fafc; }
         body.dark-mode .nav-item { color:#94a3b8; }
@@ -143,6 +148,11 @@
                                 <div class="stat-label">Saldo a favor</div>
                                 <div class="stat-value positive" id="fin-saldo-favor">$0</div>
                                 <div class="stat-meta">Ganado - gastado + ingresos manuales</div>
+                            </div>
+                            <div class="stat stat-clickable" id="fin-egreso-card">
+                                <div class="stat-label">Egreso manual</div>
+                                <div class="stat-value negative" id="fin-egreso-manual">$0</div>
+                                <div class="stat-meta">Doble click para ver/editar/eliminar</div>
                             </div>
                         </div>
                     </div>
@@ -238,12 +248,68 @@
         </div>
     </div>
 
+    <div id="fin-egresos-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-egresos-title" style="width:min(880px,100%);">
+            <div class="modal-head">
+                <div id="fin-egresos-title" class="modal-title">Egresos manuales registrados</div>
+                <button type="button" class="btn btn-muted" id="fin-egresos-close">Cerrar</button>
+            </div>
+            <div class="modal-body">
+                <p class="helper">Puedes editar o eliminar cualquier egreso manual registrado.</p>
+                <div class="table-wrap" id="fin-egresos-table-root">
+                    <div class="empty">Cargando egresos manuales...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="fin-egresos-edit-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-egresos-edit-title">
+            <div class="modal-head">
+                <div id="fin-egresos-edit-title" class="modal-title">Editar movimiento manual</div>
+                <button type="button" class="btn btn-muted" id="fin-egresos-edit-close">Cerrar</button>
+            </div>
+            <form id="fin-egresos-edit-form" class="modal-body">
+                <input type="hidden" id="fin-egresos-edit-id">
+                <div class="modal-grid">
+                    <div class="field">
+                        <label>Tipo</label>
+                        <select id="fin-egresos-edit-tipo" style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px;">
+                            <option value="ingreso">Ingreso</option>
+                            <option value="egreso">Egreso</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Monto ($)</label>
+                        <input type="number" min="1" step="1" id="fin-egresos-edit-monto" required>
+                    </div>
+                    <div class="field">
+                        <label>Fecha</label>
+                        <input type="date" id="fin-egresos-edit-fecha" required>
+                    </div>
+                    <div class="field">
+                        <label>Categoria</label>
+                        <input type="text" id="fin-egresos-edit-categoria" maxlength="80">
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Descripcion</label>
+                    <input type="text" id="fin-egresos-edit-descripcion" maxlength="300">
+                </div>
+            </form>
+            <div class="modal-foot">
+                <button type="button" class="btn btn-muted" id="fin-egresos-edit-cancel">Cancelar</button>
+                <button type="submit" form="fin-egresos-edit-form" class="btn btn-primary" id="fin-egresos-edit-save">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const initialData = {
             resumen: {{ (resumen_finanzas or {})|tojson }},
             semanas: {{ (semanas_finanzas or [])|tojson }}
         };
-        const state = { data: initialData, chart: null };
+        const state = { data: initialData, chart: null, egresos: [] };
 
         function money(value) {
             const n = Number(value || 0);
@@ -277,6 +343,7 @@
             document.getElementById('fin-semanas').textContent = `${Number(resumen.semanas || semanas.length || 0)} semanas`;
             document.getElementById('fin-gasto-general').textContent = money(resumen.gasto_general || 0);
             document.getElementById('fin-gastado-total').textContent = money(resumen.gastado_total || 0);
+            document.getElementById('fin-egreso-manual').textContent = money(resumen.egreso_manual || 0);
             const saldoEl = document.getElementById('fin-saldo-favor');
             saldoEl.textContent = money(resumen.saldo_favor || 0);
             saldoEl.classList.remove('positive', 'negative');
@@ -448,6 +515,96 @@
             modal.setAttribute('aria-hidden', 'true');
         }
 
+        function openEgresosModal() {
+            const modal = document.getElementById('fin-egresos-modal');
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            loadEgresosHistory().catch((error) => {
+                const root = document.getElementById('fin-egresos-table-root');
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error cargando egresos')}</div>`;
+            });
+        }
+
+        function closeEgresosModal() {
+            const modal = document.getElementById('fin-egresos-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function openEgresosEditModal(item) {
+            const modal = document.getElementById('fin-egresos-edit-modal');
+            if (!modal || !item) return;
+            document.getElementById('fin-egresos-edit-id').value = String(item.id || '');
+            document.getElementById('fin-egresos-edit-tipo').value = String(item.tipo || 'egreso');
+            document.getElementById('fin-egresos-edit-monto').value = Number(item.monto || 0);
+            document.getElementById('fin-egresos-edit-fecha').value = String(item.fecha || '');
+            document.getElementById('fin-egresos-edit-categoria').value = String(item.categoria || '');
+            document.getElementById('fin-egresos-edit-descripcion').value = String(item.descripcion || '');
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeEgresosEditModal() {
+            const modal = document.getElementById('fin-egresos-edit-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function renderEgresosHistory() {
+            const root = document.getElementById('fin-egresos-table-root');
+            if (!root) return;
+            const rows = Array.isArray(state.egresos) ? state.egresos : [];
+            if (!rows.length) {
+                root.innerHTML = '<div class="empty">No hay egresos manuales en este rango.</div>';
+                return;
+            }
+            const body = rows.map((row) => `
+                <tr>
+                    <td>${escapeHtml(row.fecha || '-')}</td>
+                    <td>${escapeHtml((row.tipo || '').toString())}</td>
+                    <td><strong>${money(row.monto || 0)}</strong></td>
+                    <td>${escapeHtml(row.categoria || '-')}</td>
+                    <td>${escapeHtml(row.descripcion || '-')}</td>
+                    <td>
+                        <button type="button" class="mini-btn" onclick="finEditarMovimiento(${Number(row.id || 0)})">Editar</button>
+                        <button type="button" class="mini-btn warn" onclick="finEliminarMovimiento(${Number(row.id || 0)})">Eliminar</button>
+                    </td>
+                </tr>
+            `).join('');
+            root.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Monto</th>
+                            <th>Categoria</th>
+                            <th>Descripcion</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
+        async function loadEgresosHistory() {
+            const params = new URLSearchParams(window.location.search || '');
+            const qs = new URLSearchParams();
+            if (params.get('desde')) qs.set('desde', params.get('desde'));
+            if (params.get('hasta')) qs.set('hasta', params.get('hasta'));
+            qs.set('tipo', 'egreso');
+            const response = await fetch(`/api/finanzas/movimientos-manuales?${qs.toString()}`, {
+                headers: { Accept: 'application/json' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo cargar historial de egresos');
+            }
+            state.egresos = Array.isArray(data.movimientos) ? data.movimientos : [];
+            renderEgresosHistory();
+        }
+
         async function saveManual(event) {
             event.preventDefault();
             const btn = document.getElementById('fin-save-modal');
@@ -513,6 +670,65 @@
             }
         }
 
+        async function saveEgresoEdit(event) {
+            event.preventDefault();
+            const btn = document.getElementById('fin-egresos-edit-save');
+            const backup = btn.textContent;
+            try {
+                const id = Number(document.getElementById('fin-egresos-edit-id').value || 0);
+                if (!id) throw new Error('Movimiento invalido');
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+                const payload = {
+                    tipo: (document.getElementById('fin-egresos-edit-tipo').value || '').trim(),
+                    monto: Number(document.getElementById('fin-egresos-edit-monto').value || 0),
+                    fecha: (document.getElementById('fin-egresos-edit-fecha').value || '').trim(),
+                    categoria: (document.getElementById('fin-egresos-edit-categoria').value || '').trim(),
+                    descripcion: (document.getElementById('fin-egresos-edit-descripcion').value || '').trim()
+                };
+                const response = await fetch(`/api/finanzas/movimientos-manuales/${id}/actualizar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar movimiento');
+                }
+                closeEgresosEditModal();
+                await Promise.all([loadData(), loadEgresosHistory()]);
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = backup;
+            }
+        }
+
+        window.finEditarMovimiento = function (id) {
+            const rows = Array.isArray(state.egresos) ? state.egresos : [];
+            const item = rows.find((r) => Number(r.id || 0) === Number(id || 0));
+            if (!item) return;
+            openEgresosEditModal(item);
+        };
+
+        window.finEliminarMovimiento = async function (id) {
+            if (!confirm('Eliminar este movimiento manual?')) return;
+            try {
+                const response = await fetch(`/api/finanzas/movimientos-manuales/${Number(id || 0)}/eliminar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo eliminar movimiento');
+                }
+                await Promise.all([loadData(), loadEgresosHistory()]);
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            }
+        };
+
         document.getElementById('fin-open-modal')?.addEventListener('click', openModal);
         document.getElementById('fin-refresh')?.addEventListener('click', () => {
             loadData().catch((error) => alert('[ERROR] ' + error.message));
@@ -530,6 +746,17 @@
             if (event.target?.id === 'fin-mov-modal') closeMovModal();
         });
         document.getElementById('fin-mov-form')?.addEventListener('submit', saveMovement);
+        document.getElementById('fin-egreso-card')?.addEventListener('dblclick', openEgresosModal);
+        document.getElementById('fin-egresos-close')?.addEventListener('click', closeEgresosModal);
+        document.getElementById('fin-egresos-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-egresos-modal') closeEgresosModal();
+        });
+        document.getElementById('fin-egresos-edit-close')?.addEventListener('click', closeEgresosEditModal);
+        document.getElementById('fin-egresos-edit-cancel')?.addEventListener('click', closeEgresosEditModal);
+        document.getElementById('fin-egresos-edit-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-egresos-edit-modal') closeEgresosEditModal();
+        });
+        document.getElementById('fin-egresos-edit-form')?.addEventListener('submit', saveEgresoEdit);
 
         renderAll();
     </script>

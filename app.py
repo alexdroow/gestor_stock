@@ -10546,6 +10546,125 @@ def api_finanzas_movimientos_manuales():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/api/finanzas/movimientos-manuales', methods=['GET'])
+def api_finanzas_movimientos_manuales_listar():
+    try:
+        fecha_hasta = _parse_fecha_iso_ymd(
+            request.args.get("hasta") or datetime.now().strftime("%Y-%m-%d"),
+            "fecha hasta",
+        ).strftime("%Y-%m-%d")
+        fecha_desde = _parse_fecha_iso_ymd(
+            request.args.get("desde") or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
+            "fecha desde",
+        ).strftime("%Y-%m-%d")
+        tipo = str(request.args.get("tipo") or "").strip().lower()
+        where_tipo = ""
+        params = [fecha_desde, fecha_hasta]
+        if tipo in {"ingreso", "egreso"}:
+            where_tipo = "AND LOWER(TRIM(COALESCE(tipo, ''))) = ?"
+            params.append(tipo)
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                f"""
+                SELECT id, fecha, tipo, monto, categoria, descripcion, creado
+                FROM finanzas_movimientos_manuales
+                WHERE date(fecha) >= date(?)
+                  AND date(fecha) <= date(?)
+                  {where_tipo}
+                ORDER BY date(fecha) DESC, id DESC
+                LIMIT 500
+                """,
+                tuple(params),
+            )
+            rows = [dict(r) for r in cursor.fetchall()]
+        finally:
+            conn.close()
+        return jsonify({"success": True, "movimientos": rows})
+    except ValueError as e:
+        return jsonify({"success": False, "movimientos": [], "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "movimientos": [], "error": str(e)}), 500
+
+
+@app.route('/api/finanzas/movimientos-manuales/<int:movimiento_id>/actualizar', methods=['POST'])
+def api_finanzas_movimientos_manuales_actualizar(movimiento_id):
+    try:
+        payload = request.get_json(silent=True) or {}
+        fecha = _parse_fecha_iso_ymd(payload.get("fecha") or datetime.now().strftime("%Y-%m-%d"), "fecha").strftime("%Y-%m-%d")
+        tipo = str(payload.get("tipo") or "").strip().lower()
+        if tipo not in {"ingreso", "egreso"}:
+            return jsonify({"success": False, "error": "Tipo invalido. Usa ingreso o egreso"}), 400
+        monto = max(0.0, float(payload.get("monto") or 0))
+        if monto <= 0:
+            return jsonify({"success": False, "error": "Monto debe ser mayor a 0"}), 400
+        categoria = str(payload.get("categoria") or "").strip()[:80] or None
+        descripcion = str(payload.get("descripcion") or "").strip()[:300] or None
+
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT id FROM finanzas_movimientos_manuales WHERE id = ?",
+                (int(movimiento_id),),
+            )
+            if not cursor.fetchone():
+                return jsonify({"success": False, "error": "Movimiento no encontrado"}), 404
+            cursor.execute(
+                """
+                UPDATE finanzas_movimientos_manuales
+                SET fecha = ?, tipo = ?, monto = ?, categoria = ?, descripcion = ?
+                WHERE id = ?
+                """,
+                (fecha, tipo, monto, categoria, descripcion, int(movimiento_id)),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        try:
+            crear_backup()
+        except Exception as backup_error:
+            print(f"[WARN] No se pudo crear backup tras actualizar movimiento manual de finanzas: {backup_error}")
+
+        return jsonify({"success": True})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/finanzas/movimientos-manuales/<int:movimiento_id>/eliminar', methods=['POST'])
+def api_finanzas_movimientos_manuales_eliminar(movimiento_id):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT id FROM finanzas_movimientos_manuales WHERE id = ?",
+                (int(movimiento_id),),
+            )
+            if not cursor.fetchone():
+                return jsonify({"success": False, "error": "Movimiento no encontrado"}), 404
+            cursor.execute(
+                "DELETE FROM finanzas_movimientos_manuales WHERE id = ?",
+                (int(movimiento_id),),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        try:
+            crear_backup()
+        except Exception as backup_error:
+            print(f"[WARN] No se pudo crear backup tras eliminar movimiento manual de finanzas: {backup_error}")
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/ventas/desactivaciones-pendientes')
 def api_desactivaciones_pendientes_venta():
     try:
