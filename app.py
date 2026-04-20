@@ -10338,50 +10338,81 @@ def api_reportes_version_prueba_canales_resumen():
         return jsonify({"success": False, "data": {}, "error": str(e)}), 500
 
 
+def _guardar_resumen_manual_apps_semanal(payload):
+    data = payload or {}
+    fecha_ref = _parse_fecha_iso_ymd(
+        data.get("semana_inicio") or data.get("fecha") or datetime.now().strftime("%Y-%m-%d"),
+        "semana",
+    )
+    semana_inicio = _semana_lunes(fecha_ref).strftime("%Y-%m-%d")
+    ventas_uber = max(0.0, float(data.get("ventas_uber") or 0))
+    ventas_pedidosya = max(0.0, float(data.get("ventas_pedidosya") or 0))
+    notas = str(data.get("notas") or "").strip()[:500] or None
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT * FROM ventas_semanales WHERE semana_inicio = ? LIMIT 1",
+            (semana_inicio,),
+        )
+        existente = cursor.fetchone()
+    finally:
+        conn.close()
+
+    data_guardar = {
+        "semana_inicio": semana_inicio,
+        "ventas_local": float(existente["ventas_local"] or 0) if existente else 0.0,
+        "ventas_uber": ventas_uber,
+        "ventas_pedidosya": ventas_pedidosya,
+        "marketing_monto": float(existente["marketing_monto"] or 0) if existente else 0.0,
+        "otros_descuentos_monto": float(existente["otros_descuentos_monto"] or 0) if existente else 0.0,
+        "tasa_servicio_pct": float(existente["tasa_servicio_pct"] or 30) if existente else 30,
+        "impuesto_tasa_servicio_pct": float(existente["impuesto_tasa_servicio_pct"] or 19) if existente else 19,
+        "notas": notas if notas is not None else (str(existente["notas"] or "").strip()[:500] if existente else None),
+    }
+    resultado = guardar_venta_semanal(data_guardar)
+    if not resultado.get("success"):
+        raise ValueError(resultado.get("error", "No se pudo guardar"))
+    try:
+        crear_backup()
+    except Exception as backup_error:
+        print(f"[WARN] No se pudo crear backup tras guardar ventas apps manuales: {backup_error}")
+    return resultado.get("registro")
+
+
 @app.route('/api/reportes/version-prueba/canales-resumen/manual-apps', methods=['POST'])
 def api_reportes_version_prueba_manual_apps():
     try:
         payload = request.get_json(silent=True) or {}
-        fecha_ref = _parse_fecha_iso_ymd(
-            payload.get("semana_inicio") or payload.get("fecha") or datetime.now().strftime("%Y-%m-%d"),
-            "semana",
+        registro = _guardar_resumen_manual_apps_semanal(payload)
+        return jsonify({"success": True, "registro": registro})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/finanzas/resumen-canales')
+def api_finanzas_resumen_canales():
+    try:
+        data = _construir_reporte_version_prueba_canales(
+            fecha_desde_raw=request.args.get("desde"),
+            fecha_hasta_raw=request.args.get("hasta"),
         )
-        semana_inicio = _semana_lunes(fecha_ref).strftime("%Y-%m-%d")
-        ventas_uber = max(0.0, float(payload.get("ventas_uber") or 0))
-        ventas_pedidosya = max(0.0, float(payload.get("ventas_pedidosya") or 0))
-        notas = str(payload.get("notas") or "").strip()[:500] or None
+        return jsonify({"success": True, "data": data})
+    except ValueError as e:
+        return jsonify({"success": False, "data": {}, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "data": {}, "error": str(e)}), 500
 
-        conn = get_db()
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "SELECT * FROM ventas_semanales WHERE semana_inicio = ? LIMIT 1",
-                (semana_inicio,),
-            )
-            existente = cursor.fetchone()
-        finally:
-            conn.close()
 
-        data_guardar = {
-            "semana_inicio": semana_inicio,
-            "ventas_local": float(existente["ventas_local"] or 0) if existente else 0.0,
-            "ventas_uber": ventas_uber,
-            "ventas_pedidosya": ventas_pedidosya,
-            "marketing_monto": float(existente["marketing_monto"] or 0) if existente else 0.0,
-            "otros_descuentos_monto": float(existente["otros_descuentos_monto"] or 0) if existente else 0.0,
-            "tasa_servicio_pct": float(existente["tasa_servicio_pct"] or 30) if existente else 30,
-            "impuesto_tasa_servicio_pct": float(existente["impuesto_tasa_servicio_pct"] or 19) if existente else 19,
-            "notas": notas if notas is not None else (str(existente["notas"] or "").strip()[:500] if existente else None),
-        }
-        resultado = guardar_venta_semanal(data_guardar)
-        if not resultado.get("success"):
-            return jsonify({"success": False, "error": resultado.get("error", "No se pudo guardar")}), 400
-        try:
-            crear_backup()
-        except Exception as backup_error:
-            print(f"[WARN] No se pudo crear backup tras guardar ventas apps manuales: {backup_error}")
-
-        return jsonify({"success": True, "registro": resultado.get("registro")})
+@app.route('/api/finanzas/resumen-canales/manual-apps', methods=['POST'])
+def api_finanzas_resumen_canales_manual_apps():
+    try:
+        payload = request.get_json(silent=True) or {}
+        registro = _guardar_resumen_manual_apps_semanal(payload)
+        return jsonify({"success": True, "registro": registro})
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
@@ -11107,6 +11138,31 @@ def anular_venta(venta_id):
         return jsonify({'success': False, 'error': str(e)}), 404
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/finanzas')
+def finanzas():
+    try:
+        fecha_hasta = request.args.get('hasta') or datetime.now().strftime('%Y-%m-%d')
+        fecha_desde = request.args.get('desde') or (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        _parse_fecha_iso_ymd(fecha_desde, "fecha desde")
+        _parse_fecha_iso_ymd(fecha_hasta, "fecha hasta")
+        data = _construir_reporte_version_prueba_canales(
+            fecha_desde_raw=fecha_desde,
+            fecha_hasta_raw=fecha_hasta,
+        )
+        return render_template(
+            'finanzas.html',
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            resumen_finanzas=data.get("resumen") or {},
+            semanas_finanzas=data.get("semanas") or [],
+        )
+    except ValueError as e:
+        return _error_or_text(e, 400)
+    except Exception as e:
+        return _error_or_text(e, 500)
+
 
 @app.route('/reportes')
 def reportes():

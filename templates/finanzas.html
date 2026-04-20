@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanzas - Sucr&eacute;e Pasteler&iacute;a</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { box-sizing:border-box; margin:0; padding:0; }
+        :root { --primary:#f59e0b; --secondary:#f97316; }
+        body { font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:#f8fafc; color:#0f172a; }
+        .layout { display:flex; min-height:100vh; }
+        .main { margin-left:260px; width:calc(100vw - 260px); padding:26px 30px; }
+        .title { font-size:32px; font-weight:800; margin-bottom:4px; }
+        .subtitle { color:#64748b; margin-bottom:16px; }
+        .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; margin-bottom:14px; overflow:hidden; }
+        .card-head { padding:14px 16px; border-bottom:1px solid #e2e8f0; font-weight:700; }
+        .card-body { padding:14px 16px; }
+        .filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; align-items:end; }
+        .field label { display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px; text-transform:uppercase; }
+        .field input { width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px; }
+        .btn { border:none; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer; font-size:14px; }
+        .btn-primary { color:#fff; background:linear-gradient(135deg,var(--primary),var(--secondary)); }
+        .btn-muted { color:#334155; background:#f1f5f9; border:1px solid #e2e8f0; }
+        .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:12px; }
+        .stat { border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:12px; }
+        .stat-label { font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700; }
+        .stat-value { margin-top:6px; font-size:24px; font-weight:800; color:#0f172a; }
+        .stat-meta { margin-top:4px; font-size:12px; color:#64748b; }
+        .panel-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+        .chart-wrap { height:310px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:10px; margin-bottom:10px; }
+        .table-wrap { overflow:auto; }
+        .data-table { width:100%; min-width:900px; border-collapse:collapse; font-size:13px; }
+        .data-table th { text-align:left; padding:10px 11px; border-bottom:1px solid #e2e8f0; background:#f8fafc; color:#64748b; text-transform:uppercase; font-size:11px; }
+        .data-table td { padding:10px 11px; border-bottom:1px solid #f1f5f9; }
+        .week { font-weight:700; }
+        .pill { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:1px solid #fdba74; color:#9a3412; background:#fff7ed; font-size:11px; font-weight:700; padding:2px 8px; }
+        .pill.ok { border-color:#86efac; color:#166534; background:#f0fdf4; }
+        .helper { color:#64748b; font-size:13px; margin-bottom:10px; }
+        .empty { border:1px dashed #cbd5e1; background:#f8fafc; color:#64748b; border-radius:12px; text-align:center; padding:16px; }
+        .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:1200; padding:16px; }
+        .modal-bg.active { display:flex; }
+        .modal { width:min(560px,100%); border-radius:16px; border:1px solid #e2e8f0; background:#fff; overflow:hidden; box-shadow:0 20px 45px rgba(15,23,42,.25); }
+        .modal-head { padding:12px 15px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+        .modal-title { font-size:18px; font-weight:800; }
+        .modal-body { padding:14px 15px; display:grid; gap:10px; }
+        .modal-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; }
+        .modal-foot { padding:12px 15px; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end; }
+        @media (max-width:1024px) { .main { margin-left:240px; width:calc(100vw - 240px); padding:22px; } }
+        @media (max-width:768px) { .main { margin-left:0; width:100vw; padding:18px; } }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div class="layout">
+        {% include "_sidebar.html" %}
+        <main class="main">
+            <h1 class="title">Finanzas</h1>
+            <p class="subtitle">Panel simple y claro para controlar ventas autom&aacute;ticas de caja/web y carga manual de apps.</p>
+
+            <div class="card">
+                <div class="card-head">Rango de fechas</div>
+                <div class="card-body">
+                    <form class="filters" method="GET" action="/finanzas">
+                        <div class="field">
+                            <label>Desde</label>
+                            <input type="date" name="desde" value="{{ fecha_desde }}">
+                        </div>
+                        <div class="field">
+                            <label>Hasta</label>
+                            <input type="date" name="hasta" value="{{ fecha_hasta }}">
+                        </div>
+                        <button class="btn btn-primary" type="submit">Aplicar rango</button>
+                        <a class="btn btn-muted" href="/finanzas">Ultimos 30 dias</a>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">Resumen por canal</div>
+                <div class="card-body">
+                    <p class="helper">Presencial + tienda online se calculan desde ventas. Uber Eats y PedidosYa se cargan manualmente por semana.</p>
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-label">Auto presencial</div>
+                            <div class="stat-value" id="fin-auto-presencial">$0</div>
+                            <div class="stat-meta" id="fin-auto-ops">0 operaciones</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Auto tienda online</div>
+                            <div class="stat-value" id="fin-auto-online">$0</div>
+                            <div class="stat-meta">Canal web</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Manual Uber + PedidosYa</div>
+                            <div class="stat-value" id="fin-manual-apps">$0</div>
+                            <div class="stat-meta">Carga semanal manual</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Total combinado</div>
+                            <div class="stat-value" id="fin-total">$0</div>
+                            <div class="stat-meta" id="fin-semanas">0 semanas</div>
+                        </div>
+                    </div>
+
+                    <div class="panel-actions">
+                        <button type="button" class="btn btn-primary" id="fin-open-modal">Registrar Uber/PedidosYa semanal</button>
+                        <button type="button" class="btn btn-muted" id="fin-refresh">Actualizar panel</button>
+                    </div>
+
+                    <div class="chart-wrap">
+                        <canvas id="fin-chart"></canvas>
+                    </div>
+
+                    <div class="table-wrap" id="fin-table-root">
+                        <div class="empty">Cargando resumen semanal...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="fin-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-modal-title">
+            <div class="modal-head">
+                <div id="fin-modal-title" class="modal-title">Carga semanal de apps</div>
+                <button type="button" class="btn btn-muted" id="fin-close-modal">Cerrar</button>
+            </div>
+            <form id="fin-form" class="modal-body">
+                <p class="helper">Registra una vez por semana montos de Uber Eats y PedidosYa.</p>
+                <div class="modal-grid">
+                    <div class="field">
+                        <label>Semana referencia</label>
+                        <input type="date" id="fin-semana" required>
+                    </div>
+                    <div class="field">
+                        <label>Uber Eats ($)</label>
+                        <input type="number" min="0" step="1" id="fin-uber" value="0" required>
+                    </div>
+                    <div class="field">
+                        <label>PedidosYa ($)</label>
+                        <input type="number" min="0" step="1" id="fin-pedidosya" value="0" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Notas (opcional)</label>
+                    <input type="text" id="fin-notas" maxlength="500" placeholder="Ej: cierre semanal apps">
+                </div>
+            </form>
+            <div class="modal-foot">
+                <button type="button" class="btn btn-muted" id="fin-cancel-modal">Cancelar</button>
+                <button type="submit" form="fin-form" class="btn btn-primary" id="fin-save-modal">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const initialData = {
+            resumen: {{ (resumen_finanzas or {})|tojson }},
+            semanas: {{ (semanas_finanzas or [])|tojson }}
+        };
+        const state = { data: initialData, chart: null };
+
+        function money(value) {
+            const n = Number(value || 0);
+            return `$${Math.round(n).toLocaleString('es-CL')}`;
+        }
+
+        function escapeHtml(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function weekStart(dateIso) {
+            const source = dateIso ? new Date(`${dateIso}T00:00:00`) : new Date();
+            if (Number.isNaN(source.getTime())) return '';
+            const day = source.getDay();
+            const shift = day === 0 ? -6 : (1 - day);
+            source.setDate(source.getDate() + shift);
+            return source.toISOString().slice(0, 10);
+        }
+
+        function renderSummary() {
+            const resumen = state.data?.resumen || {};
+            const semanas = Array.isArray(state.data?.semanas) ? state.data.semanas : [];
+            document.getElementById('fin-auto-presencial').textContent = money(resumen.auto_presencial || 0);
+            document.getElementById('fin-auto-ops').textContent = `${Number(resumen.operaciones_auto || 0)} operaciones`;
+            document.getElementById('fin-auto-online').textContent = money(resumen.auto_tienda_online || 0);
+            document.getElementById('fin-manual-apps').textContent = money(resumen.manual_apps_total || 0);
+            document.getElementById('fin-total').textContent = money(resumen.total_combinado || 0);
+            document.getElementById('fin-semanas').textContent = `${Number(resumen.semanas || semanas.length || 0)} semanas`;
+        }
+
+        function renderTable() {
+            const root = document.getElementById('fin-table-root');
+            const rows = Array.isArray(state.data?.semanas) ? state.data.semanas : [];
+            if (!rows.length) {
+                root.innerHTML = '<div class="empty">No hay semanas registradas en el rango.</div>';
+                return;
+            }
+            const body = rows.map((row) => {
+                const loaded = Number(row.manual_apps_total || 0) > 0;
+                return `
+                    <tr>
+                        <td><span class="week">${escapeHtml(row.semana_inicio || '-')}</span><br><small>${escapeHtml(row.semana_fin || '-')}</small></td>
+                        <td>${money(row.auto_presencial || 0)}</td>
+                        <td>${money(row.auto_tienda_online || 0)}</td>
+                        <td><strong>${money(row.auto_total || 0)}</strong></td>
+                        <td>${money(row.manual_uber || 0)}</td>
+                        <td>${money(row.manual_pedidosya || 0)}</td>
+                        <td><span class="pill ${loaded ? 'ok' : ''}">${loaded ? 'Cargado' : 'Pendiente'}</span></td>
+                        <td><strong>${money(row.total_combinado || 0)}</strong></td>
+                    </tr>
+                `;
+            }).join('');
+            root.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Semana</th>
+                            <th>Presencial auto</th>
+                            <th>Tienda online auto</th>
+                            <th>Total auto</th>
+                            <th>Uber manual</th>
+                            <th>PedidosYa manual</th>
+                            <th>Estado</th>
+                            <th>Total combinado</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
+        function renderChart() {
+            const canvas = document.getElementById('fin-chart');
+            if (!canvas) return;
+            const rows = Array.isArray(state.data?.semanas) ? state.data.semanas : [];
+            if (state.chart) state.chart.destroy();
+            state.chart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: rows.map((r) => String(r.semana_inicio || '').slice(5)),
+                    datasets: [
+                        {
+                            label: 'Presencial + online (auto)',
+                            data: rows.map((r) => Number(r.auto_total || 0)),
+                            backgroundColor: '#0ea5e9',
+                            stack: 'total',
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Uber + PedidosYa (manual)',
+                            data: rows.map((r) => Number(r.manual_apps_total || 0)),
+                            backgroundColor: '#f59e0b',
+                            stack: 'total',
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+                }
+            });
+        }
+
+        function renderAll() {
+            renderSummary();
+            renderTable();
+            renderChart();
+        }
+
+        async function loadData() {
+            const params = new URLSearchParams(window.location.search || '');
+            const url = params.toString() ? `/api/finanzas/resumen-canales?${params.toString()}` : '/api/finanzas/resumen-canales';
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            const payload = await response.json();
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'No se pudo cargar finanzas');
+            }
+            state.data = payload.data || { resumen: {}, semanas: [] };
+            renderAll();
+        }
+
+        function openModal() {
+            const modal = document.getElementById('fin-modal');
+            const semana = document.getElementById('fin-semana');
+            semana.value = weekStart(new Date().toISOString().slice(0, 10));
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('fin-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        async function saveManual(event) {
+            event.preventDefault();
+            const btn = document.getElementById('fin-save-modal');
+            const backup = btn.textContent;
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+                const payload = {
+                    semana_inicio: weekStart(document.getElementById('fin-semana').value),
+                    ventas_uber: Number(document.getElementById('fin-uber').value || 0),
+                    ventas_pedidosya: Number(document.getElementById('fin-pedidosya').value || 0),
+                    notas: (document.getElementById('fin-notas').value || '').trim()
+                };
+                const response = await fetch('/api/finanzas/resumen-canales/manual-apps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar');
+                }
+                closeModal();
+                await loadData();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = backup;
+            }
+        }
+
+        document.getElementById('fin-open-modal')?.addEventListener('click', openModal);
+        document.getElementById('fin-refresh')?.addEventListener('click', () => {
+            loadData().catch((error) => alert('[ERROR] ' + error.message));
+        });
+        document.getElementById('fin-close-modal')?.addEventListener('click', closeModal);
+        document.getElementById('fin-cancel-modal')?.addEventListener('click', closeModal);
+        document.getElementById('fin-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-modal') closeModal();
+        });
+        document.getElementById('fin-form')?.addEventListener('submit', saveManual);
+
+        renderAll();
+    </script>
+    <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+    <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+</body>
+</html>
