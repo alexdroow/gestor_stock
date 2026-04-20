@@ -144,6 +144,11 @@
                                 <div class="stat-value negative" id="fin-gastado-total">$0</div>
                                 <div class="stat-meta">Facturas + egresos manuales</div>
                             </div>
+                            <div class="stat stat-clickable" id="fin-ingreso-card">
+                                <div class="stat-label">Ingreso manual</div>
+                                <div class="stat-value positive" id="fin-ingreso-manual">$0</div>
+                                <div class="stat-meta">Doble click para ver/editar/eliminar</div>
+                            </div>
                             <div class="stat">
                                 <div class="stat-label">Saldo a favor</div>
                                 <div class="stat-value positive" id="fin-saldo-favor">$0</div>
@@ -258,6 +263,49 @@
                 <p class="helper">Puedes editar o eliminar cualquier egreso manual registrado.</p>
                 <div class="table-wrap" id="fin-egresos-table-root">
                     <div class="empty">Cargando egresos manuales...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="fin-ingresos-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-ingresos-title" style="width:min(980px,100%);">
+            <div class="modal-head">
+                <div id="fin-ingresos-title" class="modal-title">Ingresos manuales registrados</div>
+                <button type="button" class="btn btn-muted" id="fin-ingresos-close">Cerrar</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-grid">
+                    <div class="field">
+                        <label>Filtrar por</label>
+                        <select id="fin-ingresos-filter-kind" style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px;">
+                            <option value="fecha">Fecha</option>
+                            <option value="semana">Semanas</option>
+                        </select>
+                    </div>
+                    <div class="field" id="fin-ingresos-fecha-desde-wrap">
+                        <label>Desde</label>
+                        <input type="date" id="fin-ingresos-desde">
+                    </div>
+                    <div class="field" id="fin-ingresos-fecha-hasta-wrap">
+                        <label>Hasta</label>
+                        <input type="date" id="fin-ingresos-hasta">
+                    </div>
+                    <div class="field" id="fin-ingresos-semana-desde-wrap" style="display:none;">
+                        <label>Semana desde</label>
+                        <input type="week" id="fin-ingresos-semana-desde">
+                    </div>
+                    <div class="field" id="fin-ingresos-semana-hasta-wrap" style="display:none;">
+                        <label>Semana hasta</label>
+                        <input type="week" id="fin-ingresos-semana-hasta">
+                    </div>
+                    <div class="field" style="display:flex; align-items:flex-end;">
+                        <button type="button" class="btn btn-primary" id="fin-ingresos-apply">Aplicar filtro</button>
+                    </div>
+                </div>
+                <div class="helper" id="fin-ingresos-summary">Cargando ingresos manuales...</div>
+                <div class="table-wrap" id="fin-ingresos-table-root">
+                    <div class="empty">Cargando ingresos manuales...</div>
                 </div>
             </div>
         </div>
@@ -386,7 +434,7 @@
             resumen: {{ (resumen_finanzas or {})|tojson }},
             semanas: {{ (semanas_finanzas or [])|tojson }}
         };
-        const state = { data: initialData, chart: null, egresos: [], appsRows: [], canalRows: [], canalActual: 'presencial' };
+        const state = { data: initialData, chart: null, egresos: [], ingresos: [], appsRows: [], canalRows: [], canalActual: 'presencial' };
 
         function money(value) {
             const n = Number(value || 0);
@@ -420,6 +468,7 @@
             document.getElementById('fin-semanas').textContent = `${Number(resumen.semanas || semanas.length || 0)} semanas`;
             document.getElementById('fin-gasto-general').textContent = money(resumen.gasto_general || 0);
             document.getElementById('fin-gastado-total').textContent = money(resumen.gastado_total || 0);
+            document.getElementById('fin-ingreso-manual').textContent = money(resumen.ingreso_manual || 0);
             document.getElementById('fin-egreso-manual').textContent = money(resumen.egreso_manual || 0);
             const saldoEl = document.getElementById('fin-saldo-favor');
             saldoEl.textContent = money(resumen.saldo_favor || 0);
@@ -606,6 +655,74 @@
             const modal = document.getElementById('fin-egresos-modal');
             modal.classList.remove('active');
             modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function dateToWeekInput(dateObj) {
+            const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+        }
+
+        function weekToDate(weekValue, endOfWeek = false) {
+            const m = /^(\d{4})-W(\d{2})$/.exec(String(weekValue || '').trim());
+            if (!m) return '';
+            const year = Number(m[1]);
+            const week = Number(m[2]);
+            if (!year || !week) return '';
+            const jan4 = new Date(Date.UTC(year, 0, 4));
+            const jan4Day = jan4.getUTCDay() || 7;
+            const monday = new Date(jan4);
+            monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + ((week - 1) * 7));
+            if (endOfWeek) monday.setUTCDate(monday.getUTCDate() + 6);
+            return monday.toISOString().slice(0, 10);
+        }
+
+        function openIngresosModal() {
+            const modal = document.getElementById('fin-ingresos-modal');
+            const filterKind = document.getElementById('fin-ingresos-filter-kind');
+            const desde = document.getElementById('fin-ingresos-desde');
+            const hasta = document.getElementById('fin-ingresos-hasta');
+            const semanaDesde = document.getElementById('fin-ingresos-semana-desde');
+            const semanaHasta = document.getElementById('fin-ingresos-semana-hasta');
+            const now = new Date();
+            const end = now.toISOString().slice(0, 10);
+            const startDate = new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000));
+            const start = startDate.toISOString().slice(0, 10);
+            if (filterKind) filterKind.value = 'fecha';
+            if (desde) desde.value = start;
+            if (hasta) hasta.value = end;
+            if (semanaDesde) semanaDesde.value = dateToWeekInput(startDate);
+            if (semanaHasta) semanaHasta.value = dateToWeekInput(now);
+            toggleIngresosFilterInputs();
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            loadIngresosHistory().catch((error) => {
+                const root = document.getElementById('fin-ingresos-table-root');
+                const summary = document.getElementById('fin-ingresos-summary');
+                if (summary) summary.textContent = 'No se pudo cargar ingresos manuales.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        }
+
+        function closeIngresosModal() {
+            const modal = document.getElementById('fin-ingresos-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function toggleIngresosFilterInputs() {
+            const kind = (document.getElementById('fin-ingresos-filter-kind')?.value || 'fecha').trim();
+            const isSemana = kind === 'semana';
+            const fechaDesde = document.getElementById('fin-ingresos-fecha-desde-wrap');
+            const fechaHasta = document.getElementById('fin-ingresos-fecha-hasta-wrap');
+            const semDesde = document.getElementById('fin-ingresos-semana-desde-wrap');
+            const semHasta = document.getElementById('fin-ingresos-semana-hasta-wrap');
+            if (fechaDesde) fechaDesde.style.display = isSemana ? 'none' : '';
+            if (fechaHasta) fechaHasta.style.display = isSemana ? 'none' : '';
+            if (semDesde) semDesde.style.display = isSemana ? '' : 'none';
+            if (semHasta) semHasta.style.display = isSemana ? '' : 'none';
         }
 
         function openEgresosEditModal(item) {
@@ -860,6 +977,48 @@
             `;
         }
 
+        function renderIngresosHistory() {
+            const root = document.getElementById('fin-ingresos-table-root');
+            const summary = document.getElementById('fin-ingresos-summary');
+            if (!root || !summary) return;
+            const rows = Array.isArray(state.ingresos) ? state.ingresos : [];
+            if (!rows.length) {
+                summary.textContent = 'No hay ingresos manuales en este rango.';
+                root.innerHTML = '<div class="empty">No hay ingresos manuales en este rango.</div>';
+                return;
+            }
+            const total = rows.reduce((s, r) => s + Number(r.monto || 0), 0);
+            summary.textContent = `Ingresos: ${rows.length} registro(s) | Total: ${money(total)}`;
+            const body = rows.map((row) => `
+                <tr>
+                    <td>${escapeHtml(row.fecha || '-')}</td>
+                    <td>${escapeHtml((row.tipo || '').toString())}</td>
+                    <td><strong>${money(row.monto || 0)}</strong></td>
+                    <td>${escapeHtml(row.categoria || '-')}</td>
+                    <td>${escapeHtml(row.descripcion || '-')}</td>
+                    <td>
+                        <button type="button" class="mini-btn" onclick="finEditarMovimiento(${Number(row.id || 0)})">Editar</button>
+                        <button type="button" class="mini-btn warn" onclick="finEliminarMovimiento(${Number(row.id || 0)})">Eliminar</button>
+                    </td>
+                </tr>
+            `).join('');
+            root.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Monto</th>
+                            <th>Categoria</th>
+                            <th>Descripcion</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
         async function loadEgresosHistory() {
             const params = new URLSearchParams(window.location.search || '');
             const qs = new URLSearchParams();
@@ -875,6 +1034,38 @@
             }
             state.egresos = Array.isArray(data.movimientos) ? data.movimientos : [];
             renderEgresosHistory();
+        }
+
+        async function loadIngresosHistory() {
+            const filterKind = (document.getElementById('fin-ingresos-filter-kind')?.value || 'fecha').trim();
+            let desde = '';
+            let hasta = '';
+            if (filterKind === 'semana') {
+                const semanaDesde = weekToDate(document.getElementById('fin-ingresos-semana-desde')?.value || '', false);
+                const semanaHasta = weekToDate(document.getElementById('fin-ingresos-semana-hasta')?.value || '', true);
+                desde = semanaDesde || '';
+                hasta = semanaHasta || '';
+            } else {
+                desde = (document.getElementById('fin-ingresos-desde')?.value || '').trim();
+                hasta = (document.getElementById('fin-ingresos-hasta')?.value || '').trim();
+            }
+            const now = new Date().toISOString().slice(0, 10);
+            const startDate = new Date(Date.now() - (29 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+            if (!desde) desde = startDate;
+            if (!hasta) hasta = now;
+            const qs = new URLSearchParams();
+            qs.set('tipo', 'ingreso');
+            qs.set('desde', desde);
+            qs.set('hasta', hasta);
+            const response = await fetch(`/api/finanzas/movimientos-manuales?${qs.toString()}`, {
+                headers: { Accept: 'application/json' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo cargar historial de ingresos');
+            }
+            state.ingresos = Array.isArray(data.movimientos) ? data.movimientos : [];
+            renderIngresosHistory();
         }
 
         async function saveManual(event) {
@@ -968,7 +1159,10 @@
                     throw new Error(data.error || 'No se pudo actualizar movimiento');
                 }
                 closeEgresosEditModal();
-                await Promise.all([loadData(), loadEgresosHistory()]);
+                const tasks = [loadData()];
+                if (document.getElementById('fin-egresos-modal')?.classList.contains('active')) tasks.push(loadEgresosHistory());
+                if (document.getElementById('fin-ingresos-modal')?.classList.contains('active')) tasks.push(loadIngresosHistory());
+                await Promise.all(tasks);
             } catch (error) {
                 alert('[ERROR] ' + error.message);
             } finally {
@@ -978,7 +1172,7 @@
         }
 
         window.finEditarMovimiento = function (id) {
-            const rows = Array.isArray(state.egresos) ? state.egresos : [];
+            const rows = [...(Array.isArray(state.egresos) ? state.egresos : []), ...(Array.isArray(state.ingresos) ? state.ingresos : [])];
             const item = rows.find((r) => Number(r.id || 0) === Number(id || 0));
             if (!item) return;
             openEgresosEditModal(item);
@@ -995,7 +1189,10 @@
                 if (!response.ok || !data.success) {
                     throw new Error(data.error || 'No se pudo eliminar movimiento');
                 }
-                await Promise.all([loadData(), loadEgresosHistory()]);
+                const tasks = [loadData()];
+                if (document.getElementById('fin-egresos-modal')?.classList.contains('active')) tasks.push(loadEgresosHistory());
+                if (document.getElementById('fin-ingresos-modal')?.classList.contains('active')) tasks.push(loadIngresosHistory());
+                await Promise.all(tasks);
             } catch (error) {
                 alert('[ERROR] ' + error.message);
             }
@@ -1029,6 +1226,20 @@
             if (event.target?.id === 'fin-egresos-edit-modal') closeEgresosEditModal();
         });
         document.getElementById('fin-egresos-edit-form')?.addEventListener('submit', saveEgresoEdit);
+        document.getElementById('fin-ingreso-card')?.addEventListener('dblclick', openIngresosModal);
+        document.getElementById('fin-ingresos-close')?.addEventListener('click', closeIngresosModal);
+        document.getElementById('fin-ingresos-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-ingresos-modal') closeIngresosModal();
+        });
+        document.getElementById('fin-ingresos-filter-kind')?.addEventListener('change', toggleIngresosFilterInputs);
+        document.getElementById('fin-ingresos-apply')?.addEventListener('click', () => {
+            loadIngresosHistory().catch((error) => {
+                const root = document.getElementById('fin-ingresos-table-root');
+                const summary = document.getElementById('fin-ingresos-summary');
+                if (summary) summary.textContent = 'No se pudo cargar ingresos manuales.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        });
         document.getElementById('fin-apps-card')?.addEventListener('dblclick', openAppsModal);
         document.getElementById('fin-apps-close')?.addEventListener('click', closeAppsModal);
         document.getElementById('fin-apps-modal')?.addEventListener('click', (event) => {
