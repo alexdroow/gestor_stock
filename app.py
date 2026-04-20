@@ -10190,6 +10190,204 @@ def api_eliminar_ventas_semanales(registro_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _parse_fecha_iso_ymd(valor, campo):
+    raw = str(valor or "").strip()
+    if not raw:
+        raise ValueError(f"{campo} es obligatorio")
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        raise ValueError(f"{campo} invalida. Formato esperado: YYYY-MM-DD")
+
+
+def _semana_lunes(fecha):
+    return fecha - timedelta(days=fecha.weekday())
+
+
+def _construir_reporte_version_prueba_canales(fecha_desde_raw=None, fecha_hasta_raw=None):
+    fecha_hasta = _parse_fecha_iso_ymd(
+        fecha_hasta_raw or datetime.now().strftime("%Y-%m-%d"),
+        "fecha hasta",
+    )
+    fecha_desde = _parse_fecha_iso_ymd(
+        fecha_desde_raw or (fecha_hasta - timedelta(days=29)).strftime("%Y-%m-%d"),
+        "fecha desde",
+    )
+    if fecha_desde > fecha_hasta:
+        raise ValueError("fecha desde no puede ser mayor que fecha hasta")
+
+    semanas = {}
+    cursor_semana = _semana_lunes(fecha_desde)
+    while cursor_semana <= fecha_hasta:
+        semana_inicio = cursor_semana.strftime("%Y-%m-%d")
+        semanas[semana_inicio] = {
+            "semana_inicio": semana_inicio,
+            "semana_fin": (cursor_semana + timedelta(days=6)).strftime("%Y-%m-%d"),
+            "auto_presencial": 0.0,
+            "auto_tienda_online": 0.0,
+            "auto_total": 0.0,
+            "auto_operaciones": 0,
+            "manual_uber": 0.0,
+            "manual_pedidosya": 0.0,
+            "manual_apps_total": 0.0,
+            "total_combinado": 0.0,
+        }
+        cursor_semana += timedelta(days=7)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT fecha_hora, COALESCE(canal_venta, 'presencial') AS canal_venta, COALESCE(total_monto, 0) AS total_monto
+            FROM ventas
+            WHERE date(fecha_hora) >= date(?)
+              AND date(fecha_hora) <= date(?)
+              AND LOWER(COALESCE(estado, '')) NOT IN ('anulada', 'anulado', 'cancelada', 'cancelado')
+            """,
+            (fecha_desde.strftime("%Y-%m-%d"), fecha_hasta.strftime("%Y-%m-%d")),
+        )
+        ventas = cursor.fetchall()
+
+        for venta in ventas:
+            fecha_hora = str(venta["fecha_hora"] or "").strip()
+            if len(fecha_hora) < 10:
+                continue
+            try:
+                fecha_venta = datetime.strptime(fecha_hora[:10], "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            semana_inicio = _semana_lunes(fecha_venta).strftime("%Y-%m-%d")
+            item = semanas.get(semana_inicio)
+            if item is None:
+                continue
+
+            canal = str(venta["canal_venta"] or "presencial").strip().lower()
+            monto = max(0.0, float(venta["total_monto"] or 0))
+            if canal in {"uber_eats", "pedidosya"}:
+                continue
+
+            if canal == "tienda_online":
+                item["auto_tienda_online"] += monto
+            else:
+                item["auto_presencial"] += monto
+            item["auto_total"] += monto
+            item["auto_operaciones"] += 1
+
+        cursor.execute(
+            """
+            SELECT semana_inicio, COALESCE(ventas_uber, 0) AS ventas_uber, COALESCE(ventas_pedidosya, 0) AS ventas_pedidosya
+            FROM ventas_semanales
+            WHERE date(semana_inicio) >= date(?)
+              AND date(semana_inicio) <= date(?)
+            """,
+            (fecha_desde.strftime("%Y-%m-%d"), fecha_hasta.strftime("%Y-%m-%d")),
+        )
+        manuales = cursor.fetchall()
+
+        for manual in manuales:
+            semana_inicio = str(manual["semana_inicio"] or "").strip()
+            item = semanas.get(semana_inicio)
+            if item is None:
+                continue
+            item["manual_uber"] = max(0.0, float(manual["ventas_uber"] or 0))
+            item["manual_pedidosya"] = max(0.0, float(manual["ventas_pedidosya"] or 0))
+            item["manual_apps_total"] = item["manual_uber"] + item["manual_pedidosya"]
+
+        filas = []
+        for key in sorted(semanas.keys()):
+            item = semanas[key]
+            item["auto_presencial"] = round(item["auto_presencial"], 2)
+            item["auto_tienda_online"] = round(item["auto_tienda_online"], 2)
+            item["auto_total"] = round(item["auto_total"], 2)
+            item["manual_uber"] = round(item["manual_uber"], 2)
+            item["manual_pedidosya"] = round(item["manual_pedidosya"], 2)
+            item["manual_apps_total"] = round(item["manual_apps_total"], 2)
+            item["total_combinado"] = round(item["auto_total"] + item["manual_apps_total"], 2)
+            filas.append(item)
+
+        resumen = {
+            "periodo_desde": fecha_desde.strftime("%Y-%m-%d"),
+            "periodo_hasta": fecha_hasta.strftime("%Y-%m-%d"),
+            "semanas": len(filas),
+            "auto_presencial": round(sum(r["auto_presencial"] for r in filas), 2),
+            "auto_tienda_online": round(sum(r["auto_tienda_online"] for r in filas), 2),
+            "auto_total": round(sum(r["auto_total"] for r in filas), 2),
+            "manual_uber": round(sum(r["manual_uber"] for r in filas), 2),
+            "manual_pedidosya": round(sum(r["manual_pedidosya"] for r in filas), 2),
+            "manual_apps_total": round(sum(r["manual_apps_total"] for r in filas), 2),
+            "total_combinado": round(sum(r["total_combinado"] for r in filas), 2),
+            "operaciones_auto": int(sum(r["auto_operaciones"] for r in filas)),
+        }
+        return {"resumen": resumen, "semanas": filas}
+    finally:
+        conn.close()
+
+
+@app.route('/api/reportes/version-prueba/canales-resumen')
+def api_reportes_version_prueba_canales_resumen():
+    try:
+        data = _construir_reporte_version_prueba_canales(
+            fecha_desde_raw=request.args.get("desde"),
+            fecha_hasta_raw=request.args.get("hasta"),
+        )
+        return jsonify({"success": True, "data": data})
+    except ValueError as e:
+        return jsonify({"success": False, "data": {}, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "data": {}, "error": str(e)}), 500
+
+
+@app.route('/api/reportes/version-prueba/canales-resumen/manual-apps', methods=['POST'])
+def api_reportes_version_prueba_manual_apps():
+    try:
+        payload = request.get_json(silent=True) or {}
+        fecha_ref = _parse_fecha_iso_ymd(
+            payload.get("semana_inicio") or payload.get("fecha") or datetime.now().strftime("%Y-%m-%d"),
+            "semana",
+        )
+        semana_inicio = _semana_lunes(fecha_ref).strftime("%Y-%m-%d")
+        ventas_uber = max(0.0, float(payload.get("ventas_uber") or 0))
+        ventas_pedidosya = max(0.0, float(payload.get("ventas_pedidosya") or 0))
+        notas = str(payload.get("notas") or "").strip()[:500] or None
+
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT * FROM ventas_semanales WHERE semana_inicio = ? LIMIT 1",
+                (semana_inicio,),
+            )
+            existente = cursor.fetchone()
+        finally:
+            conn.close()
+
+        data_guardar = {
+            "semana_inicio": semana_inicio,
+            "ventas_local": float(existente["ventas_local"] or 0) if existente else 0.0,
+            "ventas_uber": ventas_uber,
+            "ventas_pedidosya": ventas_pedidosya,
+            "marketing_monto": float(existente["marketing_monto"] or 0) if existente else 0.0,
+            "otros_descuentos_monto": float(existente["otros_descuentos_monto"] or 0) if existente else 0.0,
+            "tasa_servicio_pct": float(existente["tasa_servicio_pct"] or 30) if existente else 30,
+            "impuesto_tasa_servicio_pct": float(existente["impuesto_tasa_servicio_pct"] or 19) if existente else 19,
+            "notas": notas if notas is not None else (str(existente["notas"] or "").strip()[:500] if existente else None),
+        }
+        resultado = guardar_venta_semanal(data_guardar)
+        if not resultado.get("success"):
+            return jsonify({"success": False, "error": resultado.get("error", "No se pudo guardar")}), 400
+        try:
+            crear_backup()
+        except Exception as backup_error:
+            print(f"[WARN] No se pudo crear backup tras guardar ventas apps manuales: {backup_error}")
+
+        return jsonify({"success": True, "registro": resultado.get("registro")})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/ventas/desactivaciones-pendientes')
 def api_desactivaciones_pendientes_venta():
     try:

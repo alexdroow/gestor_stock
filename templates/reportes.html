@@ -90,6 +90,26 @@
         .weekly-metric-value { font-size:22px; font-weight:800; color:#0f172a; }
         .weekly-metric-value.negative, .money-negative { color:#b91c1c; font-weight:800; }
         .weekly-metric-value.positive, .money-positive { color:#047857; font-weight:800; }
+        .vp-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:12px; }
+        .vp-stat { border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:12px; }
+        .vp-label { font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700; }
+        .vp-value { font-size:24px; font-weight:800; color:#0f172a; margin-top:6px; }
+        .vp-subvalue { font-size:12px; color:#64748b; margin-top:4px; }
+        .vp-panel-actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+        .vp-chart-wrap { height:300px; border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; margin-bottom:12px; }
+        .vp-help { font-size:13px; color:#64748b; margin-bottom:12px; }
+        .vp-week { font-weight:700; color:#0f172a; }
+        .vp-pill { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:1px solid #fdba74; color:#9a3412; background:#fff7ed; font-size:11px; font-weight:700; padding:2px 8px; }
+        .vp-pill.ok { border-color:#86efac; color:#166534; background:#f0fdf4; }
+        .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:1200; padding:18px; }
+        .modal-backdrop.active { display:flex; }
+        .modal-card { width:min(560px, 100%); background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 20px 50px rgba(15,23,42,.25); overflow:hidden; }
+        .modal-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px; border-bottom:1px solid #e2e8f0; }
+        .modal-title { font-size:18px; font-weight:800; color:#0f172a; }
+        .modal-close { border:1px solid #e2e8f0; background:#f8fafc; color:#334155; border-radius:9px; padding:7px 10px; font-size:12px; font-weight:700; cursor:pointer; }
+        .modal-body { padding:14px 16px; display:grid; gap:10px; }
+        .modal-grid { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); }
+        .modal-foot { padding:12px 16px; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end; }
 
         body.dark-mode { background:#0f172a; color:#f1f5f9; }
         body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
@@ -126,6 +146,16 @@
         body.dark-mode .weekly-metric-value { color:#f8fafc; }
         body.dark-mode .weekly-metric-value.negative, body.dark-mode .money-negative { color:#fca5a5; }
         body.dark-mode .weekly-metric-value.positive, body.dark-mode .money-positive { color:#86efac; }
+        body.dark-mode .vp-stat { background:#334155; border-color:#475569; }
+        body.dark-mode .vp-label, body.dark-mode .vp-subvalue, body.dark-mode .vp-help { color:#94a3b8; }
+        body.dark-mode .vp-value, body.dark-mode .vp-week { color:#f8fafc; }
+        body.dark-mode .vp-chart-wrap { background:#1e293b; border-color:#475569; }
+        body.dark-mode .vp-pill { border-color:#92400e; background:rgba(146,64,14,.25); color:#fde68a; }
+        body.dark-mode .vp-pill.ok { border-color:#166534; background:rgba(22,101,52,.3); color:#bbf7d0; }
+        body.dark-mode .modal-card { background:#1e293b; border-color:#475569; }
+        body.dark-mode .modal-head, body.dark-mode .modal-foot { border-color:#475569; }
+        body.dark-mode .modal-title { color:#f8fafc; }
+        body.dark-mode .modal-close { background:#334155; border-color:#475569; color:#e2e8f0; }
 
         @media (max-width: 1024px) { .sidebar { width:240px; } .main-content { margin-left:240px; width:calc(100vw - 240px); padding:24px; } .stats-grid { grid-template-columns:1fr; } }
         @media (max-width: 768px) { .sidebar { transform:translateX(-100%); } .main-content { margin-left:0; width:100vw; padding:20px; } }
@@ -500,18 +530,85 @@
 
             <div id="tab-version-prueba" class="tab-panel">
                 <div class="card">
-                    <div class="card-header">Version prueba - Reportes operativos</div>
+                    <div class="card-header">Version prueba - Canal de ventas (didactico)</div>
                     <div class="card-body">
-                        <p class="helper">
-                            Esta pestana es un entorno seguro para experimentar cambios del panel sin tocar la version real.
+                        <p class="vp-help">
+                            Este panel separa automaticamente ventas <strong>presencial + tienda online</strong> y permite cargar manualmente
+                            una vez por semana los montos de <strong>Uber Eats</strong> y <strong>PedidosYa</strong>.
                         </p>
-                        <div class="empty-state">
-                            Base de pruebas creada. Indica aqui el siguiente cambio y lo implementamos en esta seccion.
+                        <div class="vp-grid">
+                            <div class="vp-stat">
+                                <div class="vp-label">Auto presencial</div>
+                                <div class="vp-value" id="vp-auto-presencial">$0</div>
+                                <div class="vp-subvalue" id="vp-auto-presencial-meta">0 operaciones</div>
+                            </div>
+                            <div class="vp-stat">
+                                <div class="vp-label">Auto tienda online</div>
+                                <div class="vp-value" id="vp-auto-online">$0</div>
+                                <div class="vp-subvalue">Desde ventas registradas</div>
+                            </div>
+                            <div class="vp-stat">
+                                <div class="vp-label">Manual apps (Uber + PedidosYa)</div>
+                                <div class="vp-value" id="vp-manual-apps">$0</div>
+                                <div class="vp-subvalue">Carga semanal manual</div>
+                            </div>
+                            <div class="vp-stat">
+                                <div class="vp-label">Total combinado</div>
+                                <div class="vp-value" id="vp-total-combinado">$0</div>
+                                <div class="vp-subvalue" id="vp-rango-semanas">0 semanas</div>
+                            </div>
+                        </div>
+
+                        <div class="vp-panel-actions">
+                            <button type="button" class="btn btn-primary" id="vp-btn-abrir-modal">Registrar Uber/PedidosYa (semanal)</button>
+                            <button type="button" class="btn btn-secondary" id="vp-btn-refrescar">Actualizar panel</button>
+                        </div>
+
+                        <div class="vp-chart-wrap">
+                            <canvas id="vp-canal-chart"></canvas>
+                        </div>
+
+                        <div id="vp-tabla-root" class="table-wrapper">
+                            <div class="empty-state">Cargando datos del panel de prueba...</div>
                         </div>
                     </div>
                 </div>
             </div>
         </main>
+    </div>
+
+    <div id="vp-modal-manual" class="modal-backdrop" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="vp-modal-title">
+            <div class="modal-head">
+                <div id="vp-modal-title" class="modal-title">Registrar ventas semanales de apps</div>
+                <button type="button" class="modal-close" id="vp-modal-close">Cerrar</button>
+            </div>
+            <form id="vp-form-manual" class="modal-body">
+                <p class="helper">Solo para Uber Eats y PedidosYa. Presencial y tienda online se toman automaticamente.</p>
+                <div class="modal-grid">
+                    <div class="form-group">
+                        <label>Semana de referencia</label>
+                        <input type="date" id="vp-semana" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Uber Eats ($)</label>
+                        <input type="number" min="0" step="1" id="vp-uber" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>PedidosYa ($)</label>
+                        <input type="number" min="0" step="1" id="vp-pedidosya" value="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notas (opcional)</label>
+                    <input type="text" id="vp-notas" maxlength="500" placeholder="Ej: Cierre semanal apps">
+                </div>
+            </form>
+            <div class="modal-foot">
+                <button type="button" class="btn btn-secondary" id="vp-modal-cancelar">Cancelar</button>
+                <button type="submit" form="vp-form-manual" class="btn btn-primary" id="vp-modal-guardar">Guardar registro semanal</button>
+            </div>
+        </div>
     </div>
 
     <button onclick="toggleDarkMode()" id="darkModeBtn" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(245,158,11,.4);z-index:1000;transition:all .3s ease;">&#127769;</button>
@@ -538,6 +635,7 @@
             }
             setDarkModeButtonIcon();
             renderComparativo();
+            if (vpState.data?.semanas) vpRenderChart(vpState.data.semanas);
         }
 
         const REPORTES_UI_STATE_KEY = 'reportes_ui_state_v1';
@@ -658,6 +756,214 @@
                 desde: form.querySelector('[name="desde"]')?.value || '',
                 hasta: form.querySelector('[name="hasta"]')?.value || ''
             };
+        }
+
+        const vpState = {
+            chart: null,
+            data: null,
+        };
+
+        function vpInicioSemana(fechaIso) {
+            const source = fechaIso ? new Date(`${fechaIso}T00:00:00`) : new Date();
+            if (Number.isNaN(source.getTime())) return '';
+            const dia = source.getDay();
+            const ajuste = dia === 0 ? -6 : (1 - dia);
+            source.setDate(source.getDate() + ajuste);
+            return source.toISOString().slice(0, 10);
+        }
+
+        function vpAbrirModal() {
+            const modal = document.getElementById('vp-modal-manual');
+            const semana = document.getElementById('vp-semana');
+            if (!modal || !semana) return;
+            semana.value = vpInicioSemana(new Date().toISOString().slice(0, 10));
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function vpCerrarModal() {
+            const modal = document.getElementById('vp-modal-manual');
+            if (!modal) return;
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function vpRenderTabla(semanas) {
+            const root = document.getElementById('vp-tabla-root');
+            if (!root) return;
+            const rows = Array.isArray(semanas) ? semanas : [];
+            if (!rows.length) {
+                root.innerHTML = '<div class="empty-state">No hay semanas en el rango seleccionado.</div>';
+                return;
+            }
+            const body = rows.map((s) => {
+                const manualCargado = Number(s.manual_apps_total || 0) > 0;
+                return `
+                    <tr>
+                        <td><span class="vp-week">${escapeHtml(s.semana_inicio || '-')}</span><br><small>${escapeHtml(s.semana_fin || '-')}</small></td>
+                        <td>${formatearMoneda(s.auto_presencial || 0)}</td>
+                        <td>${formatearMoneda(s.auto_tienda_online || 0)}</td>
+                        <td><strong>${formatearMoneda(s.auto_total || 0)}</strong></td>
+                        <td>${formatearMoneda(s.manual_uber || 0)}</td>
+                        <td>${formatearMoneda(s.manual_pedidosya || 0)}</td>
+                        <td><span class="vp-pill ${manualCargado ? 'ok' : ''}">${manualCargado ? 'Cargado' : 'Pendiente'}</span></td>
+                        <td><strong>${formatearMoneda(s.total_combinado || 0)}</strong></td>
+                    </tr>
+                `;
+            }).join('');
+
+            root.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Semana</th>
+                            <th>Auto presencial</th>
+                            <th>Auto online</th>
+                            <th>Auto total</th>
+                            <th>Manual Uber</th>
+                            <th>Manual PedidosYa</th>
+                            <th>Estado apps</th>
+                            <th>Total combinado</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
+        function vpRenderChart(semanas) {
+            const canvas = document.getElementById('vp-canal-chart');
+            if (!canvas) return;
+            const isDark = document.body.classList.contains('dark-mode');
+            if (vpState.chart) vpState.chart.destroy();
+            const rows = Array.isArray(semanas) ? semanas : [];
+            vpState.chart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: rows.map((s) => (s.semana_inicio || '').slice(5)),
+                    datasets: [
+                        {
+                            label: 'Auto presencial + online',
+                            data: rows.map((s) => Number(s.auto_total || 0)),
+                            backgroundColor: '#0ea5e9',
+                            stack: 'total',
+                            borderRadius: 6,
+                        },
+                        {
+                            label: 'Manual Uber + PedidosYa',
+                            data: rows.map((s) => Number(s.manual_apps_total || 0)),
+                            backgroundColor: '#f59e0b',
+                            stack: 'total',
+                            borderRadius: 6,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: isDark ? '#cbd5e1' : '#334155' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: { color: isDark ? '#cbd5e1' : '#334155' },
+                            grid: { color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.2)' }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: { color: isDark ? '#cbd5e1' : '#334155' },
+                            grid: { color: isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.2)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function vpRenderResumen(data) {
+            const resumen = data?.resumen || {};
+            const semanas = Array.isArray(data?.semanas) ? data.semanas : [];
+            const autoPresencial = document.getElementById('vp-auto-presencial');
+            const autoPresencialMeta = document.getElementById('vp-auto-presencial-meta');
+            const autoOnline = document.getElementById('vp-auto-online');
+            const manualApps = document.getElementById('vp-manual-apps');
+            const totalCombinado = document.getElementById('vp-total-combinado');
+            const rangoSemanas = document.getElementById('vp-rango-semanas');
+            if (autoPresencial) autoPresencial.textContent = formatearMoneda(resumen.auto_presencial || 0);
+            if (autoPresencialMeta) autoPresencialMeta.textContent = `${Number(resumen.operaciones_auto || 0)} operaciones`;
+            if (autoOnline) autoOnline.textContent = formatearMoneda(resumen.auto_tienda_online || 0);
+            if (manualApps) manualApps.textContent = formatearMoneda(resumen.manual_apps_total || 0);
+            if (totalCombinado) totalCombinado.textContent = formatearMoneda(resumen.total_combinado || 0);
+            if (rangoSemanas) rangoSemanas.textContent = `${Number(resumen.semanas || semanas.length || 0)} semanas`;
+            vpRenderTabla(semanas);
+            vpRenderChart(semanas);
+        }
+
+        async function cargarVersionPruebaCanales() {
+            const root = document.getElementById('vp-tabla-root');
+            if (root) root.innerHTML = '<div class="empty-state">Cargando datos semanales...</div>';
+            const { desde, hasta } = leerRangoFechasReportes();
+            const qs = new URLSearchParams();
+            if (desde) qs.set('desde', desde);
+            if (hasta) qs.set('hasta', hasta);
+            const url = qs.toString()
+                ? `/api/reportes/version-prueba/canales-resumen?${qs.toString()}`
+                : '/api/reportes/version-prueba/canales-resumen';
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo cargar el panel de prueba');
+            }
+            vpState.data = data.data || {};
+            vpRenderResumen(vpState.data);
+        }
+
+        async function vpGuardarManualApps(event) {
+            event.preventDefault();
+            const semanaInput = document.getElementById('vp-semana');
+            const uberInput = document.getElementById('vp-uber');
+            const pedidosInput = document.getElementById('vp-pedidosya');
+            const notasInput = document.getElementById('vp-notas');
+            const btn = document.getElementById('vp-modal-guardar');
+            const textoOriginal = btn ? btn.textContent : '';
+            const semanaInicio = vpInicioSemana(semanaInput?.value || '');
+            if (!semanaInicio) {
+                alert('[ERROR] Selecciona una semana valida.');
+                return;
+            }
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Guardando...';
+                }
+                const payload = {
+                    semana_inicio: semanaInicio,
+                    ventas_uber: Number(uberInput?.value || 0),
+                    ventas_pedidosya: Number(pedidosInput?.value || 0),
+                    notas: (notasInput?.value || '').trim()
+                };
+                const response = await fetch('/api/reportes/version-prueba/canales-resumen/manual-apps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar el registro manual');
+                }
+                vpCerrarModal();
+                await cargarVersionPruebaCanales();
+            } catch (error) {
+                alert('[ERROR] ' + error.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal || 'Guardar registro semanal';
+                }
+            }
         }
 
         function estadoAutomatizacionTexto(status) {
@@ -938,6 +1244,20 @@
             }
         }
 
+        document.getElementById('vp-btn-abrir-modal')?.addEventListener('click', vpAbrirModal);
+        document.getElementById('vp-btn-refrescar')?.addEventListener('click', () => {
+            cargarVersionPruebaCanales().catch((error) => {
+                const root = document.getElementById('vp-tabla-root');
+                if (root) root.innerHTML = `<div class="empty-state">${escapeHtml(error.message || 'Error cargando panel')}</div>`;
+            });
+        });
+        document.getElementById('vp-modal-close')?.addEventListener('click', vpCerrarModal);
+        document.getElementById('vp-modal-cancelar')?.addEventListener('click', vpCerrarModal);
+        document.getElementById('vp-modal-manual')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'vp-modal-manual') vpCerrarModal();
+        });
+        document.getElementById('vp-form-manual')?.addEventListener('submit', vpGuardarManualApps);
+
         renderComparativo();
         restoreReportesUiStateIfNeeded();
         cargarAutomatizaciones().catch((error) => {
@@ -945,6 +1265,10 @@
             const meta = document.getElementById('auto-meta');
             if (meta) meta.textContent = 'No se pudo cargar automatizaciones.';
             if (grid) grid.innerHTML = `<div class="empty-state">${escapeHtml(error.message || 'Error cargando automatizaciones')}</div>`;
+        });
+        cargarVersionPruebaCanales().catch((error) => {
+            const root = document.getElementById('vp-tabla-root');
+            if (root) root.innerHTML = `<div class="empty-state">${escapeHtml(error.message || 'Error cargando panel')}</div>`;
         });
 
         fetch('/api/alertas/contador')
