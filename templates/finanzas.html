@@ -75,7 +75,7 @@
         {% include "_sidebar.html" %}
         <main class="main">
             <h1 class="title">Finanzas</h1>
-            <p class="subtitle">Panel simple y claro para controlar ventas autom&aacute;ticas de caja/web y carga manual de apps.</p>
+            <p class="subtitle">Panel simple y claro para controlar ventas, gastos y saldo a favor.</p>
 
             <div class="card">
                 <div class="card-head">Rango de fechas</div>
@@ -98,7 +98,7 @@
             <div class="card">
                 <div class="card-head">Resumen por canal</div>
                 <div class="card-body">
-                    <p class="helper">Presencial + tienda online se calculan desde ventas. Uber Eats y PedidosYa se cargan manualmente por semana.</p>
+                    <p class="helper">Presencial + tienda online se calculan desde ventas. Uber Eats y PedidosYa se cargan manualmente por semana. Gasto insumos se toma desde compras completadas y gasto general desde facturas.</p>
                     <div class="stats">
                         <div class="stat">
                             <div class="stat-label">Presencial</div>
@@ -119,6 +119,26 @@
                             <div class="stat-label">Total</div>
                             <div class="stat-value" id="fin-total">$0</div>
                             <div class="stat-meta" id="fin-semanas">0 semanas</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Gasto insumos</div>
+                            <div class="stat-value" id="fin-gasto-insumos">$0</div>
+                            <div class="stat-meta">Compras completadas</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Gasto general</div>
+                            <div class="stat-value" id="fin-gasto-general">$0</div>
+                            <div class="stat-meta">Facturas registradas</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Gastado total</div>
+                            <div class="stat-value" id="fin-gastado-total">$0</div>
+                            <div class="stat-meta">Insumos + general</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Saldo a favor</div>
+                            <div class="stat-value" id="fin-saldo-favor">$0</div>
+                            <div class="stat-meta">Ganado - gastado</div>
                         </div>
                     </div>
 
@@ -210,6 +230,10 @@
             document.getElementById('fin-manual-apps').textContent = money(resumen.manual_apps_total || 0);
             document.getElementById('fin-total').textContent = money(resumen.total_combinado || 0);
             document.getElementById('fin-semanas').textContent = `${Number(resumen.semanas || semanas.length || 0)} semanas`;
+            document.getElementById('fin-gasto-insumos').textContent = money(resumen.gasto_insumos || 0);
+            document.getElementById('fin-gasto-general').textContent = money(resumen.gasto_general || 0);
+            document.getElementById('fin-gastado-total').textContent = money(resumen.gastado_total || 0);
+            document.getElementById('fin-saldo-favor').textContent = money(resumen.saldo_favor || 0);
         }
 
         function renderTable() {
@@ -229,6 +253,10 @@
                         <td><strong>${money(row.auto_total || 0)}</strong></td>
                         <td>${money(row.manual_uber || 0)}</td>
                         <td>${money(row.manual_pedidosya || 0)}</td>
+                        <td>${money(row.gasto_insumos || 0)}</td>
+                        <td>${money(row.gasto_general || 0)}</td>
+                        <td>${money(row.gastado_total || 0)}</td>
+                        <td><strong>${money(row.saldo_favor || 0)}</strong></td>
                         <td><span class="pill ${loaded ? 'ok' : ''}">${loaded ? 'Cargado' : 'Pendiente'}</span></td>
                         <td><strong>${money(row.total_combinado || 0)}</strong></td>
                     </tr>
@@ -244,6 +272,10 @@
                             <th>Total auto</th>
                             <th>Uber manual</th>
                             <th>PedidosYa manual</th>
+                            <th>Gasto insumos</th>
+                            <th>Gasto general</th>
+                            <th>Gastado total</th>
+                            <th>Saldo a favor</th>
                             <th>Estado</th>
                             <th>Total combinado</th>
                         </tr>
@@ -265,31 +297,30 @@
                     labels,
                     datasets: [
                         {
-                            label: 'Auto presencial + online',
-                            data: rows.map((r) => Number(r.auto_total || 0)),
-                            borderColor: '#0ea5e9',
-                            backgroundColor: 'rgba(14,165,233,.12)',
-                            fill: true,
-                            tension: .28,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
-                            pointBackgroundColor: '#0ea5e9'
-                        },
-                        {
-                            label: 'Uber + PedidosYa (manual)',
-                            data: rows.map((r) => Number(r.manual_apps_total || 0)),
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'rgba(245,158,11,.10)',
-                            fill: true,
-                            tension: .28,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
-                            pointBackgroundColor: '#f59e0b',
-                            borderDash: [6, 4]
-                        },
-                        {
-                            label: 'Total combinado',
+                            label: 'Ganado total',
                             data: rows.map((r) => Number(r.total_combinado || 0)),
+                            borderColor: '#16a34a',
+                            backgroundColor: 'rgba(22,163,74,.14)',
+                            fill: true,
+                            tension: .28,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#16a34a'
+                        },
+                        {
+                            label: 'Gastado total',
+                            data: rows.map((r) => Number(r.gastado_total || 0)),
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239,68,68,.12)',
+                            fill: true,
+                            tension: .28,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#ef4444'
+                        },
+                        {
+                            label: 'Saldo a favor',
+                            data: rows.map((r) => Number(r.saldo_favor || 0)),
                             borderColor: '#1d4ed8',
                             backgroundColor: 'rgba(29,78,216,.08)',
                             fill: false,
