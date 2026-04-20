@@ -11,6 +11,18 @@
         :root { --primary:#f59e0b; --secondary:#f97316; }
         body { font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:#f8fafc; color:#0f172a; }
         .layout { display:flex; min-height:100vh; }
+        .sidebar { width:260px; background:#fff; border-right:1px solid #e2e8f0; padding:24px; display:flex; flex-direction:column; position:fixed; height:100vh; z-index:100; }
+        .logo { display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid #e2e8f0; margin-bottom:14px; }
+        .logo-icon { width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg,var(--primary),var(--secondary)); display:flex; align-items:center; justify-content:center; font-size:24px; }
+        .logo-text { font-size:20px; font-weight:700; color:#0f172a; }
+        .logo-text span { background:linear-gradient(135deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .nav-menu { display:flex; flex-direction:column; gap:8px; flex:1; }
+        .nav-item { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px; text-decoration:none; color:#64748b; font-weight:600; transition:all .2s ease; }
+        .nav-item:hover { background:#fff7ed; color:#d97706; }
+        .nav-item.active { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:#fff; }
+        .nav-item .icon { font-size:20px; width:24px; text-align:center; }
+        .nav-badge { margin-left:auto; background:#ef4444; color:#fff; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; min-width:28px; }
+        .sidebar-footer { padding-top:16px; border-top:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center; }
         .main { margin-left:260px; width:calc(100vw - 260px); padding:26px 30px; }
         .title { font-size:32px; font-weight:800; margin-bottom:4px; }
         .subtitle { color:#64748b; margin-bottom:16px; }
@@ -47,8 +59,14 @@
         .modal-body { padding:14px 15px; display:grid; gap:10px; }
         .modal-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; }
         .modal-foot { padding:12px 15px; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end; }
+        body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
+        body.dark-mode .logo-text { color:#f8fafc; }
+        body.dark-mode .nav-item { color:#94a3b8; }
+        body.dark-mode .nav-item:hover { background:#334155; color:#f8fafc; }
+        body.dark-mode .sidebar-footer { border-color:#334155; color:#cbd5e1; }
         @media (max-width:1024px) { .main { margin-left:240px; width:calc(100vw - 240px); padding:22px; } }
-        @media (max-width:768px) { .main { margin-left:0; width:100vw; padding:18px; } }
+        @media (max-width:1024px) { .sidebar { width:240px; } }
+        @media (max-width:768px) { .sidebar { transform:translateX(-100%); } .main { margin-left:0; width:100vw; padding:18px; } }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
 </head>
