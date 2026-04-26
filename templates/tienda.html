@@ -6699,6 +6699,50 @@
                     doc.link(margin, y - 7, contentWidth, 8, { url });
                 } catch (e) {}
             };
+            const detalleEnSecciones = (texto, tituloDefault = "Detalle pedido") => {
+                const lineas = String(texto || "").replace(/\r\n?/g, "\n").split("\n").map((ln) => String(ln || "").trim()).filter(Boolean);
+                if (!lineas.length) return [{ titulo: tituloDefault, items: ["-"] }];
+                const out = [];
+                let curr = { titulo: tituloDefault, items: [] };
+                const push = () => {
+                    if (!curr.items.length) return;
+                    out.push(curr);
+                };
+                lineas.forEach((line) => {
+                    const m = line.match(/^---\s*(.+?)\s*---$/);
+                    if (m && m[1]) {
+                        push();
+                        curr = { titulo: String(m[1] || "").trim(), items: [] };
+                        return;
+                    }
+                    curr.items.push(line);
+                });
+                push();
+                return out.length ? out : [{ titulo: tituloDefault, items: ["-"] }];
+            };
+            const drawDetalleSecciones = (titulo, texto) => {
+                const secciones = detalleEnSecciones(texto, titulo);
+                secciones.forEach((sec) => {
+                    ensurePage(18);
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(9.5);
+                    doc.setTextColor(...colors.muted);
+                    doc.text(String(sec.titulo || titulo).toUpperCase(), margin, y);
+                    y += textBlockHeight(1, 9.5) + 2;
+                    (Array.isArray(sec.items) && sec.items.length ? sec.items : ["-"]).forEach((item) => {
+                        const raw = String(item || "-").trim() || "-";
+                        const bullet = raw.startsWith("-") ? raw : `- ${raw}`;
+                        const wrapped = doc.splitTextToSize(bullet, contentWidth - 2);
+                        ensurePage(textBlockHeight(wrapped.length, 11) + 4);
+                        doc.setFont("helvetica", "normal");
+                        doc.setFontSize(11);
+                        doc.setTextColor(...colors.dark);
+                        doc.text(wrapped, margin + 2, y);
+                        y += textBlockHeight(wrapped.length, 11) + 2;
+                    });
+                    y += 2;
+                });
+            };
             const entregaTxt = payload.entrega_tipo === "despacho" ? "Despacho" : "Retiro en tienda";
             const fechaTxt = _formatearFechaAgenda(payload.fecha);
             const pinTxt = payload.entrega_tipo === "despacho"
@@ -6821,7 +6865,7 @@
 
             drawSectionTitle("Detalle del Pedido");
             drawField("Descripcion", `Reserva tienda - ${_labelTipoReserva(payload.tipo)}`);
-            drawField("Ingredientes / Detalles", detallePedido);
+            drawDetalleSecciones("Ingredientes / Detalles", detallePedido);
 
             drawSectionTitle("Terminos y Condiciones");
             ensurePage(26);

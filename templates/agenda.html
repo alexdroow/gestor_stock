@@ -382,6 +382,19 @@
             background: #ffe4e6;
             border-color: #fda4af;
         }
+        .btn-torta-tool {
+            background: #f8fafc;
+            color: #9a3412;
+            border: 1px solid #fed7aa;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-torta-tool:hover {
+            background: #fff7ed;
+            border-color: #fb923c;
+        }
         
         .calendar-grid {
             flex: 1;
@@ -1097,6 +1110,21 @@
         .checkbox-group input {
             width: auto;
         }
+        .torta-manual-box {
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            background: #fffbeb;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+        .torta-manual-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #92400e;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+        }
 
         .nota-checklist-editor {
             display: flex;
@@ -1327,6 +1355,22 @@
         
         body.dark-mode .calendar-day.empty {
             background: #1e293b;
+        }
+        body.dark-mode .btn-torta-tool {
+            background: #1e293b;
+            color: #fdba74;
+            border-color: #9a3412;
+        }
+        body.dark-mode .btn-torta-tool:hover {
+            background: #334155;
+            border-color: #c2410c;
+        }
+        body.dark-mode .torta-manual-box {
+            background: #3f2d14;
+            border-color: #7c2d12;
+        }
+        body.dark-mode .torta-manual-title {
+            color: #fdba74;
         }
 
         body.dark-mode .event-item:hover {
@@ -1646,6 +1690,9 @@
                                 <button onclick="eliminarEventosPasados()" class="btn-danger-soft" title="Eliminar eventos anteriores al día actual">
                                     🗑 Limpiar pasados
                                 </button>
+                                <button onclick="agendarTortaManual()" class="btn-torta-tool" title="Flujo dedicado para tomar pedidos de torta">
+                                    &#127874; Agendar Tortas
+                                </button>
                                 <button onclick="nuevoEvento()" class="btn-primary">
                                     + Nuevo Evento
                                 </button>
@@ -1821,6 +1868,44 @@
                 
                 <!-- Campos solo para tortas/pedidos -->
                 <div id="campos-cliente">
+                    <div class="torta-manual-box" id="bloque-torta-manual" style="display:none;">
+                        <div class="torta-manual-title">&#127874; Agendado manual de torta (estructura tienda)</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tipo de torta</label>
+                                <input type="text" id="torta-tipo" placeholder="Ej: Cumpleanos, tematica, matrimonio">
+                            </div>
+                            <div class="form-group">
+                                <label>Tamano / porciones</label>
+                                <input type="text" id="torta-tamano" placeholder="Ej: 20 porciones / 2 pisos">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Sabores / rellenos</label>
+                                <input type="text" id="torta-rellenos" placeholder="Ej: Chocolate, manjar-frambuesa">
+                            </div>
+                            <div class="form-group">
+                                <label>Cobertura / estilo</label>
+                                <input type="text" id="torta-cobertura" placeholder="Ej: Buttercream blanca con flores">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Topper / dedicatoria</label>
+                                <input type="text" id="torta-topper" placeholder="Texto topper o dedicatoria">
+                            </div>
+                            <div class="form-group">
+                                <label>Referencia visual</label>
+                                <input type="text" id="torta-referencia" placeholder="URL o descripcion de referencia">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Observaciones de produccion</label>
+                            <textarea id="torta-observaciones" rows="2" placeholder="Color, detalles finos, alergias, etc."></textarea>
+                        </div>
+                        <p class="form-hint">Estos campos se ordenan automaticamente en el PDF y en el detalle del pedido.</p>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Cliente</label>
@@ -2027,6 +2112,7 @@
         let eventos = [];
         let notasAgenda = [];
         let eventoEditando = null;
+        let modoAgendarTorta = false;
         let notaEditando = null;
         let notaChecklistDraft = [];
         let fechaSeleccionada = '';
@@ -2089,6 +2175,116 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        function valorCampo(id) {
+            const el = document.getElementById(id);
+            return el ? String(el.value || '').trim() : '';
+        }
+
+        function setCampo(id, value) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.value = String(value || '');
+        }
+
+        function limpiarCamposTortaManual() {
+            setCampo('torta-tipo', '');
+            setCampo('torta-tamano', '');
+            setCampo('torta-rellenos', '');
+            setCampo('torta-cobertura', '');
+            setCampo('torta-topper', '');
+            setCampo('torta-referencia', '');
+            setCampo('torta-observaciones', '');
+        }
+
+        function mostrarBloqueTortaManual(mostrar) {
+            const box = document.getElementById('bloque-torta-manual');
+            if (!box) return;
+            box.style.display = mostrar ? 'block' : 'none';
+        }
+
+        function obtenerDatosTortaManual() {
+            return {
+                tipo_torta: valorCampo('torta-tipo'),
+                tamano: valorCampo('torta-tamano'),
+                rellenos: valorCampo('torta-rellenos'),
+                cobertura: valorCampo('torta-cobertura'),
+                topper: valorCampo('torta-topper'),
+                referencia: valorCampo('torta-referencia'),
+                observaciones: valorCampo('torta-observaciones'),
+            };
+        }
+
+        function detalleTortaManualArmado() {
+            const data = obtenerDatosTortaManual();
+            const cliente = valorCampo('evento-cliente');
+            const entrega = document.getElementById('evento-envio')?.checked ? 'Despacho' : 'Retiro en tienda';
+            const direccion = valorCampo('evento-direccion');
+            const bloques = [
+                '--- Datos torta ---',
+                `Tipo de torta: ${data.tipo_torta || '-'}`,
+                `Tamano / porciones: ${data.tamano || '-'}`,
+                `Sabores / rellenos: ${data.rellenos || '-'}`,
+                `Cobertura / estilo: ${data.cobertura || '-'}`,
+                `Topper / dedicatoria: ${data.topper || '-'}`,
+                `Referencia visual: ${data.referencia || '-'}`,
+                `Observaciones produccion: ${data.observaciones || '-'}`,
+                '--- Entrega ---',
+                `Modalidad: ${entrega}`,
+                `Direccion: ${entrega === 'Despacho' ? (direccion || '-') : 'Retiro en tienda'}`,
+            ];
+            if (cliente) {
+                bloques.unshift(`Cliente de referencia: ${cliente}`);
+            }
+            return bloques.join('\n');
+        }
+
+        function aplicarDetalleTortaManualDesdeTexto(raw) {
+            const text = String(raw || '').replace(/\r\n?/g, '\n');
+            if (!text) return;
+            const map = {
+                'tipo de torta': 'torta-tipo',
+                'tamano / porciones': 'torta-tamano',
+                'sabores / rellenos': 'torta-rellenos',
+                'cobertura / estilo': 'torta-cobertura',
+                'topper / dedicatoria': 'torta-topper',
+                'referencia visual': 'torta-referencia',
+                'observaciones produccion': 'torta-observaciones',
+            };
+            text.split('\n').forEach((ln) => {
+                const line = String(ln || '').trim();
+                if (!line) return;
+                const idx = line.indexOf(':');
+                if (idx <= 0) return;
+                const key = line.slice(0, idx).trim().toLowerCase();
+                const value = line.slice(idx + 1).trim();
+                const target = map[key];
+                if (target) setCampo(target, value === '-' ? '' : value);
+            });
+        }
+
+        function detalleEnSecciones(texto, tituloDefault = 'Detalle pedido') {
+            const source = String(texto || '').replace(/\r\n?/g, '\n');
+            const lineas = source.split('\n').map((ln) => String(ln || '').trim()).filter(Boolean);
+            if (!lineas.length) return [{ titulo: tituloDefault, items: ['-'] }];
+            const secciones = [];
+            let actual = { titulo: tituloDefault, items: [] };
+            const pushActual = () => {
+                if (!actual.items.length) return;
+                secciones.push(actual);
+            };
+            lineas.forEach((line) => {
+                const m = line.match(/^---\s*(.+?)\s*---$/);
+                if (m && m[1]) {
+                    pushActual();
+                    actual = { titulo: String(m[1] || '').trim(), items: [] };
+                    return;
+                }
+                actual.items.push(line);
+            });
+            pushActual();
+            return secciones.length ? secciones : [{ titulo: tituloDefault, items: ['-'] }];
         }
 
         function normalizarChecklistNota(items) {
@@ -2358,20 +2554,39 @@
             const horaInicio = document.getElementById('evento-hora-inicio').value || '00:00';
             const esEnvio = document.getElementById('evento-envio').checked;
             const direccionEntrega = (document.getElementById('evento-direccion').value || '').trim();
+            const esTortaManual = Boolean(modoAgendarTorta && String(tipo).toLowerCase() === 'torta');
+            let tituloEvento = (document.getElementById('evento-titulo').value || '').trim();
+            let ingredientesEvento = (document.getElementById('evento-ingredientes').value || '').trim();
             const confirmarReservaTienda = Boolean(eventoEditando && esReservaTiendaPendiente(eventoEditando));
-            
-            // Validar que haya fecha
+
             if (!fecha) {
                 alert('Selecciona una fecha');
                 return;
             }
 
             if (tipo !== 'bloqueo' && esEnvio && !direccionEntrega) {
-                alert('Ingresa la dirección de entrega para pedidos a domicilio.');
+                alert('Ingresa la direccion de entrega para pedidos a domicilio.');
                 return;
             }
-            
-            // Validar bloqueos (solo para tortas y pedidos)
+
+            if (esTortaManual) {
+                const dataTorta = obtenerDatosTortaManual();
+                if (!dataTorta.tamano) {
+                    alert('Completa el tamano o porciones de la torta.');
+                    return;
+                }
+                if (!dataTorta.rellenos) {
+                    alert('Completa los sabores o rellenos de la torta.');
+                    return;
+                }
+                ingredientesEvento = detalleTortaManualArmado();
+                if (!tituloEvento || tituloEvento === 'Torta personalizada') {
+                    const baseTipo = dataTorta.tipo_torta || 'personalizada';
+                    const clienteTxt = (document.getElementById('evento-cliente').value || '').trim();
+                    tituloEvento = `Torta ${baseTipo}${clienteTxt ? ` - ${clienteTxt}` : ''}`;
+                }
+            }
+
             if (tipo !== 'bloqueo') {
                 const horaFinEvento = document.getElementById('evento-hora-fin').value || horaInicio || '00:00';
                 const bloqueos = eventos.filter(e => {
@@ -2383,17 +2598,17 @@
                     const finEvento = horaFinEvento || inicioEvento;
                     return !(finEvento < inicioBloqueo || inicioEvento > finBloqueo);
                 });
-                
+
                 if (bloqueos.length > 0) {
-                    alert('\u26D4 No se puede agendar: este horario está bloqueado');
+                    alert('No se puede agendar: este horario esta bloqueado');
                     return;
                 }
             }
-            
+
             const evento = {
                 id: eventoEditando ? eventoEditando.id : null,
                 tipo: tipo,
-                titulo: document.getElementById('evento-titulo').value || 'Sin título',
+                titulo: tituloEvento || 'Sin titulo',
                 fecha: fecha,
                 hora_inicio: document.getElementById('evento-hora-inicio').value || null,
                 hora_fin: document.getElementById('evento-hora-fin').value || null,
@@ -2402,7 +2617,7 @@
                 telefono: document.getElementById('evento-telefono').value || null,
                 es_envio: esEnvio,
                 direccion: esEnvio ? direccionEntrega : null,
-                ingredientes: document.getElementById('evento-ingredientes').value || null,
+                ingredientes: ingredientesEvento || null,
                 total: parseFloat(document.getElementById('evento-total').value) || 0,
                 abono: parseFloat(document.getElementById('evento-abono').value) || 0,
                 motivo: document.getElementById('bloqueo-motivo').value || null,
@@ -2416,9 +2631,9 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(evento)
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     if (confirmarReservaTienda && eventoEditando && eventoEditando.id) {
                         await fetch(`/api/agenda/evento/${Number(eventoEditando.id)}/estado`, {
@@ -2428,21 +2643,21 @@
                         });
                     }
                     cerrarModal();
-                    await cargarEventos(); // Recargar desde BD
+                    await cargarEventos();
                     alert(confirmarReservaTienda
-                        ? '\u2705 Reserva confirmada y guardada correctamente'
-                        : '\u2705 Evento guardado correctamente');
+                        ? 'Reserva confirmada y guardada correctamente'
+                        : 'Evento guardado correctamente');
                 } else {
                     alert('[ERROR] Error: ' + data.error);
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('[ERROR] Error de conexión al guardar');
+                alert('[ERROR] Error de conexion al guardar');
             } finally {
                 mostrarLoading(false);
             }
         }
-        
+
         // ============================================================================
         // ELIMINAR EVENTO DE BASE DE DATOS
         // ============================================================================
@@ -3416,9 +3631,12 @@
         function cerrarModal() {
             document.getElementById('modal-evento').classList.remove('active');
             eventoEditando = null;
+            modoAgendarTorta = false;
             document.getElementById('evento-id').value = '';
             document.getElementById('evento-envio').checked = false;
             document.getElementById('grupo-direccion').style.display = 'none';
+            document.getElementById('evento-tipo').disabled = false;
+            mostrarBloqueTortaManual(false);
             const mapaWrap = document.getElementById('mapa-preview');
             if (mapaWrap) mapaWrap.style.display = 'none';
             limpiarMapaEstado();
@@ -3444,11 +3662,13 @@
         // FORMULARIO
         function nuevoEvento() {
             eventoEditando = null;
+            modoAgendarTorta = false;
             document.getElementById('modal-titulo').textContent = 'Nuevo Evento';
             document.getElementById('btn-eliminar').style.display = 'none';
 
             // Limpiar formulario
             document.getElementById('evento-id').value = '';
+            document.getElementById('evento-tipo').disabled = false;
             document.getElementById('evento-tipo').value = 'torta';
             document.getElementById('evento-titulo').value = '';
             document.getElementById('evento-fecha').value = formatearFecha(new Date());
@@ -3465,12 +3685,25 @@
             document.getElementById('bloqueo-motivo').value = '';
             document.getElementById('evento-alerta').value = config.alertaDefault;
             document.getElementById('evento-restante').textContent = '$0';
+            limpiarCamposTortaManual();
+            mostrarBloqueTortaManual(false);
 
             cambiarTipo();
             toggleEnvio();
             actualizarVisibilidadBotonPdf();
             actualizarBotonWhatsAppCliente();
             abrirModal();
+        }
+
+        function agendarTortaManual() {
+            nuevoEvento();
+            modoAgendarTorta = true;
+            document.getElementById('modal-titulo').textContent = 'Agendar Torta Manual';
+            document.getElementById('evento-tipo').value = 'torta';
+            document.getElementById('evento-tipo').disabled = true;
+            document.getElementById('evento-titulo').value = 'Torta personalizada';
+            mostrarBloqueTortaManual(true);
+            cambiarTipo();
         }
         
         async function editarEvento(id) {
@@ -3479,8 +3712,10 @@
             if (!evento) return;
             
             eventoEditando = evento;
+            modoAgendarTorta = false;
             document.getElementById('modal-titulo').textContent = 'Editar Evento';
             document.getElementById('btn-eliminar').style.display = 'inline-block';
+            document.getElementById('evento-tipo').disabled = false;
 
             document.getElementById('evento-id').value = evento.id;
             document.getElementById('evento-tipo').value = evento.tipo;
@@ -3498,6 +3733,19 @@
             document.getElementById('evento-abono').value = evento.abono || '';
             document.getElementById('bloqueo-motivo').value = evento.motivo || '';
             document.getElementById('evento-alerta').value = evento.alerta_minutos || 1440;
+            limpiarCamposTortaManual();
+            const esTorta = String(evento.tipo || '').trim().toLowerCase() === 'torta';
+            const detalleEvento = String(evento.ingredientes || '');
+            if (esTorta && detalleEvento.toLowerCase().includes('--- datos torta ---')) {
+                modoAgendarTorta = true;
+                mostrarBloqueTortaManual(true);
+                document.getElementById('modal-titulo').textContent = 'Editar Torta Agendada';
+                document.getElementById('evento-tipo').value = 'torta';
+                document.getElementById('evento-tipo').disabled = true;
+                aplicarDetalleTortaManualDesdeTexto(detalleEvento);
+            } else {
+                mostrarBloqueTortaManual(false);
+            }
             
             calcularRestante();
             cambiarTipo();
@@ -3523,8 +3771,10 @@
                 const mapaWrap = document.getElementById('mapa-preview');
                 if (mapaWrap) mapaWrap.style.display = 'none';
                 limpiarMapaEstado();
+                mostrarBloqueTortaManual(false);
             } else {
                 toggleEnvio();
+                mostrarBloqueTortaManual(modoAgendarTorta && tipo === 'torta');
             }
             actualizarVisibilidadBotonPdf();
             actualizarBotonWhatsAppCliente();
@@ -3818,9 +4068,14 @@
                 return Number.isFinite(n) ? n : 0;
             };
             const eventoId = (document.getElementById('evento-id').value || '').trim();
+            const tipoSeleccionado = (document.getElementById('evento-tipo').value || (eventoEditando && eventoEditando.tipo) || 'torta');
+            const ingredientesFuente = (document.getElementById('evento-ingredientes').value || (eventoEditando && eventoEditando.ingredientes) || '');
+            const ingredientesArmados = (modoAgendarTorta && String(tipoSeleccionado).toLowerCase() === 'torta')
+                ? detalleTortaManualArmado()
+                : ingredientesFuente;
             return {
                 id: eventoId || (eventoEditando && eventoEditando.id) || 'BORRADOR',
-                tipo: (document.getElementById('evento-tipo').value || (eventoEditando && eventoEditando.tipo) || 'torta'),
+                tipo: tipoSeleccionado,
                 titulo: (document.getElementById('evento-titulo').value || (eventoEditando && eventoEditando.titulo) || ''),
                 fecha: (document.getElementById('evento-fecha').value || (eventoEditando && eventoEditando.fecha) || ''),
                 hora_inicio: (document.getElementById('evento-hora-inicio').value || (eventoEditando && eventoEditando.hora_inicio) || ''),
@@ -3830,7 +4085,7 @@
                 telefono: (document.getElementById('evento-telefono').value || (eventoEditando && eventoEditando.telefono) || ''),
                 es_envio: !!document.getElementById('evento-envio').checked,
                 direccion: (document.getElementById('evento-direccion').value || (eventoEditando && eventoEditando.direccion) || ''),
-                ingredientes: (document.getElementById('evento-ingredientes').value || (eventoEditando && eventoEditando.ingredientes) || ''),
+                ingredientes: ingredientesArmados,
                 total: toNumber(document.getElementById('evento-total').value || (eventoEditando && eventoEditando.total)),
                 abono: toNumber(document.getElementById('evento-abono').value || (eventoEditando && eventoEditando.abono)),
                 motivo: (document.getElementById('bloqueo-motivo').value || (eventoEditando && eventoEditando.motivo) || ''),
@@ -3934,8 +4189,31 @@
                     const linkY = y - 6;
                     doc.link(margin, linkY, contentWidth, 6, { url });
                 } catch (error) {
-                    // ignora si la versión no soporta links
+                    // ignora si la version no soporta links
                 }
+            };
+            const drawDetalleSecciones = (titulo, texto) => {
+                const sections = detalleEnSecciones(texto, titulo);
+                sections.forEach((sec) => {
+                    ensurePage(12);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(9);
+                    doc.setTextColor(...colors.muted);
+                    doc.text(String(sec.titulo || titulo).toUpperCase(), margin, y);
+                    y += 5;
+                    (Array.isArray(sec.items) && sec.items.length ? sec.items : ['-']).forEach((item) => {
+                        const raw = String(item || '-').trim() || '-';
+                        const bulletLine = raw.startsWith('-') ? raw : `- ${raw}`;
+                        const wrapped = doc.splitTextToSize(bulletLine, contentWidth - 2);
+                        ensurePage((wrapped.length * 5.2) + 2);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(11);
+                        doc.setTextColor(...colors.dark);
+                        doc.text(wrapped, margin + 2, y);
+                        y += (wrapped.length * 5.2) + 1;
+                    });
+                    y += 2;
+                });
             };
             // Header elegante
             doc.setFillColor(...colors.primary);
@@ -4023,7 +4301,7 @@
 
             drawSectionTitle('Detalle del Pedido');
             drawField('Descripción', e.titulo);
-            drawField('Ingredientes / Detalles', e.ingredientes);
+            drawDetalleSecciones('Ingredientes / Detalles', e.ingredientes);
 
             drawSectionTitle('Resumen de Pago');
             ensurePage(34);

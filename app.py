@@ -2440,37 +2440,91 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             out.append(line)
         return out or [""]
 
+    def _split_sections(txt, default_title="Detalle pedido"):
+        lines = [str(ln or "").strip() for ln in str(txt or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+        lines = [ln for ln in lines if ln]
+        if not lines:
+            return [{"title": default_title, "items": ["-"]}]
+        sections = []
+        current = {"title": default_title, "items": []}
+        for line in lines:
+            if line.startswith("---") and line.endswith("---") and len(line) > 6:
+                title = str(line.strip("- ").strip() or default_title)
+                if current["items"]:
+                    sections.append(current)
+                current = {"title": title, "items": []}
+                continue
+            current["items"].append(line)
+        if current["items"]:
+            sections.append(current)
+        return sections or [{"title": default_title, "items": ["-"]}]
+
     c = canvas.Canvas(abs_path, pagesize=A4)
-    width, height = A4
-    y = height - 50
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(40, y, f"Reserva agenda tienda #{rid}")
-    y -= 18
-    c.setFont("Helvetica", 10)
-    c.drawString(40, y, f"Generado: {datetime.now(ZoneInfo('America/Santiago')).strftime('%d-%m-%Y %H:%M:%S')}")
+    _, height = A4
+    y = height - 44
+    margin = 40
+    right = 560
+
+    def _ensure_space(needed=20, reset_font=True):
+        nonlocal y
+        if y >= 62 + needed:
+            return
+        c.showPage()
+        y = height - 44
+        if reset_font:
+            c.setFont("Helvetica", 10)
+
+    def _draw_wrapped(lines, x=margin + 2, font="Helvetica", size=10, step=12):
+        nonlocal y
+        c.setFont(font, size)
+        for ln in lines:
+            _ensure_space(step + 2, reset_font=False)
+            c.drawString(x, y, str(ln or "")[:170])
+            y -= step
+
+    c.setFont("Helvetica-Bold", 17)
+    c.drawString(margin, y, f"Reserva agenda tienda #{rid}")
     y -= 16
-    c.drawString(40, y, f"Tipo: {str(reserva.get('tipo') or '').capitalize()}")
-    y -= 14
-    c.drawString(40, y, f"Fecha: {reserva.get('fecha') or '-'} {reserva.get('hora_inicio') or '-'}")
-    y -= 14
-    c.drawString(40, y, f"Cliente: {reserva.get('cliente') or '-'}")
-    y -= 14
-    c.drawString(40, y, f"Telefono: {reserva.get('telefono') or '-'}")
-    y -= 14
-    c.drawString(40, y, f"Direccion: {reserva.get('direccion') or 'Retiro en tienda'}")
-    y -= 20
+    c.setFont("Helvetica", 10)
+    c.drawString(margin, y, f"Generado: {datetime.now(ZoneInfo('America/Santiago')).strftime('%d-%m-%Y %H:%M:%S')}")
+    y -= 18
+    c.setStrokeColorRGB(0.87, 0.90, 0.95)
+    c.line(margin, y, right, y)
+    y -= 16
 
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(40, y, "Ingredientes / Detalles")
+    c.drawString(margin, y, "Datos de Reserva")
     y -= 14
-    c.setFont("Helvetica", 10)
-    for ln in _wrap(reserva.get("ingredientes") or "", max_len=96):
-        c.drawString(42, y, ln[:150])
-        y -= 13
-        if y < 72:
-            c.showPage()
-            y = height - 50
-            c.setFont("Helvetica", 10)
+    _draw_wrapped(_wrap(f"Tipo: {str(reserva.get('tipo') or '').capitalize()}", max_len=92))
+    _draw_wrapped(_wrap(f"Fecha: {reserva.get('fecha') or '-'} {reserva.get('hora_inicio') or '-'}", max_len=92))
+    _draw_wrapped(_wrap(f"Cliente: {reserva.get('cliente') or '-'}", max_len=92))
+    _draw_wrapped(_wrap(f"Telefono: {reserva.get('telefono') or '-'}", max_len=92))
+    _draw_wrapped(_wrap(f"Direccion: {reserva.get('direccion') or 'Retiro en tienda'}", max_len=92))
+    y -= 6
+
+    c.setFont("Helvetica-Bold", 11)
+    _ensure_space(24, reset_font=False)
+    c.drawString(margin, y, "Detalle del Pedido")
+    y -= 16
+
+    for section in _split_sections(reserva.get("ingredientes") or "", "Ingredientes / Detalles"):
+        _ensure_space(26, reset_font=False)
+        c.setFillColorRGB(0.96, 0.97, 0.99)
+        c.roundRect(margin, y - 11, right - margin, 16, 3, stroke=0, fill=1)
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin + 6, y, str(section.get("title") or "Detalle")[:90])
+        y -= 18
+        items = section.get("items") or ["-"]
+        for item in items:
+            bullet = str(item or "-").strip()
+            if not bullet:
+                bullet = "-"
+            if not bullet.startswith("-"):
+                bullet = f"- {bullet}"
+            wrapped = _wrap(bullet, max_len=96)
+            _draw_wrapped(wrapped, x=margin + 8, font="Helvetica", size=9.8, step=11)
+        y -= 4
     c.save()
     return filename
 
