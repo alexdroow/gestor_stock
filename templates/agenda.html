@@ -1125,41 +1125,43 @@
             text-transform: uppercase;
             letter-spacing: .3px;
         }
-        .torta-cotizador-row {
-            display: grid;
-            grid-template-columns: 1fr 110px auto;
-            gap: 8px;
-            align-items: end;
-            margin-bottom: 10px;
-        }
-        .torta-cotizador-list {
+        .torta-builder-list {
             border: 1px solid #fcd34d;
             border-radius: 8px;
             background: #fff;
             padding: 8px;
             margin-top: 6px;
-            max-height: 175px;
-            overflow: auto;
             display: grid;
             gap: 6px;
+            max-height: 188px;
+            overflow: auto;
         }
-        .torta-cotizador-item {
-            display: grid;
-            grid-template-columns: 1fr auto auto auto;
-            gap: 8px;
+        .torta-builder-row {
+            display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 8px;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            padding: 6px 8px;
+            padding: 7px 9px;
             font-size: 12px;
             background: #fff;
         }
-        .torta-cotizador-item-name {
+        .torta-builder-row-name {
             color: #0f172a;
             font-weight: 700;
         }
-        .torta-cotizador-total {
+        .torta-builder-ref-list {
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            background: #fff;
+            padding: 8px;
             margin-top: 8px;
+            display: grid;
+            gap: 7px;
+        }
+        .torta-builder-total {
+            margin-top: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -1425,19 +1427,20 @@
         body.dark-mode .torta-manual-title {
             color: #fdba74;
         }
-        body.dark-mode .torta-cotizador-list {
+        body.dark-mode .torta-builder-list {
             background: #1e293b;
             border-color: #b45309;
         }
-        body.dark-mode .torta-cotizador-item {
+        body.dark-mode .torta-builder-row,
+        body.dark-mode .torta-builder-ref-list {
             background: #0f172a;
             border-color: #334155;
             color: #e2e8f0;
         }
-        body.dark-mode .torta-cotizador-item-name {
+        body.dark-mode .torta-builder-row-name {
             color: #f8fafc;
         }
-        body.dark-mode .torta-cotizador-total {
+        body.dark-mode .torta-builder-total {
             color: #fdba74;
             border-top-color: #b45309;
         }
@@ -1941,66 +1944,48 @@
                         <div class="torta-manual-title">&#127874; Agendado manual de torta (estructura tienda)</div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Tipo de torta</label>
-                                <input type="text" id="torta-tipo" placeholder="Ej: Cumpleanos, tematica, matrimonio">
+                                <label>Categoria</label>
+                                <input type="text" id="torta-categoria-buscar" list="torta-categoria-sugerencias" placeholder="Ej: bizcocho" oninput="buscarCategoriaTortaBuilder()">
+                                <datalist id="torta-categoria-sugerencias"></datalist>
+                                <select id="torta-categoria" onchange="cambiarCategoriaTortaBuilder()"></select>
                             </div>
                             <div class="form-group">
-                                <label>Tamano / porciones</label>
-                                <input type="text" id="torta-tamano" placeholder="Ej: 20 porciones / 2 pisos">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Sabores / rellenos</label>
-                                <input type="text" id="torta-rellenos" placeholder="Ej: Chocolate, manjar-frambuesa">
-                            </div>
-                            <div class="form-group">
-                                <label>Cobertura / estilo</label>
-                                <input type="text" id="torta-cobertura" placeholder="Ej: Buttercream blanca con flores">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Topper / dedicatoria</label>
-                                <input type="text" id="torta-topper" placeholder="Texto topper o dedicatoria">
-                            </div>
-                            <div class="form-group">
-                                <label>Referencia visual</label>
-                                <input type="text" id="torta-referencia" placeholder="URL o descripcion de referencia">
+                                <label>Tamano</label>
+                                <select id="torta-size" onchange="cambiarTamanoTortaBuilder()"></select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Observaciones de produccion</label>
-                            <textarea id="torta-observaciones" rows="2" placeholder="Color, detalles finos, alergias, etc."></textarea>
+                            <label>Sabores / rellenos</label>
+                            <div class="torta-builder-list" id="torta-sabores-list"></div>
+                            <p class="form-hint" id="torta-sabores-hint">Selecciona sabores segun el tamano elegido.</p>
                         </div>
                         <div class="form-group">
-                            <label>Cotizador rapido (catalogo tienda)</label>
-                            <div class="torta-cotizador-row">
-                                <input type="text" id="torta-item-buscar" list="torta-item-sugerencias" placeholder="Ej: bizcocho, relleno, topper, tamano">
-                                <input type="number" id="torta-item-cantidad" min="1" step="1" value="1">
-                                <button type="button" class="btn-mini-add" onclick="agregarItemCotizadorTorta()">Agregar</button>
+                            <label>Extras</label>
+                            <div class="torta-builder-list" id="torta-extras-list"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Topper</label>
+                            <select id="torta-topper-select" onchange="cambiarTopperTortaBuilder()"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Fotos de referencia</label>
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                <input type="file" id="torta-ref-file" accept=".jpg,.jpeg,.png,.webp" multiple>
+                                <button type="button" class="btn-mini-add" onclick="subirFotosReferenciaTorta()">Subir foto</button>
                             </div>
-                            <datalist id="torta-item-sugerencias"></datalist>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Item manual</label>
-                                    <input type="text" id="torta-item-manual-nombre" placeholder="Nombre item adicional">
-                                </div>
-                                <div class="form-group">
-                                    <label>Precio manual ($)</label>
-                                    <input type="number" id="torta-item-manual-precio" min="0" step="1" placeholder="0">
-                                </div>
-                            </div>
-                            <button type="button" class="btn-mini-add" onclick="agregarItemManualCotizadorTorta()">Agregar item manual</button>
-                            <div class="torta-cotizador-list" id="torta-cotizador-list">
-                                <div class="form-hint">Aun no hay items agregados.</div>
-                            </div>
-                            <div class="torta-cotizador-total">
-                                <span>Total cotizacion</span>
-                                <span id="torta-cotizador-total">$0</span>
+                            <div class="torta-builder-ref-list" id="torta-ref-list">
+                                <div class="form-hint">Sin fotos de referencia.</div>
                             </div>
                         </div>
-                        <p class="form-hint">Estos campos se ordenan automaticamente en el PDF y en el detalle del pedido.</p>
+                        <div class="form-group">
+                            <label>Nota de diseno</label>
+                            <textarea id="torta-nota" rows="2" placeholder="Color, estilo, texto topper, etc." oninput="syncTotalTortaBuilderConFormulario()"></textarea>
+                        </div>
+                        <div class="torta-builder-total">
+                            <span>Total estimado catalogo</span>
+                            <span id="torta-builder-total">$0</span>
+                        </div>
+                        <p class="form-hint">Replica del flujo de tienda: categoria, tamano, sabores, extras, topper y fotos.</p>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -2210,9 +2195,8 @@
         let notasAgenda = [];
         let eventoEditando = null;
         let modoAgendarTorta = false;
-        let tortaCatalogoOpciones = [];
-        let tortaCatalogoLookup = {};
-        let tortaCotizadorItems = [];
+        let tortaCatalogoPublico = null;
+        let tortaBuilder = null;
         let tortaCatalogoCargado = false;
         let notaEditando = null;
         let notaChecklistDraft = [];
@@ -2294,52 +2278,216 @@
             return `$${Math.max(0, n).toLocaleString('es-CL')}`;
         }
 
-        function limpiarCamposTortaManual() {
-            setCampo('torta-tipo', '');
-            setCampo('torta-tamano', '');
-            setCampo('torta-rellenos', '');
-            setCampo('torta-cobertura', '');
-            setCampo('torta-topper', '');
-            setCampo('torta-referencia', '');
-            setCampo('torta-observaciones', '');
-            setCampo('torta-item-buscar', '');
-            setCampo('torta-item-cantidad', '1');
-            setCampo('torta-item-manual-nombre', '');
-            setCampo('torta-item-manual-precio', '');
-            tortaCotizadorItems = [];
-            renderCotizadorTorta();
-        }
-
         function _normalizarNumero(value, fallback = 0) {
             const n = Number(value);
             return Number.isFinite(n) ? n : fallback;
         }
 
-        function _normalizarCatalogoOpcionesTorta(catalogo) {
-            const cat = (catalogo && typeof catalogo === 'object') ? catalogo : {};
-            const fuentes = [
-                { key: 'sizes', tipo: 'Tamano' },
-                { key: 'sabores', tipo: 'Sabor/Relleno' },
-                { key: 'extras', tipo: 'Extra' },
-                { key: 'toppers', tipo: 'Topper' },
-            ];
-            const out = [];
-            fuentes.forEach((cfg) => {
-                const lista = Array.isArray(cat[cfg.key]) ? cat[cfg.key] : [];
-                lista.forEach((row) => {
-                    const id = String(row && row.id ? row.id : '').trim();
-                    const nombre = String(row && row.nombre ? row.nombre : '').trim();
-                    const precio = _normalizarNumero(row && row.precio ? row.precio : 0, 0);
-                    if (!id || !nombre) return;
-                    out.push({
-                        uid: `${cfg.key}:${id}`,
-                        tipo: cfg.tipo,
-                        nombre,
-                        precio,
-                    });
-                });
+        function _tortaBuilderVacio() {
+            return {
+                categoria_id: '',
+                size_id: '',
+                sabor_ids: [],
+                extra_items: [],
+                topper_id: '',
+                referencia_urls: [],
+                nota: '',
+            };
+        }
+        if (!tortaBuilder) tortaBuilder = _tortaBuilderVacio();
+
+        function _catalogList(key) {
+            const src = (tortaCatalogoPublico && Array.isArray(tortaCatalogoPublico[key])) ? tortaCatalogoPublico[key] : [];
+            return src.map((x) => ({ ...x }));
+        }
+
+        function _catalogFind(key, id) {
+            const sid = String(id || '');
+            return _catalogList(key).find((x) => String(x.id || '') === sid) || null;
+        }
+
+        function _catalogCategoriasActivas() {
+            return _catalogList('categorias').filter((x) => Boolean(x.activo));
+        }
+
+        function _catalogCategoriaActual() {
+            return _catalogCategoriasActivas().find((c) => String(c.id || '') === String(tortaBuilder.categoria_id || '')) || null;
+        }
+
+        function _catalogSizesCategoria(catId) {
+            const sizes = _catalogList('sizes').filter((s) => Boolean(s.activo));
+            const cat = String(catId || '').trim();
+            const filtered = sizes.filter((s) => String(s.categoria_id || '') === cat);
+            return filtered.length ? filtered : sizes;
+        }
+
+        function _catalogPermitidos(key, categoria) {
+            const all = _catalogList(key).filter((x) => Boolean(x.activo));
+            if (!categoria) return all;
+            const mapField = key === 'sabores' ? 'sabores_ids' : (key === 'extras' ? 'extras_ids' : 'toppers_ids');
+            const allow = Array.isArray(categoria[mapField]) ? categoria[mapField].map((x) => String(x || '').trim().toLowerCase()).filter(Boolean) : [];
+            if (!allow.length) return all;
+            const allowSet = new Set(allow);
+            return all.filter((x) => allowSet.has(String(x.id || '').trim().toLowerCase()));
+        }
+
+        function _tortaBuilderSubtotal() {
+            const size = _catalogFind('sizes', tortaBuilder.size_id);
+            let total = Math.max(0, _normalizarNumero(size && size.precio, 0));
+            tortaBuilder.sabor_ids.forEach((sid) => {
+                const s = _catalogFind('sabores', sid);
+                total += Math.max(0, _normalizarNumero(s && s.precio, 0));
             });
-            return out;
+            (tortaBuilder.extra_items || []).forEach((ex) => {
+                const e = _catalogFind('extras', ex.id);
+                const qty = Math.max(1, Math.round(_normalizarNumero(ex.qty, 1)));
+                total += Math.max(0, _normalizarNumero(e && e.precio, 0)) * qty;
+            });
+            const topper = _catalogFind('toppers', tortaBuilder.topper_id);
+            total += Math.max(0, _normalizarNumero(topper && topper.precio, 0));
+            return Math.round(total);
+        }
+
+        function syncTotalTortaBuilderConFormulario() {
+            const total = _tortaBuilderSubtotal();
+            const totalEl = document.getElementById('evento-total');
+            if (totalEl) totalEl.value = total > 0 ? String(total) : '';
+            calcularRestante();
+            const totalTxt = document.getElementById('torta-builder-total');
+            if (totalTxt) totalTxt.textContent = formatoMonedaCLP(total);
+        }
+
+        function _normalizarBuilderState() {
+            const categorias = _catalogCategoriasActivas();
+            if (!categorias.length) return;
+            if (!tortaBuilder.categoria_id || !categorias.some((c) => String(c.id || '') === String(tortaBuilder.categoria_id || ''))) {
+                tortaBuilder.categoria_id = String((categorias[0] && categorias[0].id) || '');
+            }
+            const sizes = _catalogSizesCategoria(tortaBuilder.categoria_id);
+            if (!tortaBuilder.size_id || !sizes.some((s) => String(s.id || '') === String(tortaBuilder.size_id || ''))) {
+                tortaBuilder.size_id = String((sizes[0] && sizes[0].id) || '');
+            }
+            const cat = _catalogCategoriaActual();
+            const saboresAllow = new Set(_catalogPermitidos('sabores', cat).map((x) => String(x.id || '')));
+            tortaBuilder.sabor_ids = (Array.isArray(tortaBuilder.sabor_ids) ? tortaBuilder.sabor_ids : []).filter((sid) => saboresAllow.has(String(sid || '')));
+            const extrasAllow = new Set(_catalogPermitidos('extras', cat).map((x) => String(x.id || '')));
+            tortaBuilder.extra_items = (Array.isArray(tortaBuilder.extra_items) ? tortaBuilder.extra_items : [])
+                .filter((x) => extrasAllow.has(String((x && x.id) || '')))
+                .map((x) => ({ id: String(x.id || ''), qty: Math.max(1, Math.round(_normalizarNumero(x.qty, 1))) }));
+            const toppersAllow = new Set(_catalogPermitidos('toppers', cat).map((x) => String(x.id || '')));
+            if (tortaBuilder.topper_id && !toppersAllow.has(String(tortaBuilder.topper_id || ''))) tortaBuilder.topper_id = '';
+            const sizeSel = _catalogFind('sizes', tortaBuilder.size_id);
+            const maxSab = Math.max(1, _normalizarNumero(sizeSel && sizeSel.max_sabores, 1));
+            tortaBuilder.sabor_ids = tortaBuilder.sabor_ids.slice(0, maxSab);
+            tortaBuilder.referencia_urls = (Array.isArray(tortaBuilder.referencia_urls) ? tortaBuilder.referencia_urls : [])
+                .map((u) => String(u || '').trim())
+                .filter(Boolean)
+                .slice(0, 8);
+            tortaBuilder.nota = String(tortaBuilder.nota || '').trim().slice(0, 500);
+        }
+
+        function renderTortaBuilder() {
+            const box = document.getElementById('bloque-torta-manual');
+            if (!box) return;
+            const categorias = _catalogCategoriasActivas();
+            const catSel = document.getElementById('torta-categoria');
+            const catBuscar = document.getElementById('torta-categoria-buscar');
+            const catSugs = document.getElementById('torta-categoria-sugerencias');
+            const sizeSel = document.getElementById('torta-size');
+            const saboresList = document.getElementById('torta-sabores-list');
+            const saboresHint = document.getElementById('torta-sabores-hint');
+            const extrasList = document.getElementById('torta-extras-list');
+            const topperSel = document.getElementById('torta-topper-select');
+            const refList = document.getElementById('torta-ref-list');
+            const notaEl = document.getElementById('torta-nota');
+
+            if (!tortaCatalogoCargado || !categorias.length) {
+                if (catSel) catSel.innerHTML = '<option value="">Sin categorias</option>';
+                if (catSugs) catSugs.innerHTML = '';
+                if (sizeSel) sizeSel.innerHTML = '<option value="">Sin tamanos</option>';
+                if (saboresList) saboresList.innerHTML = '<div class="form-hint">No hay sabores disponibles.</div>';
+                if (extrasList) extrasList.innerHTML = '<div class="form-hint">No hay extras disponibles.</div>';
+                if (topperSel) topperSel.innerHTML = '<option value="">Sin topper</option>';
+                if (refList) refList.innerHTML = '<div class="form-hint">Sin fotos de referencia.</div>';
+                if (saboresHint) saboresHint.textContent = 'Configura el catalogo de tortas en tienda para habilitar opciones.';
+                syncTotalTortaBuilderConFormulario();
+                return;
+            }
+
+            _normalizarBuilderState();
+            const categoria = _catalogCategoriaActual();
+            const sizes = _catalogSizesCategoria(tortaBuilder.categoria_id);
+            const size = _catalogFind('sizes', tortaBuilder.size_id);
+            const maxSabores = Math.max(1, _normalizarNumero(size && size.max_sabores, 1));
+            const sabores = _catalogPermitidos('sabores', categoria);
+            const extras = _catalogPermitidos('extras', categoria);
+            const toppers = _catalogPermitidos('toppers', categoria);
+
+            if (catSel) {
+                catSel.innerHTML = categorias.map((c) => `<option value="${escapeHtml(String(c.id || ''))}">${escapeHtml(String(c.nombre || 'Categoria'))}</option>`).join('');
+                catSel.value = String(tortaBuilder.categoria_id || '');
+            }
+            if (catSugs) {
+                catSugs.innerHTML = categorias.map((c) => `<option value="${escapeHtml(String(c.nombre || ''))}"></option>`).join('');
+            }
+            if (catBuscar) {
+                const catActual = categorias.find((c) => String(c.id || '') === String(tortaBuilder.categoria_id || ''));
+                catBuscar.value = catActual ? String(catActual.nombre || '') : '';
+            }
+            if (sizeSel) {
+                sizeSel.innerHTML = sizes.map((s) => `<option value="${escapeHtml(String(s.id || ''))}">${escapeHtml(String(s.nombre || 'Tamano'))} (${escapeHtml(formatoMonedaCLP(s.precio || 0))})</option>`).join('');
+                sizeSel.value = String(tortaBuilder.size_id || '');
+            }
+
+            if (saboresList) {
+                if (!sabores.length) {
+                    saboresList.innerHTML = '<div class="form-hint">No hay sabores activos para esta categoria.</div>';
+                } else {
+                    saboresList.innerHTML = sabores.map((s) => {
+                        const sid = String(s.id || '');
+                        const checked = tortaBuilder.sabor_ids.includes(sid);
+                        return `<label class="torta-builder-row"><span class="torta-builder-row-name">${escapeHtml(String(s.nombre || 'Sabor'))}</span><span>${escapeHtml(formatoMonedaCLP(s.precio || 0))}</span><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleSaborTortaBuilder('${escapeHtml(sid)}', this.checked)"></label>`;
+                    }).join('');
+                }
+            }
+            if (saboresHint) saboresHint.textContent = `Maximo ${maxSabores} sabor(es) segun tamano seleccionado.`;
+
+            if (extrasList) {
+                if (!extras.length) {
+                    extrasList.innerHTML = '<div class="form-hint">No hay extras activos para esta categoria.</div>';
+                } else {
+                    extrasList.innerHTML = extras.map((e) => {
+                        const eid = String(e.id || '');
+                        const curr = (tortaBuilder.extra_items || []).find((x) => String(x.id || '') === eid);
+                        const qty = Math.max(0, _normalizarNumero(curr && curr.qty, 0));
+                        const maxQty = Math.max(1, _normalizarNumero(e.max_cantidad, 1));
+                        return `<div class="torta-builder-row"><span class="torta-builder-row-name">${escapeHtml(String(e.nombre || 'Extra'))} (${escapeHtml(formatoMonedaCLP(e.precio || 0))})</span><span style="display:flex;gap:6px;align-items:center;"><button type="button" class="btn-mini-outline" onclick="cambiarExtraTortaBuilder('${escapeHtml(eid)}', -1)">-</button><strong>${qty}</strong><button type="button" class="btn-mini-outline" ${qty >= maxQty ? 'disabled' : ''} onclick="cambiarExtraTortaBuilder('${escapeHtml(eid)}', 1)">+</button></span></div>`;
+                    }).join('');
+                }
+            }
+
+            if (topperSel) {
+                topperSel.innerHTML = ['<option value="">Sin topper</option>']
+                    .concat(toppers.map((t) => `<option value="${escapeHtml(String(t.id || ''))}">${escapeHtml(String(t.nombre || 'Topper'))} (${escapeHtml(formatoMonedaCLP(t.precio || 0))})</option>`))
+                    .join('');
+                topperSel.value = String(tortaBuilder.topper_id || '');
+            }
+
+            if (refList) {
+                if (!tortaBuilder.referencia_urls.length) {
+                    refList.innerHTML = '<div class="form-hint">Sin fotos de referencia.</div>';
+                } else {
+                    refList.innerHTML = tortaBuilder.referencia_urls.map((url, idx) => `
+                        <div class="torta-builder-row">
+                            <a class="torta-builder-row-name" href="${escapeHtml(url)}" target="_blank" rel="noopener">Referencia ${idx + 1}</a>
+                            <button type="button" class="btn-mini-danger" onclick="quitarFotoReferenciaTorta(${idx})">Eliminar</button>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            if (notaEl) notaEl.value = String(tortaBuilder.nota || '');
+            syncTotalTortaBuilderConFormulario();
         }
 
         async function cargarCatalogoTortaManual(force = false) {
@@ -2348,145 +2496,183 @@
                 const res = await fetch(`/api/tienda/catalogo-torta?t=${Date.now()}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo cargar catalogo de torta');
-                tortaCatalogoOpciones = _normalizarCatalogoOpcionesTorta(data.catalogo || {});
-                tortaCatalogoLookup = {};
-                const datalist = document.getElementById('torta-item-sugerencias');
-                if (datalist) datalist.innerHTML = '';
-                tortaCatalogoOpciones.forEach((item) => {
-                    const label = `${item.nombre} (${item.tipo}) - ${formatoMonedaCLP(item.precio)}`;
-                    tortaCatalogoLookup[label] = item;
-                    if (datalist) {
-                        const opt = document.createElement('option');
-                        opt.value = label;
-                        datalist.appendChild(opt);
-                    }
-                });
+                tortaCatalogoPublico = data.catalogo || {};
                 tortaCatalogoCargado = true;
             } catch (err) {
                 console.warn('[agenda] catalogo torta manual no disponible:', err);
-                tortaCatalogoOpciones = [];
-                tortaCatalogoLookup = {};
+                tortaCatalogoPublico = null;
                 tortaCatalogoCargado = false;
             }
+            renderTortaBuilder();
         }
 
-        function totalCotizadorTorta() {
-            return (Array.isArray(tortaCotizadorItems) ? tortaCotizadorItems : []).reduce((acc, item) => {
-                const qty = Math.max(1, Math.round(_normalizarNumero(item.cantidad, 1)));
-                const precio = Math.max(0, _normalizarNumero(item.precio, 0));
-                return acc + (qty * precio);
-            }, 0);
-        }
-
-        function syncTotalCotizadorConFormulario() {
-            const total = Math.round(totalCotizadorTorta());
-            const totalEl = document.getElementById('evento-total');
-            if (totalEl) totalEl.value = total > 0 ? String(total) : '';
-            calcularRestante();
-            const totalTxt = document.getElementById('torta-cotizador-total');
-            if (totalTxt) totalTxt.textContent = formatoMonedaCLP(total);
-        }
-
-        function renderCotizadorTorta() {
-            const list = document.getElementById('torta-cotizador-list');
-            if (!list) return;
-            if (!Array.isArray(tortaCotizadorItems) || !tortaCotizadorItems.length) {
-                list.innerHTML = '<div class="form-hint">Aun no hay items agregados.</div>';
-                syncTotalCotizadorConFormulario();
-                return;
-            }
-            list.innerHTML = tortaCotizadorItems.map((item, idx) => {
-                const qty = Math.max(1, Math.round(_normalizarNumero(item.cantidad, 1)));
-                const precio = Math.max(0, _normalizarNumero(item.precio, 0));
-                const subtotal = qty * precio;
-                return `
-                    <div class="torta-cotizador-item">
-                        <div class="torta-cotizador-item-name">${escapeHtml(item.nombre || 'Item')}</div>
-                        <input type="number" min="1" step="1" value="${qty}" onchange="cambiarCantidadCotizadorTorta(${idx}, this.value)" style="width:64px;padding:4px 6px;">
-                        <div>${escapeHtml(formatoMonedaCLP(precio))}</div>
-                        <div style="display:flex;gap:6px;align-items:center;">
-                            <strong>${escapeHtml(formatoMonedaCLP(subtotal))}</strong>
-                            <button type="button" class="btn-mini-outline" onclick="quitarItemCotizadorTorta(${idx})">x</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            syncTotalCotizadorConFormulario();
-        }
-
-        function agregarItemCotizadorTorta() {
-            const buscar = valorCampo('torta-item-buscar');
-            const cantidad = Math.max(1, Math.round(_normalizarNumero(valorCampo('torta-item-cantidad'), 1)));
-            if (!buscar) return;
-            let base = tortaCatalogoLookup[buscar];
-            if (!base) {
-                const q = buscar.toLowerCase();
-                base = (tortaCatalogoOpciones || []).find((item) => String(item.nombre || '').toLowerCase().includes(q));
-            }
-            if (!base) {
-                alert('No se encontro ese item en el catalogo. Prueba otra palabra (ej: bizcocho, topper, relleno).');
-                return;
-            }
-            tortaCotizadorItems.push({
-                id: base.uid,
-                tipo: base.tipo,
-                nombre: `${base.tipo}: ${base.nombre}`,
-                precio: Math.max(0, _normalizarNumero(base.precio, 0)),
-                cantidad,
-            });
-            setCampo('torta-item-buscar', '');
-            setCampo('torta-item-cantidad', '1');
-            renderCotizadorTorta();
-        }
-
-        function agregarItemManualCotizadorTorta() {
-            const nombre = valorCampo('torta-item-manual-nombre');
-            const precio = Math.max(0, _normalizarNumero(valorCampo('torta-item-manual-precio'), 0));
-            if (!nombre) {
-                alert('Ingresa el nombre del item manual.');
-                return;
-            }
-            tortaCotizadorItems.push({
-                id: `manual:${Date.now()}`,
-                tipo: 'Manual',
-                nombre: `Manual: ${nombre}`,
-                precio,
-                cantidad: 1,
-            });
-            setCampo('torta-item-manual-nombre', '');
-            setCampo('torta-item-manual-precio', '');
-            renderCotizadorTorta();
-        }
-
-        function cambiarCantidadCotizadorTorta(index, value) {
-            const idx = Number(index);
-            if (!Number.isFinite(idx) || idx < 0 || idx >= tortaCotizadorItems.length) return;
-            tortaCotizadorItems[idx].cantidad = Math.max(1, Math.round(_normalizarNumero(value, 1)));
-            renderCotizadorTorta();
-        }
-
-        function quitarItemCotizadorTorta(index) {
-            const idx = Number(index);
-            if (!Number.isFinite(idx) || idx < 0 || idx >= tortaCotizadorItems.length) return;
-            tortaCotizadorItems.splice(idx, 1);
-            renderCotizadorTorta();
+        function limpiarCamposTortaManual() {
+            tortaBuilder = _tortaBuilderVacio();
+            setCampo('torta-nota', '');
+            const refInput = document.getElementById('torta-ref-file');
+            if (refInput) refInput.value = '';
+            renderTortaBuilder();
         }
 
         function mostrarBloqueTortaManual(mostrar) {
             const box = document.getElementById('bloque-torta-manual');
             if (!box) return;
             box.style.display = mostrar ? 'block' : 'none';
+            if (mostrar) {
+                cargarCatalogoTortaManual();
+                renderTortaBuilder();
+            }
+        }
+
+        function cambiarCategoriaTortaBuilder() {
+            tortaBuilder.categoria_id = valorCampo('torta-categoria');
+            tortaBuilder.size_id = '';
+            tortaBuilder.sabor_ids = [];
+            tortaBuilder.extra_items = [];
+            tortaBuilder.topper_id = '';
+            renderTortaBuilder();
+        }
+
+        function buscarCategoriaTortaBuilder() {
+            const query = String(valorCampo('torta-categoria-buscar') || '').toLowerCase();
+            if (!query) return;
+            const categorias = _catalogCategoriasActivas();
+            const found = categorias.find((c) => String(c.nombre || '').toLowerCase().includes(query));
+            if (!found) return;
+            const id = String(found.id || '');
+            if (id && id !== String(tortaBuilder.categoria_id || '')) {
+                tortaBuilder.categoria_id = id;
+                tortaBuilder.size_id = '';
+                tortaBuilder.sabor_ids = [];
+                tortaBuilder.extra_items = [];
+                tortaBuilder.topper_id = '';
+                renderTortaBuilder();
+            }
+        }
+
+        function cambiarTamanoTortaBuilder() {
+            tortaBuilder.size_id = valorCampo('torta-size');
+            const size = _catalogFind('sizes', tortaBuilder.size_id);
+            const maxSab = Math.max(1, _normalizarNumero(size && size.max_sabores, 1));
+            tortaBuilder.sabor_ids = tortaBuilder.sabor_ids.slice(0, maxSab);
+            renderTortaBuilder();
+        }
+
+        function toggleSaborTortaBuilder(saborId, checked) {
+            const sid = String(saborId || '');
+            if (!sid) return;
+            const size = _catalogFind('sizes', tortaBuilder.size_id);
+            const maxSab = Math.max(1, _normalizarNumero(size && size.max_sabores, 1));
+            const curr = Array.isArray(tortaBuilder.sabor_ids) ? [...tortaBuilder.sabor_ids] : [];
+            const has = curr.includes(sid);
+            if (checked && !has) {
+                if (curr.length >= maxSab) {
+                    alert(`Maximo ${maxSab} sabor(es) para este tamano.`);
+                    renderTortaBuilder();
+                    return;
+                }
+                curr.push(sid);
+            }
+            if (!checked && has) {
+                tortaBuilder.sabor_ids = curr.filter((x) => x !== sid);
+            } else {
+                tortaBuilder.sabor_ids = curr;
+            }
+            renderTortaBuilder();
+        }
+
+        function cambiarExtraTortaBuilder(extraId, delta) {
+            const eid = String(extraId || '');
+            if (!eid) return;
+            const step = Number(delta || 0);
+            if (!step) return;
+            const extra = _catalogFind('extras', eid);
+            if (!extra) return;
+            const maxQty = Math.max(1, _normalizarNumero(extra.max_cantidad, 1));
+            const rows = Array.isArray(tortaBuilder.extra_items) ? [...tortaBuilder.extra_items] : [];
+            const idx = rows.findIndex((x) => String(x.id || '') === eid);
+            const curr = idx >= 0 ? Math.max(0, _normalizarNumero(rows[idx].qty, 0)) : 0;
+            const next = Math.max(0, Math.min(maxQty, curr + step));
+            if (idx >= 0) {
+                if (next <= 0) rows.splice(idx, 1);
+                else rows[idx] = { id: eid, qty: next };
+            } else if (next > 0) {
+                rows.push({ id: eid, qty: next });
+            }
+            tortaBuilder.extra_items = rows;
+            renderTortaBuilder();
+        }
+
+        function cambiarTopperTortaBuilder() {
+            tortaBuilder.topper_id = valorCampo('torta-topper-select');
+            renderTortaBuilder();
+        }
+
+        async function subirFotosReferenciaTorta() {
+            const fileInput = document.getElementById('torta-ref-file');
+            if (!fileInput || !fileInput.files || !fileInput.files.length) {
+                alert('Selecciona al menos una foto de referencia.');
+                return;
+            }
+            const files = Array.from(fileInput.files).slice(0, 4);
+            try {
+                mostrarLoading(true);
+                for (const file of files) {
+                    const fd = new FormData();
+                    fd.append('foto', file);
+                    const res = await fetch('/api/tienda/agenda/referencia-foto', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo subir foto de referencia');
+                    const url = String(data.url || '').trim();
+                    if (url) tortaBuilder.referencia_urls.push(url);
+                }
+                tortaBuilder.referencia_urls = tortaBuilder.referencia_urls.slice(0, 8);
+                fileInput.value = '';
+                renderTortaBuilder();
+            } catch (err) {
+                alert(String(err && err.message ? err.message : 'No se pudo subir referencia'));
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
+        function quitarFotoReferenciaTorta(index) {
+            const idx = Number(index);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= tortaBuilder.referencia_urls.length) return;
+            tortaBuilder.referencia_urls.splice(idx, 1);
+            renderTortaBuilder();
         }
 
         function obtenerDatosTortaManual() {
+            _normalizarBuilderState();
+            const categoria = _catalogFind('categorias', tortaBuilder.categoria_id);
+            const size = _catalogFind('sizes', tortaBuilder.size_id);
+            const sabores = (tortaBuilder.sabor_ids || []).map((sid) => _catalogFind('sabores', sid)).filter(Boolean);
+            const extras = (tortaBuilder.extra_items || []).map((ex) => {
+                const row = _catalogFind('extras', ex.id);
+                if (!row) return null;
+                return { ...row, qty: Math.max(1, _normalizarNumero(ex.qty, 1)) };
+            }).filter(Boolean);
+            const topper = _catalogFind('toppers', tortaBuilder.topper_id);
+            tortaBuilder.nota = valorCampo('torta-nota').slice(0, 500);
             return {
-                tipo_torta: valorCampo('torta-tipo'),
-                tamano: valorCampo('torta-tamano'),
-                rellenos: valorCampo('torta-rellenos'),
-                cobertura: valorCampo('torta-cobertura'),
-                topper: valorCampo('torta-topper'),
-                referencia: valorCampo('torta-referencia'),
-                observaciones: valorCampo('torta-observaciones'),
+                categoria,
+                size,
+                sabores,
+                extras,
+                topper,
+                referencia_urls: [...(tortaBuilder.referencia_urls || [])],
+                nota: tortaBuilder.nota,
+                subtotal: _tortaBuilderSubtotal(),
+                raw: {
+                    categoria_id: String(tortaBuilder.categoria_id || ''),
+                    size_id: String(tortaBuilder.size_id || ''),
+                    sabor_ids: [...(tortaBuilder.sabor_ids || [])],
+                    extra_items: [...(tortaBuilder.extra_items || [])],
+                    topper_id: String(tortaBuilder.topper_id || ''),
+                    referencia_urls: [...(tortaBuilder.referencia_urls || [])],
+                    nota: String(tortaBuilder.nota || ''),
+                },
             };
         }
 
@@ -2495,88 +2681,68 @@
             const cliente = valorCampo('evento-cliente');
             const entrega = document.getElementById('evento-envio')?.checked ? 'Despacho' : 'Retiro en tienda';
             const direccion = valorCampo('evento-direccion');
-            const lineasCot = [];
-            (Array.isArray(tortaCotizadorItems) ? tortaCotizadorItems : []).forEach((item) => {
-                const qty = Math.max(1, Math.round(_normalizarNumero(item.cantidad, 1)));
-                const precio = Math.max(0, _normalizarNumero(item.precio, 0));
-                lineasCot.push(`- ${item.nombre || 'Item'} x${qty} (${formatoMonedaCLP(precio * qty)})`);
-            });
-            const totalCot = totalCotizadorTorta();
+            const saboresTxt = data.sabores.length ? data.sabores.map((s) => `${s.nombre} (${formatoMonedaCLP(s.precio || 0)})`).join(', ') : '-';
+            const extrasTxt = data.extras.length
+                ? data.extras.map((e) => `${e.nombre} x${e.qty} (${formatoMonedaCLP((_normalizarNumero(e.precio, 0) * _normalizarNumero(e.qty, 1)))})`).join(' | ')
+                : '-';
+            const refsTxt = data.referencia_urls.length ? data.referencia_urls.join(' | ') : '-';
             const bloques = [
-                '--- Datos torta ---',
-                `Tipo de torta: ${data.tipo_torta || '-'}`,
-                `Tamano / porciones: ${data.tamano || '-'}`,
-                `Sabores / rellenos: ${data.rellenos || '-'}`,
-                `Cobertura / estilo: ${data.cobertura || '-'}`,
-                `Topper / dedicatoria: ${data.topper || '-'}`,
-                `Referencia visual: ${data.referencia || '-'}`,
-                `Observaciones produccion: ${data.observaciones || '-'}`,
-                '--- Cotizacion ---',
-                ...(lineasCot.length ? lineasCot : ['- Sin items en cotizador']),
-                `Total cotizacion: ${formatoMonedaCLP(totalCot)}`,
+                '--- Catalogo torta ---',
+                `Categoria: ${data.categoria ? data.categoria.nombre : '-'}`,
+                `Tamano: ${data.size ? `${data.size.nombre} (${formatoMonedaCLP(data.size.precio || 0)})` : '-'}`,
+                `Sabores: ${saboresTxt}`,
+                `Extras: ${extrasTxt}`,
+                `Topper: ${data.topper ? `${data.topper.nombre} (${formatoMonedaCLP(data.topper.precio || 0)})` : 'Sin topper'}`,
+                `Referencias: ${refsTxt}`,
+                `Nota catalogo: ${data.nota || '-'}`,
+                `Subtotal estimado productos: ${formatoMonedaCLP(data.subtotal)}`,
+                '--- Builder JSON ---',
+                JSON.stringify(data.raw),
                 '--- Entrega ---',
                 `Modalidad: ${entrega}`,
                 `Direccion: ${entrega === 'Despacho' ? (direccion || '-') : 'Retiro en tienda'}`,
             ];
-            if (cliente) {
-                bloques.unshift(`Cliente de referencia: ${cliente}`);
-            }
+            if (cliente) bloques.unshift(`Cliente de referencia: ${cliente}`);
             return bloques.join('\n');
         }
 
         function aplicarDetalleTortaManualDesdeTexto(raw) {
             const text = String(raw || '').replace(/\r\n?/g, '\n');
             if (!text) return;
-            const map = {
-                'tipo de torta': 'torta-tipo',
-                'tamano / porciones': 'torta-tamano',
-                'sabores / rellenos': 'torta-rellenos',
-                'cobertura / estilo': 'torta-cobertura',
-                'topper / dedicatoria': 'torta-topper',
-                'referencia visual': 'torta-referencia',
-                'observaciones produccion': 'torta-observaciones',
-            };
-            text.split('\n').forEach((ln) => {
-                const line = String(ln || '').trim();
-                if (!line) return;
-                const idx = line.indexOf(':');
-                if (idx <= 0) return;
-                const key = line.slice(0, idx).trim().toLowerCase();
-                const value = line.slice(idx + 1).trim();
-                const target = map[key];
-                if (target) setCampo(target, value === '-' ? '' : value);
-            });
-            tortaCotizadorItems = extraerCotizacionDesdeDetalle(text);
-            renderCotizadorTorta();
-        }
-
-        function extraerCotizacionDesdeDetalle(texto) {
-            const out = [];
-            const lineas = String(texto || '').replace(/\r\n?/g, '\n').split('\n').map((ln) => String(ln || '').trim());
-            let enCot = false;
-            lineas.forEach((line) => {
+            const lines = text.split('\n').map((x) => String(x || '').trim());
+            let inJson = false;
+            let jsonLine = '';
+            lines.forEach((line) => {
                 if (!line) return;
                 const sec = line.match(/^---\s*(.+?)\s*---$/);
                 if (sec && sec[1]) {
-                    enCot = String(sec[1] || '').trim().toLowerCase() === 'cotizacion';
+                    inJson = String(sec[1] || '').trim().toLowerCase() === 'builder json';
                     return;
                 }
-                if (!enCot) return;
-                if (line.toLowerCase().startsWith('total cotizacion:')) return;
-                if (!line.startsWith('-')) return;
-                const raw = line.replace(/^-+\s*/, '').trim();
-                const m = raw.match(/^(.*?)\s*x(\d+)\s*\(([^)]+)\)\s*$/i);
-                if (!m) {
-                    out.push({ id: `import:${Date.now()}:${out.length}`, tipo: 'Importado', nombre: raw, precio: 0, cantidad: 1 });
-                    return;
-                }
-                const nombre = String(m[1] || '').trim() || 'Item';
-                const qty = Math.max(1, parseInt(m[2] || '1', 10));
-                const subtotalNum = Number(String(m[3] || '').replace(/[^\d]/g, '')) || 0;
-                const precio = qty > 0 ? Math.round(subtotalNum / qty) : subtotalNum;
-                out.push({ id: `import:${Date.now()}:${out.length}`, tipo: 'Importado', nombre, precio, cantidad: qty });
+                if (inJson && !jsonLine && line.startsWith('{') && line.endsWith('}')) jsonLine = line;
             });
-            return out;
+            if (!jsonLine) {
+                tortaBuilder = _tortaBuilderVacio();
+                renderTortaBuilder();
+                return;
+            }
+            try {
+                const parsed = JSON.parse(jsonLine);
+                tortaBuilder = {
+                    categoria_id: String(parsed.categoria_id || ''),
+                    size_id: String(parsed.size_id || ''),
+                    sabor_ids: Array.isArray(parsed.sabor_ids) ? parsed.sabor_ids.map((x) => String(x || '')) : [],
+                    extra_items: Array.isArray(parsed.extra_items)
+                        ? parsed.extra_items.map((x) => ({ id: String((x && x.id) || ''), qty: Math.max(1, _normalizarNumero(x && x.qty, 1)) })).filter((x) => x.id)
+                        : [],
+                    topper_id: String(parsed.topper_id || ''),
+                    referencia_urls: Array.isArray(parsed.referencia_urls) ? parsed.referencia_urls.map((x) => String(x || '').trim()).filter(Boolean) : [],
+                    nota: String(parsed.nota || '').trim(),
+                };
+            } catch (_) {
+                tortaBuilder = _tortaBuilderVacio();
+            }
+            renderTortaBuilder();
         }
 
         function detalleEnSecciones(texto, tituloDefault = 'Detalle pedido') {
@@ -2807,26 +2973,15 @@
             if (telefonoInput) {
                 telefonoInput.addEventListener('input', actualizarBotonWhatsAppCliente);
             }
-            const itemBuscar = document.getElementById('torta-item-buscar');
-            if (itemBuscar) {
-                itemBuscar.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Enter') {
-                        ev.preventDefault();
-                        agregarItemCotizadorTorta();
-                    }
-                });
-            }
-            const itemManualNombre = document.getElementById('torta-item-manual-nombre');
-            if (itemManualNombre) {
-                itemManualNombre.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Enter') {
-                        ev.preventDefault();
-                        agregarItemManualCotizadorTorta();
-                    }
+            const notaTortaEl = document.getElementById('torta-nota');
+            if (notaTortaEl) {
+                notaTortaEl.addEventListener('input', () => {
+                    if (!tortaBuilder) tortaBuilder = _tortaBuilderVacio();
+                    tortaBuilder.nota = String(notaTortaEl.value || '').slice(0, 500);
                 });
             }
             cargarCatalogoTortaManual();
-            renderCotizadorTorta();
+            renderTortaBuilder();
         });
 
         window.addEventListener('storage', (event) => {
@@ -2906,17 +3061,17 @@
 
             if (esTortaManual) {
                 const dataTorta = obtenerDatosTortaManual();
-                if (!dataTorta.tamano) {
-                    alert('Completa el tamano o porciones de la torta.');
+                if (!dataTorta.size) {
+                    alert('Selecciona un tamano de torta.');
                     return;
                 }
-                if (!dataTorta.rellenos) {
-                    alert('Completa los sabores o rellenos de la torta.');
+                if (!Array.isArray(dataTorta.sabores) || !dataTorta.sabores.length) {
+                    alert('Selecciona al menos un sabor/relleno.');
                     return;
                 }
                 ingredientesEvento = detalleTortaManualArmado();
                 if (!tituloEvento || tituloEvento === 'Torta personalizada') {
-                    const baseTipo = dataTorta.tipo_torta || 'personalizada';
+                    const baseTipo = (dataTorta.categoria && dataTorta.categoria.nombre) ? dataTorta.categoria.nombre : 'personalizada';
                     const clienteTxt = (document.getElementById('evento-cliente').value || '').trim();
                     tituloEvento = `Torta ${baseTipo}${clienteTxt ? ` - ${clienteTxt}` : ''}`;
                 }
@@ -4094,7 +4249,7 @@
             document.getElementById('evento-tipo').disabled = true;
             document.getElementById('evento-titulo').value = 'Torta personalizada';
             mostrarBloqueTortaManual(true);
-            cargarCatalogoTortaManual().finally(() => renderCotizadorTorta());
+            cargarCatalogoTortaManual().finally(() => renderTortaBuilder());
             cambiarTipo();
         }
         
@@ -4128,7 +4283,8 @@
             limpiarCamposTortaManual();
             const esTorta = String(evento.tipo || '').trim().toLowerCase() === 'torta';
             const detalleEvento = String(evento.ingredientes || '');
-            if (esTorta && detalleEvento.toLowerCase().includes('--- datos torta ---')) {
+            const detalleNorm = detalleEvento.toLowerCase();
+            if (esTorta && (detalleNorm.includes('--- catalogo torta ---') || detalleNorm.includes('--- builder json ---') || detalleNorm.includes('--- datos torta ---'))) {
                 modoAgendarTorta = true;
                 mostrarBloqueTortaManual(true);
                 document.getElementById('modal-titulo').textContent = 'Editar Torta Agendada';
