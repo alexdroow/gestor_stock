@@ -2529,16 +2529,16 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     return filename
 
 
-def _enviar_whatsapp_twilio(body_text, media_url=None):
+def _enviar_whatsapp_twilio(body_text, media_url=None, to_number=None):
     account_sid = str(os.environ.get("TWILIO_ACCOUNT_SID") or "").strip()
     auth_token = str(os.environ.get("TWILIO_AUTH_TOKEN") or "").strip()
     from_number = _normalizar_numero_whatsapp(os.environ.get("TWILIO_WHATSAPP_FROM"))
-    to_number = _normalizar_numero_whatsapp(os.environ.get("GESTIONSTOCK_WHATSAPP_TO", "+56964330546"))
-    if not account_sid or not auth_token or not from_number or not to_number:
+    destino = _normalizar_numero_whatsapp(to_number or os.environ.get("GESTIONSTOCK_WHATSAPP_TO", "+56964330546"))
+    if not account_sid or not auth_token or not from_number or not destino:
         return False, "Twilio no configurado"
 
     payload = {
-        "To": to_number,
+        "To": destino,
         "From": from_number,
         "Body": str(body_text or "").strip()[:1500],
     }
@@ -16212,6 +16212,83 @@ def api_agenda_guardar():
         return jsonify(resultado)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agenda/evento/<int:id>/whatsapp-cliente-pdf', methods=['POST'])
+def api_agenda_evento_whatsapp_cliente_pdf(id):
+    conn = None
+    try:
+        evento_id = int(id or 0)
+        if evento_id <= 0:
+            return jsonify({'success': False, 'error': 'ID de evento invalido'}), 400
+
+        data = request.get_json(silent=True) or {}
+        telefono_req = str(data.get('telefono') or '').strip()
+        cliente_req = str(data.get('cliente') or '').strip()
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono, direccion, ingredientes, total, abono, codigo_operacion
+            FROM agenda_eventos
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (evento_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'Evento no encontrado'}), 404
+        evento = dict(row)
+
+        telefono_cliente = telefono_req or str(evento.get('telefono') or '').strip()
+        destino_twilio = _normalizar_numero_whatsapp(telefono_cliente)
+        destino_digits = re.sub(r"\D+", "", telefono_cliente)
+        if destino_digits.startswith("56") and len(destino_digits) >= 10:
+            destino_wa = destino_digits
+        elif len(destino_digits) == 9 and destino_digits.startswith("9"):
+            destino_wa = f"56{destino_digits}"
+        else:
+            destino_wa = ""
+        if not destino_twilio and not destino_wa:
+            return jsonify({'success': False, 'error': 'Telefono del cliente invalido o faltante'}), 400
+
+        filename = _crear_pdf_reserva_agenda_tienda(evento)
+        media_url = f"{str(request.url_root or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
+
+        cliente_txt = cliente_req or str(evento.get('cliente') or '').strip() or 'cliente'
+        tipo_txt = str(evento.get('tipo') or '').strip().capitalize() or 'Reserva'
+        fecha_txt = str(evento.get('fecha') or '-').strip()
+        hora_txt = str(evento.get('hora_entrega') or evento.get('hora_inicio') or '-').strip()
+        body = (
+            f"Hola {cliente_txt}, te compartimos la cotizacion de tu pedido.\n"
+            f"Evento #{evento_id}\n"
+            f"Tipo: {tipo_txt}\n"
+            f"Fecha: {fecha_txt} {hora_txt}\n"
+            "Adjunto PDF con el detalle y total."
+        )
+
+        if _bool_env("GESTIONSTOCK_WHATSAPP_ENABLED", default=False) and _twilio_whatsapp_configurado() and destino_twilio:
+            ok, err = _enviar_whatsapp_twilio(body, media_url=media_url, to_number=destino_twilio)
+            if ok:
+                return jsonify({'success': True, 'via': 'twilio', 'media_url': media_url})
+            return jsonify({'success': False, 'error': err or 'No se pudo enviar por WhatsApp (Twilio)'}), 502
+
+        mensaje_manual = (
+            f"Hola {cliente_txt}, te compartimos la cotizacion de tu pedido. "
+            f"Evento #{evento_id}. Tipo: {tipo_txt}. Fecha: {fecha_txt} {hora_txt}. "
+            f"PDF: {media_url}"
+        )
+        whatsapp_url = f"https://wa.me/{destino_wa}?text={quote(mensaje_manual)}" if destino_wa else ""
+        if not whatsapp_url:
+            return jsonify({'success': False, 'error': 'No se pudo generar enlace WhatsApp para envio manual'}), 400
+        return jsonify({'success': True, 'via': 'manual', 'media_url': media_url, 'whatsapp_url': whatsapp_url})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/agenda/evento/<int:id>/estado', methods=['POST'])

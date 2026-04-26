@@ -1125,6 +1125,59 @@
             text-transform: uppercase;
             letter-spacing: .3px;
         }
+        .torta-cotizador-row {
+            display: grid;
+            grid-template-columns: 1fr 110px auto;
+            gap: 8px;
+            align-items: end;
+            margin-bottom: 10px;
+        }
+        .torta-cotizador-list {
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            background: #fff;
+            padding: 8px;
+            margin-top: 6px;
+            max-height: 175px;
+            overflow: auto;
+            display: grid;
+            gap: 6px;
+        }
+        .torta-cotizador-item {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 8px;
+            align-items: center;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 12px;
+            background: #fff;
+        }
+        .torta-cotizador-item-name {
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .torta-cotizador-total {
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px dashed #f59e0b;
+            padding-top: 8px;
+            font-weight: 800;
+            color: #7c2d12;
+        }
+        .btn-mini-add {
+            border: 1px solid #f59e0b;
+            color: #9a3412;
+            background: #fff7ed;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
 
         .nota-checklist-editor {
             display: flex;
@@ -1371,6 +1424,22 @@
         }
         body.dark-mode .torta-manual-title {
             color: #fdba74;
+        }
+        body.dark-mode .torta-cotizador-list {
+            background: #1e293b;
+            border-color: #b45309;
+        }
+        body.dark-mode .torta-cotizador-item {
+            background: #0f172a;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
+        body.dark-mode .torta-cotizador-item-name {
+            color: #f8fafc;
+        }
+        body.dark-mode .torta-cotizador-total {
+            color: #fdba74;
+            border-top-color: #b45309;
         }
 
         body.dark-mode .event-item:hover {
@@ -1904,6 +1973,33 @@
                             <label>Observaciones de produccion</label>
                             <textarea id="torta-observaciones" rows="2" placeholder="Color, detalles finos, alergias, etc."></textarea>
                         </div>
+                        <div class="form-group">
+                            <label>Cotizador rapido (catalogo tienda)</label>
+                            <div class="torta-cotizador-row">
+                                <input type="text" id="torta-item-buscar" list="torta-item-sugerencias" placeholder="Ej: bizcocho, relleno, topper, tamano">
+                                <input type="number" id="torta-item-cantidad" min="1" step="1" value="1">
+                                <button type="button" class="btn-mini-add" onclick="agregarItemCotizadorTorta()">Agregar</button>
+                            </div>
+                            <datalist id="torta-item-sugerencias"></datalist>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Item manual</label>
+                                    <input type="text" id="torta-item-manual-nombre" placeholder="Nombre item adicional">
+                                </div>
+                                <div class="form-group">
+                                    <label>Precio manual ($)</label>
+                                    <input type="number" id="torta-item-manual-precio" min="0" step="1" placeholder="0">
+                                </div>
+                            </div>
+                            <button type="button" class="btn-mini-add" onclick="agregarItemManualCotizadorTorta()">Agregar item manual</button>
+                            <div class="torta-cotizador-list" id="torta-cotizador-list">
+                                <div class="form-hint">Aun no hay items agregados.</div>
+                            </div>
+                            <div class="torta-cotizador-total">
+                                <span>Total cotizacion</span>
+                                <span id="torta-cotizador-total">$0</span>
+                            </div>
+                        </div>
                         <p class="form-hint">Estos campos se ordenan automaticamente en el PDF y en el detalle del pedido.</p>
                     </div>
                     <div class="form-row">
@@ -1985,6 +2081,7 @@
                 <button onclick="eliminarEvento()" class="btn btn-danger" id="btn-eliminar" style="display: none;">Eliminar</button>
                 <button onclick="cerrarModal()" class="btn btn-secondary">Cancelar</button>
                 <button onclick="contactarClienteWhatsAppEvento()" class="btn btn-whatsapp" id="btn-whatsapp-cliente" style="display: none;">WhatsApp cliente</button>
+                <button onclick="enviarCotizacionWhatsAppCliente()" class="btn btn-whatsapp" id="btn-whatsapp-pdf" style="display: none;">WhatsApp + PDF</button>
                 <button onclick="generarPDF()" class="btn btn-pdf" id="btn-pdf" style="display: none;">&#128196; PDF</button>
                 <button onclick="guardarEvento()" class="btn btn-success">Guardar</button>
             </div>
@@ -2113,6 +2210,10 @@
         let notasAgenda = [];
         let eventoEditando = null;
         let modoAgendarTorta = false;
+        let tortaCatalogoOpciones = [];
+        let tortaCatalogoLookup = {};
+        let tortaCotizadorItems = [];
+        let tortaCatalogoCargado = false;
         let notaEditando = null;
         let notaChecklistDraft = [];
         let fechaSeleccionada = '';
@@ -2188,6 +2289,11 @@
             el.value = String(value || '');
         }
 
+        function formatoMonedaCLP(valor) {
+            const n = Number(valor || 0);
+            return `$${Math.max(0, n).toLocaleString('es-CL')}`;
+        }
+
         function limpiarCamposTortaManual() {
             setCampo('torta-tipo', '');
             setCampo('torta-tamano', '');
@@ -2196,6 +2302,174 @@
             setCampo('torta-topper', '');
             setCampo('torta-referencia', '');
             setCampo('torta-observaciones', '');
+            setCampo('torta-item-buscar', '');
+            setCampo('torta-item-cantidad', '1');
+            setCampo('torta-item-manual-nombre', '');
+            setCampo('torta-item-manual-precio', '');
+            tortaCotizadorItems = [];
+            renderCotizadorTorta();
+        }
+
+        function _normalizarNumero(value, fallback = 0) {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : fallback;
+        }
+
+        function _normalizarCatalogoOpcionesTorta(catalogo) {
+            const cat = (catalogo && typeof catalogo === 'object') ? catalogo : {};
+            const fuentes = [
+                { key: 'sizes', tipo: 'Tamano' },
+                { key: 'sabores', tipo: 'Sabor/Relleno' },
+                { key: 'extras', tipo: 'Extra' },
+                { key: 'toppers', tipo: 'Topper' },
+            ];
+            const out = [];
+            fuentes.forEach((cfg) => {
+                const lista = Array.isArray(cat[cfg.key]) ? cat[cfg.key] : [];
+                lista.forEach((row) => {
+                    const id = String(row && row.id ? row.id : '').trim();
+                    const nombre = String(row && row.nombre ? row.nombre : '').trim();
+                    const precio = _normalizarNumero(row && row.precio ? row.precio : 0, 0);
+                    if (!id || !nombre) return;
+                    out.push({
+                        uid: `${cfg.key}:${id}`,
+                        tipo: cfg.tipo,
+                        nombre,
+                        precio,
+                    });
+                });
+            });
+            return out;
+        }
+
+        async function cargarCatalogoTortaManual(force = false) {
+            if (tortaCatalogoCargado && !force) return;
+            try {
+                const res = await fetch(`/api/tienda/catalogo-torta?t=${Date.now()}`, { cache: 'no-store' });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo cargar catalogo de torta');
+                tortaCatalogoOpciones = _normalizarCatalogoOpcionesTorta(data.catalogo || {});
+                tortaCatalogoLookup = {};
+                const datalist = document.getElementById('torta-item-sugerencias');
+                if (datalist) datalist.innerHTML = '';
+                tortaCatalogoOpciones.forEach((item) => {
+                    const label = `${item.nombre} (${item.tipo}) - ${formatoMonedaCLP(item.precio)}`;
+                    tortaCatalogoLookup[label] = item;
+                    if (datalist) {
+                        const opt = document.createElement('option');
+                        opt.value = label;
+                        datalist.appendChild(opt);
+                    }
+                });
+                tortaCatalogoCargado = true;
+            } catch (err) {
+                console.warn('[agenda] catalogo torta manual no disponible:', err);
+                tortaCatalogoOpciones = [];
+                tortaCatalogoLookup = {};
+                tortaCatalogoCargado = false;
+            }
+        }
+
+        function totalCotizadorTorta() {
+            return (Array.isArray(tortaCotizadorItems) ? tortaCotizadorItems : []).reduce((acc, item) => {
+                const qty = Math.max(1, Math.round(_normalizarNumero(item.cantidad, 1)));
+                const precio = Math.max(0, _normalizarNumero(item.precio, 0));
+                return acc + (qty * precio);
+            }, 0);
+        }
+
+        function syncTotalCotizadorConFormulario() {
+            const total = Math.round(totalCotizadorTorta());
+            const totalEl = document.getElementById('evento-total');
+            if (totalEl) totalEl.value = total > 0 ? String(total) : '';
+            calcularRestante();
+            const totalTxt = document.getElementById('torta-cotizador-total');
+            if (totalTxt) totalTxt.textContent = formatoMonedaCLP(total);
+        }
+
+        function renderCotizadorTorta() {
+            const list = document.getElementById('torta-cotizador-list');
+            if (!list) return;
+            if (!Array.isArray(tortaCotizadorItems) || !tortaCotizadorItems.length) {
+                list.innerHTML = '<div class="form-hint">Aun no hay items agregados.</div>';
+                syncTotalCotizadorConFormulario();
+                return;
+            }
+            list.innerHTML = tortaCotizadorItems.map((item, idx) => {
+                const qty = Math.max(1, Math.round(_normalizarNumero(item.cantidad, 1)));
+                const precio = Math.max(0, _normalizarNumero(item.precio, 0));
+                const subtotal = qty * precio;
+                return `
+                    <div class="torta-cotizador-item">
+                        <div class="torta-cotizador-item-name">${escapeHtml(item.nombre || 'Item')}</div>
+                        <input type="number" min="1" step="1" value="${qty}" onchange="cambiarCantidadCotizadorTorta(${idx}, this.value)" style="width:64px;padding:4px 6px;">
+                        <div>${escapeHtml(formatoMonedaCLP(precio))}</div>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <strong>${escapeHtml(formatoMonedaCLP(subtotal))}</strong>
+                            <button type="button" class="btn-mini-outline" onclick="quitarItemCotizadorTorta(${idx})">x</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            syncTotalCotizadorConFormulario();
+        }
+
+        function agregarItemCotizadorTorta() {
+            const buscar = valorCampo('torta-item-buscar');
+            const cantidad = Math.max(1, Math.round(_normalizarNumero(valorCampo('torta-item-cantidad'), 1)));
+            if (!buscar) return;
+            let base = tortaCatalogoLookup[buscar];
+            if (!base) {
+                const q = buscar.toLowerCase();
+                base = (tortaCatalogoOpciones || []).find((item) => String(item.nombre || '').toLowerCase().includes(q));
+            }
+            if (!base) {
+                alert('No se encontro ese item en el catalogo. Prueba otra palabra (ej: bizcocho, topper, relleno).');
+                return;
+            }
+            tortaCotizadorItems.push({
+                id: base.uid,
+                tipo: base.tipo,
+                nombre: `${base.tipo}: ${base.nombre}`,
+                precio: Math.max(0, _normalizarNumero(base.precio, 0)),
+                cantidad,
+            });
+            setCampo('torta-item-buscar', '');
+            setCampo('torta-item-cantidad', '1');
+            renderCotizadorTorta();
+        }
+
+        function agregarItemManualCotizadorTorta() {
+            const nombre = valorCampo('torta-item-manual-nombre');
+            const precio = Math.max(0, _normalizarNumero(valorCampo('torta-item-manual-precio'), 0));
+            if (!nombre) {
+                alert('Ingresa el nombre del item manual.');
+                return;
+            }
+            tortaCotizadorItems.push({
+                id: `manual:${Date.now()}`,
+                tipo: 'Manual',
+                nombre: `Manual: ${nombre}`,
+                precio,
+                cantidad: 1,
+            });
+            setCampo('torta-item-manual-nombre', '');
+            setCampo('torta-item-manual-precio', '');
+            renderCotizadorTorta();
+        }
+
+        function cambiarCantidadCotizadorTorta(index, value) {
+            const idx = Number(index);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= tortaCotizadorItems.length) return;
+            tortaCotizadorItems[idx].cantidad = Math.max(1, Math.round(_normalizarNumero(value, 1)));
+            renderCotizadorTorta();
+        }
+
+        function quitarItemCotizadorTorta(index) {
+            const idx = Number(index);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= tortaCotizadorItems.length) return;
+            tortaCotizadorItems.splice(idx, 1);
+            renderCotizadorTorta();
         }
 
         function mostrarBloqueTortaManual(mostrar) {
@@ -2221,6 +2495,13 @@
             const cliente = valorCampo('evento-cliente');
             const entrega = document.getElementById('evento-envio')?.checked ? 'Despacho' : 'Retiro en tienda';
             const direccion = valorCampo('evento-direccion');
+            const lineasCot = [];
+            (Array.isArray(tortaCotizadorItems) ? tortaCotizadorItems : []).forEach((item) => {
+                const qty = Math.max(1, Math.round(_normalizarNumero(item.cantidad, 1)));
+                const precio = Math.max(0, _normalizarNumero(item.precio, 0));
+                lineasCot.push(`- ${item.nombre || 'Item'} x${qty} (${formatoMonedaCLP(precio * qty)})`);
+            });
+            const totalCot = totalCotizadorTorta();
             const bloques = [
                 '--- Datos torta ---',
                 `Tipo de torta: ${data.tipo_torta || '-'}`,
@@ -2230,6 +2511,9 @@
                 `Topper / dedicatoria: ${data.topper || '-'}`,
                 `Referencia visual: ${data.referencia || '-'}`,
                 `Observaciones produccion: ${data.observaciones || '-'}`,
+                '--- Cotizacion ---',
+                ...(lineasCot.length ? lineasCot : ['- Sin items en cotizador']),
+                `Total cotizacion: ${formatoMonedaCLP(totalCot)}`,
                 '--- Entrega ---',
                 `Modalidad: ${entrega}`,
                 `Direccion: ${entrega === 'Despacho' ? (direccion || '-') : 'Retiro en tienda'}`,
@@ -2262,6 +2546,37 @@
                 const target = map[key];
                 if (target) setCampo(target, value === '-' ? '' : value);
             });
+            tortaCotizadorItems = extraerCotizacionDesdeDetalle(text);
+            renderCotizadorTorta();
+        }
+
+        function extraerCotizacionDesdeDetalle(texto) {
+            const out = [];
+            const lineas = String(texto || '').replace(/\r\n?/g, '\n').split('\n').map((ln) => String(ln || '').trim());
+            let enCot = false;
+            lineas.forEach((line) => {
+                if (!line) return;
+                const sec = line.match(/^---\s*(.+?)\s*---$/);
+                if (sec && sec[1]) {
+                    enCot = String(sec[1] || '').trim().toLowerCase() === 'cotizacion';
+                    return;
+                }
+                if (!enCot) return;
+                if (line.toLowerCase().startsWith('total cotizacion:')) return;
+                if (!line.startsWith('-')) return;
+                const raw = line.replace(/^-+\s*/, '').trim();
+                const m = raw.match(/^(.*?)\s*x(\d+)\s*\(([^)]+)\)\s*$/i);
+                if (!m) {
+                    out.push({ id: `import:${Date.now()}:${out.length}`, tipo: 'Importado', nombre: raw, precio: 0, cantidad: 1 });
+                    return;
+                }
+                const nombre = String(m[1] || '').trim() || 'Item';
+                const qty = Math.max(1, parseInt(m[2] || '1', 10));
+                const subtotalNum = Number(String(m[3] || '').replace(/[^\d]/g, '')) || 0;
+                const precio = qty > 0 ? Math.round(subtotalNum / qty) : subtotalNum;
+                out.push({ id: `import:${Date.now()}:${out.length}`, tipo: 'Importado', nombre, precio, cantidad: qty });
+            });
+            return out;
         }
 
         function detalleEnSecciones(texto, tituloDefault = 'Detalle pedido') {
@@ -2492,6 +2807,26 @@
             if (telefonoInput) {
                 telefonoInput.addEventListener('input', actualizarBotonWhatsAppCliente);
             }
+            const itemBuscar = document.getElementById('torta-item-buscar');
+            if (itemBuscar) {
+                itemBuscar.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        agregarItemCotizadorTorta();
+                    }
+                });
+            }
+            const itemManualNombre = document.getElementById('torta-item-manual-nombre');
+            if (itemManualNombre) {
+                itemManualNombre.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        agregarItemManualCotizadorTorta();
+                    }
+                });
+            }
+            cargarCatalogoTortaManual();
+            renderCotizadorTorta();
         });
 
         window.addEventListener('storage', (event) => {
@@ -3171,6 +3506,7 @@
 
         function actualizarBotonWhatsAppCliente() {
             const btn = document.getElementById('btn-whatsapp-cliente');
+            const btnPdf = document.getElementById('btn-whatsapp-pdf');
             const tipoEl = document.getElementById('evento-tipo');
             const telefonoEl = document.getElementById('evento-telefono');
             if (!btn || !tipoEl || !telefonoEl) return;
@@ -3179,12 +3515,24 @@
                 btn.style.display = 'none';
                 btn.disabled = true;
                 btn.title = '';
+                if (btnPdf) {
+                    btnPdf.style.display = 'none';
+                    btnPdf.disabled = true;
+                    btnPdf.title = '';
+                }
                 return;
             }
             const phone = normalizarTelefonoWhatsApp(telefonoEl.value);
             btn.style.display = 'inline-block';
             btn.disabled = !phone;
             btn.title = phone ? 'Contactar cliente por WhatsApp' : 'Ingresa un telefono valido para habilitar WhatsApp';
+            if (btnPdf) {
+                btnPdf.style.display = 'inline-block';
+                btnPdf.disabled = !(phone && eventoEditando && Number(eventoEditando.id || 0) > 0);
+                btnPdf.title = btnPdf.disabled
+                    ? 'Guarda primero el evento para enviar PDF por WhatsApp'
+                    : 'Enviar cotizacion PDF al cliente por WhatsApp';
+            }
         }
 
         function contactarClienteWhatsAppEvento() {
@@ -3207,6 +3555,49 @@
             ].join(' ');
             const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
+        async function enviarCotizacionWhatsAppCliente() {
+            const tipo = String((document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
+            if (tipo === 'bloqueo') return;
+            if (!eventoEditando || !Number(eventoEditando.id || 0)) {
+                alert('Guarda primero el evento para generar y enviar la cotizacion PDF.');
+                return;
+            }
+            const telefono = normalizarTelefonoWhatsApp(document.getElementById('evento-telefono').value);
+            if (!telefono) {
+                alert('Ingresa un telefono valido para enviar por WhatsApp.');
+                return;
+            }
+            try {
+                mostrarLoading(true);
+                const res = await fetch(`/api/agenda/evento/${Number(eventoEditando.id)}/whatsapp-cliente-pdf`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telefono: telefono,
+                        cliente: document.getElementById('evento-cliente').value || '',
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo enviar la cotizacion por WhatsApp');
+                }
+                if (data.via === 'twilio') {
+                    alert('Cotizacion PDF enviada por WhatsApp al cliente.');
+                    return;
+                }
+                if (data.whatsapp_url) {
+                    window.open(String(data.whatsapp_url), '_blank', 'noopener,noreferrer');
+                    alert('Se abrio WhatsApp con el link de la cotizacion para envio manual.');
+                    return;
+                }
+                alert('Cotizacion preparada correctamente.');
+            } catch (err) {
+                alert(String(err && err.message ? err.message : 'No se pudo enviar la cotizacion'));
+            } finally {
+                mostrarLoading(false);
+            }
         }
 
         function limpiarMapaEstado(mensaje = 'Escribe una dirección para ver el mapa.', tipo = '') {
@@ -3703,6 +4094,7 @@
             document.getElementById('evento-tipo').disabled = true;
             document.getElementById('evento-titulo').value = 'Torta personalizada';
             mostrarBloqueTortaManual(true);
+            cargarCatalogoTortaManual().finally(() => renderCotizadorTorta());
             cambiarTipo();
         }
         
