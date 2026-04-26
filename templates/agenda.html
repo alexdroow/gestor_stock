@@ -1945,9 +1945,8 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Categoria</label>
-                                <input type="text" id="torta-categoria-buscar" list="torta-categoria-sugerencias" placeholder="Ej: bizcocho" oninput="buscarCategoriaTortaBuilder()">
-                                <datalist id="torta-categoria-sugerencias"></datalist>
                                 <select id="torta-categoria" onchange="cambiarCategoriaTortaBuilder()"></select>
+                                <p class="form-hint">Se sincroniza con el catalogo activo de Tienda.</p>
                             </div>
                             <div class="form-group">
                                 <label>Tamano</label>
@@ -2391,8 +2390,6 @@
             if (!box) return;
             const categorias = _catalogCategoriasActivas();
             const catSel = document.getElementById('torta-categoria');
-            const catBuscar = document.getElementById('torta-categoria-buscar');
-            const catSugs = document.getElementById('torta-categoria-sugerencias');
             const sizeSel = document.getElementById('torta-size');
             const saboresList = document.getElementById('torta-sabores-list');
             const saboresHint = document.getElementById('torta-sabores-hint');
@@ -2403,7 +2400,6 @@
 
             if (!tortaCatalogoCargado || !categorias.length) {
                 if (catSel) catSel.innerHTML = '<option value="">Sin categorias</option>';
-                if (catSugs) catSugs.innerHTML = '';
                 if (sizeSel) sizeSel.innerHTML = '<option value="">Sin tamanos</option>';
                 if (saboresList) saboresList.innerHTML = '<div class="form-hint">No hay sabores disponibles.</div>';
                 if (extrasList) extrasList.innerHTML = '<div class="form-hint">No hay extras disponibles.</div>';
@@ -2426,13 +2422,6 @@
             if (catSel) {
                 catSel.innerHTML = categorias.map((c) => `<option value="${escapeHtml(String(c.id || ''))}">${escapeHtml(String(c.nombre || 'Categoria'))}</option>`).join('');
                 catSel.value = String(tortaBuilder.categoria_id || '');
-            }
-            if (catSugs) {
-                catSugs.innerHTML = categorias.map((c) => `<option value="${escapeHtml(String(c.nombre || ''))}"></option>`).join('');
-            }
-            if (catBuscar) {
-                const catActual = categorias.find((c) => String(c.id || '') === String(tortaBuilder.categoria_id || ''));
-                catBuscar.value = catActual ? String(catActual.nombre || '') : '';
             }
             if (sizeSel) {
                 sizeSel.innerHTML = sizes.map((s) => `<option value="${escapeHtml(String(s.id || ''))}">${escapeHtml(String(s.nombre || 'Tamano'))} (${escapeHtml(formatoMonedaCLP(s.precio || 0))})</option>`).join('');
@@ -2519,7 +2508,7 @@
             if (!box) return;
             box.style.display = mostrar ? 'block' : 'none';
             if (mostrar) {
-                cargarCatalogoTortaManual();
+                cargarCatalogoTortaManual(true);
                 renderTortaBuilder();
             }
         }
@@ -2531,23 +2520,6 @@
             tortaBuilder.extra_items = [];
             tortaBuilder.topper_id = '';
             renderTortaBuilder();
-        }
-
-        function buscarCategoriaTortaBuilder() {
-            const query = String(valorCampo('torta-categoria-buscar') || '').toLowerCase();
-            if (!query) return;
-            const categorias = _catalogCategoriasActivas();
-            const found = categorias.find((c) => String(c.nombre || '').toLowerCase().includes(query));
-            if (!found) return;
-            const id = String(found.id || '');
-            if (id && id !== String(tortaBuilder.categoria_id || '')) {
-                tortaBuilder.categoria_id = id;
-                tortaBuilder.size_id = '';
-                tortaBuilder.sabor_ids = [];
-                tortaBuilder.extra_items = [];
-                tortaBuilder.topper_id = '';
-                renderTortaBuilder();
-            }
         }
 
         function cambiarTamanoTortaBuilder() {
@@ -4249,7 +4221,7 @@
             document.getElementById('evento-tipo').disabled = true;
             document.getElementById('evento-titulo').value = 'Torta personalizada';
             mostrarBloqueTortaManual(true);
-            cargarCatalogoTortaManual().finally(() => renderTortaBuilder());
+            cargarCatalogoTortaManual(true).finally(() => renderTortaBuilder());
             cambiarTipo();
         }
         
@@ -4290,6 +4262,7 @@
                 document.getElementById('modal-titulo').textContent = 'Editar Torta Agendada';
                 document.getElementById('evento-tipo').value = 'torta';
                 document.getElementById('evento-tipo').disabled = true;
+                await cargarCatalogoTortaManual(true);
                 aplicarDetalleTortaManualDesdeTexto(detalleEvento);
             } else {
                 mostrarBloqueTortaManual(false);
