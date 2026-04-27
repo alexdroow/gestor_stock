@@ -1777,7 +1777,22 @@
                                     </summary>
                                     <div style="padding: 12px; background: #f8fafc; border-radius: 0 0 6px 6px; margin-top: 4px;">
                                         {% for item in receta.costo_detalle %}
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid #e2e8f0; {% if item.tipo == 'insumo' and not item.error %}cursor: pointer;{% endif %}"
+                                            {% if item.tipo == 'insumo' and not item.error %}
+                                            ondblclick="abrirModalVariacionInsumo(this)"
+                                            title="Doble click para ver variacion de precio"
+                                            data-insumo="{{ item.insumo|e }}"
+                                            data-costo-actual="{{ item.costo if item.costo is not none else '' }}"
+                                            data-costo-anterior="{{ item.costo_anterior if item.costo_anterior is not none else '' }}"
+                                            data-precio-actual="{{ item.precio_por_unidad if item.precio_por_unidad is not none else '' }}"
+                                            data-precio-anterior="{{ item.precio_por_unidad_anterior if item.precio_por_unidad_anterior is not none else '' }}"
+                                            data-unidad-base="{{ item.unidad_base|default('unidad')|e }}"
+                                            data-variacion-monto="{{ item.variacion_monto if item.variacion_monto is not none else '' }}"
+                                            data-variacion-pct="{{ item.variacion_pct if item.variacion_pct is not none else '' }}"
+                                            data-variacion-tipo="{{ item.variacion_tipo|default('sin_historial')|e }}"
+                                            {% endif %}
+                                        >
                                             <div style="display: flex; flex-direction: column; gap: 4px;">
                                                 <span style="color: #374151;">{{ item.insumo }}</span>
                                                 {% if item.tipo == 'insumo' and not item.error and item.variacion_tipo in ['alza', 'baja', 'sin_cambio'] %}
@@ -2167,6 +2182,18 @@
             </div>
         </div>
     </div>
+
+    <div class="modal-overlay" id="modal-variacion-insumo">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Variacion de precio del insumo</h3>
+                <button class="btn-close" onclick="cerrarModalVariacionInsumo()">&#215;</button>
+            </div>
+            <div id="variacion-insumo-body" style="display:flex; flex-direction:column; gap:10px; font-size:14px; color:#334155;">
+                <div style="color:#64748b;">Selecciona un insumo desde el desglose.</div>
+            </div>
+        </div>
+    </div>
  
     <!-- Boton Modo Oscuro -->
     <button onclick="toggleDarkMode()" id="darkModeBtn" style="
@@ -2230,6 +2257,81 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        function parseNumeroSeguro(valor) {
+            const num = Number(valor);
+            return Number.isFinite(num) ? num : null;
+        }
+
+        function formatoMonedaCLP(valor) {
+            const num = Number(valor || 0);
+            return '$' + Math.round(num).toLocaleString('es-CL');
+        }
+
+        function abrirModalVariacionInsumo(row) {
+            if (!row) return;
+            const nombre = String(row.dataset.insumo || 'Insumo').trim();
+            const costoActual = parseNumeroSeguro(row.dataset.costoActual);
+            const costoAnterior = parseNumeroSeguro(row.dataset.costoAnterior);
+            const precioActual = parseNumeroSeguro(row.dataset.precioActual);
+            const precioAnterior = parseNumeroSeguro(row.dataset.precioAnterior);
+            const unidadBase = String(row.dataset.unidadBase || 'unidad').trim();
+            const variacionMonto = parseNumeroSeguro(row.dataset.variacionMonto);
+            const variacionPct = parseNumeroSeguro(row.dataset.variacionPct);
+            const variacionTipo = String(row.dataset.variacionTipo || 'sin_historial').trim().toLowerCase();
+
+            const body = document.getElementById('variacion-insumo-body');
+            const modal = document.getElementById('modal-variacion-insumo');
+            if (!body || !modal) return;
+
+            const badge = (() => {
+                if (variacionTipo === 'alza') return '<span style="display:inline-flex; width:fit-content; font-size:12px; font-weight:700; color:#991b1b; background:#fee2e2; border-radius:999px; padding:3px 10px;">▲ Alza</span>';
+                if (variacionTipo === 'baja') return '<span style="display:inline-flex; width:fit-content; font-size:12px; font-weight:700; color:#065f46; background:#d1fae5; border-radius:999px; padding:3px 10px;">▼ Baja</span>';
+                if (variacionTipo === 'sin_cambio') return '<span style="display:inline-flex; width:fit-content; font-size:12px; font-weight:700; color:#475569; background:#e2e8f0; border-radius:999px; padding:3px 10px;">= Sin cambio</span>';
+                return '<span style="display:inline-flex; width:fit-content; font-size:12px; font-weight:700; color:#64748b; background:#f1f5f9; border-radius:999px; padding:3px 10px;">Sin historial</span>';
+            })();
+
+            const variacionMontoAbs = variacionMonto === null ? null : Math.abs(variacionMonto);
+            const variacionPctTxt = variacionPct === null ? '-' : `${variacionPct >= 0 ? '+' : ''}${variacionPct.toFixed(2)}%`;
+
+            body.innerHTML = `
+                <div style="font-size:16px; font-weight:700; color:#0f172a;">${escapeHtml(nombre)}</div>
+                ${badge}
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                        <div style="font-size:12px; color:#64748b;">Costo actual en receta</div>
+                        <div style="font-size:18px; font-weight:700; color:#059669;">${costoActual === null ? '-' : formatoMonedaCLP(costoActual)}</div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                        <div style="font-size:12px; color:#64748b;">Costo anterior en receta</div>
+                        <div style="font-size:18px; font-weight:700; color:#334155;">${costoAnterior === null ? '-' : formatoMonedaCLP(costoAnterior)}</div>
+                    </div>
+                </div>
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px;">
+                    <div style="font-size:12px; color:#92400e;">Variacion</div>
+                    <div style="font-size:16px; font-weight:700; color:#78350f;">
+                        ${variacionMontoAbs === null ? '-' : formatoMonedaCLP(variacionMontoAbs)} (${escapeHtml(variacionPctTxt)})
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                        <div style="font-size:12px; color:#64748b;">Precio unitario actual (${escapeHtml(unidadBase)})</div>
+                        <div style="font-size:15px; font-weight:700; color:#0f172a;">${precioActual === null ? '-' : formatoMonedaCLP(precioActual)}</div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                        <div style="font-size:12px; color:#64748b;">Precio unitario anterior (${escapeHtml(unidadBase)})</div>
+                        <div style="font-size:15px; font-weight:700; color:#0f172a;">${precioAnterior === null ? '-' : formatoMonedaCLP(precioAnterior)}</div>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.add('active');
+        }
+
+        function cerrarModalVariacionInsumo() {
+            const modal = document.getElementById('modal-variacion-insumo');
+            if (modal) modal.classList.remove('active');
         }
 
         const NUTRICION_METRICAS = [
@@ -3624,7 +3726,7 @@
                     badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
                 });
 
-            ['modal-receta', 'modal-editar-receta', 'modal-producir', 'modal-ver-receta', 'modal-agendar-produccion', 'modal-agenda-detalle'].forEach(id => {
+            ['modal-receta', 'modal-editar-receta', 'modal-producir', 'modal-ver-receta', 'modal-agendar-produccion', 'modal-agenda-detalle', 'modal-variacion-insumo'].forEach(id => {
                 const modal = document.getElementById(id);
                 if (!modal) return;
                 modal.addEventListener('click', function(e) {
@@ -3635,6 +3737,7 @@
                     if (id === 'modal-ver-receta') cerrarModalVerReceta();
                     if (id === 'modal-agendar-produccion') cerrarModalAgendaProduccion();
                     if (id === 'modal-agenda-detalle') cerrarModalDetalleAgendaProduccion();
+                    if (id === 'modal-variacion-insumo') cerrarModalVariacionInsumo();
                 });
             });
 
@@ -3653,6 +3756,11 @@
                 const modalDetalleAgenda = document.getElementById('modal-agenda-detalle');
                 if (modalDetalleAgenda && modalDetalleAgenda.classList.contains('active')) {
                     cerrarModalDetalleAgendaProduccion();
+                    return;
+                }
+                const modalVariacionInsumo = document.getElementById('modal-variacion-insumo');
+                if (modalVariacionInsumo && modalVariacionInsumo.classList.contains('active')) {
+                    cerrarModalVariacionInsumo();
                 }
             });
         });

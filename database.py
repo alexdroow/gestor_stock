@@ -9382,6 +9382,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
                     "cantidad_base": round(cantidad_receta_base, 2),
                     "unidad_base": tipo_base,
                     "precio_por_unidad": round(precio_por_unidad_base, 4),
+                    "precio_por_unidad_anterior": round(precio_por_unidad_base_anterior, 4) if precio_por_unidad_base_anterior > 0 else None,
                     "costo_anterior": round(costo_item_anterior, 2) if precio_por_unidad_base_anterior > 0 else None,
                     "variacion_monto": round(variacion_monto, 2) if variacion_monto is not None else None,
                     "variacion_pct": round(variacion_pct, 2) if variacion_pct is not None else None,
