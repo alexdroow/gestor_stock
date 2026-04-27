@@ -2235,7 +2235,7 @@
                 <input type="hidden" id="editar-finalizar-unidad-stock">
                 <div class="form-group">
                     <label>Insumo</label>
-                    <input type="text" id="editar-finalizar-nombre" readonly>
+                    <input type="text" id="editar-finalizar-nombre" required>
                 </div>
                 <div class="form-group">
                     <label>Cantidad que se va a subir</label>
@@ -2249,7 +2249,8 @@
                 </div>
                 <div class="form-group">
                     <label>Stock actual</label>
-                    <input type="text" id="editar-finalizar-stock-actual" readonly>
+                    <input type="number" id="editar-finalizar-stock-actual" min="0" step="0.01" required>
+                    <small id="editar-finalizar-stock-unidad" class="modal-note"></small>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="cerrarModalEditarFinalizarCompra()">Cancelar</button>
@@ -4379,11 +4380,11 @@ let insumosData = [
             }
             const ins = det.insumo;
             const payload = {
-                nombre: ins.nombre,
+                nombre: (cambios.nombre !== undefined) ? String(cambios.nombre || '').trim() : ins.nombre,
                 codigo_barra: ins.codigo_barra || '',
                 unidad: ins.unidad || 'unidad',
                 unidad_compra: (cambios.unidad_compra !== undefined) ? String(cambios.unidad_compra) : (ins.unidad_compra || ins.unidad || 'unidad'),
-                stock: ins.stock || 0,
+                stock: (cambios.stock !== undefined) ? Number(cambios.stock || 0) : (ins.stock || 0),
                 stock_minimo: ins.stock_minimo || 0,
                 precio_unitario: (cambios.precio_unitario !== undefined) ? Number(cambios.precio_unitario) : Number(ins.precio_unitario || 0),
                 cantidad_comprada: (cambios.cantidad_comprada !== undefined) ? Number(cambios.cantidad_comprada) : Number(ins.cantidad_comprada || 1),
@@ -4391,6 +4392,9 @@ let insumosData = [
                 cantidad_por_scan: ins.cantidad_por_scan || 1,
                 unidad_por_scan: ins.unidad_por_scan || ins.unidad || 'unidad'
             };
+            if (!payload.nombre) {
+                throw new Error('El nombre del insumo es obligatorio.');
+            }
             const respUpd = await fetch(`/api/insumo/${insumoId}/actualizar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -4792,7 +4796,7 @@ let insumosData = [
                     previewFinalizarCompras = data;
                     const resumen = data.resumen || {};
                     if (resumenEl) {
-                        resumenEl.textContent = `Total lista: ${Number(resumen.total_items || 0)} | Aplicables: ${Number(resumen.aplicables || 0)} | Omitidos: ${Number(resumen.omitidos || 0)} | Doble click en un insumo para editar cantidad/precio`;
+                        resumenEl.textContent = `Total lista: ${Number(resumen.total_items || 0)} | Aplicables: ${Number(resumen.aplicables || 0)} | Omitidos: ${Number(resumen.omitidos || 0)} | Doble click en un insumo para editar datos`;
                     }
 
                     const items = Array.isArray(data.items) ? data.items : [];
@@ -4863,8 +4867,9 @@ let insumosData = [
             document.getElementById('editar-finalizar-nombre').value = nombre;
             document.getElementById('editar-finalizar-cantidad').value = cantidad > 0 ? cantidad : '';
             document.getElementById('editar-finalizar-precio').value = precioTotalCompra >= 0 ? Math.round(precioTotalCompra) : 0;
-            document.getElementById('editar-finalizar-stock-actual').value = `${formatoNumero(stockActual)} ${unidadStock}`;
+            document.getElementById('editar-finalizar-stock-actual').value = stockActual >= 0 ? stockActual : 0;
             document.getElementById('editar-finalizar-cantidad-unidad').textContent = `Unidad de compra: ${unidadCompra}`;
+            document.getElementById('editar-finalizar-stock-unidad').textContent = `Unidad de stock: ${unidadStock}`;
 
             cerrarModalFinalizarCompras();
             modal.classList.add('active');
@@ -4880,11 +4885,22 @@ let insumosData = [
         async function guardarEdicionFinalizarCompra(event) {
             event.preventDefault();
             const compraId = Number(document.getElementById('editar-finalizar-compra-id').value || 0);
+            const insumoId = Number(document.getElementById('editar-finalizar-insumo-id').value || 0);
+            const nombre = String(document.getElementById('editar-finalizar-nombre').value || '').trim();
             const cantidad = Number(document.getElementById('editar-finalizar-cantidad').value || 0);
             const precioTotalCompra = Number(document.getElementById('editar-finalizar-precio').value || 0);
+            const stockActual = Number(document.getElementById('editar-finalizar-stock-actual').value || 0);
 
             if (!compraId) {
                 alert('No se identificó el item a editar.');
+                return;
+            }
+            if (!insumoId) {
+                alert('No se identificó el insumo asociado.');
+                return;
+            }
+            if (!nombre) {
+                alert('El nombre del insumo es obligatorio.');
                 return;
             }
             if (!(cantidad > 0)) {
@@ -4895,6 +4911,10 @@ let insumosData = [
                 alert('El precio no puede ser negativo.');
                 return;
             }
+            if (stockActual < 0) {
+                alert('El stock actual no puede ser negativo.');
+                return;
+            }
             const precioUnitario = cantidad > 0 ? (precioTotalCompra / cantidad) : 0;
 
             try {
@@ -4902,6 +4922,7 @@ let insumosData = [
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        nombre: nombre,
                         cantidad: cantidad,
                         precio_unitario: precioUnitario
                     })
@@ -4910,6 +4931,30 @@ let insumosData = [
                 if (!response.ok || !data.success) {
                     throw new Error(data.error || 'No se pudo actualizar el item pendiente.');
                 }
+                await guardarAjusteCosteoInsumo(insumoId, {
+                    nombre: nombre,
+                    stock: stockActual
+                });
+                const local = insumosData.find(i => Number(i.id) === Number(insumoId));
+                if (local) {
+                    local.nombre = nombre;
+                    local.stock = stockActual;
+                }
+                const lookupKey = String(insumoId);
+                if (insumosLookup[lookupKey]) {
+                    insumosLookup[lookupKey].nombre = nombre;
+                    insumosLookup[lookupKey].stock = stockActual;
+                }
+                actualizarFilaInsumoEnTabla(insumoId, {
+                    nombre: nombre,
+                    codigo_barra: (local && local.codigo_barra) ? local.codigo_barra : '',
+                    unidad: (local && local.unidad) ? local.unidad : 'unidad',
+                    stock: stockActual,
+                    stock_minimo: (local && local.stock_minimo) ? local.stock_minimo : 0,
+                    precio_unitario: (local && local.precio_unitario) ? local.precio_unitario : 0,
+                    cantidad_comprada: (local && local.cantidad_comprada) ? local.cantidad_comprada : 1,
+                    unidad_compra: (local && local.unidad_compra) ? local.unidad_compra : ((local && local.unidad) ? local.unidad : 'unidad')
+                });
 
                 const modal = document.getElementById('modal-editar-finalizar-compra');
                 if (modal) modal.classList.remove('active');
