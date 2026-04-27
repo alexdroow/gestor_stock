@@ -12174,6 +12174,13 @@ def guardar_evento_agenda(evento):
     
     try:
         tipo = evento.get("tipo") or "torta"
+        evento_id = None
+        try:
+            evento_id_int = int(evento.get("id") or 0)
+            if evento_id_int > 0:
+                evento_id = evento_id_int
+        except (TypeError, ValueError):
+            evento_id = None
         codigo_operacion_evento = str(evento.get("codigo_operacion") or "").strip()[:80] or None
         codigo_pedido_evento = _normalizar_codigo_pedido_agenda(evento.get("codigo_pedido"))
         hora_inicio = evento.get("hora_inicio") or None
@@ -12183,8 +12190,27 @@ def guardar_evento_agenda(evento):
             hora_inicio = None
             hora_fin = None
 
-        if evento.get('id'):
-            cursor.execute("SELECT codigo_operacion, codigo_pedido FROM agenda_eventos WHERE id = ?", (evento["id"],))
+        # Fallback para evitar duplicados por pérdida de id en frontend:
+        # si llega sin id pero con codigo de pedido/operacion existente, actualizamos ese registro.
+        if not evento_id and tipo != "bloqueo" and codigo_pedido_evento:
+            cursor.execute(
+                "SELECT id FROM agenda_eventos WHERE codigo_pedido = ? LIMIT 1",
+                (codigo_pedido_evento,),
+            )
+            row_codigo = cursor.fetchone()
+            if row_codigo:
+                evento_id = int(row_codigo["id"] or 0)
+        if not evento_id and codigo_operacion_evento:
+            cursor.execute(
+                "SELECT id FROM agenda_eventos WHERE codigo_operacion = ? LIMIT 1",
+                (codigo_operacion_evento,),
+            )
+            row_operacion = cursor.fetchone()
+            if row_operacion:
+                evento_id = int(row_operacion["id"] or 0)
+
+        if evento_id:
+            cursor.execute("SELECT codigo_operacion, codigo_pedido FROM agenda_eventos WHERE id = ?", (evento_id,))
             row_actual = cursor.fetchone()
             codigo_actual = str(row_actual["codigo_operacion"] or "").strip() if row_actual else ""
             codigo_pedido_actual = _normalizar_codigo_pedido_agenda(row_actual["codigo_pedido"]) if row_actual else ""
@@ -12195,14 +12221,14 @@ def guardar_evento_agenda(evento):
             elif codigo_pedido_actual:
                 codigo_pedido_evento = codigo_pedido_actual
             elif not codigo_pedido_evento:
-                codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento.get("id"))
+                codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento_id)
             elif codigo_pedido_evento:
                 cursor.execute(
                     "SELECT id FROM agenda_eventos WHERE codigo_pedido = ? AND id <> ? LIMIT 1",
-                    (codigo_pedido_evento, evento.get("id")),
+                    (codigo_pedido_evento, evento_id),
                 )
                 if cursor.fetchone():
-                    codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento.get("id"))
+                    codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento_id)
             # Actualizar existente
             cursor.execute('''
                 UPDATE agenda_eventos SET
@@ -12219,8 +12245,12 @@ def guardar_evento_agenda(evento):
                 evento.get('direccion'), evento.get('ingredientes'),
                 evento.get('total', 0), evento.get('abono', 0),
                 evento.get('motivo'), evento.get('alerta_minutos', 1440), codigo_operacion_evento, codigo_pedido_evento,
-                evento['id']
+                evento_id
             ))
+            if int(cursor.rowcount or 0) <= 0:
+                conn.rollback()
+                return {'success': False, 'error': 'No se encontró el evento a editar'}
+            evento['id'] = evento_id
         else:
             if not codigo_operacion_evento:
                 codigo_operacion_evento = generar_codigo_operacion("OPA")

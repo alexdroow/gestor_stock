@@ -2074,7 +2074,7 @@
                 <button onclick="contactarClienteWhatsAppEvento()" class="btn btn-whatsapp" id="btn-whatsapp-cliente" style="display: none;">WhatsApp cliente</button>
                 <button onclick="enviarCotizacionWhatsAppCliente()" class="btn btn-whatsapp" id="btn-whatsapp-pdf" style="display: none;">WhatsApp + PDF</button>
                 <button onclick="generarPDF()" class="btn btn-pdf" id="btn-pdf" style="display: none;">&#128196; PDF</button>
-                <button onclick="guardarEvento()" class="btn btn-success">Guardar</button>
+                <button onclick="guardarEvento()" class="btn btn-success" id="btn-guardar-evento">Guardar</button>
             </div>
         </div>
     </div>
@@ -2270,6 +2270,7 @@
         let tortaBuilder = null;
         let tortaCatalogoCargado = false;
         let pedidoBusquedaActual = null;
+        let guardandoEvento = false;
         let pedidosRangoActual = [];
         let notaEditando = null;
         let notaChecklistDraft = [];
@@ -3129,6 +3130,7 @@
         // ============================================================================
         
         async function guardarEvento() {
+            if (guardandoEvento) return;
             const tipo = document.getElementById('evento-tipo').value;
             const fecha = document.getElementById('evento-fecha').value;
             const horaInicio = document.getElementById('evento-hora-inicio').value || '00:00';
@@ -3138,6 +3140,8 @@
             let tituloEvento = (document.getElementById('evento-titulo').value || '').trim();
             let ingredientesEvento = (document.getElementById('evento-ingredientes').value || '').trim();
             const confirmarReservaTienda = Boolean(eventoEditando && esReservaTiendaPendiente(eventoEditando));
+            const idFormulario = Number(document.getElementById('evento-id').value || 0);
+            const idEventoActual = Number((eventoEditando && eventoEditando.id) || idFormulario || 0);
 
             if (!fecha) {
                 alert('Selecciona una fecha');
@@ -3186,7 +3190,7 @@
             }
 
             const evento = {
-                id: eventoEditando ? eventoEditando.id : null,
+                id: idEventoActual > 0 ? idEventoActual : null,
                 tipo: tipo,
                 titulo: tituloEvento || 'Sin titulo',
                 fecha: fecha,
@@ -3202,9 +3206,17 @@
                 abono: parseFloat(document.getElementById('evento-abono').value) || 0,
                 motivo: document.getElementById('bloqueo-motivo').value || null,
                 alerta_minutos: parseInt(document.getElementById('evento-alerta').value) || 1440,
-                codigo_pedido: document.getElementById('evento-codigo-pedido').value || null
+                codigo_pedido: (document.getElementById('evento-codigo-pedido').value || '').trim() || null,
+                codigo_operacion: (eventoEditando && eventoEditando.codigo_operacion) ? String(eventoEditando.codigo_operacion).trim() : null
             };
 
+            const btnGuardar = document.getElementById('btn-guardar-evento');
+            guardandoEvento = true;
+            if (btnGuardar) {
+                btnGuardar.disabled = true;
+                btnGuardar.dataset.textoOriginal = btnGuardar.textContent || 'Guardar';
+                btnGuardar.textContent = 'Guardando...';
+            }
             mostrarLoading(true);
             try {
                 const response = await fetch('/api/agenda/evento', {
@@ -3235,6 +3247,11 @@
                 console.error('Error:', error);
                 alert('[ERROR] Error de conexion al guardar');
             } finally {
+                guardandoEvento = false;
+                if (btnGuardar) {
+                    btnGuardar.disabled = false;
+                    btnGuardar.textContent = btnGuardar.dataset.textoOriginal || 'Guardar';
+                }
                 mostrarLoading(false);
             }
         }
