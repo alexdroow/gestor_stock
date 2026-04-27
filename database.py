@@ -1114,6 +1114,25 @@ def init_db():
             )
             '''
         )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS insumo_precio_historial (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                insumo_id INTEGER NOT NULL,
+                precio_unitario REAL DEFAULT 0,
+                cantidad_comprada REAL DEFAULT 1,
+                unidad_compra TEXT DEFAULT 'unidad',
+                precio_incluye_iva INTEGER DEFAULT 1,
+                precio_unitario_base REAL DEFAULT 0,
+                variacion_monto_base REAL,
+                variacion_pct_base REAL,
+                origen_modulo TEXT DEFAULT '',
+                codigo_operacion TEXT,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (insumo_id) REFERENCES insumos(id) ON DELETE CASCADE
+            )
+            '''
+        )
 
         cursor.execute(
             '''
@@ -3977,6 +3996,17 @@ def actualizar_insumo(insumo_id, data):
                 insumo_id,
             ),
         )
+        if hubo_cambio_precio:
+            _registrar_historial_precio_insumo_cursor(
+                cursor,
+                insumo_id=insumo_id,
+                precio_unitario=precio_unitario,
+                cantidad_comprada=cantidad_comprada,
+                unidad_compra=unidad_compra,
+                precio_incluye_iva=precio_incluye_iva,
+                origen_modulo="insumos",
+                codigo_operacion=codigo_operacion,
+            )
         _sincronizar_lotes_insumo_a_stock_cursor(
             cursor,
             insumo_id,
@@ -4123,6 +4153,17 @@ def procesar_lote_rapido_insumos(items):
                     ),
                 )
                 insumo_id = insumo["id"]
+                if hubo_cambio_precio:
+                    _registrar_historial_precio_insumo_cursor(
+                        cursor,
+                        insumo_id=insumo_id,
+                        precio_unitario=precio_unitario,
+                        cantidad_comprada=max(cantidad_comprada, 0.01),
+                        unidad_compra=unidad_compra or unidad_stock,
+                        precio_incluye_iva=precio_incluye_iva,
+                        origen_modulo="lote_rapido",
+                        codigo_operacion=codigo_operacion,
+                    )
                 if codigo:
                     _asociar_codigo_insumo_cursor(cursor, insumo_id, codigo)
                 _crear_o_sumar_lote_insumo_cursor(
@@ -4178,6 +4219,16 @@ def procesar_lote_rapido_insumos(items):
                     ),
                 )
                 insumo_id = cursor.lastrowid
+                _registrar_historial_precio_insumo_cursor(
+                    cursor,
+                    insumo_id=insumo_id,
+                    precio_unitario=precio_unitario,
+                    cantidad_comprada=max(cantidad_comprada, 0.01),
+                    unidad_compra=unidad_compra or unidad,
+                    precio_incluye_iva=precio_incluye_iva,
+                    origen_modulo="lote_rapido",
+                    codigo_operacion=codigo_operacion,
+                )
                 if codigo:
                     _asociar_codigo_insumo_cursor(cursor, insumo_id, codigo)
                 _crear_o_sumar_lote_insumo_cursor(
@@ -8737,6 +8788,31 @@ def migrar_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS insumo_precio_historial (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                insumo_id INTEGER NOT NULL,
+                precio_unitario REAL DEFAULT 0,
+                cantidad_comprada REAL DEFAULT 1,
+                unidad_compra TEXT DEFAULT 'unidad',
+                precio_incluye_iva INTEGER DEFAULT 1,
+                precio_unitario_base REAL DEFAULT 0,
+                variacion_monto_base REAL,
+                variacion_pct_base REAL,
+                origen_modulo TEXT DEFAULT '',
+                codigo_operacion TEXT,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (insumo_id) REFERENCES insumos(id) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.execute(
+            """
+            DELETE FROM insumo_precio_historial
+            WHERE datetime(creado) < datetime('now', '-3 months')
+            """
+        )
 
         conn.execute(
             """
@@ -9113,6 +9189,8 @@ def migrar_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_produccion_movimientos_prod ON produccion_movimientos(produccion_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_compras_pendientes_estado ON compras_pendientes(estado)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_compras_pendientes_nombre ON compras_pendientes(nombre)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_insumo_precio_historial_insumo_creado ON insumo_precio_historial(insumo_id, creado DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_insumo_precio_historial_creado ON insumo_precio_historial(creado DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agenda_notas_estado ON agenda_notas(estado)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agenda_notas_recordatorio ON agenda_notas(recordatorio)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_producto_mermas_creado ON producto_mermas(creado)")
@@ -9231,6 +9309,150 @@ def _calcular_precio_unitario_base_insumo(precio_compra, cantidad_comprada, unid
     if cantidad_base <= 0:
         return 0.0
     return float(precio / cantidad_base)
+
+
+def _registrar_historial_precio_insumo_cursor(
+    cursor,
+    insumo_id,
+    precio_unitario,
+    cantidad_comprada,
+    unidad_compra,
+    precio_incluye_iva,
+    origen_modulo="insumos",
+    codigo_operacion=None,
+):
+    insumo_id_int = int(insumo_id or 0)
+    if insumo_id_int <= 0:
+        return None
+
+    precio = float(precio_unitario or 0)
+    cantidad = float(cantidad_comprada or 1)
+    unidad = str(unidad_compra or "unidad").strip().lower() or "unidad"
+    incluye_iva = 1 if precio_incluye_iva in [True, 1, "1", "true", "True", "on"] else 0
+    precio_base = _calcular_precio_unitario_base_insumo(precio, cantidad, unidad, incluye_iva)
+
+    cursor.execute(
+        """
+        SELECT precio_unitario, cantidad_comprada, unidad_compra, precio_incluye_iva, precio_unitario_base
+        FROM insumo_precio_historial
+        WHERE insumo_id = ?
+        ORDER BY datetime(creado) DESC, id DESC
+        LIMIT 1
+        """,
+        (insumo_id_int,),
+    )
+    ultimo = cursor.fetchone()
+    if ultimo:
+        mismos_datos = (
+            round(float(ultimo["precio_unitario"] or 0), 6) == round(precio, 6)
+            and round(float(ultimo["cantidad_comprada"] or 1), 6) == round(max(cantidad, 0.000001), 6)
+            and (str(ultimo["unidad_compra"] or "").strip().lower() or "unidad") == unidad
+            and int(ultimo["precio_incluye_iva"] or 0) == incluye_iva
+        )
+        if mismos_datos:
+            cursor.execute(
+                """
+                DELETE FROM insumo_precio_historial
+                WHERE datetime(creado) < datetime('now', '-3 months')
+                """
+            )
+            return None
+
+    variacion_monto = None
+    variacion_pct = None
+    if ultimo:
+        base_anterior = float(ultimo["precio_unitario_base"] or 0)
+        if base_anterior > 0:
+            variacion_monto = precio_base - base_anterior
+            variacion_pct = (variacion_monto / base_anterior) * 100
+
+    cursor.execute(
+        """
+        INSERT INTO insumo_precio_historial (
+            insumo_id, precio_unitario, cantidad_comprada, unidad_compra, precio_incluye_iva,
+            precio_unitario_base, variacion_monto_base, variacion_pct_base, origen_modulo, codigo_operacion
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            insumo_id_int,
+            precio,
+            cantidad,
+            unidad,
+            incluye_iva,
+            precio_base,
+            variacion_monto,
+            variacion_pct,
+            str(origen_modulo or "").strip()[:60],
+            str(codigo_operacion or "").strip()[:80] or None,
+        ),
+    )
+    historial_id = int(cursor.lastrowid or 0)
+    cursor.execute(
+        """
+        DELETE FROM insumo_precio_historial
+        WHERE datetime(creado) < datetime('now', '-3 months')
+        """
+    )
+    return historial_id
+
+
+def obtener_historial_precio_insumo(insumo_id, meses=3, limite=120):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        try:
+            insumo_id_int = int(insumo_id or 0)
+        except (TypeError, ValueError):
+            insumo_id_int = 0
+        if insumo_id_int <= 0:
+            return {"success": False, "error": "Insumo invalido", "items": []}
+
+        try:
+            meses_int = int(meses or 3)
+        except (TypeError, ValueError):
+            meses_int = 3
+        meses_int = max(1, min(meses_int, 12))
+
+        try:
+            limite_int = int(limite or 120)
+        except (TypeError, ValueError):
+            limite_int = 120
+        limite_int = max(1, min(limite_int, 500))
+
+        cursor.execute(
+            """
+            SELECT id, nombre
+            FROM insumos
+            WHERE id = ?
+            """,
+            (insumo_id_int,),
+        )
+        insumo = cursor.fetchone()
+        if not insumo:
+            return {"success": False, "error": "Insumo no encontrado", "items": []}
+
+        cursor.execute(
+            """
+            SELECT id, insumo_id, precio_unitario, cantidad_comprada, unidad_compra, precio_incluye_iva,
+                   precio_unitario_base, variacion_monto_base, variacion_pct_base, origen_modulo, codigo_operacion, creado
+            FROM insumo_precio_historial
+            WHERE insumo_id = ?
+              AND datetime(creado) >= datetime('now', ?)
+            ORDER BY datetime(creado) DESC, id DESC
+            LIMIT ?
+            """,
+            (insumo_id_int, f"-{meses_int} months", limite_int),
+        )
+        items = [dict(r) for r in cursor.fetchall()]
+        return {
+            "success": True,
+            "insumo": {"id": insumo_id_int, "nombre": str(insumo["nombre"] or "").strip() or f"Insumo #{insumo_id_int}"},
+            "meses": meses_int,
+            "items": items,
+        }
+    finally:
+        conn.close()
 
 
 def calcular_costo_receta(receta_id, _visitados=None):
@@ -9376,6 +9598,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
             detalle.append(
                 {
                     "tipo": "insumo",
+                    "insumo_id": int(item["insumo_id"] or 0) if item["insumo_id"] is not None else None,
                     "insumo": item["insumo_nombre"],
                     "cantidad": cantidad_receta,
                     "unidad": unidad_receta,
@@ -12906,7 +13129,14 @@ def _resolver_insumo_desde_compra_cursor(cursor, item):
         insumo_id = 0
 
     if insumo_id > 0:
-        cursor.execute("SELECT id, nombre, stock, unidad FROM insumos WHERE id = ?", (insumo_id,))
+        cursor.execute(
+            """
+            SELECT id, nombre, stock, unidad, precio_unitario, cantidad_comprada, unidad_compra, precio_incluye_iva
+            FROM insumos
+            WHERE id = ?
+            """,
+            (insumo_id,),
+        )
         row = cursor.fetchone()
         if row:
             return dict(row), "id"
@@ -12917,7 +13147,7 @@ def _resolver_insumo_desde_compra_cursor(cursor, item):
 
     cursor.execute(
         """
-        SELECT id, nombre, stock, unidad
+        SELECT id, nombre, stock, unidad, precio_unitario, cantidad_comprada, unidad_compra, precio_incluye_iva
         FROM insumos
         WHERE lower(trim(nombre)) = lower(trim(?))
         ORDER BY id ASC
@@ -13061,6 +13291,71 @@ def finalizar_compras_pendientes_con_stock(aplicar_stock=True, factura_info=None
                     cantidad_stock = float(calc.get("cantidad_stock") or 0)
                     unidad_stock = _normalizar_unidad_producto(calc.get("unidad_stock") or resuelto.get("unidad") or "unidad")
 
+                    precio_actual_prev = float(resuelto.get("precio_unitario") or 0)
+                    cantidad_actual_prev = float(resuelto.get("cantidad_comprada") or 0)
+                    unidad_actual_prev = _normalizar_unidad_producto(resuelto.get("unidad_compra") or (item.get("unidad") or "unidad"))
+                    iva_actual_prev = int(resuelto.get("precio_incluye_iva") or 0)
+                    precio_compra_raw = max(0.0, _parse_float(item.get("precio_unitario"), 0))
+                    cantidad_compra_raw = max(0.0001, _parse_float(item.get("cantidad"), 0))
+                    unidad_compra_raw = _normalizar_unidad_producto(item.get("unidad") or "unidad")
+                    precio_incluye_iva_raw = 1 if bool(item.get("precio_incluye_iva", True)) else 0
+
+                    # Solo actualizamos precio de costeo desde esta finalización cuando viene un precio válido (>0).
+                    if precio_compra_raw > 0:
+                        precio_compra_nuevo = precio_compra_raw
+                        cantidad_compra_nueva = cantidad_compra_raw
+                        unidad_compra_nueva = unidad_compra_raw
+                        precio_incluye_iva_nuevo = precio_incluye_iva_raw
+                    else:
+                        precio_compra_nuevo = precio_actual_prev
+                        cantidad_compra_nueva = max(cantidad_actual_prev, 0.0001)
+                        unidad_compra_nueva = unidad_actual_prev
+                        precio_incluye_iva_nuevo = iva_actual_prev
+
+                    hubo_cambio_precio = (
+                        round(precio_actual_prev, 6) != round(precio_compra_nuevo, 6)
+                        or round(cantidad_actual_prev, 6) != round(cantidad_compra_nueva, 6)
+                        or unidad_actual_prev != unidad_compra_nueva
+                        or iva_actual_prev != precio_incluye_iva_nuevo
+                    )
+
+                    cursor.execute(
+                        """
+                        UPDATE insumos
+                        SET precio_unitario = ?,
+                            cantidad_comprada = ?,
+                            unidad_compra = ?,
+                            precio_incluye_iva = ?,
+                            precio_unitario_anterior = COALESCE(?, precio_unitario_anterior),
+                            cantidad_comprada_anterior = COALESCE(?, cantidad_comprada_anterior),
+                            unidad_compra_anterior = COALESCE(?, unidad_compra_anterior),
+                            precio_incluye_iva_anterior = COALESCE(?, precio_incluye_iva_anterior)
+                        WHERE id = ?
+                        """,
+                        (
+                            precio_compra_nuevo,
+                            cantidad_compra_nueva,
+                            unidad_compra_nueva,
+                            precio_incluye_iva_nuevo,
+                            precio_actual_prev if hubo_cambio_precio else None,
+                            cantidad_actual_prev if hubo_cambio_precio else None,
+                            unidad_actual_prev if hubo_cambio_precio else None,
+                            iva_actual_prev if hubo_cambio_precio else None,
+                            insumo_id,
+                        ),
+                    )
+                    if hubo_cambio_precio:
+                        _registrar_historial_precio_insumo_cursor(
+                            cursor,
+                            insumo_id=insumo_id,
+                            precio_unitario=precio_compra_nuevo,
+                            cantidad_comprada=cantidad_compra_nueva,
+                            unidad_compra=unidad_compra_nueva,
+                            precio_incluye_iva=precio_incluye_iva_nuevo,
+                            origen_modulo="compras_pendientes",
+                            codigo_operacion=codigo_operacion,
+                        )
+
                     registrar_movimiento_stock(
                         "insumo",
                         insumo_id,
@@ -13078,6 +13373,9 @@ def finalizar_compras_pendientes_con_stock(aplicar_stock=True, factura_info=None
                             "compra_pendiente_id": compra_id,
                             "cantidad_compra": cantidad,
                             "unidad_compra": unidad_compra,
+                            "precio_compra_total": precio_compra_nuevo,
+                            "precio_incluye_iva": bool(precio_incluye_iva_nuevo),
+                            "hubo_cambio_precio": bool(hubo_cambio_precio),
                             "factura": factura_info or {},
                         },
                         conn=conn,

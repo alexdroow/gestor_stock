@@ -8575,6 +8575,21 @@ def api_detalle_insumo(id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/insumo/<int:id>/precio-historial')
+def api_historial_precio_insumo(id):
+    try:
+        from database import obtener_historial_precio_insumo
+        meses = request.args.get('meses', default=3, type=int)
+        limite = request.args.get('limit', default=120, type=int)
+        data = obtener_historial_precio_insumo(id, meses=meses, limite=limite)
+        if not data.get('success'):
+            codigo = 404 if 'no encontrado' in str(data.get('error', '')).lower() else 400
+            return jsonify(data), codigo
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'items': []}), 500
+
+
 @app.route('/api/insumo/<int:id>/actualizar', methods=['POST'])
 def api_actualizar_insumo(id):
     try:

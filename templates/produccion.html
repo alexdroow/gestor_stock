@@ -1782,6 +1782,7 @@
                                             {% if item.tipo == 'insumo' and not item.error %}
                                             ondblclick="abrirModalVariacionInsumo(this)"
                                             title="Doble click para ver variacion de precio"
+                                            data-insumo-id="{{ item.insumo_id if item.insumo_id is not none else '' }}"
                                             data-insumo="{{ item.insumo|e }}"
                                             data-costo-actual="{{ item.costo if item.costo is not none else '' }}"
                                             data-costo-anterior="{{ item.costo_anterior if item.costo_anterior is not none else '' }}"
@@ -2269,8 +2270,23 @@
             return '$' + Math.round(num).toLocaleString('es-CL');
         }
 
-        function abrirModalVariacionInsumo(row) {
+        function formatearFechaHoraCorta(valor) {
+            const txt = String(valor || '').trim().replace(' ', 'T');
+            if (!txt) return '-';
+            const dt = new Date(txt);
+            if (Number.isNaN(dt.getTime())) return String(valor || '-');
+            return dt.toLocaleString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        async function abrirModalVariacionInsumo(row) {
             if (!row) return;
+            const insumoId = Number(row.dataset.insumoId || 0);
             const nombre = String(row.dataset.insumo || 'Insumo').trim();
             const costoActual = parseNumeroSeguro(row.dataset.costoActual);
             const costoAnterior = parseNumeroSeguro(row.dataset.costoAnterior);
@@ -2324,9 +2340,63 @@
                         <div style="font-size:15px; font-weight:700; color:#0f172a;">${precioAnterior === null ? '-' : formatoMonedaCLP(precioAnterior)}</div>
                     </div>
                 </div>
+                <div id="variacion-insumo-historial" style="margin-top:4px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                    <div style="font-size:12px; color:#64748b;">Historial ultimos 3 meses</div>
+                    <div style="font-size:13px; color:#334155; margin-top:6px;">Cargando...</div>
+                </div>
             `;
 
             modal.classList.add('active');
+            const historialBox = document.getElementById('variacion-insumo-historial');
+            if (!historialBox || insumoId <= 0) return;
+
+            try {
+                const res = await fetch(`/api/insumo/${insumoId}/precio-historial?meses=3&limit=120`);
+                const data = await res.json();
+                const items = Array.isArray(data.items) ? data.items : [];
+                if (!data.success) {
+                    throw new Error(data.error || 'No se pudo cargar historial');
+                }
+                if (!items.length) {
+                    historialBox.innerHTML = `
+                        <div style="font-size:12px; color:#64748b;">Historial ultimos 3 meses</div>
+                        <div style="font-size:13px; color:#334155; margin-top:6px;">Sin cambios registrados en este periodo.</div>
+                    `;
+                    return;
+                }
+
+                const rows = items.slice(0, 12).map((it) => {
+                    const base = Number(it.precio_unitario_base || 0);
+                    const delta = parseNumeroSeguro(it.variacion_monto_base);
+                    const pct = parseNumeroSeguro(it.variacion_pct_base);
+                    const deltaTxt = delta === null
+                        ? '-'
+                        : `${delta >= 0 ? '+' : ''}${formatoMonedaCLP(Math.abs(delta))}`;
+                    const pctTxt = pct === null ? '-' : `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+                    return `
+                        <div style="display:grid; grid-template-columns: 1.1fr 1fr 1fr; gap:8px; font-size:12px; padding:6px 0; border-bottom:1px solid #e2e8f0;">
+                            <div>${escapeHtml(formatearFechaHoraCorta(it.creado))}</div>
+                            <div>${escapeHtml(formatoMonedaCLP(base))}</div>
+                            <div>${escapeHtml(`${deltaTxt} (${pctTxt})`)}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                historialBox.innerHTML = `
+                    <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Historial ultimos 3 meses (precio base con IVA)</div>
+                    <div style="display:grid; grid-template-columns: 1.1fr 1fr 1fr; gap:8px; font-size:11px; font-weight:700; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:6px;">
+                        <div>Fecha</div>
+                        <div>Precio base</div>
+                        <div>Variacion</div>
+                    </div>
+                    ${rows}
+                `;
+            } catch (error) {
+                historialBox.innerHTML = `
+                    <div style="font-size:12px; color:#64748b;">Historial ultimos 3 meses</div>
+                    <div style="font-size:13px; color:#b91c1c; margin-top:6px;">No se pudo cargar historial.</div>
+                `;
+            }
         }
 
         function cerrarModalVariacionInsumo() {
