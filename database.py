@@ -610,6 +610,10 @@ def init_db():
                 cantidad_comprada REAL DEFAULT 1,
                 unidad_compra TEXT DEFAULT 'unidad',
                 precio_incluye_iva BOOLEAN DEFAULT 1,
+                precio_unitario_anterior REAL DEFAULT NULL,
+                cantidad_comprada_anterior REAL DEFAULT NULL,
+                unidad_compra_anterior TEXT DEFAULT NULL,
+                precio_incluye_iva_anterior INTEGER DEFAULT NULL,
                 cantidad_por_scan REAL DEFAULT 1,
                 unidad_por_scan TEXT DEFAULT NULL,
                 nutricion_ref_cantidad REAL DEFAULT 100,
@@ -3819,12 +3823,19 @@ def actualizar_insumo(insumo_id, data):
     codigo_operacion = _normalizar_codigo_operacion(prefijo="OPI")
 
     try:
-        cursor.execute("SELECT id FROM insumos WHERE id = ?", (insumo_id,))
-        if not cursor.fetchone():
+        cursor.execute(
+            """
+            SELECT id, stock, precio_unitario, cantidad_comprada, unidad_compra, precio_incluye_iva
+            FROM insumos
+            WHERE id = ?
+            """,
+            (insumo_id,),
+        )
+        insumo_actual = cursor.fetchone()
+        if not insumo_actual:
             raise ValueError("Insumo no encontrado")
 
-        cursor.execute("SELECT stock FROM insumos WHERE id = ?", (insumo_id,))
-        stock_anterior = float(cursor.fetchone()["stock"] or 0)
+        stock_anterior = float(insumo_actual["stock"] or 0)
 
         nombre = str(data.get('nombre', '')).strip()
         if not nombre:
@@ -3896,6 +3907,21 @@ def actualizar_insumo(insumo_id, data):
                 f"La unidad nutricional ({nutricion_ref_unidad}) no es compatible con la unidad del stock ({unidad})"
             )
 
+        precio_actual_prev = float(insumo_actual["precio_unitario"] or 0)
+        cantidad_actual_prev = float(insumo_actual["cantidad_comprada"] or 0)
+        unidad_actual_prev = str(insumo_actual["unidad_compra"] or "").strip().lower() or "unidad"
+        iva_actual_prev = int(insumo_actual["precio_incluye_iva"] or 0)
+        hubo_cambio_precio = (
+            round(precio_actual_prev, 6) != round(precio_unitario, 6)
+            or round(cantidad_actual_prev, 6) != round(cantidad_comprada, 6)
+            or unidad_actual_prev != unidad_compra
+            or iva_actual_prev != int(precio_incluye_iva)
+        )
+        precio_unitario_anterior = precio_actual_prev if hubo_cambio_precio else None
+        cantidad_comprada_anterior = cantidad_actual_prev if hubo_cambio_precio else None
+        unidad_compra_anterior = unidad_actual_prev if hubo_cambio_precio else None
+        precio_incluye_iva_anterior = iva_actual_prev if hubo_cambio_precio else None
+
         cursor.execute(
             '''
             UPDATE insumos
@@ -3908,6 +3934,10 @@ def actualizar_insumo(insumo_id, data):
                 cantidad_comprada = ?,
                 unidad_compra = ?,
                 precio_incluye_iva = ?,
+                precio_unitario_anterior = COALESCE(?, precio_unitario_anterior),
+                cantidad_comprada_anterior = COALESCE(?, cantidad_comprada_anterior),
+                unidad_compra_anterior = COALESCE(?, unidad_compra_anterior),
+                precio_incluye_iva_anterior = COALESCE(?, precio_incluye_iva_anterior),
                 cantidad_por_scan = ?,
                 unidad_por_scan = ?,
                 nutricion_ref_cantidad = ?,
@@ -3930,6 +3960,10 @@ def actualizar_insumo(insumo_id, data):
                 cantidad_comprada,
                 unidad_compra,
                 precio_incluye_iva,
+                precio_unitario_anterior,
+                cantidad_comprada_anterior,
+                unidad_compra_anterior,
+                precio_incluye_iva_anterior,
                 cantidad_por_scan,
                 unidad_por_scan,
                 nutricion_ref_cantidad,
@@ -4036,6 +4070,16 @@ def procesar_lote_rapido_insumos(items):
 
                 stock_anterior = float(insumo["stock"] or 0)
                 nuevo_stock = stock_anterior + cantidad_stock
+                precio_actual_prev = float(insumo["precio_unitario"] or 0)
+                cantidad_actual_prev = float(insumo["cantidad_comprada"] or 0)
+                unidad_actual_prev = str(insumo["unidad_compra"] or "").strip().lower() or unidad_stock
+                iva_actual_prev = int(insumo["precio_incluye_iva"] or 0)
+                hubo_cambio_precio = (
+                    round(precio_actual_prev, 6) != round(precio_unitario, 6)
+                    or round(cantidad_actual_prev, 6) != round(max(cantidad_comprada, 0.01), 6)
+                    or unidad_actual_prev != (unidad_compra or unidad_stock)
+                    or iva_actual_prev != int(precio_incluye_iva)
+                )
                 codigo_actual = str(insumo["codigo_barra"] or "").strip()
                 if not codigo_actual and codigo:
                     codigo_actual = codigo
@@ -4053,6 +4097,10 @@ def procesar_lote_rapido_insumos(items):
                         cantidad_comprada = ?,
                         unidad_compra = ?,
                         precio_incluye_iva = ?,
+                        precio_unitario_anterior = COALESCE(?, precio_unitario_anterior),
+                        cantidad_comprada_anterior = COALESCE(?, cantidad_comprada_anterior),
+                        unidad_compra_anterior = COALESCE(?, unidad_compra_anterior),
+                        precio_incluye_iva_anterior = COALESCE(?, precio_incluye_iva_anterior),
                         cantidad_por_scan = ?,
                         unidad_por_scan = ?
                     WHERE id = ?
@@ -4065,6 +4113,10 @@ def procesar_lote_rapido_insumos(items):
                         max(cantidad_comprada, 0.01),
                         unidad_compra or unidad_stock,
                         precio_incluye_iva,
+                        precio_actual_prev if hubo_cambio_precio else None,
+                        cantidad_actual_prev if hubo_cambio_precio else None,
+                        unidad_actual_prev if hubo_cambio_precio else None,
+                        iva_actual_prev if hubo_cambio_precio else None,
                         cantidad_por_scan_actual,
                         unidad_por_scan_actual,
                         insumo["id"],
@@ -7404,6 +7456,10 @@ def migrar_db():
         _ensure_column(conn, "insumos", "cantidad_comprada", "REAL DEFAULT 1")
         _ensure_column(conn, "insumos", "unidad_compra", "TEXT DEFAULT 'unidad'")
         _ensure_column(conn, "insumos", "precio_incluye_iva", "INTEGER DEFAULT 1")
+        _ensure_column(conn, "insumos", "precio_unitario_anterior", "REAL DEFAULT NULL")
+        _ensure_column(conn, "insumos", "cantidad_comprada_anterior", "REAL DEFAULT NULL")
+        _ensure_column(conn, "insumos", "unidad_compra_anterior", "TEXT DEFAULT NULL")
+        _ensure_column(conn, "insumos", "precio_incluye_iva_anterior", "INTEGER DEFAULT NULL")
         _ensure_column(conn, "insumos", "cantidad_por_scan", "REAL DEFAULT 1")
         _ensure_column(conn, "insumos", "unidad_por_scan", "TEXT DEFAULT NULL")
         _ensure_column(conn, "insumos", "nutricion_ref_cantidad", "REAL DEFAULT 100")
@@ -9151,6 +9207,32 @@ def _factor_unidad_costo(unidad):
     return 1, "unidad"
 
 
+def _calcular_precio_unitario_base_insumo(precio_compra, cantidad_comprada, unidad_compra, precio_incluye_iva):
+    try:
+        precio = float(precio_compra or 0)
+    except (TypeError, ValueError):
+        precio = 0
+    if precio <= 0:
+        return 0.0
+
+    incluye_iva = 1 if precio_incluye_iva in [True, 1, "1", "true", "True", "on"] else 0
+    if not incluye_iva:
+        precio *= 1.19
+
+    try:
+        cantidad = float(cantidad_comprada or 1)
+    except (TypeError, ValueError):
+        cantidad = 1
+    if cantidad <= 0:
+        return 0.0
+
+    factor, _ = _factor_unidad_costo(unidad_compra)
+    cantidad_base = cantidad * factor
+    if cantidad_base <= 0:
+        return 0.0
+    return float(precio / cantidad_base)
+
+
 def calcular_costo_receta(receta_id, _visitados=None):
     """Calcula costo considerando componentes de insumos y productos."""
     if _visitados is None:
@@ -9174,6 +9256,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
             SELECT ri.tipo, ri.insumo_id, ri.producto_id, ri.cantidad, ri.unidad,
                    i.nombre AS insumo_nombre, i.unidad AS unidad_insumo,
                    i.precio_unitario, i.cantidad_comprada, i.unidad_compra, i.precio_incluye_iva,
+                   i.precio_unitario_anterior, i.cantidad_comprada_anterior, i.unidad_compra_anterior, i.precio_incluye_iva_anterior,
                    p.nombre AS producto_nombre, p.precio AS producto_precio
             FROM receta_items ri
             LEFT JOIN insumos i ON ri.insumo_id = i.id
@@ -9251,21 +9334,45 @@ def calcular_costo_receta(receta_id, _visitados=None):
                 )
                 continue
 
-            if not item["precio_incluye_iva"]:
-                precio_compra *= 1.19
-
-            cantidad_comprada = float(item["cantidad_comprada"] or 1)
             unidad_compra = item["unidad_compra"] or item["unidad_insumo"] or "unidad"
 
-            factor_compra, tipo_base = _factor_unidad_costo(unidad_compra)
+            _, tipo_base = _factor_unidad_costo(unidad_compra)
             factor_receta, _ = _factor_unidad_costo(unidad_receta)
 
-            cantidad_comprada_base = cantidad_comprada * factor_compra
             cantidad_receta_base = cantidad_receta * factor_receta
-            precio_por_unidad_base = (precio_compra / cantidad_comprada_base) if cantidad_comprada_base > 0 else 0
+            precio_por_unidad_base = _calcular_precio_unitario_base_insumo(
+                item["precio_unitario"],
+                item["cantidad_comprada"],
+                unidad_compra,
+                item["precio_incluye_iva"],
+            )
 
             costo_item = cantidad_receta_base * precio_por_unidad_base
             costo_total += costo_item
+
+            precio_por_unidad_base_anterior = _calcular_precio_unitario_base_insumo(
+                item["precio_unitario_anterior"],
+                item["cantidad_comprada_anterior"],
+                item["unidad_compra_anterior"] or unidad_compra,
+                item["precio_incluye_iva_anterior"],
+            )
+            costo_item_anterior = cantidad_receta_base * precio_por_unidad_base_anterior
+            variacion_monto = None
+            variacion_pct = None
+            variacion_tipo = "sin_historial"
+            if precio_por_unidad_base_anterior > 0:
+                variacion_monto = float(costo_item - costo_item_anterior)
+                if abs(variacion_monto) < 0.0001:
+                    variacion_monto = 0.0
+                    variacion_tipo = "sin_cambio"
+                    variacion_pct = 0.0
+                elif variacion_monto > 0:
+                    variacion_tipo = "alza"
+                    variacion_pct = (variacion_monto / costo_item_anterior) * 100 if costo_item_anterior > 0 else None
+                else:
+                    variacion_tipo = "baja"
+                    variacion_pct = (variacion_monto / costo_item_anterior) * 100 if costo_item_anterior > 0 else None
+
             detalle.append(
                 {
                     "tipo": "insumo",
@@ -9275,6 +9382,10 @@ def calcular_costo_receta(receta_id, _visitados=None):
                     "cantidad_base": round(cantidad_receta_base, 2),
                     "unidad_base": tipo_base,
                     "precio_por_unidad": round(precio_por_unidad_base, 4),
+                    "costo_anterior": round(costo_item_anterior, 2) if precio_por_unidad_base_anterior > 0 else None,
+                    "variacion_monto": round(variacion_monto, 2) if variacion_monto is not None else None,
+                    "variacion_pct": round(variacion_pct, 2) if variacion_pct is not None else None,
+                    "variacion_tipo": variacion_tipo,
                     "costo": round(costo_item, 2),
                 }
             )

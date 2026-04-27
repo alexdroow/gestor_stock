@@ -1777,9 +1777,43 @@
                                     </summary>
                                     <div style="padding: 12px; background: #f8fafc; border-radius: 0 0 6px 6px; margin-top: 4px;">
                                         {% for item in receta.costo_detalle %}
-                                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
-                                            <span style="color: #374151;">{{ item.insumo }}</span>
-                                            <span style="font-weight: 600; color: #059669;">
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
+                                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                                <span style="color: #374151;">{{ item.insumo }}</span>
+                                                {% if item.tipo == 'insumo' and not item.error and item.variacion_tipo in ['alza', 'baja', 'sin_cambio'] %}
+                                                <span style="
+                                                    display: inline-flex;
+                                                    align-items: center;
+                                                    width: fit-content;
+                                                    font-size: 11px;
+                                                    font-weight: 700;
+                                                    border-radius: 999px;
+                                                    padding: 2px 8px;
+                                                    {% if item.variacion_tipo == 'alza' %}
+                                                        color: #991b1b; background: #fee2e2;
+                                                    {% elif item.variacion_tipo == 'baja' %}
+                                                        color: #065f46; background: #d1fae5;
+                                                    {% else %}
+                                                        color: #475569; background: #e2e8f0;
+                                                    {% endif %}
+                                                ">
+                                                    {% if item.variacion_tipo == 'alza' %}
+                                                        &#9650; Alza
+                                                    {% elif item.variacion_tipo == 'baja' %}
+                                                        &#9660; Baja
+                                                    {% else %}
+                                                        = Sin cambio
+                                                    {% endif %}
+                                                    {% if item.variacion_monto is not none %}
+                                                        &nbsp;${{ "{:,.0f}".format((item.variacion_monto if item.variacion_monto >= 0 else (item.variacion_monto * -1))).replace(",", ".") }}
+                                                    {% endif %}
+                                                    {% if item.variacion_pct is not none %}
+                                                        ({{ "{:+.1f}".format(item.variacion_pct) }}%)
+                                                    {% endif %}
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                            <span style="font-weight: 600; color: #059669; text-align: right; white-space: nowrap;">
                                                 {% if item.error %}
                                                     <span style="color: #ef4444;">{{ item.error }}</span>
                                                 {% else %}
