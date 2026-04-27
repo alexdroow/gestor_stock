@@ -1244,9 +1244,42 @@
             color: #1e3a8a;
             font-weight: 700;
         }
+        .torta-dispo-days-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .torta-dispo-day {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: #0f172a;
+            cursor: pointer;
+        }
+        .torta-dispo-day small {
+            display: block;
+            margin-top: 2px;
+            color: #475569;
+            font-weight: 600;
+        }
+        .torta-dispo-day.selected {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 1px #2563eb inset;
+            background: #ffffff;
+        }
+        .torta-dispo-day.disabled {
+            background: #e2e8f0;
+            color: #475569;
+            cursor: not-allowed;
+        }
         .torta-dispo-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 8px;
         }
         .torta-dispo-slot {
@@ -1551,6 +1584,19 @@
         body.dark-mode .torta-dispo-head {
             color: #bfdbfe;
         }
+        body.dark-mode .torta-dispo-day {
+            background: #0f172a;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
+        body.dark-mode .torta-dispo-day small {
+            color: #94a3b8;
+        }
+        body.dark-mode .torta-dispo-day.selected {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 1px #93c5fd inset;
+            background: #1e293b;
+        }
         body.dark-mode .torta-dispo-slot.selected {
             background: #1e3a8a;
             border-color: #93c5fd;
@@ -1686,6 +1732,10 @@
             .agenda-layout {
                 grid-template-columns: 1fr;
             }
+            .torta-dispo-days-grid,
+            .torta-dispo-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
         }
 
         @media (max-width: 760px) {
@@ -1709,6 +1759,11 @@
 
             #modal-evento .form-row {
                 grid-template-columns: 1fr;
+            }
+
+            .torta-dispo-days-grid,
+            .torta-dispo-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             #modal-evento .modal-footer .btn {
@@ -2049,7 +2104,7 @@
                     <input type="text" id="evento-titulo" placeholder="Ej: Torta de cumpleaños">
                 </div>
                 
-                <div class="form-row">
+                <div class="form-row" id="grupo-fecha-hora">
                     <div class="form-group">
                         <label>Fecha</label>
                         <input type="date" id="evento-fecha">
@@ -2076,6 +2131,8 @@
                         <button type="button" class="btn-mini-outline" onclick="cargarDisponibilidadHorariaTorta(true)">Actualizar</button>
                     </div>
                     <div class="form-hint" id="agenda-torta-horarios-hint">Selecciona una fecha para cargar cupos.</div>
+                    <div class="torta-dispo-days-grid" id="agenda-torta-dias-grid"></div>
+                    <div class="form-hint" id="agenda-torta-horas-hint">Selecciona un día para ver horas disponibles.</div>
                     <div class="torta-dispo-grid" id="agenda-torta-horarios-grid"></div>
                 </div>
                 
@@ -2414,6 +2471,7 @@
         let geocodeDebounceTimer = null;
         let geocodeRequestId = 0;
         let tortaDispoRequestId = 0;
+        let tortaDispoDiasCache = [];
         let loadingTimer = null;
         let loadingVisible = false;
         let mapaEvento = {
@@ -2740,9 +2798,13 @@
         function mostrarBloqueTortaManual(mostrar) {
             const box = document.getElementById('bloque-torta-manual');
             const boxHorarios = document.getElementById('agenda-torta-horarios-box');
+            const grupoFechaHora = document.getElementById('grupo-fecha-hora');
+            const grupoHoraFin = document.getElementById('grupo-hora-fin');
             if (!box) return;
             box.style.display = mostrar ? 'block' : 'none';
             if (boxHorarios) boxHorarios.style.display = mostrar ? 'block' : 'none';
+            if (grupoFechaHora) grupoFechaHora.style.display = mostrar ? 'none' : 'grid';
+            if (grupoHoraFin) grupoHoraFin.style.display = mostrar ? 'none' : 'grid';
             if (mostrar) {
                 cargarCatalogoTortaManual(true);
                 renderTortaBuilder();
@@ -2754,8 +2816,13 @@
 
         function limpiarDisponibilidadHorariaTorta() {
             const hint = document.getElementById('agenda-torta-horarios-hint');
+            const hintHoras = document.getElementById('agenda-torta-horas-hint');
+            const diasGrid = document.getElementById('agenda-torta-dias-grid');
             const grid = document.getElementById('agenda-torta-horarios-grid');
+            tortaDispoDiasCache = [];
             if (hint) hint.textContent = 'Selecciona una fecha para cargar cupos.';
+            if (hintHoras) hintHoras.textContent = 'Selecciona un día para ver horas disponibles.';
+            if (diasGrid) diasGrid.innerHTML = '';
             if (grid) grid.innerHTML = '';
         }
 
@@ -2772,33 +2839,70 @@
             cargarDisponibilidadHorariaTorta(false);
         }
 
+        function formatearDiaTortaDisponible(fechaIso) {
+            const fecha = parseFechaISO(fechaIso);
+            if (!fecha) return { dia: fechaIso || '-', estado: '' };
+            const dias = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+            const dd = String(fecha.getDate()).padStart(2, '0');
+            const mm = String(fecha.getMonth() + 1).padStart(2, '0');
+            return { dia: `${dias[fecha.getDay()]} ${dd}/${mm}`, estado: '' };
+        }
+
+        function renderizarDiasDisponiblesTorta(dias, fechaSeleccionada) {
+            const diasGrid = document.getElementById('agenda-torta-dias-grid');
+            if (!diasGrid) return;
+            if (!Array.isArray(dias) || !dias.length) {
+                diasGrid.innerHTML = '';
+                return;
+            }
+            diasGrid.innerHTML = dias.map((d) => {
+                const fecha = String(d.fecha || '');
+                const info = formatearDiaTortaDisponible(fecha);
+                const sinCupos = Boolean(d.sin_cupos);
+                const selected = fecha === fechaSeleccionada;
+                const className = `torta-dispo-day ${sinCupos ? 'disabled' : ''} ${selected ? 'selected' : ''}`.trim();
+                const estado = sinCupos ? 'Sin cupos' : 'Con cupo';
+                if (sinCupos) {
+                    return `<div class="${className}"><span>${escapeHtml(info.dia)}</span><small>${escapeHtml(estado)}</small></div>`;
+                }
+                return `<button type="button" class="${className}" onclick="seleccionarDiaDisponibilidadTorta('${escapeHtml(fecha)}')"><span>${escapeHtml(info.dia)}</span><small>${escapeHtml(estado)}</small></button>`;
+            }).join('');
+        }
+
+        function seleccionarDiaDisponibilidadTorta(fechaIso) {
+            const fecha = String(fechaIso || '').trim();
+            if (!fecha) return;
+            setCampo('evento-fecha', fecha);
+            const horaInicioEl = document.getElementById('evento-hora-inicio');
+            const horaFinEl = document.getElementById('evento-hora-fin');
+            const horaEntregaEl = document.getElementById('evento-entrega');
+            if (horaInicioEl) horaInicioEl.value = '';
+            if (horaFinEl) horaFinEl.value = '';
+            if (horaEntregaEl) horaEntregaEl.value = '';
+            cargarDisponibilidadHorariaTorta(false);
+        }
+
         async function cargarDisponibilidadHorariaTorta(forzar = false) {
             const tipo = String((document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
             if (!(modoAgendarTorta && tipo === 'torta')) return;
 
             const boxHorarios = document.getElementById('agenda-torta-horarios-box');
             const hint = document.getElementById('agenda-torta-horarios-hint');
+            const hintHoras = document.getElementById('agenda-torta-horas-hint');
             const grid = document.getElementById('agenda-torta-horarios-grid');
-            const fecha = valorCampo('evento-fecha');
-            if (!boxHorarios || !hint || !grid) return;
+            if (!boxHorarios || !hint || !hintHoras || !grid) return;
 
             boxHorarios.style.display = 'block';
-            if (!fecha) {
-                hint.textContent = 'Selecciona una fecha para cargar cupos.';
-                grid.innerHTML = '';
-                return;
-            }
 
             const requestId = ++tortaDispoRequestId;
-            hint.textContent = 'Consultando horarios disponibles...';
+            hint.textContent = 'Consultando días y horarios disponibles...';
+            hintHoras.textContent = 'Selecciona un día para ver horas disponibles.';
             if (forzar) grid.innerHTML = '';
             try {
                 const categoriaId = valorCampo('torta-categoria');
                 const topperId = valorCampo('torta-topper-select');
                 const params = new URLSearchParams({
                     tipo: 'torta',
-                    fecha_desde: fecha,
-                    fecha_hasta: fecha,
                 });
                 if (categoriaId) params.set('categoria_id', categoriaId);
                 if (topperId) params.set('topper_id', topperId);
@@ -2806,16 +2910,35 @@
                 const data = await res.json();
                 if (requestId !== tortaDispoRequestId) return;
                 if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo consultar disponibilidad');
-                const dia = (Array.isArray(data.dias) ? data.dias : []).find(d => String(d.fecha || '') === fecha) || {};
+                const dias = Array.isArray(data.dias) ? data.dias : [];
+                tortaDispoDiasCache = dias;
+                if (!dias.length) {
+                    hint.textContent = 'No hay días disponibles en el rango configurado.';
+                    hintHoras.textContent = 'Sin horarios disponibles.';
+                    renderizarDiasDisponiblesTorta([], '');
+                    grid.innerHTML = '';
+                    return;
+                }
+
+                let fecha = valorCampo('evento-fecha');
+                if (!fecha || !dias.some(d => String(d.fecha || '') === fecha)) {
+                    const primerConCupo = dias.find(d => !Boolean(d.sin_cupos));
+                    fecha = String((primerConCupo || dias[0]).fecha || '');
+                    if (fecha) setCampo('evento-fecha', fecha);
+                }
+                renderizarDiasDisponiblesTorta(dias, fecha);
+                hint.textContent = 'Selecciona el día y luego una hora disponible.';
+
+                const dia = dias.find(d => String(d.fecha || '') === fecha) || {};
                 const horas = Array.isArray(dia.horas) ? dia.horas : [];
                 if (!horas.length) {
-                    hint.textContent = 'No hay horarios configurados para esa fecha.';
+                    hintHoras.textContent = 'No hay horarios configurados para ese día.';
                     grid.innerHTML = '';
                     return;
                 }
 
                 const horaActual = valorCampo('evento-hora-inicio');
-                hint.textContent = `Fecha ${fecha}: selecciona una hora disponible.`;
+                hintHoras.textContent = `Fecha ${fecha}: selecciona una hora disponible.`;
                 grid.innerHTML = horas.map((h) => {
                     const inicio = String(h.hora_inicio || h.hora || '').slice(0, 5);
                     const fin = String(h.hora_fin || '').slice(0, 5);
@@ -2833,6 +2956,7 @@
             } catch (error) {
                 if (requestId !== tortaDispoRequestId) return;
                 hint.textContent = 'No se pudo cargar disponibilidad de horas.';
+                hintHoras.textContent = 'Intenta nuevamente con "Actualizar".';
                 grid.innerHTML = '<div class="form-hint">Intenta nuevamente con "Actualizar".</div>';
             }
         }
