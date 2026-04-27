@@ -597,6 +597,14 @@
         .data-table tbody tr:hover {
             background: #f8fafc;
         }
+
+        .data-table tbody tr.row-editable {
+            cursor: pointer;
+        }
+
+        .data-table tbody tr.row-editable td:last-child {
+            cursor: default;
+        }
         
         .data-table tbody tr.alert {
             background: #fef2f2;
@@ -2514,6 +2522,9 @@
                     <!-- Insumos Table -->
                     <div class="card">
                         <div class="card-body" style="padding: 0;">
+                            <div class="form-hint" style="padding: 10px 16px 0 16px;">
+                                Doble click en un item para editar rápido (nombre, unidad, stock mínimo, stock actual, precio y más).
+                            </div>
                             <div class="table-wrapper">
                                 <table class="data-table" id="tabla-insumos">
                                     <thead>
@@ -2528,7 +2539,8 @@
                                     </thead>
                                     <tbody>
                                         {% for i in insumos %}
-                                        <tr class="{{ 'alert' if i.stock_minimo > 0 and i.stock <= i.stock_minimo }}" 
+                                        <tr class="row-editable {{ 'alert' if i.stock_minimo > 0 and i.stock <= i.stock_minimo }}"
+                                            data-insumo-id="{{ i.id }}"
                                             data-nombre="{{ i.nombre.lower() }}" 
                                             data-codigo="{{ i.codigo_barra.lower() if i.codigo_barra else '' }}"
                                             data-unidad="{{ i.unidad.lower() if i.unidad else '' }}">
@@ -3833,6 +3845,18 @@
         document.getElementById('modal-editar-insumo').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalEditarInsumo();
         });
+
+        const tablaInsumosEl = document.getElementById('tabla-insumos');
+        if (tablaInsumosEl) {
+            tablaInsumosEl.addEventListener('dblclick', function(e) {
+                if (e.target.closest('button, input, select, textarea, a, label')) return;
+                const fila = e.target.closest('tbody tr[data-insumo-id]');
+                if (!fila) return;
+                const insumoId = Number(fila.getAttribute('data-insumo-id') || 0);
+                if (!insumoId) return;
+                abrirModalEditarInsumo(insumoId);
+            });
+        }
 
         document.getElementById('modal-descuento-rapido').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalDescuentoRapido();
