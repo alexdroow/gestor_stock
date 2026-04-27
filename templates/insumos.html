@@ -159,6 +159,13 @@
             color: #92400e;
             border: 1px solid #fed7aa;
         }
+        .modal-note-inline {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.35;
+            color: #64748b;
+        }
 
         .descarte-meta-grid {
             display: grid;
@@ -1021,6 +1028,9 @@
             background: #3f2900;
             border-color: #7c3b00;
             color: #fcd34d;
+        }
+        body.dark-mode .modal-note-inline {
+            color: #94a3b8;
         }
 
         body.dark-mode .descarte-list-wrap {
@@ -2240,23 +2250,23 @@
                 <div class="form-group">
                     <label>Cantidad que se va a subir</label>
                     <input type="number" id="editar-finalizar-cantidad" min="0.01" step="0.01" required>
-                    <small id="editar-finalizar-cantidad-unidad" class="modal-note"></small>
+                    <small id="editar-finalizar-cantidad-unidad" class="modal-note-inline"></small>
                 </div>
                 <div class="form-group">
                     <label>Precio total compra</label>
                     <input type="number" id="editar-finalizar-precio" min="0" step="1" required oninput="actualizarPreviewIvaFinalizarCompra()">
-                    <small class="modal-note">Ingresa el total pagado por esta compra.</small>
+                    <small class="modal-note-inline">Ingresa el total pagado por esta compra.</small>
                     <label style="display:flex; align-items:center; gap:8px; margin-top:8px;">
                         <input type="checkbox" id="editar-finalizar-precio-iva" style="width:auto;" onchange="actualizarPreviewIvaFinalizarCompra()">
                         El valor ingresado incluye IVA
                     </label>
-                    <small id="editar-finalizar-iva-default" class="modal-note"></small>
-                    <small id="editar-finalizar-iva-preview" class="modal-note"></small>
+                    <small id="editar-finalizar-iva-default" class="modal-note-inline"></small>
+                    <small id="editar-finalizar-iva-preview" class="modal-note-inline"></small>
                 </div>
                 <div class="form-group">
                     <label>Stock actual</label>
                     <input type="number" id="editar-finalizar-stock-actual" min="0" step="0.01" required>
-                    <small id="editar-finalizar-stock-unidad" class="modal-note"></small>
+                    <small id="editar-finalizar-stock-unidad" class="modal-note-inline"></small>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="cerrarModalEditarFinalizarCompra()">Cancelar</button>
