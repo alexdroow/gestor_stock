@@ -134,15 +134,15 @@
                             </div>
                         </div>
                         <div class="stats-col">
-                            <div class="stat">
+                            <div class="stat stat-clickable" id="fin-gasto-general-card">
                                 <div class="stat-label">Gasto general</div>
                                 <div class="stat-value negative" id="fin-gasto-general">$0</div>
-                                <div class="stat-meta">Facturas registradas</div>
+                                <div class="stat-meta">Doble click para ver historial</div>
                             </div>
-                            <div class="stat">
+                            <div class="stat stat-clickable" id="fin-gastado-total-card">
                                 <div class="stat-label">Gasto total</div>
                                 <div class="stat-value negative" id="fin-gastado-total">$0</div>
-                                <div class="stat-meta">Facturas + egresos manuales</div>
+                                <div class="stat-meta">Doble click para ver historial</div>
                             </div>
                             <div class="stat stat-clickable" id="fin-ingreso-card">
                                 <div class="stat-label">Ingreso manual</div>
@@ -429,12 +429,47 @@
         </div>
     </div>
 
+    <div id="fin-gastos-modal" class="modal-bg" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fin-gastos-title" style="width:min(980px,100%);">
+            <div class="modal-head">
+                <div id="fin-gastos-title" class="modal-title">Historial de gastos</div>
+                <button type="button" class="btn btn-muted" id="fin-gastos-close">Cerrar</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-grid">
+                    <div class="field">
+                        <label>Filtro</label>
+                        <select id="fin-gastos-filter-mode" style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px;">
+                            <option value="last30">Ultimos 30 dias</option>
+                            <option value="custom">Fecha personalizada</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Desde</label>
+                        <input type="date" id="fin-gastos-desde">
+                    </div>
+                    <div class="field">
+                        <label>Hasta</label>
+                        <input type="date" id="fin-gastos-hasta">
+                    </div>
+                    <div class="field" style="display:flex; align-items:flex-end;">
+                        <button type="button" class="btn btn-primary" id="fin-gastos-apply">Aplicar filtro</button>
+                    </div>
+                </div>
+                <div class="helper" id="fin-gastos-summary">Cargando historial...</div>
+                <div class="table-wrap" id="fin-gastos-table-root">
+                    <div class="empty">Cargando historial...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const initialData = {
             resumen: {{ (resumen_finanzas or {})|tojson }},
             semanas: {{ (semanas_finanzas or [])|tojson }}
         };
-        const state = { data: initialData, chart: null, egresos: [], ingresos: [], appsRows: [], canalRows: [], canalActual: 'presencial' };
+        const state = { data: initialData, chart: null, egresos: [], ingresos: [], appsRows: [], canalRows: [], canalActual: 'presencial', gastosRows: [], gastoModo: 'general' };
 
         function money(value) {
             const n = Number(value || 0);
@@ -808,6 +843,115 @@
             const modal = document.getElementById('fin-canal-modal');
             modal.classList.remove('active');
             modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function gastoLabel(modo) {
+            return modo === 'total' ? 'Gasto total' : 'Gasto general';
+        }
+
+        function openGastosModal(modo) {
+            state.gastoModo = (modo === 'total') ? 'total' : 'general';
+            const modal = document.getElementById('fin-gastos-modal');
+            const title = document.getElementById('fin-gastos-title');
+            const mode = document.getElementById('fin-gastos-filter-mode');
+            const desde = document.getElementById('fin-gastos-desde');
+            const hasta = document.getElementById('fin-gastos-hasta');
+            const now = new Date();
+            const end = now.toISOString().slice(0, 10);
+            const startDate = new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000));
+            const start = startDate.toISOString().slice(0, 10);
+            if (title) title.textContent = `Historial ${gastoLabel(state.gastoModo)}`;
+            if (mode) mode.value = 'last30';
+            if (desde) desde.value = start;
+            if (hasta) hasta.value = end;
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            loadGastosHistory().catch((error) => {
+                const root = document.getElementById('fin-gastos-table-root');
+                const summary = document.getElementById('fin-gastos-summary');
+                if (summary) summary.textContent = 'No se pudo cargar historial de gastos.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        }
+
+        function closeGastosModal() {
+            const modal = document.getElementById('fin-gastos-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function renderGastosHistory() {
+            const root = document.getElementById('fin-gastos-table-root');
+            const summary = document.getElementById('fin-gastos-summary');
+            if (!root || !summary) return;
+            const rows = Array.isArray(state.gastosRows) ? state.gastosRows : [];
+            if (!rows.length) {
+                summary.textContent = `Sin registros para ${gastoLabel(state.gastoModo)} en el rango seleccionado.`;
+                root.innerHTML = '<div class="empty">No hay historial para este periodo.</div>';
+                return;
+            }
+            const total = rows.reduce((s, r) => s + Number(r.monto || 0), 0);
+            summary.textContent = `${gastoLabel(state.gastoModo)} | Registros: ${rows.length} semana(s) | Total: ${money(total)}`;
+            const body = rows.map((r) => `
+                <tr>
+                    <td><span class="week">${escapeHtml(r.periodo_inicio || '-')}</span><br><small>${escapeHtml(r.periodo_fin || '-')}</small></td>
+                    <td>${money(r.gasto_general || 0)}</td>
+                    <td>${money(r.gastado_total || 0)}</td>
+                    <td><strong>${money(r.monto || 0)}</strong></td>
+                </tr>
+            `).join('');
+            root.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Semana</th>
+                            <th>Gasto general</th>
+                            <th>Gasto total</th>
+                            <th>Valor seleccionado</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            `;
+        }
+
+        async function loadGastosHistory() {
+            const mode = (document.getElementById('fin-gastos-filter-mode')?.value || 'last30').trim();
+            const desdeInput = document.getElementById('fin-gastos-desde');
+            const hastaInput = document.getElementById('fin-gastos-hasta');
+            const now = new Date();
+            const end = now.toISOString().slice(0, 10);
+            const startDate = new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000));
+            const start = startDate.toISOString().slice(0, 10);
+            let desde = start;
+            let hasta = end;
+            if (mode === 'custom') {
+                desde = (desdeInput?.value || '').trim() || start;
+                hasta = (hastaInput?.value || '').trim() || end;
+            } else {
+                if (desdeInput) desdeInput.value = start;
+                if (hastaInput) hastaInput.value = end;
+            }
+            const response = await fetch(`/api/finanzas/resumen-canales?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`, {
+                headers: { Accept: 'application/json' }
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'No se pudo cargar historial de gastos');
+            }
+            const semanas = Array.isArray(payload.data?.semanas) ? payload.data.semanas : [];
+            state.gastosRows = semanas.map((row) => {
+                const general = Number(row.gasto_general || 0);
+                const total = Number(row.gastado_total || 0);
+                return {
+                    periodo_inicio: String(row.semana_inicio || ''),
+                    periodo_fin: String(row.semana_fin || ''),
+                    gasto_general: general,
+                    gastado_total: total,
+                    monto: state.gastoModo === 'total' ? total : general
+                };
+            }).filter((r) => r.monto > 0 || r.gasto_general > 0 || r.gastado_total > 0);
+            renderGastosHistory();
         }
 
         function renderCanalHistory() {
@@ -1281,6 +1425,27 @@
             if (desde) desde.disabled = !isCustom;
             if (hasta) hasta.disabled = !isCustom;
         });
+        document.getElementById('fin-gasto-general-card')?.addEventListener('dblclick', () => openGastosModal('general'));
+        document.getElementById('fin-gastado-total-card')?.addEventListener('dblclick', () => openGastosModal('total'));
+        document.getElementById('fin-gastos-close')?.addEventListener('click', closeGastosModal);
+        document.getElementById('fin-gastos-modal')?.addEventListener('click', (event) => {
+            if (event.target?.id === 'fin-gastos-modal') closeGastosModal();
+        });
+        document.getElementById('fin-gastos-apply')?.addEventListener('click', () => {
+            loadGastosHistory().catch((error) => {
+                const root = document.getElementById('fin-gastos-table-root');
+                const summary = document.getElementById('fin-gastos-summary');
+                if (summary) summary.textContent = 'No se pudo cargar historial de gastos.';
+                if (root) root.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Error')}</div>`;
+            });
+        });
+        document.getElementById('fin-gastos-filter-mode')?.addEventListener('change', () => {
+            const isCustom = (document.getElementById('fin-gastos-filter-mode')?.value || '') === 'custom';
+            const desde = document.getElementById('fin-gastos-desde');
+            const hasta = document.getElementById('fin-gastos-hasta');
+            if (desde) desde.disabled = !isCustom;
+            if (hasta) hasta.disabled = !isCustom;
+        });
         (() => {
             const isCustom = (document.getElementById('fin-apps-filter-mode')?.value || '') === 'custom';
             const desde = document.getElementById('fin-apps-desde');
@@ -1292,6 +1457,13 @@
             const isCustom = (document.getElementById('fin-canal-filter-mode')?.value || '') === 'custom';
             const desde = document.getElementById('fin-canal-desde');
             const hasta = document.getElementById('fin-canal-hasta');
+            if (desde) desde.disabled = !isCustom;
+            if (hasta) hasta.disabled = !isCustom;
+        })();
+        (() => {
+            const isCustom = (document.getElementById('fin-gastos-filter-mode')?.value || '') === 'custom';
+            const desde = document.getElementById('fin-gastos-desde');
+            const hasta = document.getElementById('fin-gastos-hasta');
             if (desde) desde.disabled = !isCustom;
             if (hasta) hasta.disabled = !isCustom;
         })();
