@@ -395,6 +395,15 @@
             background: #fff7ed;
             border-color: #fb923c;
         }
+        .btn-draft-soft {
+            background: #fff7ed;
+            color: #9a3412;
+            border: 1px solid #fdba74;
+        }
+        .btn-draft-soft:hover {
+            background: #ffedd5;
+            border-color: #fb923c;
+        }
         
         .calendar-grid {
             flex: 1;
@@ -490,6 +499,11 @@
         .day-event.bloqueo {
             background: #fee2e2;
             color: #991b1b;
+        }
+        .day-event.borrador {
+            background: #ffedd5;
+            color: #9a3412;
+            border: 1px solid #fdba74;
         }
         
         /* PANEL LATERAL */
@@ -662,6 +676,10 @@
             box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.16);
             background: #fff7ed;
         }
+        .hour-slot-event.borrador {
+            border-color: #fdba74;
+            background: #fff7ed;
+        }
 
         .hour-slot-event-main {
             min-width: 0;
@@ -759,6 +777,10 @@
         .event-item.bloqueo {
             border-left-color: var(--danger);
             background: #fef2f2;
+        }
+        .event-item.borrador {
+            border-left-color: #f97316;
+            background: #fff7ed;
         }
         
         .event-time {
@@ -1859,6 +1881,16 @@
                     </div>
                     <div class="panel-card">
                         <div class="panel-header">
+                            &#128221; Borradores
+                        </div>
+                        <div class="panel-body" id="borradores-eventos">
+                            <p style="color: #64748b; text-align: center; padding: 12px;">
+                                Sin borradores.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="panel-card">
+                        <div class="panel-header">
                             🗂 Eventos pasados
                         </div>
                         <div class="panel-body" id="eventos-pasados">
@@ -1897,6 +1929,10 @@
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <span style="width: 12px; height: 12px; background: #fee2e2; border-radius: 3px;"></span>
                                     <span>&#9940; D&iacute;a Bloqueado</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="width: 12px; height: 12px; background: #ffedd5; border: 1px solid #fdba74; border-radius: 3px;"></span>
+                                    <span>&#128221; Borrador</span>
                                 </div>
                             </div>
                         </div>
@@ -2099,6 +2135,7 @@
                 <button onclick="contactarClienteWhatsAppEvento()" class="btn btn-whatsapp" id="btn-whatsapp-cliente" style="display: none;">WhatsApp cliente</button>
                 <button onclick="enviarCotizacionWhatsAppCliente()" class="btn btn-whatsapp" id="btn-whatsapp-pdf" style="display: none;">WhatsApp + PDF</button>
                 <button onclick="generarPDF()" class="btn btn-pdf" id="btn-pdf" style="display: none;">&#128196; PDF</button>
+                <button onclick="guardarEvento('borrador')" class="btn btn-draft-soft" id="btn-guardar-borrador">Guardar borrador</button>
                 <button onclick="guardarEvento()" class="btn btn-success" id="btn-guardar-evento">Guardar</button>
             </div>
         </div>
@@ -2376,6 +2413,23 @@
         function formatoMonedaCLP(valor) {
             const n = Number(valor || 0);
             return `$${Math.max(0, n).toLocaleString('es-CL')}`;
+        }
+
+        function normalizarEstadoAgenda(estado, defaultEstado = 'pendiente') {
+            const val = String(estado || '').trim().toLowerCase();
+            if (['pendiente', 'completado', 'cancelado', 'borrador'].includes(val)) return val;
+            return defaultEstado;
+        }
+
+        function esEventoBorrador(evento) {
+            return normalizarEstadoAgenda(evento && evento.estado, 'pendiente') === 'borrador';
+        }
+
+        function claseCssEvento(evento) {
+            const tipo = String((evento && evento.tipo) || '').trim().toLowerCase() || 'pedido';
+            const clases = [tipo];
+            if (esEventoBorrador(evento)) clases.push('borrador');
+            return clases.join(' ');
         }
 
         function _normalizarNumero(value, fallback = 0) {
@@ -3131,6 +3185,7 @@
                     renderizarCalendario();
                     renderizarDetalleHorarioDia();
                     renderizarProximos();
+                    renderizarBorradores();
                     renderizarEventosPasados();
                     renderizarBloqueosActivos();
                     verificarNotificaciones();
@@ -3156,8 +3211,9 @@
         // GUARDAR EVENTO EN BASE DE DATOS (REEMPLAZA localStorage)
         // ============================================================================
         
-        async function guardarEvento() {
+        async function guardarEvento(modo = 'final') {
             if (guardandoEvento) return;
+            const guardadoBorrador = String(modo || '').trim().toLowerCase() === 'borrador';
             const tipo = document.getElementById('evento-tipo').value;
             const fecha = document.getElementById('evento-fecha').value;
             const horaInicio = document.getElementById('evento-hora-inicio').value || '00:00';
@@ -3175,22 +3231,25 @@
                 return;
             }
 
-            if (tipo !== 'bloqueo' && esEnvio && !direccionEntrega) {
+            if (tipo !== 'bloqueo' && !guardadoBorrador && esEnvio && !direccionEntrega) {
                 alert('Ingresa la direccion de entrega para pedidos a domicilio.');
                 return;
             }
 
             if (esTortaManual) {
                 const dataTorta = obtenerDatosTortaManual();
-                if (!dataTorta.size) {
+                if (!guardadoBorrador && !dataTorta.size) {
                     alert('Selecciona un tamano de torta.');
                     return;
                 }
-                if (!Array.isArray(dataTorta.sabores) || !dataTorta.sabores.length) {
+                if (!guardadoBorrador && (!Array.isArray(dataTorta.sabores) || !dataTorta.sabores.length)) {
                     alert('Selecciona al menos un sabor/relleno.');
                     return;
                 }
-                ingredientesEvento = detalleTortaManualArmado();
+                const detalleManual = detalleTortaManualArmado();
+                if (String(detalleManual || '').trim()) {
+                    ingredientesEvento = detalleManual;
+                }
                 if (!tituloEvento || tituloEvento === 'Torta personalizada') {
                     const baseTipo = (dataTorta.categoria && dataTorta.categoria.nombre) ? dataTorta.categoria.nombre : 'personalizada';
                     const clienteTxt = (document.getElementById('evento-cliente').value || '').trim();
@@ -3200,20 +3259,41 @@
 
             if (tipo !== 'bloqueo') {
                 const horaFinEvento = document.getElementById('evento-hora-fin').value || horaInicio || '00:00';
+                const inicioEventoMin = horaAMinutos(horaInicio, 0);
+                const finEventoMin = horaAMinutos(horaFinEvento, inicioEventoMin + 60);
                 const bloqueos = eventos.filter(e => {
                     if (e.tipo !== 'bloqueo' || e.fecha !== fecha) return false;
                     if (eventoEditando && e.id === eventoEditando.id) return false;
-                    const inicioBloqueo = e.hora_inicio || '00:00';
-                    const finBloqueo = e.hora_fin || '23:59';
-                    const inicioEvento = horaInicio || '00:00';
-                    const finEvento = horaFinEvento || inicioEvento;
-                    return !(finEvento < inicioBloqueo || inicioEvento > finBloqueo);
+                    const inicioBloqueoMin = horaAMinutos(e.hora_inicio, 0);
+                    const finBloqueoMin = horaAMinutos(e.hora_fin, 24 * 60);
+                    return hayCruceRangos(inicioEventoMin, finEventoMin, inicioBloqueoMin, finBloqueoMin);
                 });
 
                 if (bloqueos.length > 0) {
                     alert('No se puede agendar: este horario esta bloqueado');
                     return;
                 }
+
+                const borradoresEnCruce = eventos.filter(e => {
+                    if (e.tipo === 'bloqueo' || e.fecha !== fecha) return false;
+                    if (!esEventoBorrador(e)) return false;
+                    if (Number(e.id || 0) === idEventoActual) return false;
+                    const inicioDraft = horaAMinutos(e.hora_inicio || e.hora_entrega, 0);
+                    const finDraft = horaAMinutos(e.hora_fin, inicioDraft + 60);
+                    return hayCruceRangos(inicioEventoMin, finEventoMin, inicioDraft, finDraft);
+                });
+                if (borradoresEnCruce.length > 0) {
+                    alert('Ese horario ya esta reservado por un borrador. Editalo o eliminelo para liberar la hora.');
+                    return;
+                }
+            }
+
+            const estadoActual = normalizarEstadoAgenda(eventoEditando && eventoEditando.estado, 'pendiente');
+            let estadoGuardar = 'pendiente';
+            if (guardadoBorrador) {
+                estadoGuardar = 'borrador';
+            } else if (estadoActual === 'completado' || estadoActual === 'cancelado') {
+                estadoGuardar = estadoActual;
             }
 
             const evento = {
@@ -3233,16 +3313,23 @@
                 abono: parseFloat(document.getElementById('evento-abono').value) || 0,
                 motivo: document.getElementById('bloqueo-motivo').value || null,
                 alerta_minutos: parseInt(document.getElementById('evento-alerta').value) || 1440,
+                estado: estadoGuardar,
                 codigo_pedido: (document.getElementById('evento-codigo-pedido').value || '').trim() || null,
                 codigo_operacion: (eventoEditando && eventoEditando.codigo_operacion) ? String(eventoEditando.codigo_operacion).trim() : null
             };
 
             const btnGuardar = document.getElementById('btn-guardar-evento');
+            const btnGuardarBorrador = document.getElementById('btn-guardar-borrador');
             guardandoEvento = true;
             if (btnGuardar) {
                 btnGuardar.disabled = true;
                 btnGuardar.dataset.textoOriginal = btnGuardar.textContent || 'Guardar';
-                btnGuardar.textContent = 'Guardando...';
+                btnGuardar.textContent = guardadoBorrador ? 'Guardando...' : 'Guardando...';
+            }
+            if (btnGuardarBorrador) {
+                btnGuardarBorrador.disabled = true;
+                btnGuardarBorrador.dataset.textoOriginal = btnGuardarBorrador.textContent || 'Guardar borrador';
+                btnGuardarBorrador.textContent = guardadoBorrador ? 'Guardando borrador...' : 'Guardar borrador';
             }
             mostrarLoading(true);
             try {
@@ -3264,9 +3351,13 @@
                     }
                     cerrarModal();
                     await cargarEventos();
-                    alert(confirmarReservaTienda
-                        ? 'Reserva confirmada y guardada correctamente'
-                        : 'Evento guardado correctamente');
+                    if (guardadoBorrador) {
+                        alert('Borrador guardado y horario bloqueado correctamente.');
+                    } else {
+                        alert(confirmarReservaTienda
+                            ? 'Reserva confirmada y guardada correctamente'
+                            : 'Evento guardado correctamente');
+                    }
                 } else {
                     alert('[ERROR] Error: ' + data.error);
                 }
@@ -3278,6 +3369,10 @@
                 if (btnGuardar) {
                     btnGuardar.disabled = false;
                     btnGuardar.textContent = btnGuardar.dataset.textoOriginal || 'Guardar';
+                }
+                if (btnGuardarBorrador) {
+                    btnGuardarBorrador.disabled = false;
+                    btnGuardarBorrador.textContent = btnGuardarBorrador.dataset.textoOriginal || 'Guardar borrador';
                 }
                 mostrarLoading(false);
             }
@@ -4318,8 +4413,9 @@
                     
                     eventosDia.slice(0, 3).forEach(ev => {
                         const span = document.createElement('span');
-                        span.className = `day-event ${ev.tipo}`;
-                        span.textContent = ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : ev.titulo;
+                        span.className = `day-event ${claseCssEvento(ev)}`;
+                        const prefijo = esEventoBorrador(ev) ? '\uD83D\uDCDD ' : '';
+                        span.textContent = ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`;
                         span.title = 'Click: ver detalle del evento · Doble click: abrir evento';
                         span.onclick = (event) => {
                             event.stopPropagation();
@@ -4432,13 +4528,13 @@
                         const clienteTxt = (evento.cliente || '').trim() || 'Sin cliente';
                         const detalleTxt = (evento.ingredientes || '').trim();
                         return `
-                            <div class="hour-slot-event ${seleccionado ? 'selected' : ''}" onclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, false)" ondblclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, true)">
+                            <div class="hour-slot-event ${claseCssEvento(evento)} ${seleccionado ? 'selected' : ''}" onclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, false)" ondblclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, true)">
                                 <div class="hour-slot-event-main">
                                     <span>${icono}</span>
                                     <span class="hour-slot-event-title">${escapeHtml(evento.titulo || 'Sin t&iacute;tulo')}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px;">
-                                    <span class="hour-slot-event-time">${escapeHtml(horaTxt)}</span>
+                                    <span class="hour-slot-event-time">${escapeHtml(horaTxt)}${esEventoBorrador(evento) ? ' · Borrador' : ''}</span>
                                     <button class="btn-hour" onclick="event.stopPropagation(); editarEvento(${eventoId})">Editar</button>
                                 </div>
                                 ${seleccionado ? `
@@ -4532,6 +4628,7 @@
             document.getElementById('evento-fecha').value = fecha;
             document.getElementById('evento-hora-inicio').value = horaInicioSugerida || config.horaInicio;
             actualizarVisibilidadBotonPdf();
+            actualizarAccionesGuardadoModal();
             abrirModal();
         }
         
@@ -4555,6 +4652,7 @@
             if (mapaWrap) mapaWrap.style.display = 'none';
             limpiarMapaEstado();
             actualizarBotonWhatsAppCliente();
+            actualizarAccionesGuardadoModal();
         }
         
         function abrirConfig() {
@@ -4607,13 +4705,27 @@
             if (!btnPdf || !tipoEl) return;
             const tipo = String(tipoEl.value || '').trim().toLowerCase();
             const esBloqueo = tipo === 'bloqueo';
+            const esBorrador = normalizarEstadoAgenda(eventoEditando && eventoEditando.estado, 'pendiente') === 'borrador';
             const tieneId = Boolean(eventoEditando && Number(eventoEditando.id || 0) > 0);
             const codigoActual = String(document.getElementById('evento-codigo-pedido')?.value || (eventoEditando && eventoEditando.codigo_pedido) || '').trim();
             btnPdf.style.display = esBloqueo ? 'none' : 'inline-block';
-            btnPdf.disabled = esBloqueo ? true : !(tieneId && codigoActual);
+            btnPdf.disabled = esBloqueo ? true : (esBorrador || !(tieneId && codigoActual));
             btnPdf.title = btnPdf.disabled
-                ? 'Guarda el pedido para generar el PDF final con codigo.'
+                ? (esBorrador
+                    ? 'Confirma el pedido para habilitar PDF final.'
+                    : 'Guarda el pedido para generar el PDF final con codigo.')
                 : 'Generar PDF final del pedido';
+        }
+
+        function actualizarAccionesGuardadoModal() {
+            const btnDraft = document.getElementById('btn-guardar-borrador');
+            const btnGuardar = document.getElementById('btn-guardar-evento');
+            const tipo = String((document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
+            if (!btnDraft || !btnGuardar) return;
+            const esBloqueo = tipo === 'bloqueo';
+            const esBorradorActual = normalizarEstadoAgenda(eventoEditando && eventoEditando.estado, 'pendiente') === 'borrador';
+            btnDraft.style.display = esBloqueo ? 'none' : 'inline-block';
+            btnGuardar.textContent = esBorradorActual ? 'Confirmar pedido' : 'Guardar';
         }
 
         // FORMULARIO
@@ -4649,6 +4761,7 @@
             cambiarTipo();
             toggleEnvio();
             actualizarVisibilidadBotonPdf();
+            actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
             abrirModal();
         }
@@ -4672,7 +4785,7 @@
             
             eventoEditando = evento;
             modoAgendarTorta = false;
-            document.getElementById('modal-titulo').textContent = 'Editar Evento';
+            document.getElementById('modal-titulo').textContent = esEventoBorrador(evento) ? 'Editar Borrador' : 'Editar Evento';
             document.getElementById('btn-eliminar').style.display = 'inline-block';
             document.getElementById('evento-tipo').disabled = false;
 
@@ -4713,6 +4826,7 @@
             cambiarTipo();
             toggleEnvio();
             actualizarVisibilidadBotonPdf();
+            actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
             abrirModal();
         }
@@ -4739,6 +4853,7 @@
                 mostrarBloqueTortaManual(modoAgendarTorta && tipo === 'torta');
             }
             actualizarVisibilidadBotonPdf();
+            actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
         }
         
@@ -4776,7 +4891,7 @@
                     const fechaEvento = parseFechaISO(e.fecha);
                     if (!fechaEvento) return false;
                     const tipo = String(e.tipo || '').trim().toLowerCase();
-                    return fechaEvento >= hoy && tipo !== 'bloqueo';
+                    return fechaEvento >= hoy && tipo !== 'bloqueo' && !esEventoBorrador(e);
                 })
                 .sort((a, b) => {
                     const fechaA = parseFechaISO(a.fecha);
@@ -4809,13 +4924,57 @@
                 const horaStr = e.hora_inicio ? e.hora_inicio.substring(0, 5) : '';
                 
                 return `
-                    <div class="event-item ${e.tipo}" onclick="editarEvento(${e.id})">
+                    <div class="event-item ${claseCssEvento(e)}" onclick="editarEvento(${e.id})">
                         <div class="event-time">${fechaStr} ${horaStr}</div>
                         <div class="event-title">${e.titulo}</div>
                         <div class="event-client">${e.cliente || 'Sin cliente'}</div>
                         ${e.total ? `<span class="event-badge ${e.abono >= e.total ? 'pagado' : 'pendiente'}">
                             ${e.abono >= e.total ? '\u2713 Pagado' : `$${(e.total - (e.abono || 0)).toLocaleString()} restante`}
                         </span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderizarBorradores() {
+            const contenedor = document.getElementById('borradores-eventos');
+            if (!contenedor) return;
+
+            const borradores = eventos
+                .filter(e => e.tipo !== 'bloqueo' && esEventoBorrador(e))
+                .sort((a, b) => {
+                    const fechaA = parseFechaISO(a.fecha);
+                    const fechaB = parseFechaISO(b.fecha);
+                    const minutosA = horaAMinutos(a.hora_inicio || a.hora_entrega, 0) || 0;
+                    const minutosB = horaAMinutos(b.hora_inicio || b.hora_entrega, 0) || 0;
+                    const keyA = (fechaA ? fechaA.getTime() : 0) + (minutosA * 60000);
+                    const keyB = (fechaB ? fechaB.getTime() : 0) + (minutosB * 60000);
+                    return keyA - keyB;
+                })
+                .slice(0, 20);
+
+            if (!borradores.length) {
+                contenedor.innerHTML = `
+                    <p style="color: #64748b; text-align: center; padding: 12px;">
+                        Sin borradores.
+                    </p>
+                `;
+                return;
+            }
+
+            const dias = ['Dom', 'Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'];
+            const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+            contenedor.innerHTML = borradores.map(e => {
+                const fecha = parseFechaISO(e.fecha);
+                const fechaStr = fecha
+                    ? `${dias[fecha.getDay()]} ${fecha.getDate()} ${meses[fecha.getMonth()]}`
+                    : (e.fecha || '-');
+                const horaStr = (e.hora_entrega || e.hora_inicio || '').substring(0, 5);
+                return `
+                    <div class="event-item ${claseCssEvento(e)}" onclick="editarEvento(${Number(e.id || 0)})">
+                        <div class="event-time">${escapeHtml(fechaStr)} ${escapeHtml(horaStr)}</div>
+                        <div class="event-title">${escapeHtml(e.titulo || 'Sin t&iacute;tulo')}</div>
+                        <div class="event-client">${escapeHtml(e.cliente || 'Por confirmar')}</div>
                     </div>
                 `;
             }).join('');
@@ -4877,7 +5036,7 @@
                 const horaStr = e.hora_inicio ? e.hora_inicio.substring(0, 5) : '';
 
                 return `
-                    <div class="event-item ${e.tipo}" style="cursor:default;">
+                    <div class="event-item ${claseCssEvento(e)}" style="cursor:default;">
                         <div class="event-time">${fechaStr} ${horaStr}</div>
                         <div class="event-title">${escapeHtml(e.titulo || 'Sin título')}</div>
                         <div class="event-client">${escapeHtml(e.cliente || 'Sin cliente')}</div>

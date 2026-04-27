@@ -12249,6 +12249,14 @@ def obtener_evento_agenda_por_id(evento_id):
         conn.close()
 
 
+def _normalizar_estado_evento_agenda(estado, default="pendiente"):
+    estado_norm = str(estado or "").strip().lower()
+    permitidos = {"pendiente", "completado", "cancelado", "borrador"}
+    if estado_norm in permitidos:
+        return estado_norm
+    return str(default or "pendiente").strip().lower()
+
+
 def actualizar_estado_evento_agenda(evento_id, estado):
     """Actualiza el estado de un evento de agenda."""
     try:
@@ -12258,8 +12266,8 @@ def actualizar_estado_evento_agenda(evento_id, estado):
     if evento_id <= 0:
         return {"success": False, "error": "Evento inválido"}
 
-    estado_normalizado = str(estado or "").strip().lower()
-    if estado_normalizado not in {"pendiente", "completado", "cancelado"}:
+    estado_normalizado = _normalizar_estado_evento_agenda(estado, default="")
+    if estado_normalizado not in {"pendiente", "completado", "cancelado", "borrador"}:
         return {"success": False, "error": "Estado inválido"}
 
     conn = get_db()
@@ -12407,6 +12415,7 @@ def guardar_evento_agenda(evento):
             evento_id = None
         codigo_operacion_evento = str(evento.get("codigo_operacion") or "").strip()[:80] or None
         codigo_pedido_evento = _normalizar_codigo_pedido_agenda(evento.get("codigo_pedido"))
+        estado_evento = _normalizar_estado_evento_agenda(evento.get("estado"), default="pendiente")
         hora_inicio = evento.get("hora_inicio") or None
         hora_fin = evento.get("hora_fin") or None
         if tipo == "bloqueo" and not hora_inicio and not hora_fin:
@@ -12434,10 +12443,13 @@ def guardar_evento_agenda(evento):
                 evento_id = int(row_operacion["id"] or 0)
 
         if evento_id:
-            cursor.execute("SELECT codigo_operacion, codigo_pedido FROM agenda_eventos WHERE id = ?", (evento_id,))
+            cursor.execute("SELECT codigo_operacion, codigo_pedido, estado FROM agenda_eventos WHERE id = ?", (evento_id,))
             row_actual = cursor.fetchone()
             codigo_actual = str(row_actual["codigo_operacion"] or "").strip() if row_actual else ""
             codigo_pedido_actual = _normalizar_codigo_pedido_agenda(row_actual["codigo_pedido"]) if row_actual else ""
+            estado_actual = _normalizar_estado_evento_agenda(row_actual["estado"] if row_actual else None, default="pendiente")
+            if str(evento.get("estado") or "").strip() == "":
+                estado_evento = estado_actual
             if not codigo_operacion_evento:
                 codigo_operacion_evento = codigo_actual or generar_codigo_operacion("OPA")
             if tipo == "bloqueo":
@@ -12459,7 +12471,7 @@ def guardar_evento_agenda(evento):
                     tipo = ?, titulo = ?, fecha = ?, hora_inicio = ?,
                     hora_fin = ?, hora_entrega = ?, cliente = ?, telefono = ?,
                     es_envio = ?, direccion = ?, ingredientes = ?, total = ?,
-                    abono = ?, motivo = ?, alerta_minutos = ?, codigo_operacion = ?, codigo_pedido = ?
+                    abono = ?, motivo = ?, alerta_minutos = ?, estado = ?, codigo_operacion = ?, codigo_pedido = ?
                 WHERE id = ?
             ''', (
                 tipo, evento['titulo'], evento['fecha'], 
@@ -12468,7 +12480,7 @@ def guardar_evento_agenda(evento):
                 evento.get('telefono'), 1 if evento.get('es_envio') else 0,
                 evento.get('direccion'), evento.get('ingredientes'),
                 evento.get('total', 0), evento.get('abono', 0),
-                evento.get('motivo'), evento.get('alerta_minutos', 1440), codigo_operacion_evento, codigo_pedido_evento,
+                evento.get('motivo'), evento.get('alerta_minutos', 1440), estado_evento, codigo_operacion_evento, codigo_pedido_evento,
                 evento_id
             ))
             if int(cursor.rowcount or 0) <= 0:
@@ -12493,7 +12505,7 @@ def guardar_evento_agenda(evento):
                 evento.get('direccion'), evento.get('ingredientes'),
                 evento.get('total', 0), evento.get('abono', 0),
                 evento.get('motivo'), evento.get('alerta_minutos', 1440),
-                'pendiente', codigo_operacion_evento
+                estado_evento, codigo_operacion_evento
             ))
             evento['id'] = cursor.lastrowid
             if tipo != "bloqueo":
