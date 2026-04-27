@@ -2467,6 +2467,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     y = height - 44
     margin = 40
     right = 560
+    motivo_raw = str(reserva.get("motivo") or "").strip().lower()
+    es_reserva_pendiente = "reserva cliente tienda online" in motivo_raw
 
     def _ensure_space(needed=20, reset_font=True):
         nonlocal y
@@ -2491,6 +2493,15 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.setFont("Helvetica", 10)
     c.drawString(margin, y, f"Generado: {datetime.now(ZoneInfo('America/Santiago')).strftime('%d-%m-%Y %H:%M:%S')}")
     y -= 18
+    if es_reserva_pendiente:
+        _ensure_space(34, reset_font=False)
+        c.setFillColorRGB(1.0, 0.95, 0.86)
+        c.roundRect(margin, y - 11, right - margin, 18, 4, stroke=0, fill=1)
+        c.setFillColorRGB(0.62, 0.20, 0.04)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin + 8, y + 1, "RESERVACION PENDIENTE")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 22
     c.setStrokeColorRGB(0.87, 0.90, 0.95)
     c.line(margin, y, right, y)
     y -= 16
@@ -2529,6 +2540,29 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             wrapped = _wrap(bullet, max_len=96)
             _draw_wrapped(wrapped, x=margin + 8, font="Helvetica", size=9.8, step=11)
         y -= 4
+    if es_reserva_pendiente:
+        _ensure_space(56, reset_font=False)
+        c.setStrokeColorRGB(0.97, 0.69, 0.28)
+        c.setFillColorRGB(1.0, 0.98, 0.94)
+        c.roundRect(margin, y - 36, right - margin, 42, 4, stroke=1, fill=1)
+        c.setFillColorRGB(0.55, 0.23, 0.06)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin + 8, y - 4, "Importante")
+        c.setFillColorRGB(0.20, 0.15, 0.10)
+        y -= 16
+        _draw_wrapped(
+            _wrap(
+                "Esta reserva se encuentra pendiente de confirmacion. "
+                "Cuando tu pedido sea confirmado por Pasteleria, se enviara "
+                "la cotizacion final en PDF con toda la informacion adicional registrada.",
+                max_len=92,
+            ),
+            x=margin + 8,
+            font="Helvetica",
+            size=9.2,
+            step=10,
+        )
+        y -= 6
     c.save()
     return filename
 

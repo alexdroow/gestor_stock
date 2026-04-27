@@ -2425,10 +2425,14 @@
             return normalizarEstadoAgenda(evento && evento.estado, 'pendiente') === 'borrador';
         }
 
+        function esPedidoPendientePorConfirmar(evento) {
+            return esEventoBorrador(evento) || esReservaTiendaPendiente(evento);
+        }
+
         function claseCssEvento(evento) {
             const tipo = String((evento && evento.tipo) || '').trim().toLowerCase() || 'pedido';
             const clases = [tipo];
-            if (esEventoBorrador(evento)) clases.push('borrador');
+            if (esPedidoPendientePorConfirmar(evento)) clases.push('borrador');
             return clases.join(' ');
         }
 
@@ -3311,7 +3315,9 @@
                 ingredientes: ingredientesEvento || null,
                 total: parseFloat(document.getElementById('evento-total').value) || 0,
                 abono: parseFloat(document.getElementById('evento-abono').value) || 0,
-                motivo: document.getElementById('bloqueo-motivo').value || null,
+                motivo: (confirmarReservaTienda && !guardadoBorrador && tipo !== 'bloqueo')
+                    ? 'Pedido confirmado desde agenda'
+                    : (document.getElementById('bloqueo-motivo').value || null),
                 alerta_minutos: parseInt(document.getElementById('evento-alerta').value) || 1440,
                 estado: estadoGuardar,
                 codigo_pedido: (document.getElementById('evento-codigo-pedido').value || '').trim() || null,
@@ -3342,13 +3348,6 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    if (confirmarReservaTienda && eventoEditando && eventoEditando.id) {
-                        await fetch(`/api/agenda/evento/${Number(eventoEditando.id)}/estado`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ estado: 'completado' })
-                        });
-                    }
                     cerrarModal();
                     await cargarEventos();
                     if (guardadoBorrador) {
@@ -3762,13 +3761,7 @@
             const tipo = String(evento.tipo || '').trim().toLowerCase();
             if (tipo === 'bloqueo') return false;
             const motivo = String(evento.motivo || '').toLowerCase();
-            const ingredientes = String(evento.ingredientes || '').toLowerCase();
-            const titulo = String(evento.titulo || '').toLowerCase();
-            return (
-                motivo.includes('reserva cliente tienda online') ||
-                ingredientes.includes('reserva desde tienda online') ||
-                titulo.includes('reserva tienda')
-            );
+            return motivo.includes('reserva cliente tienda online');
         }
 
         function obtenerReservasTiendaPendientesOrdenadas() {
@@ -4724,8 +4717,9 @@
             if (!btnDraft || !btnGuardar) return;
             const esBloqueo = tipo === 'bloqueo';
             const esBorradorActual = normalizarEstadoAgenda(eventoEditando && eventoEditando.estado, 'pendiente') === 'borrador';
-            btnDraft.style.display = esBloqueo ? 'none' : 'inline-block';
-            btnGuardar.textContent = esBorradorActual ? 'Confirmar pedido' : 'Guardar';
+            const esReservaPendienteTienda = Boolean(eventoEditando && esReservaTiendaPendiente(eventoEditando));
+            btnDraft.style.display = (esBloqueo || esReservaPendienteTienda) ? 'none' : 'inline-block';
+            btnGuardar.textContent = (esBorradorActual || esReservaPendienteTienda) ? 'Confirmar pedido' : 'Guardar';
         }
 
         // FORMULARIO
@@ -4941,7 +4935,7 @@
             if (!contenedor) return;
 
             const borradores = eventos
-                .filter(e => e.tipo !== 'bloqueo' && esEventoBorrador(e))
+                .filter(e => e.tipo !== 'bloqueo' && esPedidoPendientePorConfirmar(e))
                 .sort((a, b) => {
                     const fechaA = parseFechaISO(a.fecha);
                     const fechaB = parseFechaISO(b.fecha);
@@ -4956,7 +4950,7 @@
             if (!borradores.length) {
                 contenedor.innerHTML = `
                     <p style="color: #64748b; text-align: center; padding: 12px;">
-                        Sin borradores.
+                        Sin pedidos pendientes por confirmar.
                     </p>
                 `;
                 return;
