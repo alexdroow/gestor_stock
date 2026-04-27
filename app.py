@@ -332,7 +332,7 @@ from database import (
     convertir_a_base
 )
 from backup import crear_backup, obtener_ultimo_backup
-from config import DATA_DIR, LEGACY_DATA_DIRS, BACKUP_DIR, APP_VERSION, APP_DISPLAY_NAME
+from config import DATA_DIR, LEGACY_DATA_DIRS, BACKUP_DIR, APP_VERSION, APP_DISPLAY_NAME, DB_PATH
 from unit_utils import (
     normalize_unit,
     unit_type,
@@ -347,7 +347,15 @@ def inject_app_globals():
     return {"app_version": APP_VERSION}
 
 
-init_db()
+try:
+    init_db()
+except sqlite3.OperationalError as _init_err:
+    # En PythonAnywhere puede aparecer "locking protocol" durante reload;
+    # no debemos botar todo el WSGI si la base ya existe.
+    if "locking protocol" in str(_init_err).lower() and os.path.exists(DB_PATH):
+        print(f"[WARN] init_db omitida temporalmente por locking protocol: {_init_err}")
+    else:
+        raise
 
 # Migrar base de datos (agregar columnas nuevas)
 from database import migrar_db
