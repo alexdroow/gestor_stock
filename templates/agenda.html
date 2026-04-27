@@ -2653,18 +2653,26 @@
             const cliente = valorCampo('evento-cliente');
             const entrega = document.getElementById('evento-envio')?.checked ? 'Despacho' : 'Retiro en tienda';
             const direccion = valorCampo('evento-direccion');
-            const saboresTxt = data.sabores.length ? data.sabores.map((s) => `${s.nombre} (${formatoMonedaCLP(s.precio || 0)})`).join(', ') : '-';
-            const extrasTxt = data.extras.length
-                ? data.extras.map((e) => `${e.nombre} x${e.qty} (${formatoMonedaCLP((_normalizarNumero(e.precio, 0) * _normalizarNumero(e.qty, 1)))})`).join(' | ')
-                : '-';
+            const saboresItems = data.sabores.length
+                ? data.sabores.map((s) => `- ${s.nombre} (${formatoMonedaCLP(s.precio || 0)})`)
+                : ['- -'];
+            const extrasItems = data.extras.length
+                ? data.extras.map((e) => `- ${e.nombre} x${e.qty} (${formatoMonedaCLP((_normalizarNumero(e.precio, 0) * _normalizarNumero(e.qty, 1)))})`)
+                : ['- -'];
+            const topperItems = data.topper
+                ? [`- ${data.topper.nombre} (${formatoMonedaCLP(data.topper.precio || 0)})`]
+                : ['- Sin topper'];
             const refsTxt = data.referencia_urls.length ? data.referencia_urls.join(' | ') : '-';
             const bloques = [
                 '--- Catalogo torta ---',
                 `Categoria: ${data.categoria ? data.categoria.nombre : '-'}`,
                 `Tamano: ${data.size ? `${data.size.nombre} (${formatoMonedaCLP(data.size.precio || 0)})` : '-'}`,
-                `Sabores: ${saboresTxt}`,
-                `Extras: ${extrasTxt}`,
-                `Topper: ${data.topper ? `${data.topper.nombre} (${formatoMonedaCLP(data.topper.precio || 0)})` : 'Sin topper'}`,
+                'Sabores:',
+                ...saboresItems,
+                'Extras:',
+                ...extrasItems,
+                'Topper:',
+                ...topperItems,
                 `Referencias: ${refsTxt}`,
                 `Nota catalogo: ${data.nota || '-'}`,
                 `Subtotal estimado productos: ${formatoMonedaCLP(data.subtotal)}`,
@@ -2734,10 +2742,34 @@
                     actual = { titulo: String(m[1] || '').trim(), items: [] };
                     return;
                 }
+                const tituloActual = String(actual.titulo || '').trim().toLowerCase();
+                if (tituloActual === 'catalogo torta') {
+                    const matchLista = line.match(/^(Sabores|Extras|Topper):\s*(.*)$/i);
+                    if (matchLista) {
+                        const etiqueta = `${String(matchLista[1] || '').trim()}:`;
+                        const valor = String(matchLista[2] || '').trim();
+                        actual.items.push(etiqueta);
+                        if (valor && valor !== '-') {
+                            const partes = valor
+                                .split(valor.includes('|') ? '|' : ',')
+                                .map((v) => String(v || '').trim())
+                                .filter(Boolean);
+                            if (partes.length) {
+                                partes.forEach((p) => actual.items.push(`- ${p}`));
+                            } else {
+                                actual.items.push('- -');
+                            }
+                        } else {
+                            actual.items.push('- -');
+                        }
+                        return;
+                    }
+                }
                 actual.items.push(line);
             });
             pushActual();
-            return secciones.length ? secciones : [{ titulo: tituloDefault, items: ['-'] }];
+            const filtradas = secciones.filter((sec) => String(sec.titulo || '').trim().toLowerCase() !== 'builder json');
+            return filtradas.length ? filtradas : [{ titulo: tituloDefault, items: ['-'] }];
         }
 
         function normalizarChecklistNota(items) {
@@ -4724,6 +4756,16 @@
                     y += 5;
                     (Array.isArray(sec.items) && sec.items.length ? sec.items : ['-']).forEach((item) => {
                         const raw = String(item || '-').trim() || '-';
+                        if (!raw.startsWith('-') && /:\s*$/.test(raw)) {
+                            const wrappedTitle = doc.splitTextToSize(raw, contentWidth - 2);
+                            ensurePage((wrappedTitle.length * 5.0) + 2);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(10.5);
+                            doc.setTextColor(...colors.dark);
+                            doc.text(wrappedTitle, margin + 2, y);
+                            y += (wrappedTitle.length * 5.0) + 1;
+                            return;
+                        }
                         const bulletLine = raw.startsWith('-') ? raw : `- ${raw}`;
                         const wrapped = doc.splitTextToSize(bulletLine, contentWidth - 2);
                         ensurePage((wrapped.length * 5.2) + 2);

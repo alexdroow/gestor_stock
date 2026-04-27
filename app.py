@@ -6931,19 +6931,21 @@ def api_tienda_agenda_reservar():
             f"Entrega: {'Despacho' if entrega_tipo == 'despacho' else 'Retiro'}"
         )
         if catalogo_torta_resumen:
+            categoria_row = catalogo_torta_resumen.get("categoria") or {}
             size_row = catalogo_torta_resumen.get("size") or {}
             sabores_rows = list(catalogo_torta_resumen.get("sabores") or [])
             extras_rows = list(catalogo_torta_resumen.get("extras") or [])
             topper_row = catalogo_torta_resumen.get("topper") or None
             subtotal_cat = float(catalogo_torta_resumen.get("subtotal") or 0)
             ingredientes = f"{ingredientes}\n--- Resumen de cotizacion (cliente) ---"
+            ingredientes = f"{ingredientes}\nCategoria: {categoria_row.get('nombre') or '-'}"
             ingredientes = f"{ingredientes}\nTamano: {size_row.get('nombre')} ({_fmt_clp(size_row.get('precio') or 0)})"
             if sabores_rows:
                 ingredientes = f"{ingredientes}\nSabores:"
                 for sb in sabores_rows:
                     ingredientes = f"{ingredientes}\n- {sb.get('nombre')} ({_fmt_clp(sb.get('precio') or 0)})"
             else:
-                ingredientes = f"{ingredientes}\nSabores: (sin sabores informados)"
+                ingredientes = f"{ingredientes}\nSabores:\n- -"
             if extras_rows:
                 ingredientes = f"{ingredientes}\nExtras:"
                 for ex in extras_rows:
@@ -6951,17 +6953,21 @@ def api_tienda_agenda_reservar():
                     precio_u = float(ex.get("precio") or 0)
                     ingredientes = f"{ingredientes}\n- {ex.get('nombre')} x{qty} ({_fmt_clp(precio_u * qty)})"
             else:
-                ingredientes = f"{ingredientes}\nExtras: Sin extras"
+                ingredientes = f"{ingredientes}\nExtras:\n- -"
             if topper_row:
-                ingredientes = f"{ingredientes}\nTopper: {topper_row.get('nombre')} ({_fmt_clp(topper_row.get('precio') or 0)})"
+                ingredientes = f"{ingredientes}\nTopper:\n- {topper_row.get('nombre')} ({_fmt_clp(topper_row.get('precio') or 0)})"
             else:
-                ingredientes = f"{ingredientes}\nTopper: Sin topper"
+                ingredientes = f"{ingredientes}\nTopper:\n- Sin topper"
             ingredientes = f"{ingredientes}\nSubtotal estimado productos: {_fmt_clp(subtotal_cat)}"
             if catalogo_torta_resumen.get("nota"):
                 ingredientes = f"{ingredientes}\nNota catalogo: {catalogo_torta_resumen['nota']}"
-            refs = catalogo_torta_resumen.get("referencia_urls") or []
-            for idx, ref in enumerate(refs, start=1):
-                ingredientes = f"{ingredientes}\nRef {idx}: {ref}"
+            refs = [str(r or "").strip() for r in (catalogo_torta_resumen.get("referencia_urls") or []) if str(r or "").strip()]
+            if refs:
+                ingredientes = f"{ingredientes}\nReferencias:"
+                for ref in refs:
+                    ingredientes = f"{ingredientes}\n- {ref}"
+            else:
+                ingredientes = f"{ingredientes}\nReferencias: -"
         if tipo_pedido == "pastel":
             if pastel_modo == "catalogo" and pastel_catalogo_resumen:
                 ingredientes = f"{ingredientes}\n--- Resumen de cotizacion (cliente) ---"
