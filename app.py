@@ -2450,12 +2450,15 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         for line in lines:
             if line.startswith("---") and line.endswith("---") and len(line) > 6:
                 title = str(line.strip("- ").strip() or default_title)
-                if current["items"]:
+                if current["items"] and str(current.get("title") or "").strip().lower() != "builder json":
                     sections.append(current)
+                if title.lower() == "builder json":
+                    current = {"title": title, "items": []}
+                    continue
                 current = {"title": title, "items": []}
                 continue
             current["items"].append(line)
-        if current["items"]:
+        if current["items"] and str(current.get("title") or "").strip().lower() != "builder json":
             sections.append(current)
         return sections or [{"title": default_title, "items": ["-"]}]
 
@@ -2495,6 +2498,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.setFont("Helvetica-Bold", 11)
     c.drawString(margin, y, "Datos de Reserva")
     y -= 14
+    _draw_wrapped(_wrap(f"Codigo pedido: {reserva.get('codigo_pedido') or '-'}", max_len=92))
     _draw_wrapped(_wrap(f"Tipo: {str(reserva.get('tipo') or '').capitalize()}", max_len=92))
     _draw_wrapped(_wrap(f"Fecha: {reserva.get('fecha') or '-'} {reserva.get('hora_inicio') or '-'}", max_len=92))
     _draw_wrapped(_wrap(f"Cliente: {reserva.get('cliente') or '-'}", max_len=92))
@@ -6996,6 +7000,7 @@ def api_tienda_agenda_reservar():
         total_estimado_txt = float(subtotal_estimado) + float(despacho_estimado_txt)
         ingredientes = f"{ingredientes}\nTotal estimado pedido: {_fmt_clp(total_estimado_txt)}"
         codigo_op = f"OPA-TI-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"[:80]
+        codigo_pedido = ""
 
         cursor.execute(
             """
@@ -7024,6 +7029,13 @@ def api_tienda_agenda_reservar():
             ),
         )
         reserva_id = int(cursor.lastrowid or 0)
+        if reserva_id > 0:
+            fecha_codigo = re.sub(r"[^0-9]", "", str(fecha or "").strip())[:8] or datetime.now(ZoneInfo("America/Santiago")).strftime("%Y%m%d")
+            codigo_pedido = f"AGD-{fecha_codigo}-{reserva_id:06d}"
+            cursor.execute(
+                "UPDATE agenda_eventos SET codigo_pedido = ? WHERE id = ?",
+                (codigo_pedido, reserva_id),
+            )
         cliente = _upsert_cliente_tienda_cursor(
             cursor,
             nombre=nombre,
@@ -7055,6 +7067,7 @@ def api_tienda_agenda_reservar():
                 "success": True,
                 "reserva": {
                     "id": reserva_id,
+                    "codigo_pedido": codigo_pedido or None,
                     "fecha": fecha,
                     "hora_inicio": hora_inicio,
                     "hora_fin": hora_fin,
@@ -16220,6 +16233,53 @@ def api_agenda_guardar():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/agenda/pedido/buscar', methods=['GET'])
+def api_agenda_buscar_pedido_por_codigo():
+    try:
+        from database import obtener_evento_agenda_por_codigo
+        codigo = str(request.args.get('codigo') or '').strip()
+        if not codigo:
+            return jsonify({'success': False, 'error': 'Ingresa un codigo de pedido'}), 400
+        evento = obtener_evento_agenda_por_codigo(codigo)
+        if not evento:
+            return jsonify({'success': False, 'error': 'No se encontro un pedido con ese codigo'}), 404
+        return jsonify({'success': True, 'evento': evento})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agenda/evento/<int:id>/pdf', methods=['GET'])
+def api_agenda_evento_pdf(id):
+    conn = None
+    try:
+        evento_id = int(id or 0)
+        if evento_id <= 0:
+            return jsonify({'success': False, 'error': 'ID de evento invalido'}), 400
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono, direccion, ingredientes, total, abono, codigo_operacion, codigo_pedido
+            FROM agenda_eventos
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (evento_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'Evento no encontrado'}), 404
+        evento = dict(row)
+        filename = _crear_pdf_reserva_agenda_tienda(evento)
+        media_url = f"{str(request.url_root or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
+        return jsonify({'success': True, 'media_url': media_url, 'filename': filename, 'codigo_pedido': str(evento.get('codigo_pedido') or '').strip()})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/agenda/evento/<int:id>/whatsapp-cliente-pdf', methods=['POST'])
 def api_agenda_evento_whatsapp_cliente_pdf(id):
     conn = None
@@ -16236,7 +16296,7 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono, direccion, ingredientes, total, abono, codigo_operacion
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono, direccion, ingredientes, total, abono, codigo_operacion, codigo_pedido
             FROM agenda_eventos
             WHERE id = ?
             LIMIT 1
@@ -16265,11 +16325,12 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
 
         cliente_txt = cliente_req or str(evento.get('cliente') or '').strip() or 'cliente'
         tipo_txt = str(evento.get('tipo') or '').strip().capitalize() or 'Reserva'
+        codigo_txt = str(evento.get('codigo_pedido') or '').strip()
         fecha_txt = str(evento.get('fecha') or '-').strip()
         hora_txt = str(evento.get('hora_entrega') or evento.get('hora_inicio') or '-').strip()
         body = (
             f"Hola {cliente_txt}, te compartimos la cotizacion de tu pedido.\n"
-            f"Evento #{evento_id}\n"
+            f"Codigo pedido: {codigo_txt or ('#' + str(evento_id))}\n"
             f"Tipo: {tipo_txt}\n"
             f"Fecha: {fecha_txt} {hora_txt}\n"
             "Adjunto PDF con el detalle y total."
@@ -16283,7 +16344,7 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
 
         mensaje_manual = (
             f"Hola {cliente_txt}, te compartimos la cotizacion de tu pedido. "
-            f"Evento #{evento_id}. Tipo: {tipo_txt}. Fecha: {fecha_txt} {hora_txt}. "
+            f"Codigo: {codigo_txt or ('#' + str(evento_id))}. Tipo: {tipo_txt}. Fecha: {fecha_txt} {hora_txt}. "
             f"PDF: {media_url}"
         )
         whatsapp_url = f"https://wa.me/{destino_wa}?text={quote(mensaje_manual)}" if destino_wa else ""

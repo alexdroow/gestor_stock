@@ -2,6 +2,7 @@
 import sqlite3
 import math
 import unicodedata
+import re
 import time
 import random
 import uuid
@@ -7473,6 +7474,7 @@ def migrar_db():
         _ensure_column(conn, "productos", "orden_tienda", "INTEGER DEFAULT 0")
         _ensure_column(conn, "productos", "activo_tienda", "INTEGER DEFAULT 1")
         _ensure_column(conn, "agenda_eventos", "codigo_operacion", "TEXT")
+        _ensure_column(conn, "agenda_eventos", "codigo_pedido", "TEXT")
         _ensure_column(conn, "agenda_eventos", "cliente_email", "TEXT")
         _ensure_column(conn, "agenda_eventos", "cliente_telefono", "TEXT")
         _ensure_column(conn, "ventas", "codigo_pedido", "TEXT")
@@ -7500,6 +7502,26 @@ def migrar_db():
         _ensure_column(conn, "producciones", "metadata_json", "TEXT")
         _ensure_column(conn, "producciones", "codigo_operacion", "TEXT")
         conn.execute("UPDATE agenda_eventos SET codigo_operacion = COALESCE(NULLIF(codigo_operacion, ''), 'OPA-LEGACY-' || id)")
+        conn.execute("UPDATE agenda_eventos SET codigo_pedido = UPPER(TRIM(codigo_pedido)) WHERE codigo_pedido IS NOT NULL")
+        conn.execute(
+            """
+            UPDATE agenda_eventos
+            SET codigo_pedido = ('AGD-' || COALESCE(NULLIF(REPLACE(TRIM(fecha), '-', ''), ''), strftime('%Y%m%d', 'now')) || '-' || printf('%06d', id))
+            WHERE tipo <> 'bloqueo'
+              AND (
+                    codigo_pedido IS NULL
+                 OR TRIM(codigo_pedido) = ''
+                 OR id NOT IN (
+                        SELECT MIN(id)
+                        FROM agenda_eventos
+                        WHERE codigo_pedido IS NOT NULL
+                          AND TRIM(codigo_pedido) <> ''
+                        GROUP BY UPPER(TRIM(codigo_pedido))
+                    )
+              )
+            """
+        )
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_agenda_eventos_codigo_pedido_unique ON agenda_eventos(codigo_pedido)")
         conn.execute("UPDATE ventas SET canal_venta = COALESCE(NULLIF(TRIM(canal_venta), ''), 'presencial')")
         conn.execute("UPDATE ventas SET codigo_operacion = COALESCE(NULLIF(codigo_operacion, ''), 'OPV-LEGACY-' || id)")
         conn.execute("UPDATE ventas SET pedido_estado = COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido')")
@@ -11925,6 +11947,72 @@ def actualizar_estado_evento_agenda(evento_id, estado):
     finally:
         conn.close()
 
+def _normalizar_codigo_pedido_agenda(codigo):
+    txt = str(codigo or "").strip().upper()
+    txt = re.sub(r"[^A-Z0-9\-]", "", txt)
+    txt = re.sub(r"\-+", "-", txt).strip("-")
+    return txt[:40]
+
+
+def _generar_codigo_pedido_agenda(cursor, fecha_ref=None, evento_id=None):
+    fecha_raw = str(fecha_ref or "").strip()
+    fecha_digits = re.sub(r"[^0-9]", "", fecha_raw)
+    if len(fecha_digits) >= 8:
+        fecha_digits = fecha_digits[:8]
+    else:
+        fecha_digits = datetime.now().strftime("%Y%m%d")
+
+    if evento_id:
+        base = f"AGD-{fecha_digits}-{int(evento_id):06d}"
+    else:
+        base = f"AGD-{fecha_digits}-{random.randint(100000, 999999)}"
+    codigo = _normalizar_codigo_pedido_agenda(base)
+
+    intento = 0
+    while intento < 8:
+        cursor.execute(
+            """
+            SELECT id
+            FROM agenda_eventos
+            WHERE codigo_pedido = ?
+            LIMIT 1
+            """,
+            (codigo,),
+        )
+        exists = cursor.fetchone()
+        if not exists:
+            return codigo
+        intento += 1
+        codigo = _normalizar_codigo_pedido_agenda(f"AGD-{fecha_digits}-{random.randint(100000, 999999)}")
+    return _normalizar_codigo_pedido_agenda(f"AGD-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}")
+
+
+def obtener_evento_agenda_por_codigo(codigo_pedido):
+    codigo = _normalizar_codigo_pedido_agenda(codigo_pedido)
+    if not codigo:
+        return None
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT *
+            FROM agenda_eventos
+            WHERE codigo_pedido = ?
+            LIMIT 1
+            """,
+            (codigo,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        evento = dict(row)
+        evento["es_envio"] = bool(evento.get("es_envio"))
+        return evento
+    finally:
+        conn.close()
+
+
 def guardar_evento_agenda(evento):
     """Guarda un evento nuevo o actualiza existente"""
     conn = get_db()
@@ -11933,6 +12021,7 @@ def guardar_evento_agenda(evento):
     try:
         tipo = evento.get("tipo") or "torta"
         codigo_operacion_evento = str(evento.get("codigo_operacion") or "").strip()[:80] or None
+        codigo_pedido_evento = _normalizar_codigo_pedido_agenda(evento.get("codigo_pedido"))
         hora_inicio = evento.get("hora_inicio") or None
         hora_fin = evento.get("hora_fin") or None
         if tipo == "bloqueo" and not hora_inicio and not hora_fin:
@@ -11941,18 +12030,32 @@ def guardar_evento_agenda(evento):
             hora_fin = None
 
         if evento.get('id'):
-            cursor.execute("SELECT codigo_operacion FROM agenda_eventos WHERE id = ?", (evento["id"],))
+            cursor.execute("SELECT codigo_operacion, codigo_pedido FROM agenda_eventos WHERE id = ?", (evento["id"],))
             row_actual = cursor.fetchone()
             codigo_actual = str(row_actual["codigo_operacion"] or "").strip() if row_actual else ""
+            codigo_pedido_actual = _normalizar_codigo_pedido_agenda(row_actual["codigo_pedido"]) if row_actual else ""
             if not codigo_operacion_evento:
                 codigo_operacion_evento = codigo_actual or generar_codigo_operacion("OPA")
+            if tipo == "bloqueo":
+                codigo_pedido_evento = None
+            elif codigo_pedido_actual:
+                codigo_pedido_evento = codigo_pedido_actual
+            elif not codigo_pedido_evento:
+                codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento.get("id"))
+            elif codigo_pedido_evento:
+                cursor.execute(
+                    "SELECT id FROM agenda_eventos WHERE codigo_pedido = ? AND id <> ? LIMIT 1",
+                    (codigo_pedido_evento, evento.get("id")),
+                )
+                if cursor.fetchone():
+                    codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento.get("id"))
             # Actualizar existente
             cursor.execute('''
                 UPDATE agenda_eventos SET
                     tipo = ?, titulo = ?, fecha = ?, hora_inicio = ?,
                     hora_fin = ?, hora_entrega = ?, cliente = ?, telefono = ?,
                     es_envio = ?, direccion = ?, ingredientes = ?, total = ?,
-                    abono = ?, motivo = ?, alerta_minutos = ?, codigo_operacion = ?
+                    abono = ?, motivo = ?, alerta_minutos = ?, codigo_operacion = ?, codigo_pedido = ?
                 WHERE id = ?
             ''', (
                 tipo, evento['titulo'], evento['fecha'], 
@@ -11961,7 +12064,7 @@ def guardar_evento_agenda(evento):
                 evento.get('telefono'), 1 if evento.get('es_envio') else 0,
                 evento.get('direccion'), evento.get('ingredientes'),
                 evento.get('total', 0), evento.get('abono', 0),
-                evento.get('motivo'), evento.get('alerta_minutos', 1440), codigo_operacion_evento,
+                evento.get('motivo'), evento.get('alerta_minutos', 1440), codigo_operacion_evento, codigo_pedido_evento,
                 evento['id']
             ))
         else:
@@ -11985,12 +12088,26 @@ def guardar_evento_agenda(evento):
                 'pendiente', codigo_operacion_evento
             ))
             evento['id'] = cursor.lastrowid
+            if tipo != "bloqueo":
+                if not codigo_pedido_evento:
+                    codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento["id"])
+                else:
+                    cursor.execute(
+                        "SELECT id FROM agenda_eventos WHERE codigo_pedido = ? LIMIT 1",
+                        (codigo_pedido_evento,),
+                    )
+                    if cursor.fetchone():
+                        codigo_pedido_evento = _generar_codigo_pedido_agenda(cursor, evento.get("fecha"), evento["id"])
+                cursor.execute(
+                    "UPDATE agenda_eventos SET codigo_pedido = ? WHERE id = ?",
+                    (codigo_pedido_evento, evento["id"]),
+                )
 
         # Al editar/crear se reinician descartes para recalcular nuevos avisos.
         cursor.execute("DELETE FROM agenda_recordatorios_descartados WHERE evento_id = ?", (evento["id"],))
         
         conn.commit()
-        return {'success': True, 'id': evento['id']}
+        return {'success': True, 'id': evento['id'], 'codigo_pedido': (codigo_pedido_evento or None)}
     except Exception as e:
         conn.rollback()
         return {'success': False, 'error': str(e)}

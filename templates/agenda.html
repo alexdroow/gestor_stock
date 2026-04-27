@@ -1759,6 +1759,9 @@
                                 <button onclick="cambiarMes(1)" class="btn-icon">-></button>
                             </div>
                             <div class="header-action-buttons">
+                                <button onclick="abrirBuscadorPedidos()" class="btn-secondary" title="Buscar pedido por codigo">
+                                    &#128269; Buscar Pedido
+                                </button>
                                 <button onclick="eliminarEventosPasados()" class="btn-danger-soft" title="Eliminar eventos anteriores al día actual">
                                     🗑 Limpiar pasados
                                 </button>
@@ -1901,6 +1904,10 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="evento-id">
+                <div class="form-group">
+                    <label>Codigo de pedido</label>
+                    <input type="text" id="evento-codigo-pedido" readonly placeholder="Se genera automaticamente al guardar">
+                </div>
                 
                 <div class="form-group">
                     <label>Tipo de Evento</label>
@@ -2072,6 +2079,34 @@
         </div>
     </div>
 
+    <!-- Modal buscador de pedidos -->
+    <div class="modal-overlay" id="modal-buscar-pedido">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Buscar Pedido por Codigo</h3>
+                <button onclick="cerrarBuscadorPedidos()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1.3;">
+                        <label>Codigo</label>
+                        <input type="text" id="buscar-codigo-pedido" placeholder="Ej: AGD-20260427-000123" style="text-transform:uppercase;">
+                    </div>
+                    <div class="form-group" style="align-self:flex-end;">
+                        <button type="button" class="btn btn-primary" onclick="buscarPedidoPorCodigo()">Buscar</button>
+                    </div>
+                </div>
+                <div id="buscar-pedido-resultado" class="form-hint">Ingresa un codigo para ver el resumen del pedido.</div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="cerrarBuscadorPedidos()" class="btn btn-secondary">Cerrar</button>
+                <button onclick="abrirPedidoBuscadoEnAgenda()" class="btn btn-secondary" id="btn-buscar-abrir" disabled>Abrir en agenda</button>
+                <button onclick="generarPdfPedidoBuscado()" class="btn btn-pdf" id="btn-buscar-pdf" disabled>&#128196; Generar PDF</button>
+                <button onclick="enviarPdfPedidoBuscadoWhatsApp()" class="btn btn-whatsapp" id="btn-buscar-wa" disabled>WhatsApp + PDF</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Configuración -->
     <div class="modal-overlay" id="modal-config">
         <div class="modal">
@@ -2197,6 +2232,7 @@
         let tortaCatalogoPublico = null;
         let tortaBuilder = null;
         let tortaCatalogoCargado = false;
+        let pedidoBusquedaActual = null;
         let notaEditando = null;
         let notaChecklistDraft = [];
         let fechaSeleccionada = '';
@@ -2984,6 +3020,18 @@
                     tortaBuilder.nota = String(notaTortaEl.value || '').slice(0, 500);
                 });
             }
+            const codigoPedidoEl = document.getElementById('buscar-codigo-pedido');
+            if (codigoPedidoEl) {
+                codigoPedidoEl.addEventListener('input', () => {
+                    codigoPedidoEl.value = String(codigoPedidoEl.value || '').toUpperCase();
+                });
+                codigoPedidoEl.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        buscarPedidoPorCodigo();
+                    }
+                });
+            }
             cargarCatalogoTortaManual();
             renderTortaBuilder();
         });
@@ -3115,7 +3163,8 @@
                 total: parseFloat(document.getElementById('evento-total').value) || 0,
                 abono: parseFloat(document.getElementById('evento-abono').value) || 0,
                 motivo: document.getElementById('bloqueo-motivo').value || null,
-                alerta_minutos: parseInt(document.getElementById('evento-alerta').value) || 1440
+                alerta_minutos: parseInt(document.getElementById('evento-alerta').value) || 1440,
+                codigo_pedido: document.getElementById('evento-codigo-pedido').value || null
             };
 
             mostrarLoading(true);
@@ -3759,6 +3808,123 @@
             }
         }
 
+        function _resumenPedidoBuscadoHtml(evento) {
+            if (!evento) return '<div class="form-hint">Sin datos del pedido.</div>';
+            const total = Number(evento.total || 0);
+            const abono = Number(evento.abono || 0);
+            const saldo = Math.max(0, total - abono);
+            const entrega = evento.es_envio ? 'Despacho' : 'Retiro en tienda';
+            const hora = String(evento.hora_entrega || evento.hora_inicio || '').trim();
+            const detalleRaw = String(evento.ingredientes || '').trim();
+            const detalle = escapeHtml(detalleRaw.length > 300 ? `${detalleRaw.slice(0, 300)}...` : (detalleRaw || '-'));
+            return `
+                <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#f8fafc;">
+                    <div style="font-weight:700;margin-bottom:8px;">Pedido ${escapeHtml(String(evento.codigo_pedido || '-'))}</div>
+                    <div><strong>Cliente:</strong> ${escapeHtml(String(evento.cliente || '-'))}</div>
+                    <div><strong>Telefono:</strong> ${escapeHtml(String(evento.telefono || '-'))}</div>
+                    <div><strong>Tipo:</strong> ${escapeHtml(String(evento.tipo || '-'))}</div>
+                    <div><strong>Fecha:</strong> ${escapeHtml(String(evento.fecha || '-'))}${hora ? ` ${escapeHtml(hora)}` : ''}</div>
+                    <div><strong>Entrega:</strong> ${escapeHtml(entrega)}</div>
+                    <div><strong>Total:</strong> ${escapeHtml(formatoMonedaCLP(total))} | <strong>Abono:</strong> ${escapeHtml(formatoMonedaCLP(abono))} | <strong>Saldo:</strong> ${escapeHtml(formatoMonedaCLP(saldo))}</div>
+                    <div style="margin-top:8px;"><strong>Resumen:</strong></div>
+                    <div style="white-space:pre-wrap;font-size:12px;color:#334155;">${detalle}</div>
+                </div>
+            `;
+        }
+
+        async function buscarPedidoPorCodigo() {
+            const input = document.getElementById('buscar-codigo-pedido');
+            const out = document.getElementById('buscar-pedido-resultado');
+            const btnAbrir = document.getElementById('btn-buscar-abrir');
+            const btnPdf = document.getElementById('btn-buscar-pdf');
+            const btnWa = document.getElementById('btn-buscar-wa');
+            const codigo = String((input && input.value) || '').trim().toUpperCase();
+            if (!codigo) {
+                if (out) out.innerHTML = '<span class="form-hint">Ingresa un codigo valido.</span>';
+                if (btnAbrir) btnAbrir.disabled = true;
+                if (btnPdf) btnPdf.disabled = true;
+                if (btnWa) btnWa.disabled = true;
+                pedidoBusquedaActual = null;
+                return;
+            }
+            try {
+                mostrarLoading(true);
+                const res = await fetch(`/api/agenda/pedido/buscar?codigo=${encodeURIComponent(codigo)}`);
+                const data = await res.json();
+                if (!res.ok || !data.success || !data.evento) throw new Error(data.error || 'Pedido no encontrado');
+                pedidoBusquedaActual = data.evento;
+                if (out) out.innerHTML = _resumenPedidoBuscadoHtml(pedidoBusquedaActual);
+                if (btnAbrir) btnAbrir.disabled = false;
+                if (btnPdf) btnPdf.disabled = false;
+                if (btnWa) btnWa.disabled = !normalizarTelefonoWhatsApp(pedidoBusquedaActual.telefono || '');
+            } catch (err) {
+                pedidoBusquedaActual = null;
+                if (out) out.innerHTML = `<span class="form-hint" style="color:#dc2626;">${escapeHtml(String(err && err.message ? err.message : 'No se pudo buscar el pedido'))}</span>`;
+                if (btnAbrir) btnAbrir.disabled = true;
+                if (btnPdf) btnPdf.disabled = true;
+                if (btnWa) btnWa.disabled = true;
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
+        function abrirPedidoBuscadoEnAgenda() {
+            if (!pedidoBusquedaActual || !Number(pedidoBusquedaActual.id || 0)) return;
+            cerrarBuscadorPedidos();
+            editarEvento(Number(pedidoBusquedaActual.id || 0));
+        }
+
+        async function generarPdfPedidoBuscado() {
+            if (!pedidoBusquedaActual || !Number(pedidoBusquedaActual.id || 0)) return;
+            try {
+                mostrarLoading(true);
+                const res = await fetch(`/api/agenda/evento/${Number(pedidoBusquedaActual.id)}/pdf`);
+                const data = await res.json();
+                if (!res.ok || !data.success || !data.media_url) throw new Error(data.error || 'No se pudo generar el PDF');
+                window.open(String(data.media_url), '_blank', 'noopener,noreferrer');
+            } catch (err) {
+                alert(String(err && err.message ? err.message : 'No se pudo generar el PDF'));
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
+        async function enviarPdfPedidoBuscadoWhatsApp() {
+            if (!pedidoBusquedaActual || !Number(pedidoBusquedaActual.id || 0)) return;
+            const telefono = normalizarTelefonoWhatsApp(pedidoBusquedaActual.telefono || '');
+            if (!telefono) {
+                alert('El pedido no tiene un telefono valido para WhatsApp.');
+                return;
+            }
+            try {
+                mostrarLoading(true);
+                const res = await fetch(`/api/agenda/evento/${Number(pedidoBusquedaActual.id)}/whatsapp-cliente-pdf`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telefono: telefono,
+                        cliente: String(pedidoBusquedaActual.cliente || ''),
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo enviar por WhatsApp');
+                if (data.via === 'twilio') {
+                    alert('PDF enviado automaticamente por WhatsApp al cliente.');
+                    return;
+                }
+                if (data.whatsapp_url) {
+                    window.open(String(data.whatsapp_url), '_blank', 'noopener,noreferrer');
+                    alert('Se abrio WhatsApp con el PDF para envio manual.');
+                    return;
+                }
+                alert('PDF preparado correctamente.');
+            } catch (err) {
+                alert(String(err && err.message ? err.message : 'No se pudo enviar la cotizacion'));
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
         function limpiarMapaEstado(mensaje = 'Escribe una dirección para ver el mapa.', tipo = '') {
             const statusEl = document.getElementById('mapa-status');
             const iframe = document.getElementById('mapa-iframe');
@@ -4166,6 +4332,7 @@
             renderizarDetalleHorarioDia();
             eventoEditando = null;
             document.getElementById('btn-eliminar').style.display = 'none';
+            document.getElementById('evento-codigo-pedido').value = '';
             document.getElementById('evento-fecha').value = fecha;
             document.getElementById('evento-hora-inicio').value = horaInicioSugerida || config.horaInicio;
             actualizarVisibilidadBotonPdf();
@@ -4183,6 +4350,7 @@
             eventoEditando = null;
             modoAgendarTorta = false;
             document.getElementById('evento-id').value = '';
+            document.getElementById('evento-codigo-pedido').value = '';
             document.getElementById('evento-envio').checked = false;
             document.getElementById('grupo-direccion').style.display = 'none';
             document.getElementById('evento-tipo').disabled = false;
@@ -4199,6 +4367,27 @@
 
         function cerrarConfig() {
             document.getElementById('modal-config').classList.remove('active');
+        }
+
+        function abrirBuscadorPedidos() {
+            pedidoBusquedaActual = null;
+            const input = document.getElementById('buscar-codigo-pedido');
+            const out = document.getElementById('buscar-pedido-resultado');
+            const btnAbrir = document.getElementById('btn-buscar-abrir');
+            const btnPdf = document.getElementById('btn-buscar-pdf');
+            const btnWa = document.getElementById('btn-buscar-wa');
+            if (input) input.value = '';
+            if (out) out.innerHTML = '<span class="form-hint">Ingresa un codigo para ver el resumen del pedido.</span>';
+            if (btnAbrir) btnAbrir.disabled = true;
+            if (btnPdf) btnPdf.disabled = true;
+            if (btnWa) btnWa.disabled = true;
+            document.getElementById('modal-buscar-pedido').classList.add('active');
+            setTimeout(() => { if (input) input.focus(); }, 20);
+        }
+
+        function cerrarBuscadorPedidos() {
+            document.getElementById('modal-buscar-pedido').classList.remove('active');
+            pedidoBusquedaActual = null;
         }
 
         function actualizarVisibilidadBotonPdf() {
@@ -4218,6 +4407,7 @@
 
             // Limpiar formulario
             document.getElementById('evento-id').value = '';
+            document.getElementById('evento-codigo-pedido').value = '';
             document.getElementById('evento-tipo').disabled = false;
             document.getElementById('evento-tipo').value = 'torta';
             document.getElementById('evento-titulo').value = '';
@@ -4269,6 +4459,7 @@
             document.getElementById('evento-tipo').disabled = false;
 
             document.getElementById('evento-id').value = evento.id;
+            document.getElementById('evento-codigo-pedido').value = evento.codigo_pedido || '';
             document.getElementById('evento-tipo').value = evento.tipo;
             document.getElementById('evento-titulo').value = evento.titulo;
             document.getElementById('evento-fecha').value = evento.fecha;
@@ -4621,6 +4812,7 @@
                 return Number.isFinite(n) ? n : 0;
             };
             const eventoId = (document.getElementById('evento-id').value || '').trim();
+            const codigoPedido = (document.getElementById('evento-codigo-pedido').value || (eventoEditando && eventoEditando.codigo_pedido) || '').trim();
             const tipoSeleccionado = (document.getElementById('evento-tipo').value || (eventoEditando && eventoEditando.tipo) || 'torta');
             const ingredientesFuente = (document.getElementById('evento-ingredientes').value || (eventoEditando && eventoEditando.ingredientes) || '');
             const ingredientesArmados = (modoAgendarTorta && String(tipoSeleccionado).toLowerCase() === 'torta')
@@ -4628,6 +4820,7 @@
                 : ingredientesFuente;
             return {
                 id: eventoId || (eventoEditando && eventoEditando.id) || 'BORRADOR',
+                codigo_pedido: codigoPedido,
                 tipo: tipoSeleccionado,
                 titulo: (document.getElementById('evento-titulo').value || (eventoEditando && eventoEditando.titulo) || ''),
                 fecha: (document.getElementById('evento-fecha').value || (eventoEditando && eventoEditando.fecha) || ''),
@@ -4824,6 +5017,7 @@
             y += 22;
 
             drawSectionTitle('Datos del Cliente');
+            drawField('Codigo Pedido', e.codigo_pedido || `#${e.id || '-'}`);
             drawField('Cliente', e.cliente);
             drawField('Teléfono', e.telefono);
 
