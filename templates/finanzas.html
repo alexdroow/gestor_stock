@@ -498,6 +498,21 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function _normalizarFechaSort(valor) {
+            const s = String(valor || '').trim().slice(0, 10);
+            return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+        }
+
+        function ordenarRecientePrimero(items, campoFecha, campoId = 'id') {
+            const lista = Array.isArray(items) ? [...items] : [];
+            return lista.sort((a, b) => {
+                const fa = _normalizarFechaSort(a?.[campoFecha]);
+                const fb = _normalizarFechaSort(b?.[campoFecha]);
+                if (fa !== fb) return fb.localeCompare(fa);
+                return Number(b?.[campoId] || 0) - Number(a?.[campoId] || 0);
+            });
+        }
+
         function weekStart(dateIso) {
             const source = dateIso ? new Date(`${dateIso}T00:00:00`) : new Date();
             if (Number.isNaN(source.getTime())) return '';
@@ -528,7 +543,7 @@
 
         function renderTable() {
             const root = document.getElementById('fin-table-root');
-            const rows = Array.isArray(state.data?.semanas) ? state.data.semanas : [];
+            const rows = ordenarRecientePrimero(state.data?.semanas, 'semana_inicio');
             if (!rows.length) {
                 root.innerHTML = '<div class="empty">No hay semanas registradas en el rango.</div>';
                 return;
@@ -899,7 +914,7 @@
             const root = document.getElementById('fin-gastos-table-root');
             const summary = document.getElementById('fin-gastos-summary');
             if (!root || !summary) return;
-            const rows = Array.isArray(state.gastosRows) ? state.gastosRows : [];
+            const rows = ordenarRecientePrimero(state.gastosRows, 'periodo_inicio');
             if (!rows.length) {
                 summary.textContent = `Sin registros para ${gastoLabel(state.gastoModo)} en el rango seleccionado.`;
                 root.innerHTML = '<div class="empty">No hay historial para este periodo.</div>';
@@ -987,7 +1002,7 @@
             const root = document.getElementById('fin-gastos-detalle-table-root');
             const summary = document.getElementById('fin-gastos-detalle-summary');
             if (!root || !summary) return;
-            const rows = Array.isArray(state.gastosDetalleRows) ? state.gastosDetalleRows : [];
+            const rows = ordenarRecientePrimero(state.gastosDetalleRows, 'fecha');
             if (!rows.length) {
                 summary.textContent = 'No hay movimientos en este periodo.';
                 root.innerHTML = '<div class="empty">No hay detalle de gasto para estas fechas.</div>';
@@ -1043,7 +1058,7 @@
             const root = document.getElementById('fin-canal-table-root');
             const summary = document.getElementById('fin-canal-summary');
             if (!root || !summary) return;
-            const rows = Array.isArray(state.canalRows) ? state.canalRows : [];
+            const rows = ordenarRecientePrimero(state.canalRows, 'periodo_inicio');
             if (!rows.length) {
                 summary.textContent = `Sin registros para ${canalLabel(state.canalActual)} en el rango seleccionado.`;
                 root.innerHTML = '<div class="empty">No hay ventas en este periodo.</div>';
@@ -1107,7 +1122,7 @@
             const root = document.getElementById('fin-apps-table-root');
             const summary = document.getElementById('fin-apps-summary');
             if (!root || !summary) return;
-            const rows = Array.isArray(state.appsRows) ? state.appsRows : [];
+            const rows = ordenarRecientePrimero(state.appsRows, 'semana_inicio');
             if (!rows.length) {
                 summary.textContent = 'Sin registros en el rango seleccionado.';
                 root.innerHTML = '<div class="empty">No hay registros de Uber/PedidosYa en este rango.</div>';
@@ -1171,7 +1186,7 @@
         function renderEgresosHistory() {
             const root = document.getElementById('fin-egresos-table-root');
             if (!root) return;
-            const rows = Array.isArray(state.egresos) ? state.egresos : [];
+            const rows = ordenarRecientePrimero(state.egresos, 'fecha');
             if (!rows.length) {
                 root.innerHTML = '<div class="empty">No hay egresos manuales en este rango.</div>';
                 return;
@@ -1210,7 +1225,7 @@
             const root = document.getElementById('fin-ingresos-table-root');
             const summary = document.getElementById('fin-ingresos-summary');
             if (!root || !summary) return;
-            const rows = Array.isArray(state.ingresos) ? state.ingresos : [];
+            const rows = ordenarRecientePrimero(state.ingresos, 'fecha');
             if (!rows.length) {
                 summary.textContent = 'No hay ingresos manuales en este rango.';
                 root.innerHTML = '<div class="empty">No hay ingresos manuales en este rango.</div>';
