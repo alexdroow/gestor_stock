@@ -10908,6 +10908,106 @@ def api_finanzas_movimientos_manuales_eliminar(movimiento_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/api/finanzas/gastos-detalle', methods=['GET'])
+def api_finanzas_gastos_detalle():
+    try:
+        modo = str(request.args.get("modo") or "general").strip().lower()
+        if modo not in {"general", "total"}:
+            return jsonify({"success": False, "error": "modo invalido. Usa general o total", "rows": []}), 400
+
+        fecha_hasta = _parse_fecha_iso_ymd(
+            request.args.get("hasta") or datetime.now().strftime("%Y-%m-%d"),
+            "fecha hasta",
+        )
+        fecha_desde = _parse_fecha_iso_ymd(
+            request.args.get("desde") or (fecha_hasta - timedelta(days=29)).strftime("%Y-%m-%d"),
+            "fecha desde",
+        )
+        if fecha_desde > fecha_hasta:
+            return jsonify({"success": False, "error": "fecha desde no puede ser mayor que fecha hasta", "rows": []}), 400
+
+        desde_iso = fecha_desde.strftime("%Y-%m-%d")
+        hasta_iso = fecha_hasta.strftime("%Y-%m-%d")
+        rows = []
+
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT id, fecha_factura, proveedor, numero_factura, monto_total, observacion
+                FROM facturas_archivo
+                WHERE COALESCE(eliminado, 0) = 0
+                  AND date(fecha_factura) >= date(?)
+                  AND date(fecha_factura) <= date(?)
+                ORDER BY date(fecha_factura) DESC, id DESC
+                LIMIT 800
+                """,
+                (desde_iso, hasta_iso),
+            )
+            for r in cursor.fetchall():
+                rows.append(
+                    {
+                        "id": int(r["id"] or 0),
+                        "fecha": str(r["fecha_factura"] or "").strip(),
+                        "origen": "factura",
+                        "categoria": str(r["proveedor"] or "Proveedor").strip() or "Proveedor",
+                        "referencia": str(r["numero_factura"] or "").strip() or f"Factura #{int(r['id'] or 0)}",
+                        "detalle": str(r["observacion"] or "").strip(),
+                        "monto": round(max(0.0, float(r["monto_total"] or 0)), 2),
+                    }
+                )
+
+            if modo == "total":
+                cursor.execute(
+                    """
+                    SELECT id, fecha, categoria, descripcion, monto
+                    FROM finanzas_movimientos_manuales
+                    WHERE tipo = 'egreso'
+                      AND date(fecha) >= date(?)
+                      AND date(fecha) <= date(?)
+                    ORDER BY date(fecha) DESC, id DESC
+                    LIMIT 800
+                    """,
+                    (desde_iso, hasta_iso),
+                )
+                for r in cursor.fetchall():
+                    rows.append(
+                        {
+                            "id": int(r["id"] or 0),
+                            "fecha": str(r["fecha"] or "").strip(),
+                            "origen": "egreso_manual",
+                            "categoria": str(r["categoria"] or "Egreso manual").strip() or "Egreso manual",
+                            "referencia": f"Egreso #{int(r['id'] or 0)}",
+                            "detalle": str(r["descripcion"] or "").strip(),
+                            "monto": round(max(0.0, float(r["monto"] or 0)), 2),
+                        }
+                    )
+        finally:
+            conn.close()
+
+        rows.sort(key=lambda x: (x.get("fecha") or "", int(x.get("id") or 0)), reverse=True)
+        total = round(sum(float(x.get("monto") or 0) for x in rows), 2)
+
+        return jsonify(
+            {
+                "success": True,
+                "rows": rows,
+                "resumen": {
+                    "modo": modo,
+                    "desde": desde_iso,
+                    "hasta": hasta_iso,
+                    "registros": len(rows),
+                    "total": total,
+                },
+            }
+        )
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e), "rows": []}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "rows": []}), 500
+
+
 @app.route('/api/ventas/desactivaciones-pendientes')
 def api_desactivaciones_pendientes_venta():
     try:
