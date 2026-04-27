@@ -3602,6 +3602,10 @@
             document.getElementById('modal-editar-insumo').classList.remove('active');
             renderLotesInsumoResumen([], '');
             insumoAEditar = null;
+            if (reabrirFinalizarComprasTrasEdicion) {
+                reabrirFinalizarComprasTrasEdicion = false;
+                abrirModalFinalizarCompras();
+            }
         }
 
         function actualizarPreviewPrecioInsumo() {
@@ -3790,6 +3794,28 @@
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
+                    const targetId = Number(insumoAEditar || 0);
+                    const local = insumosData.find(i => Number(i.id) === targetId);
+                    if (local) {
+                        local.nombre = payload.nombre;
+                        local.codigo_barra = payload.codigo_barra || '';
+                        local.stock = Number(payload.stock || 0);
+                        local.stock_minimo = Number(payload.stock_minimo || 0);
+                        local.unidad = payload.unidad || local.unidad || 'unidad';
+                        local.precio_unitario = Number(payload.precio_unitario || 0);
+                        local.cantidad_comprada = Number(payload.cantidad_comprada || 1);
+                        local.unidad_compra = payload.unidad_compra || local.unidad_compra || local.unidad || 'unidad';
+                        local.precio_incluye_iva = Boolean(payload.precio_incluye_iva);
+                    }
+                    const lookupKey = String(targetId);
+                    if (insumosLookup[lookupKey]) {
+                        insumosLookup[lookupKey].nombre = payload.nombre;
+                        insumosLookup[lookupKey].stock = Number(payload.stock || 0);
+                        insumosLookup[lookupKey].unidad = payload.unidad || insumosLookup[lookupKey].unidad || 'unidad';
+                        insumosLookup[lookupKey].precio_unitario = Number(payload.precio_unitario || 0);
+                        insumosLookup[lookupKey].cantidad_comprada = Number(payload.cantidad_comprada || 1);
+                        insumosLookup[lookupKey].unidad_compra = payload.unidad_compra || insumosLookup[lookupKey].unidad_compra || insumosLookup[lookupKey].unidad || 'unidad';
+                    }
                     actualizarFilaInsumoEnTabla(insumoAEditar, payload);
                     alert('\u2705 Insumo actualizado correctamente');
                     cerrarModalEditarInsumo();
@@ -3857,6 +3883,19 @@
                 abrirModalEditarInsumo(insumoId);
             });
         }
+        const finalizarComprasBodyEl = document.getElementById('finalizar-compras-body');
+        if (finalizarComprasBodyEl) {
+            finalizarComprasBodyEl.addEventListener('dblclick', function(e) {
+                if (e.target.closest('button, input, select, textarea, a, label')) return;
+                const fila = e.target.closest('tr[data-insumo-id]');
+                if (!fila) return;
+                const insumoId = Number(fila.getAttribute('data-insumo-id') || 0);
+                if (!insumoId) return;
+                reabrirFinalizarComprasTrasEdicion = true;
+                cerrarModalFinalizarCompras();
+                abrirModalEditarInsumo(insumoId);
+            });
+        }
 
         document.getElementById('modal-descuento-rapido').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalDescuentoRapido();
@@ -3914,6 +3953,8 @@ let insumosData = [
         let recetasSeleccionCalculo = [];
         let comprasPendientesCache = [];
         let previewFinalizarCompras = null;
+
+        let reabrirFinalizarComprasTrasEdicion = false;
         let facturaCompraDraft = null;
 
         function normalizarTextoBusqueda(valor) {
@@ -4707,7 +4748,7 @@ let insumosData = [
                     previewFinalizarCompras = data;
                     const resumen = data.resumen || {};
                     if (resumenEl) {
-                        resumenEl.textContent = `Total lista: ${Number(resumen.total_items || 0)} · Aplicables: ${Number(resumen.aplicables || 0)} · Omitidos: ${Number(resumen.omitidos || 0)}`;
+                        resumenEl.textContent = `Total lista: ${Number(resumen.total_items || 0)} | Aplicables: ${Number(resumen.aplicables || 0)} | Omitidos: ${Number(resumen.omitidos || 0)} | Doble click en un insumo para editar costo/unidad`;
                     }
 
                     const items = Array.isArray(data.items) ? data.items : [];
@@ -4716,7 +4757,7 @@ let insumosData = [
                             bodyEl.innerHTML = '<tr><td colspan="5" class="pendiente-empty">No hay items aplicables para stock.</td></tr>';
                         } else {
                             bodyEl.innerHTML = items.map(item => `
-                                <tr>
+                                <tr data-insumo-id="${Number(item.insumo_id || item.id || 0)}" title="Doble click para editar este insumo">
                                     <td>${escapeHtml(item.insumo_nombre || 'Insumo')}</td>
                                     <td>${escapeHtml(formatoNumero(item.cantidad_compra || 0))} ${escapeHtml(item.unidad_compra || '')}</td>
                                     <td>${escapeHtml(formatoNumero(item.cantidad_en_stock || 0))} ${escapeHtml(item.unidad_stock || '')}</td>
@@ -4730,7 +4771,7 @@ let insumosData = [
                     const omitidos = Array.isArray(data.omitidos) ? data.omitidos : [];
                     if (omitidosEl && omitidos.length) {
                         omitidosEl.style.display = '';
-                        omitidosEl.innerHTML = '<strong>No aplicados:</strong> ' + omitidos.map(o => `${escapeHtml(o.nombre || 'Insumo')} (${escapeHtml(o.motivo || 'sin motivo')})`).join(' · ');
+                        omitidosEl.innerHTML = '<strong>No aplicados:</strong> ' + omitidos.map(o => `${escapeHtml(o.nombre || 'Insumo')} (${escapeHtml(o.motivo || 'sin motivo')})`).join(' | ');
                     }
                 })
                 .catch(err => {
