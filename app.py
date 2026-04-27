@@ -3385,15 +3385,53 @@ def _catalogo_torta_publico(cfg):
     sabores_ids = {str(x.get("id") or "") for x in sabores_activos}
     extras_ids = {str(x.get("id") or "") for x in extras_activos}
     toppers_ids = {str(x.get("id") or "") for x in toppers_activos}
+    sabores_ids_orden = [str(x.get("id") or "") for x in sabores_activos if str(x.get("id") or "")]
+    extras_ids_orden = [str(x.get("id") or "") for x in extras_activos if str(x.get("id") or "")]
+    toppers_ids_orden = [str(x.get("id") or "") for x in toppers_activos if str(x.get("id") or "")]
+
+    def _sync_ids_categoria(ids_raw, activos_set, activos_orden, autocompletar=True):
+        ids_limpios = []
+        vistos = set()
+        for rid in (ids_raw or []):
+            sid = str(rid or "").strip()
+            if not sid or sid in vistos or sid not in activos_set:
+                continue
+            vistos.add(sid)
+            ids_limpios.append(sid)
+        if autocompletar:
+            for sid in activos_orden:
+                if sid in vistos:
+                    continue
+                vistos.add(sid)
+                ids_limpios.append(sid)
+        return ids_limpios
+
     categorias_activas = [x for x in (cat.get("categorias") or []) if bool(x.get("activo"))]
     categorias_activas = [
         {
             **x,
             "min_lead_hours": max(1, int(x.get("min_lead_hours") or 48)),
             "use_category_ingredients": bool(x.get("use_category_ingredients", False)),
-            "sabores_ids": [sid for sid in (x.get("sabores_ids") or []) if sid in sabores_ids],
-            "extras_ids": [eid for eid in (x.get("extras_ids") or []) if eid in extras_ids],
-            "toppers_ids": [tid for tid in (x.get("toppers_ids") or []) if tid in toppers_ids],
+            # Sincronizacion automatica: nuevos activos agregados en admin
+            # se reflejan tambien en tienda y agenda manual.
+            "sabores_ids": _sync_ids_categoria(
+                x.get("sabores_ids") or [],
+                sabores_ids,
+                sabores_ids_orden,
+                autocompletar=bool(x.get("use_category_ingredients", False)),
+            ),
+            "extras_ids": _sync_ids_categoria(
+                x.get("extras_ids") or [],
+                extras_ids,
+                extras_ids_orden,
+                autocompletar=bool(x.get("use_category_ingredients", False)),
+            ),
+            "toppers_ids": _sync_ids_categoria(
+                x.get("toppers_ids") or [],
+                toppers_ids,
+                toppers_ids_orden,
+                autocompletar=bool(x.get("use_category_ingredients", False)),
+            ),
         }
         for x in categorias_activas
     ]
