@@ -3374,6 +3374,41 @@ def _normalizar_catalogo_torta_cfg(raw):
         out["extras"] = list(base.get("extras") or [])
     if not out["toppers"]:
         out["toppers"] = list(base.get("toppers") or [])
+
+    # Sincronizacion defensiva de listas por categoria:
+    # si una categoria usa ingredientes por categoria, autocompleta con todos los activos
+    # para evitar que nuevos items queden ocultos en tienda/agenda.
+    sabores_activos_ids = [str(x.get("id") or "").strip() for x in (out.get("sabores") or []) if bool(x.get("activo")) and str(x.get("id") or "").strip()]
+    extras_activos_ids = [str(x.get("id") or "").strip() for x in (out.get("extras") or []) if bool(x.get("activo")) and str(x.get("id") or "").strip()]
+    toppers_activos_ids = [str(x.get("id") or "").strip() for x in (out.get("toppers") or []) if bool(x.get("activo")) and str(x.get("id") or "").strip()]
+
+    sabores_set = set(sabores_activos_ids)
+    extras_set = set(extras_activos_ids)
+    toppers_set = set(toppers_activos_ids)
+
+    def _sync_ids(ids_raw, ids_set, ids_ordered, autocompletar=False):
+        out_ids = []
+        seen = set()
+        for rid in (ids_raw or []):
+            sid = str(rid or "").strip()
+            if not sid or sid in seen or sid not in ids_set:
+                continue
+            seen.add(sid)
+            out_ids.append(sid)
+        if autocompletar:
+            for sid in ids_ordered:
+                if sid in seen:
+                    continue
+                seen.add(sid)
+                out_ids.append(sid)
+        return out_ids
+
+    for cat in (out.get("categorias") or []):
+        use_cat = bool(cat.get("use_category_ingredients", False))
+        cat["sabores_ids"] = _sync_ids(cat.get("sabores_ids") or [], sabores_set, sabores_activos_ids, autocompletar=use_cat)
+        cat["extras_ids"] = _sync_ids(cat.get("extras_ids") or [], extras_set, extras_activos_ids, autocompletar=use_cat)
+        cat["toppers_ids"] = _sync_ids(cat.get("toppers_ids") or [], toppers_set, toppers_activos_ids, autocompletar=use_cat)
+
     return out
 
 

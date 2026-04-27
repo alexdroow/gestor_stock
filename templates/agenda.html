@@ -2424,6 +2424,7 @@
         function _catalogPermitidos(key, categoria) {
             const all = _catalogList(key).filter((x) => Boolean(x.activo));
             if (!categoria) return all;
+            if (!Boolean(categoria.use_category_ingredients)) return all;
             const mapField = key === 'sabores' ? 'sabores_ids' : (key === 'extras' ? 'extras_ids' : 'toppers_ids');
             const allow = Array.isArray(categoria[mapField]) ? categoria[mapField].map((x) => String(x || '').trim().toLowerCase()).filter(Boolean) : [];
             if (!allow.length) return all;
