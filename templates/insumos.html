@@ -2243,8 +2243,9 @@
                     <small id="editar-finalizar-cantidad-unidad" class="modal-note"></small>
                 </div>
                 <div class="form-group">
-                    <label>Precio (compra)</label>
+                    <label>Precio total compra</label>
                     <input type="number" id="editar-finalizar-precio" min="0" step="1" required>
+                    <small class="modal-note">Ingresa el total pagado por esta compra.</small>
                 </div>
                 <div class="form-group">
                     <label>Stock actual</label>
@@ -4847,8 +4848,9 @@ let insumosData = [
             if (!modal) return;
 
             const compra = (comprasPendientesCache || []).find(it => Number(it.id || 0) === compraId) || {};
-            const precio = Number(compra.precio_unitario || 0);
             const cantidad = Number(detalle.cantidadCompra || compra.cantidad || 0);
+            const precioUnitario = Number(compra.precio_unitario || 0);
+            const precioTotalCompra = (cantidad > 0) ? (precioUnitario * cantidad) : 0;
             const unidadCompra = String(detalle.unidadCompra || compra.unidad || 'unidad');
             const unidadStock = String(detalle.unidadStock || 'unidad');
             const stockActual = Number(detalle.stockActual || 0);
@@ -4860,7 +4862,7 @@ let insumosData = [
             document.getElementById('editar-finalizar-unidad-stock').value = unidadStock;
             document.getElementById('editar-finalizar-nombre').value = nombre;
             document.getElementById('editar-finalizar-cantidad').value = cantidad > 0 ? cantidad : '';
-            document.getElementById('editar-finalizar-precio').value = precio >= 0 ? precio : 0;
+            document.getElementById('editar-finalizar-precio').value = precioTotalCompra >= 0 ? Math.round(precioTotalCompra) : 0;
             document.getElementById('editar-finalizar-stock-actual').value = `${formatoNumero(stockActual)} ${unidadStock}`;
             document.getElementById('editar-finalizar-cantidad-unidad').textContent = `Unidad de compra: ${unidadCompra}`;
 
@@ -4879,7 +4881,7 @@ let insumosData = [
             event.preventDefault();
             const compraId = Number(document.getElementById('editar-finalizar-compra-id').value || 0);
             const cantidad = Number(document.getElementById('editar-finalizar-cantidad').value || 0);
-            const precio = Number(document.getElementById('editar-finalizar-precio').value || 0);
+            const precioTotalCompra = Number(document.getElementById('editar-finalizar-precio').value || 0);
 
             if (!compraId) {
                 alert('No se identificó el item a editar.');
@@ -4889,10 +4891,11 @@ let insumosData = [
                 alert('La cantidad que se va a subir debe ser mayor a 0.');
                 return;
             }
-            if (precio < 0) {
+            if (precioTotalCompra < 0) {
                 alert('El precio no puede ser negativo.');
                 return;
             }
+            const precioUnitario = cantidad > 0 ? (precioTotalCompra / cantidad) : 0;
 
             try {
                 const response = await fetch(`/api/compras-pendientes/${compraId}`, {
@@ -4900,7 +4903,7 @@ let insumosData = [
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         cantidad: cantidad,
-                        precio_unitario: precio
+                        precio_unitario: precioUnitario
                     })
                 });
                 const data = await response.json();
