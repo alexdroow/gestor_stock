@@ -648,6 +648,19 @@
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 6px 8px;
+            cursor: pointer;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        .hour-slot-event:hover {
+            border-color: #94a3b8;
+            background: #f8fafc;
+        }
+
+        .hour-slot-event.selected {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.16);
+            background: #fff7ed;
         }
 
         .hour-slot-event-main {
@@ -669,6 +682,18 @@
             color: #64748b;
             font-weight: 600;
             white-space: nowrap;
+        }
+
+        .hour-slot-event-details {
+            margin-top: 6px;
+            background: #fff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 12px;
+            color: #334155;
+            display: grid;
+            gap: 4px;
         }
 
         .hour-slot-empty {
@@ -2275,6 +2300,7 @@
         let notaEditando = null;
         let notaChecklistDraft = [];
         let fechaSeleccionada = '';
+        let eventoDetalleSeleccionadoId = null;
         let geocodeDebounceTimer = null;
         let geocodeRequestId = 0;
         let loadingTimer = null;
@@ -4293,6 +4319,15 @@
                         const span = document.createElement('span');
                         span.className = `day-event ${ev.tipo}`;
                         span.textContent = ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : ev.titulo;
+                        span.title = 'Click: ver detalle del evento · Doble click: abrir evento';
+                        span.onclick = (event) => {
+                            event.stopPropagation();
+                            seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), false);
+                        };
+                        span.ondblclick = (event) => {
+                            event.stopPropagation();
+                            seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), true);
+                        };
                         contenedor.appendChild(span);
                     });
                     
@@ -4310,6 +4345,16 @@
                 
                 celda.onclick = () => seleccionarDia(fechaStr);
                 grid.appendChild(celda);
+            }
+        }
+
+        function seleccionarEventoAgenda(fecha, eventoId, abrirModal = false) {
+            fechaSeleccionada = fecha;
+            eventoDetalleSeleccionadoId = Number(eventoId || 0) || null;
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+            if (abrirModal && eventoDetalleSeleccionadoId) {
+                editarEvento(eventoDetalleSeleccionadoId);
             }
         }
 
@@ -4376,16 +4421,34 @@
                     detalleHtml = eventosSlot.map(({ evento }) => {
                         const icono = evento.tipo === 'torta' ? '&#127874;' : '&#128230;';
                         const horaTxt = (evento.hora_inicio || '').slice(0, 5) || 'Sin hora';
+                        const eventoId = Number(evento.id || 0);
+                        const seleccionado = eventoDetalleSeleccionadoId && Number(eventoDetalleSeleccionadoId) === eventoId;
+                        const direccionTxt = (evento.es_envio && evento.direccion) ? String(evento.direccion) : 'Retiro en local';
+                        const totalNum = Number(evento.total || 0);
+                        const abonoNum = Number(evento.abono || 0);
+                        const saldoNum = Math.max(0, totalNum - abonoNum);
+                        const telefonoTxt = (evento.telefono || '').trim() || '-';
+                        const clienteTxt = (evento.cliente || '').trim() || 'Sin cliente';
+                        const detalleTxt = (evento.ingredientes || '').trim();
                         return `
-                            <div class="hour-slot-event">
+                            <div class="hour-slot-event ${seleccionado ? 'selected' : ''}" onclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, false)" ondblclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, true)">
                                 <div class="hour-slot-event-main">
                                     <span>${icono}</span>
                                     <span class="hour-slot-event-title">${escapeHtml(evento.titulo || 'Sin t&iacute;tulo')}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px;">
                                     <span class="hour-slot-event-time">${escapeHtml(horaTxt)}</span>
-                                    <button class="btn-hour" onclick="editarEvento(${Number(evento.id || 0)})">Editar</button>
+                                    <button class="btn-hour" onclick="event.stopPropagation(); editarEvento(${eventoId})">Editar</button>
                                 </div>
+                                ${seleccionado ? `
+                                    <div class="hour-slot-event-details">
+                                        <div><strong>Cliente:</strong> ${escapeHtml(clienteTxt)}</div>
+                                        <div><strong>Telefono:</strong> ${escapeHtml(telefonoTxt)}</div>
+                                        <div><strong>Entrega:</strong> ${escapeHtml(direccionTxt)}</div>
+                                        <div><strong>Total:</strong> ${escapeHtml(Number.isFinite(totalNum) ? ('$' + totalNum.toLocaleString()) : '$0')} · <strong>Saldo:</strong> ${escapeHtml('$' + saldoNum.toLocaleString())}</div>
+                                        ${detalleTxt ? `<div><strong>Detalle:</strong> ${escapeHtml(detalleTxt)}</div>` : ''}
+                                    </div>
+                                ` : ''}
                             </div>
                         `;
                     }).join('');
@@ -4452,12 +4515,14 @@
 
         function seleccionarDiaCalendario(fecha) {
             fechaSeleccionada = fecha;
+            eventoDetalleSeleccionadoId = null;
             renderizarCalendario();
             renderizarDetalleHorarioDia();
         }
         
         function seleccionarDia(fecha, horaInicioSugerida = null) {
             fechaSeleccionada = fecha;
+            eventoDetalleSeleccionadoId = null;
             renderizarCalendario();
             renderizarDetalleHorarioDia();
             eventoEditando = null;
