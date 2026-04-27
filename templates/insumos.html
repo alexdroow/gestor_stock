@@ -2244,8 +2244,14 @@
                 </div>
                 <div class="form-group">
                     <label>Precio total compra</label>
-                    <input type="number" id="editar-finalizar-precio" min="0" step="1" required>
+                    <input type="number" id="editar-finalizar-precio" min="0" step="1" required oninput="actualizarPreviewIvaFinalizarCompra()">
                     <small class="modal-note">Ingresa el total pagado por esta compra.</small>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+                        <input type="checkbox" id="editar-finalizar-precio-iva" style="width:auto;" onchange="actualizarPreviewIvaFinalizarCompra()">
+                        El valor ingresado incluye IVA
+                    </label>
+                    <small id="editar-finalizar-iva-default" class="modal-note"></small>
+                    <small id="editar-finalizar-iva-preview" class="modal-note"></small>
                 </div>
                 <div class="form-group">
                     <label>Stock actual</label>
@@ -4388,7 +4394,7 @@ let insumosData = [
                 stock_minimo: ins.stock_minimo || 0,
                 precio_unitario: (cambios.precio_unitario !== undefined) ? Number(cambios.precio_unitario) : Number(ins.precio_unitario || 0),
                 cantidad_comprada: (cambios.cantidad_comprada !== undefined) ? Number(cambios.cantidad_comprada) : Number(ins.cantidad_comprada || 1),
-                precio_incluye_iva: Boolean(ins.precio_incluye_iva),
+                precio_incluye_iva: (cambios.precio_incluye_iva !== undefined) ? Boolean(cambios.precio_incluye_iva) : Boolean(ins.precio_incluye_iva),
                 cantidad_por_scan: ins.cantidad_por_scan || 1,
                 unidad_por_scan: ins.unidad_por_scan || ins.unidad || 'unidad'
             };
@@ -4852,9 +4858,13 @@ let insumosData = [
             if (!modal) return;
 
             const compra = (comprasPendientesCache || []).find(it => Number(it.id || 0) === compraId) || {};
+            const insumoBase = insumosData.find(i => Number(i.id) === insumoId) || {};
             const cantidad = Number(detalle.cantidadCompra || compra.cantidad || 0);
             const precioUnitario = Number(compra.precio_unitario || 0);
             const precioTotalCompra = (cantidad > 0) ? (precioUnitario * cantidad) : 0;
+            const incluyeIvaDefault = (compra.precio_incluye_iva !== undefined)
+                ? Boolean(compra.precio_incluye_iva)
+                : Boolean(insumoBase.precio_incluye_iva);
             const unidadCompra = String(detalle.unidadCompra || compra.unidad || 'unidad');
             const unidadStock = String(detalle.unidadStock || 'unidad');
             const stockActual = Number(detalle.stockActual || 0);
@@ -4867,12 +4877,30 @@ let insumosData = [
             document.getElementById('editar-finalizar-nombre').value = nombre;
             document.getElementById('editar-finalizar-cantidad').value = cantidad > 0 ? cantidad : '';
             document.getElementById('editar-finalizar-precio').value = precioTotalCompra >= 0 ? Math.round(precioTotalCompra) : 0;
+            document.getElementById('editar-finalizar-precio-iva').checked = incluyeIvaDefault;
             document.getElementById('editar-finalizar-stock-actual').value = stockActual >= 0 ? stockActual : 0;
             document.getElementById('editar-finalizar-cantidad-unidad').textContent = `Unidad de compra: ${unidadCompra}`;
             document.getElementById('editar-finalizar-stock-unidad').textContent = `Unidad de stock: ${unidadStock}`;
+            document.getElementById('editar-finalizar-iva-default').textContent = `Predeterminado del producto: ${incluyeIvaDefault ? 'con IVA' : 'sin IVA'}.`;
+            actualizarPreviewIvaFinalizarCompra();
 
             cerrarModalFinalizarCompras();
             modal.classList.add('active');
+        }
+
+        function actualizarPreviewIvaFinalizarCompra() {
+            const precio = Number((document.getElementById('editar-finalizar-precio') || {}).value || 0);
+            const incluyeIva = Boolean((document.getElementById('editar-finalizar-precio-iva') || {}).checked);
+            const out = document.getElementById('editar-finalizar-iva-preview');
+            if (!out) return;
+            if (!(precio >= 0)) {
+                out.textContent = '';
+                return;
+            }
+            const totalConIva = incluyeIva ? precio : (precio * 1.19);
+            const totalSinIva = incluyeIva ? (precio / 1.19) : precio;
+            const ivaMonto = Math.max(0, totalConIva - totalSinIva);
+            out.textContent = `Neto: ${formatearCLP(totalSinIva)} | IVA: ${formatearCLP(ivaMonto)} | Total con IVA: ${formatearCLP(totalConIva)}`;
         }
 
         function cerrarModalEditarFinalizarCompra() {
@@ -4889,6 +4917,7 @@ let insumosData = [
             const nombre = String(document.getElementById('editar-finalizar-nombre').value || '').trim();
             const cantidad = Number(document.getElementById('editar-finalizar-cantidad').value || 0);
             const precioTotalCompra = Number(document.getElementById('editar-finalizar-precio').value || 0);
+            const precioIncluyeIva = Boolean(document.getElementById('editar-finalizar-precio-iva').checked);
             const stockActual = Number(document.getElementById('editar-finalizar-stock-actual').value || 0);
 
             if (!compraId) {
@@ -4924,7 +4953,8 @@ let insumosData = [
                     body: JSON.stringify({
                         nombre: nombre,
                         cantidad: cantidad,
-                        precio_unitario: precioUnitario
+                        precio_unitario: precioUnitario,
+                        precio_incluye_iva: precioIncluyeIva
                     })
                 });
                 const data = await response.json();
@@ -4933,17 +4963,20 @@ let insumosData = [
                 }
                 await guardarAjusteCosteoInsumo(insumoId, {
                     nombre: nombre,
-                    stock: stockActual
+                    stock: stockActual,
+                    precio_incluye_iva: precioIncluyeIva
                 });
                 const local = insumosData.find(i => Number(i.id) === Number(insumoId));
                 if (local) {
                     local.nombre = nombre;
                     local.stock = stockActual;
+                    local.precio_incluye_iva = precioIncluyeIva;
                 }
                 const lookupKey = String(insumoId);
                 if (insumosLookup[lookupKey]) {
                     insumosLookup[lookupKey].nombre = nombre;
                     insumosLookup[lookupKey].stock = stockActual;
+                    insumosLookup[lookupKey].precio_incluye_iva = precioIncluyeIva;
                 }
                 actualizarFilaInsumoEnTabla(insumoId, {
                     nombre: nombre,
