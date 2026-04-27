@@ -2219,6 +2219,45 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-editar-finalizar-compra">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Editar item por subir a inventario</h3>
+                <button type="button" class="btn btn-secondary btn-icon" onclick="cerrarModalEditarFinalizarCompra()" title="Cerrar">&#215;</button>
+            </div>
+            <div class="modal-note" style="margin-bottom: 12px;">
+                Ajusta solo los datos usados en esta subida de stock.
+            </div>
+            <form onsubmit="guardarEdicionFinalizarCompra(event)">
+                <input type="hidden" id="editar-finalizar-compra-id">
+                <input type="hidden" id="editar-finalizar-insumo-id">
+                <input type="hidden" id="editar-finalizar-unidad-compra">
+                <input type="hidden" id="editar-finalizar-unidad-stock">
+                <div class="form-group">
+                    <label>Insumo</label>
+                    <input type="text" id="editar-finalizar-nombre" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad que se va a subir</label>
+                    <input type="number" id="editar-finalizar-cantidad" min="0.01" step="0.01" required>
+                    <small id="editar-finalizar-cantidad-unidad" class="modal-note"></small>
+                </div>
+                <div class="form-group">
+                    <label>Precio (compra)</label>
+                    <input type="number" id="editar-finalizar-precio" min="0" step="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Stock actual</label>
+                    <input type="text" id="editar-finalizar-stock-actual" readonly>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModalEditarFinalizarCompra()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-factura-compra">
         <div class="modal">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
@@ -3602,10 +3641,6 @@
             document.getElementById('modal-editar-insumo').classList.remove('active');
             renderLotesInsumoResumen([], '');
             insumoAEditar = null;
-            if (reabrirFinalizarComprasTrasEdicion) {
-                reabrirFinalizarComprasTrasEdicion = false;
-                abrirModalFinalizarCompras();
-            }
         }
 
         function actualizarPreviewPrecioInsumo() {
@@ -3889,11 +3924,18 @@
                 if (e.target.closest('button, input, select, textarea, a, label')) return;
                 const fila = e.target.closest('tr[data-insumo-id]');
                 if (!fila) return;
+                const compraId = Number(fila.getAttribute('data-compra-id') || 0);
                 const insumoId = Number(fila.getAttribute('data-insumo-id') || 0);
-                if (!insumoId) return;
-                reabrirFinalizarComprasTrasEdicion = true;
-                cerrarModalFinalizarCompras();
-                abrirModalEditarInsumo(insumoId);
+                if (!insumoId || !compraId) return;
+                abrirModalEditarFinalizarCompra({
+                    compraId,
+                    insumoId,
+                    nombre: fila.getAttribute('data-insumo-nombre') || 'Insumo',
+                    cantidadCompra: Number(fila.getAttribute('data-cantidad-compra') || 0),
+                    unidadCompra: fila.getAttribute('data-unidad-compra') || 'unidad',
+                    stockActual: Number(fila.getAttribute('data-stock-anterior') || 0),
+                    unidadStock: fila.getAttribute('data-unidad-stock') || 'unidad'
+                });
             });
         }
 
@@ -3902,6 +3944,9 @@
         });
         document.getElementById('modal-finalizar-compras').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalFinalizarCompras();
+        });
+        document.getElementById('modal-editar-finalizar-compra').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModalEditarFinalizarCompra();
         });
         document.getElementById('modal-factura-compra').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalFacturaCompra();
@@ -3953,8 +3998,6 @@ let insumosData = [
         let recetasSeleccionCalculo = [];
         let comprasPendientesCache = [];
         let previewFinalizarCompras = null;
-
-        let reabrirFinalizarComprasTrasEdicion = false;
         let facturaCompraDraft = null;
 
         function normalizarTextoBusqueda(valor) {
@@ -4622,7 +4665,7 @@ let insumosData = [
         }
 
         function cargarComprasPendientes() {
-            fetch('/api/compras-pendientes')
+            return fetch('/api/compras-pendientes')
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) throw new Error(data.error || 'No se pudo cargar la lista');
@@ -4748,7 +4791,7 @@ let insumosData = [
                     previewFinalizarCompras = data;
                     const resumen = data.resumen || {};
                     if (resumenEl) {
-                        resumenEl.textContent = `Total lista: ${Number(resumen.total_items || 0)} | Aplicables: ${Number(resumen.aplicables || 0)} | Omitidos: ${Number(resumen.omitidos || 0)} | Doble click en un insumo para editar costo/unidad`;
+                        resumenEl.textContent = `Total lista: ${Number(resumen.total_items || 0)} | Aplicables: ${Number(resumen.aplicables || 0)} | Omitidos: ${Number(resumen.omitidos || 0)} | Doble click en un insumo para editar cantidad/precio`;
                     }
 
                     const items = Array.isArray(data.items) ? data.items : [];
@@ -4757,7 +4800,16 @@ let insumosData = [
                             bodyEl.innerHTML = '<tr><td colspan="5" class="pendiente-empty">No hay items aplicables para stock.</td></tr>';
                         } else {
                             bodyEl.innerHTML = items.map(item => `
-                                <tr data-insumo-id="${Number(item.insumo_id || item.id || 0)}" title="Doble click para editar este insumo">
+                                <tr
+                                    data-compra-id="${Number(item.compra_id || 0)}"
+                                    data-insumo-id="${Number(item.insumo_id || item.id || 0)}"
+                                    data-insumo-nombre="${escapeHtml(item.insumo_nombre || 'Insumo')}"
+                                    data-cantidad-compra="${Number(item.cantidad_compra || 0)}"
+                                    data-unidad-compra="${escapeHtml(item.unidad_compra || 'unidad')}"
+                                    data-stock-anterior="${Number(item.stock_anterior || 0)}"
+                                    data-unidad-stock="${escapeHtml(item.unidad_stock || 'unidad')}"
+                                    title="Doble click para editar este insumo"
+                                >
                                     <td>${escapeHtml(item.insumo_nombre || 'Insumo')}</td>
                                     <td>${escapeHtml(formatoNumero(item.cantidad_compra || 0))} ${escapeHtml(item.unidad_compra || '')}</td>
                                     <td>${escapeHtml(formatoNumero(item.cantidad_en_stock || 0))} ${escapeHtml(item.unidad_stock || '')}</td>
@@ -4784,6 +4836,85 @@ let insumosData = [
             const modal = document.getElementById('modal-finalizar-compras');
             if (!modal) return;
             modal.classList.remove('active');
+        }
+
+        function abrirModalEditarFinalizarCompra(detalle = {}) {
+            const compraId = Number(detalle.compraId || 0);
+            const insumoId = Number(detalle.insumoId || 0);
+            if (!compraId || !insumoId) return;
+
+            const modal = document.getElementById('modal-editar-finalizar-compra');
+            if (!modal) return;
+
+            const compra = (comprasPendientesCache || []).find(it => Number(it.id || 0) === compraId) || {};
+            const precio = Number(compra.precio_unitario || 0);
+            const cantidad = Number(detalle.cantidadCompra || compra.cantidad || 0);
+            const unidadCompra = String(detalle.unidadCompra || compra.unidad || 'unidad');
+            const unidadStock = String(detalle.unidadStock || 'unidad');
+            const stockActual = Number(detalle.stockActual || 0);
+            const nombre = String(detalle.nombre || compra.nombre || 'Insumo');
+
+            document.getElementById('editar-finalizar-compra-id').value = String(compraId);
+            document.getElementById('editar-finalizar-insumo-id').value = String(insumoId);
+            document.getElementById('editar-finalizar-unidad-compra').value = unidadCompra;
+            document.getElementById('editar-finalizar-unidad-stock').value = unidadStock;
+            document.getElementById('editar-finalizar-nombre').value = nombre;
+            document.getElementById('editar-finalizar-cantidad').value = cantidad > 0 ? cantidad : '';
+            document.getElementById('editar-finalizar-precio').value = precio >= 0 ? precio : 0;
+            document.getElementById('editar-finalizar-stock-actual').value = `${formatoNumero(stockActual)} ${unidadStock}`;
+            document.getElementById('editar-finalizar-cantidad-unidad').textContent = `Unidad de compra: ${unidadCompra}`;
+
+            cerrarModalFinalizarCompras();
+            modal.classList.add('active');
+        }
+
+        function cerrarModalEditarFinalizarCompra() {
+            const modal = document.getElementById('modal-editar-finalizar-compra');
+            if (!modal) return;
+            modal.classList.remove('active');
+            abrirModalFinalizarCompras();
+        }
+
+        async function guardarEdicionFinalizarCompra(event) {
+            event.preventDefault();
+            const compraId = Number(document.getElementById('editar-finalizar-compra-id').value || 0);
+            const cantidad = Number(document.getElementById('editar-finalizar-cantidad').value || 0);
+            const precio = Number(document.getElementById('editar-finalizar-precio').value || 0);
+
+            if (!compraId) {
+                alert('No se identificó el item a editar.');
+                return;
+            }
+            if (!(cantidad > 0)) {
+                alert('La cantidad que se va a subir debe ser mayor a 0.');
+                return;
+            }
+            if (precio < 0) {
+                alert('El precio no puede ser negativo.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/compras-pendientes/${compraId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cantidad: cantidad,
+                        precio_unitario: precio
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar el item pendiente.');
+                }
+
+                const modal = document.getElementById('modal-editar-finalizar-compra');
+                if (modal) modal.classList.remove('active');
+                await cargarComprasPendientes();
+                abrirModalFinalizarCompras();
+            } catch (err) {
+                alert('[ERROR] ' + (err.message || 'Error al guardar cambios del item.'));
+            }
         }
 
         function abrirModalFacturaCompra() {
