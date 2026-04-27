@@ -4395,7 +4395,14 @@
             const tipoEl = document.getElementById('evento-tipo');
             if (!btnPdf || !tipoEl) return;
             const tipo = String(tipoEl.value || '').trim().toLowerCase();
-            btnPdf.style.display = (tipo === 'bloqueo') ? 'none' : 'inline-block';
+            const esBloqueo = tipo === 'bloqueo';
+            const tieneId = Boolean(eventoEditando && Number(eventoEditando.id || 0) > 0);
+            const codigoActual = String(document.getElementById('evento-codigo-pedido')?.value || (eventoEditando && eventoEditando.codigo_pedido) || '').trim();
+            btnPdf.style.display = esBloqueo ? 'none' : 'inline-block';
+            btnPdf.disabled = esBloqueo ? true : !(tieneId && codigoActual);
+            btnPdf.title = btnPdf.disabled
+                ? 'Guarda el pedido para generar el PDF final con codigo.'
+                : 'Generar PDF final del pedido';
         }
 
         // FORMULARIO
@@ -4815,11 +4822,16 @@
             const codigoPedido = (document.getElementById('evento-codigo-pedido').value || (eventoEditando && eventoEditando.codigo_pedido) || '').trim();
             const tipoSeleccionado = (document.getElementById('evento-tipo').value || (eventoEditando && eventoEditando.tipo) || 'torta');
             const ingredientesFuente = (document.getElementById('evento-ingredientes').value || (eventoEditando && eventoEditando.ingredientes) || '');
-            const ingredientesArmados = (modoAgendarTorta && String(tipoSeleccionado).toLowerCase() === 'torta')
+            const bloqueManualVisible = (() => {
+                const box = document.getElementById('bloque-torta-manual');
+                if (!box) return false;
+                return String(box.style.display || '').toLowerCase() !== 'none';
+            })();
+            const ingredientesArmados = ((modoAgendarTorta || bloqueManualVisible) && String(tipoSeleccionado).toLowerCase() === 'torta')
                 ? detalleTortaManualArmado()
                 : ingredientesFuente;
             return {
-                id: eventoId || (eventoEditando && eventoEditando.id) || 'BORRADOR',
+                id: eventoId || (eventoEditando && eventoEditando.id) || '',
                 codigo_pedido: codigoPedido,
                 tipo: tipoSeleccionado,
                 titulo: (document.getElementById('evento-titulo').value || (eventoEditando && eventoEditando.titulo) || ''),
@@ -4843,6 +4855,14 @@
             const e = construirEventoDesdeFormularioParaPdf();
             if (!e || String(e.tipo || '').trim().toLowerCase() === 'bloqueo') {
                 alert('El PDF solo est\u00e1 disponible para pedidos, no para bloqueos.');
+                return;
+            }
+            if (!eventoEditando || !Number(eventoEditando.id || 0)) {
+                alert('Debes guardar el pedido primero. Solo se genera PDF final (sin version borrador).');
+                return;
+            }
+            if (!String(e.codigo_pedido || '').trim()) {
+                alert('Este pedido aun no tiene codigo. Guarda y vuelve a abrir para generar el PDF final.');
                 return;
             }
             await asegurarMapaParaPDF(e);
@@ -5017,7 +5037,7 @@
             y += 22;
 
             drawSectionTitle('Datos del Cliente');
-            drawField('Codigo Pedido', e.codigo_pedido || `#${e.id || '-'}`);
+            drawField('Codigo Pedido', e.codigo_pedido || '-');
             drawField('Cliente', e.cliente);
             drawField('Teléfono', e.telefono);
 
