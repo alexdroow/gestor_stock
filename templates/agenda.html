@@ -2096,6 +2096,25 @@
                         <button type="button" class="btn btn-primary" onclick="buscarPedidoPorCodigo()">Buscar</button>
                     </div>
                 </div>
+                <div class="form-row" style="margin-top:6px;">
+                    <div class="form-group">
+                        <label>Desde</label>
+                        <input type="date" id="buscar-fecha-desde">
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta</label>
+                        <input type="date" id="buscar-fecha-hasta">
+                    </div>
+                    <div class="form-group" style="align-self:flex-end;">
+                        <button type="button" class="btn btn-secondary" onclick="buscarPedidosPorFechas()">Filtrar fechas</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Pedidos en rango</label>
+                    <div id="buscar-pedidos-lista" class="torta-builder-list">
+                        <div class="form-hint">Selecciona un rango para listar pedidos agendados.</div>
+                    </div>
+                </div>
                 <div id="buscar-pedido-resultado" class="form-hint">Ingresa un codigo para ver el resumen del pedido.</div>
             </div>
             <div class="modal-footer">
@@ -2108,6 +2127,24 @@
     </div>
 
     <!-- Modal Configuración -->
+    <div class="modal-overlay" id="modal-ficha-pedido">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Ficha del Pedido</h3>
+                <button onclick="cerrarFichaPedido()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="ficha-pedido-contenido" class="form-hint">Selecciona un pedido para ver su ficha.</div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="cerrarFichaPedido()" class="btn btn-secondary">Cerrar</button>
+                <button onclick="abrirPedidoBuscadoEnAgenda()" class="btn btn-secondary" id="btn-ficha-abrir" disabled>Abrir en agenda</button>
+                <button onclick="generarPdfPedidoBuscado()" class="btn btn-pdf" id="btn-ficha-pdf" disabled>&#128196; Generar PDF</button>
+                <button onclick="enviarPdfPedidoBuscadoWhatsApp()" class="btn btn-whatsapp" id="btn-ficha-wa" disabled>WhatsApp + PDF</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-config">
         <div class="modal">
             <div class="modal-header">
@@ -2233,6 +2270,7 @@
         let tortaBuilder = null;
         let tortaCatalogoCargado = false;
         let pedidoBusquedaActual = null;
+        let pedidosRangoActual = [];
         let notaEditando = null;
         let notaChecklistDraft = [];
         let fechaSeleccionada = '';
@@ -3832,6 +3870,79 @@
             `;
         }
 
+        function abrirFichaPedidoBuscado() {
+            const box = document.getElementById('ficha-pedido-contenido');
+            const btnAbrir = document.getElementById('btn-ficha-abrir');
+            const btnPdf = document.getElementById('btn-ficha-pdf');
+            const btnWa = document.getElementById('btn-ficha-wa');
+            if (!pedidoBusquedaActual) {
+                if (box) box.innerHTML = '<span class="form-hint">Selecciona un pedido para ver su ficha.</span>';
+                if (btnAbrir) btnAbrir.disabled = true;
+                if (btnPdf) btnPdf.disabled = true;
+                if (btnWa) btnWa.disabled = true;
+                return;
+            }
+            if (box) box.innerHTML = _resumenPedidoBuscadoHtml(pedidoBusquedaActual);
+            if (btnAbrir) btnAbrir.disabled = false;
+            if (btnPdf) btnPdf.disabled = false;
+            if (btnWa) btnWa.disabled = !normalizarTelefonoWhatsApp(pedidoBusquedaActual.telefono || '');
+            document.getElementById('modal-ficha-pedido').classList.add('active');
+        }
+
+        function seleccionarPedidoRango(idPedido) {
+            const idNum = Number(idPedido || 0);
+            if (!idNum) return;
+            const hit = (pedidosRangoActual || []).find((p) => Number(p.id || 0) === idNum);
+            if (!hit) return;
+            pedidoBusquedaActual = hit;
+            const out = document.getElementById('buscar-pedido-resultado');
+            if (out) out.innerHTML = _resumenPedidoBuscadoHtml(hit);
+            const btnAbrir = document.getElementById('btn-buscar-abrir');
+            const btnPdf = document.getElementById('btn-buscar-pdf');
+            const btnWa = document.getElementById('btn-buscar-wa');
+            if (btnAbrir) btnAbrir.disabled = false;
+            if (btnPdf) btnPdf.disabled = false;
+            if (btnWa) btnWa.disabled = !normalizarTelefonoWhatsApp(hit.telefono || '');
+            abrirFichaPedidoBuscado();
+        }
+
+        async function buscarPedidosPorFechas() {
+            const desde = String((document.getElementById('buscar-fecha-desde') || {}).value || '').trim();
+            const hasta = String((document.getElementById('buscar-fecha-hasta') || {}).value || '').trim();
+            const lista = document.getElementById('buscar-pedidos-lista');
+            if (!desde && !hasta) {
+                if (lista) lista.innerHTML = '<div class="form-hint">Selecciona al menos una fecha.</div>';
+                return;
+            }
+            try {
+                mostrarLoading(true);
+                const params = new URLSearchParams();
+                if (desde) params.set('desde', desde);
+                if (hasta) params.set('hasta', hasta);
+                const res = await fetch(`/api/agenda/pedidos/rango?${params.toString()}`);
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudieron consultar pedidos');
+                pedidosRangoActual = Array.isArray(data.pedidos) ? data.pedidos : [];
+                if (!lista) return;
+                if (!pedidosRangoActual.length) {
+                    lista.innerHTML = '<div class="form-hint">No hay pedidos en ese rango de fechas.</div>';
+                    return;
+                }
+                lista.innerHTML = pedidosRangoActual.map((p) => {
+                    const codigo = String(p.codigo_pedido || `SIN-COD-${Number(p.id || 0)}`);
+                    const fecha = String(p.fecha || '-');
+                    const hora = String(p.hora_entrega || p.hora_inicio || '').trim();
+                    const cliente = String(p.cliente || 'Sin cliente');
+                    const total = Number(p.total || 0);
+                    return `<button type="button" class="btn-mini-outline" style="width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;" onclick="seleccionarPedidoRango(${Number(p.id || 0)})"><strong>${escapeHtml(codigo)}</strong><br><span style="font-size:12px;color:#475569;">${escapeHtml(fecha)}${hora ? ` ${escapeHtml(hora)}` : ''} | ${escapeHtml(cliente)} | ${escapeHtml(formatoMonedaCLP(total))}</span></button>`;
+                }).join('');
+            } catch (err) {
+                if (lista) lista.innerHTML = `<div class="form-hint" style="color:#dc2626;">${escapeHtml(String(err && err.message ? err.message : 'No se pudo filtrar por fechas'))}</div>`;
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
         async function buscarPedidoPorCodigo() {
             const input = document.getElementById('buscar-codigo-pedido');
             const out = document.getElementById('buscar-pedido-resultado');
@@ -3857,6 +3968,7 @@
                 if (btnAbrir) btnAbrir.disabled = false;
                 if (btnPdf) btnPdf.disabled = false;
                 if (btnWa) btnWa.disabled = !normalizarTelefonoWhatsApp(pedidoBusquedaActual.telefono || '');
+                abrirFichaPedidoBuscado();
             } catch (err) {
                 pedidoBusquedaActual = null;
                 if (out) out.innerHTML = `<span class="form-hint" style="color:#dc2626;">${escapeHtml(String(err && err.message ? err.message : 'No se pudo buscar el pedido'))}</span>`;
@@ -3870,6 +3982,7 @@
 
         function abrirPedidoBuscadoEnAgenda() {
             if (!pedidoBusquedaActual || !Number(pedidoBusquedaActual.id || 0)) return;
+            cerrarFichaPedido();
             cerrarBuscadorPedidos();
             editarEvento(Number(pedidoBusquedaActual.id || 0));
         }
@@ -4371,13 +4484,24 @@
 
         function abrirBuscadorPedidos() {
             pedidoBusquedaActual = null;
+            pedidosRangoActual = [];
             const input = document.getElementById('buscar-codigo-pedido');
             const out = document.getElementById('buscar-pedido-resultado');
+            const lista = document.getElementById('buscar-pedidos-lista');
+            const fechaDesde = document.getElementById('buscar-fecha-desde');
+            const fechaHasta = document.getElementById('buscar-fecha-hasta');
             const btnAbrir = document.getElementById('btn-buscar-abrir');
             const btnPdf = document.getElementById('btn-buscar-pdf');
             const btnWa = document.getElementById('btn-buscar-wa');
             if (input) input.value = '';
             if (out) out.innerHTML = '<span class="form-hint">Ingresa un codigo para ver el resumen del pedido.</span>';
+            if (lista) lista.innerHTML = '<div class="form-hint">Selecciona un rango para listar pedidos agendados.</div>';
+            if (fechaHasta && !fechaHasta.value) fechaHasta.value = formatearFecha(new Date());
+            if (fechaDesde && !fechaDesde.value) {
+                const d = new Date();
+                d.setDate(d.getDate() - 30);
+                fechaDesde.value = formatearFecha(d);
+            }
             if (btnAbrir) btnAbrir.disabled = true;
             if (btnPdf) btnPdf.disabled = true;
             if (btnWa) btnWa.disabled = true;
@@ -4388,6 +4512,10 @@
         function cerrarBuscadorPedidos() {
             document.getElementById('modal-buscar-pedido').classList.remove('active');
             pedidoBusquedaActual = null;
+        }
+
+        function cerrarFichaPedido() {
+            document.getElementById('modal-ficha-pedido').classList.remove('active');
         }
 
         function actualizarVisibilidadBotonPdf() {

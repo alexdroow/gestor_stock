@@ -12013,6 +12013,49 @@ def obtener_evento_agenda_por_codigo(codigo_pedido):
         conn.close()
 
 
+def obtener_pedidos_agenda_por_rango(fecha_desde=None, fecha_hasta=None, limite=300):
+    desde = str(fecha_desde or "").strip()
+    hasta = str(fecha_hasta or "").strip()
+    if not desde and not hasta:
+        return []
+    if not desde:
+        desde = hasta
+    if not hasta:
+        hasta = desde
+    if desde > hasta:
+        desde, hasta = hasta, desde
+
+    try:
+        lim = max(1, min(int(limite or 300), 1000))
+    except (TypeError, ValueError):
+        lim = 300
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT *
+            FROM agenda_eventos
+            WHERE tipo <> 'bloqueo'
+              AND fecha >= ?
+              AND fecha <= ?
+            ORDER BY fecha DESC, COALESCE(NULLIF(hora_entrega, ''), NULLIF(hora_inicio, ''), '00:00') DESC, id DESC
+            LIMIT ?
+            """,
+            (desde, hasta, lim),
+        )
+        rows = cursor.fetchall()
+        out = []
+        for row in rows:
+            evento = dict(row)
+            evento["es_envio"] = bool(evento.get("es_envio"))
+            out.append(evento)
+        return out
+    finally:
+        conn.close()
+
+
 def guardar_evento_agenda(evento):
     """Guarda un evento nuevo o actualiza existente"""
     conn = get_db()

@@ -16248,6 +16248,20 @@ def api_agenda_buscar_pedido_por_codigo():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/agenda/pedidos/rango', methods=['GET'])
+def api_agenda_pedidos_por_rango():
+    try:
+        from database import obtener_pedidos_agenda_por_rango
+        fecha_desde = str(request.args.get('desde') or '').strip()
+        fecha_hasta = str(request.args.get('hasta') or '').strip()
+        if not fecha_desde and not fecha_hasta:
+            return jsonify({'success': False, 'error': 'Debes indicar al menos una fecha'}), 400
+        pedidos = obtener_pedidos_agenda_por_rango(fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, limite=500)
+        return jsonify({'success': True, 'pedidos': pedidos, 'desde': fecha_desde or fecha_hasta, 'hasta': fecha_hasta or fecha_desde})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'pedidos': []}), 500
+
+
 @app.route('/api/agenda/evento/<int:id>/pdf', methods=['GET'])
 def api_agenda_evento_pdf(id):
     conn = None
