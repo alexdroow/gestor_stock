@@ -7,8 +7,9 @@
     <style>
         :root { --primary:#f59e0b; --secondary:#f97316; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:#f8fafc; color:#0f172a; }
-        .main-content { flex: 1; margin-left:260px; padding:32px 40px; max-width: calc(100% - 260px); }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:#f8fafc; color:#0f172a; min-height:100vh; }
+        .sidebar { width:260px; background:#fff; border-right:1px solid #e2e8f0; padding:24px; display:flex; flex-direction:column; position:fixed; height:100vh; z-index:100; }
+        .main-content { flex: 1; margin-left:260px; padding:32px 40px; max-width: calc(100% - 260px); min-height:100vh; }
         .page-header { margin-bottom: 20px; }
         .page-title { font-size:32px; font-weight:700; }
         .page-subtitle { color:#64748b; margin-top:6px; }
@@ -37,8 +38,18 @@
         .event-title { font-size:14px; font-weight:700; color:#0f172a; margin-bottom:4px; }
         .event-data { font-size:12px; color:#334155; display:grid; grid-template-columns:1fr 1fr; gap:4px 8px; }
         .empty { color:#64748b; font-size:13px; padding:14px; text-align:center; border:1px dashed #cbd5e1; border-radius:10px; }
+        body.dark-mode { background:#0f172a; color:#f8fafc; }
+        body.dark-mode .main-content { background:#0f172a; color:#f8fafc; }
+        body.dark-mode .card { background:#1e293b; border-color:#334155; }
+        body.dark-mode .page-subtitle, body.dark-mode .meta, body.dark-mode .field label, body.dark-mode .cliente-sub, body.dark-mode .event-top, body.dark-mode .event-data { color:#cbd5e1; }
+        body.dark-mode .field input, body.dark-mode .field select { background:#0f172a; border-color:#334155; color:#f8fafc; }
+        body.dark-mode .cliente-item, body.dark-mode .event { background:#1e293b; border-color:#334155; }
+        body.dark-mode .cliente-item.active { border-color:#f59e0b; }
+        body.dark-mode .event-title, body.dark-mode .cliente-name { color:#f8fafc; }
+        body.dark-mode .empty { border-color:#475569; color:#cbd5e1; }
         @media (max-width:1200px){ .filters{grid-template-columns:1fr 1fr 1fr;} .layout{grid-template-columns:1fr;} .main-content{margin-left:240px;max-width:calc(100% - 240px);padding:24px;} }
-        @media (max-width:768px){ .main-content{margin-left:0;max-width:100%;padding:16px;} .filters{grid-template-columns:1fr;} }
+        @media (max-width:1024px){ .sidebar { width:240px; } }
+        @media (max-width:768px){ .sidebar{transform:translateX(-100%);} .main-content{margin-left:0;max-width:100%;padding:16px;} .filters{grid-template-columns:1fr;} }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
 </head>
@@ -100,7 +111,7 @@
 let _clientes = [];
 let _selected = "";
 
-function esc(v){ return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function esc(v){ return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#39;"); }
 function fmtMoney(v){ const n = Number(v||0); return `$${Math.max(0, Math.round(n)).toLocaleString("es-CL")}`; }
 function paramsActuales(){
     return {
@@ -154,7 +165,7 @@ function renderClientes(){
                     </div>
                     <span class="pill">${Number(c.total_interacciones || 0)} evento(s)</span>
                 </div>
-                <div class="cliente-sub">Ultimo: ${esc(c.ultima_fecha || "-")} · ${esc(c.ult_tipo || "-")}</div>
+                <div class="cliente-sub">Ultimo: ${esc(c.ultima_fecha || "-")} - ${esc(c.ult_tipo || "-")}</div>
                 <div class="cliente-actions">${waBtn}</div>
             </div>
         `;
@@ -201,6 +212,7 @@ document.getElementById("btn-buscar").addEventListener("click", cargarClientes);
 document.getElementById("f-q").addEventListener("keydown", (e)=>{ if(e.key === "Enter"){ e.preventDefault(); cargarClientes(); }});
 cargarClientes();
 </script>
+<script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+<script src="{{ url_for('static', filename='nav-active.js') }}"></script>
 </body>
 </html>
-
