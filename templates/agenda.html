@@ -2696,7 +2696,6 @@
                     descripcion: String((x && x.descripcion) || '').trim().slice(0, 120),
                     valor: Math.max(0, Math.round(_normalizarNumero(x && x.valor, 0))),
                 }))
-                .filter((x) => x.descripcion || x.valor > 0)
                 .slice(0, 12);
         }
 
@@ -2825,7 +2824,7 @@
                 alert('Maximo 12 cargos manuales.');
                 return;
             }
-            tortaBuilder.otros_cargos.push({ descripcion: '', valor: 0 });
+            tortaBuilder.otros_cargos.push({ descripcion: 'Cargo manual', valor: 0 });
             renderTortaBuilder();
         }
 
