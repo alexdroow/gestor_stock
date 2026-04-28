@@ -4218,21 +4218,118 @@
         function contactarClienteWhatsAppEvento() {
             const tipo = String((document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
             if (tipo === 'bloqueo') return;
-            const cliente = (document.getElementById('evento-cliente').value || 'cliente').trim();
+            const clienteRaw = (document.getElementById('evento-cliente').value || '').trim();
             const telefono = normalizarTelefonoWhatsApp(document.getElementById('evento-telefono').value);
             if (!telefono) {
                 alert('Ingresa un telefono valido para contactar por WhatsApp.');
                 return;
             }
-            const fecha = (document.getElementById('evento-fecha').value || '').trim();
-            const hora = (document.getElementById('evento-entrega').value || document.getElementById('evento-hora-inicio').value || '').trim();
-            const titulo = (document.getElementById('evento-titulo').value || 'tu reserva').trim();
+            const saludo = clienteRaw ? `Hola ${clienteRaw}` : 'Hola';
+            const total = Math.max(0, Number(document.getElementById('evento-total')?.value || 0));
+            const abono50 = Math.round(total * 0.5);
+            const esEnvio = Boolean(document.getElementById('evento-envio')?.checked);
+            const modalidadEntrega = esEnvio ? 'Despacho' : 'Retiro en tienda';
+            const horaEntrega = (document.getElementById('evento-entrega')?.value || document.getElementById('evento-hora-inicio')?.value || '').trim();
+            const detalleRaw = String(document.getElementById('evento-ingredientes')?.value || '');
+
+            let tamanoTorta = '-';
+            let rellenosLista = [];
+            let extrasLista = [];
+            if (String(tipo) === 'torta') {
+                try {
+                    const dataTorta = obtenerDatosTortaManual();
+                    if (dataTorta?.size?.nombre) tamanoTorta = String(dataTorta.size.nombre);
+                    if (Array.isArray(dataTorta?.sabores) && dataTorta.sabores.length) {
+                        rellenosLista = dataTorta.sabores
+                            .map((s) => String((s && s.nombre) || '').trim())
+                            .filter(Boolean);
+                    }
+                    if (Array.isArray(dataTorta?.extras) && dataTorta.extras.length) {
+                        extrasLista = dataTorta.extras
+                            .map((e) => {
+                                const nombre = String((e && e.nombre) || '').trim();
+                                const qty = Math.max(1, Number((e && e.qty) || 1));
+                                return nombre ? `${nombre}${qty > 1 ? ` x${qty}` : ''}` : '';
+                            })
+                            .filter(Boolean);
+                    }
+                } catch (_) {}
+            }
+
+            if (tamanoTorta === '-' || !rellenosLista.length || !extrasLista.length) {
+                const lines = detalleRaw.replace(/\r\n?/g, '\n').split('\n').map((x) => String(x || '').trim());
+                let inSabores = false;
+                let inExtras = false;
+                lines.forEach((ln) => {
+                    const line = String(ln || '').trim();
+                    if (!line) return;
+                    const low = line.toLowerCase();
+                    if (low.startsWith('tamano:') || low.startsWith('tamaño:')) {
+                        tamanoTorta = line.split(':').slice(1).join(':').trim() || tamanoTorta;
+                        return;
+                    }
+                    if (low === 'sabores:') {
+                        inSabores = true;
+                        inExtras = false;
+                        return;
+                    }
+                    if (low === 'extras:') {
+                        inExtras = true;
+                        inSabores = false;
+                        return;
+                    }
+                    if (low === 'topper:' || line.startsWith('---')) {
+                        inSabores = false;
+                        inExtras = false;
+                        return;
+                    }
+                    if (inSabores && line.startsWith('-')) rellenosLista.push(line.replace(/^-+\s*/, '').trim());
+                    if (inExtras && line.startsWith('-')) extrasLista.push(line.replace(/^-+\s*/, '').trim());
+                });
+            }
+
+            const rellenosMsg = rellenosLista.length ? rellenosLista.map((x) => `- ${x}`).join('\n') : '- Sin rellenos registrados';
+            const extrasMsg = extrasLista.length ? extrasLista.map((x) => `- ${x}`).join('\n') : '- Sin extras';
+            const nombreLinea = clienteRaw || '-';
+            const telefonoLinea = String(document.getElementById('evento-telefono')?.value || '').trim() || '-';
+            const totalLinea = formatoMonedaCLP(total);
+            const abonoLinea = formatoMonedaCLP(abono50);
+
             const mensaje = [
-                `Hola ${cliente}, te escribimos de Sucree Pasteleria.`,
-                `Estamos revisando tu reserva: ${titulo}.`,
-                `Fecha: ${fecha}${hora ? ' a las ' + hora : ''}.`,
-                'Te contactamos para coordinar los detalles finales.'
-            ].join(' ');
+                `${saludo}`,
+                'Somos de Pasteleria Sucree, te informamos que tu pedido quedo agendado exitosamente.',
+                'Te dejo el resumen de tu pedido para que revises que toda la informacion este correcta:',
+                '',
+                `* Nombre: ${nombreLinea}`,
+                `* Numero de telefono: ${telefonoLinea}`,
+                '* Informacion del pedido',
+                `-Tamano de torta: ${tamanoTorta}`,
+                '-Rellenos:',
+                rellenosMsg,
+                '-Informacion extra:',
+                extrasMsg,
+                `-Retiro o despacho: ${modalidadEntrega}`,
+                `-Hora de retiro o despacho: ${horaEntrega || '-'}`,
+                `-Total a pagar: ${totalLinea}`,
+                '',
+                'Para confirmar la reserva solicitamos un abono del *50%* del total el cual debe ser transferido a la siguiente cuenta',
+                'Datos de Transferencia',
+                '',
+                `*TOTAL ABONO ${abonoLinea}*`,
+                '',
+                'NUEVOS DATOS DE TRANSFERENCIA',
+                '(Si tienes registrada la cuenta "Banco Santander" debes anadir la nueva cuenta.)',
+                '',
+                'ALEXIS JAVIER GUTIERREZ SALGADO',
+                '18.121.947-5',
+                'Bci / Banco Credito e Inversiones / Mach',
+                'Cuenta Vista',
+                '777018121947',
+                'pasteleria.sucree@outlook.com',
+                '',
+                'Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.',
+                '*La boleta es enviada el dia de la entrega por este mismo medio en formato digital, si necesita en formato fisico lo puede solicitar antes de hacer el envio o de retirar*',
+            ].join('\n');
             const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank', 'noopener,noreferrer');
         }
