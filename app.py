@@ -363,11 +363,18 @@ else:
 
 # Migrar base de datos (agregar columnas nuevas)
 from database import migrar_db
-try:
-    migrar_db()
-except Exception as _migrar_err:
-    print(f"[WARN] migrar_db omitida por error: {_migrar_err}")
-_admin_ensure_bootstrap_user()
+RUN_BOOTSTRAP_MIGRATIONS_ON_START = str(os.getenv("GESTORSTOCK_BOOTSTRAP_MIGRATIONS", "0")).strip().lower() in {"1", "true", "yes", "on"}
+if RUN_BOOTSTRAP_MIGRATIONS_ON_START:
+    try:
+        migrar_db()
+    except Exception as _migrar_err:
+        print(f"[WARN] migrar_db omitida por error: {_migrar_err}")
+    try:
+        _admin_ensure_bootstrap_user()
+    except Exception as _admin_boot_err:
+        print(f"[WARN] bootstrap admin omitido por error: {_admin_boot_err}")
+else:
+    print("[INFO] migrar_db/bootstrap admin desactivados en bootstrap")
 
 FACTURAS_DIR = os.path.join(DATA_DIR, "facturas")
 ALLOWED_FACTURA_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
