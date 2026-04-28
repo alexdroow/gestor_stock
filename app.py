@@ -9101,6 +9101,67 @@ def api_requerimientos_agenda_produccion(agendado_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/produccion/agenda/<int:agendado_id>/confirmar', methods=['POST'])
+def api_confirmar_agendado_produccion(agendado_id):
+    try:
+        req = obtener_requerimientos_agenda_produccion(agendado_id)
+        if not req.get('success'):
+            msg = str(req.get('error') or '').lower()
+            status = 404 if 'no encontrado' in msg or 'no encontrada' in msg else 400
+            return jsonify(req), status
+
+        agenda = req.get('agenda') or {}
+        resumen = req.get('resumen') or {}
+        if bool(resumen.get('hay_faltantes')) or int(resumen.get('componentes_incompatibles') or 0) > 0:
+            return jsonify({
+                'success': False,
+                'error': 'No se puede confirmar la produccion: existen faltantes o unidades incompatibles.'
+            }), 400
+
+        receta_id = int(agenda.get('receta_id') or 0)
+        if receta_id <= 0:
+            return jsonify({'success': False, 'error': 'La agenda seleccionada no tiene receta asociada valida.'}), 400
+
+        cantidad_lotes_raw = float(agenda.get('cantidad_lotes') or 0)
+        if cantidad_lotes_raw <= 0:
+            return jsonify({'success': False, 'error': 'La cantidad de lotes agendada es invalida.'}), 400
+        cantidad_lotes = int(round(cantidad_lotes_raw))
+        if abs(cantidad_lotes_raw - cantidad_lotes) > 1e-9:
+            return jsonify({
+                'success': False,
+                'error': 'La agenda tiene lotes decimales. Ajusta a un numero entero para confirmar produccion.'
+            }), 400
+
+        resultado = producir_receta(receta_id, cantidad_lotes)
+        if not resultado.get('success'):
+            return jsonify(resultado), 400
+
+        eliminar_res = eliminar_produccion_agendada(agendado_id)
+        if not eliminar_res.get('success'):
+            # La produccion ya fue aplicada; devolvemos warning sin ocultar exito.
+            resultado['warning'] = f"Produccion aplicada, pero no se pudo quitar de agenda: {eliminar_res.get('error')}"
+
+        try:
+            limpiar_producciones_antiguas(meses=6)
+        except Exception:
+            pass
+        try:
+            resultado["agenda"] = obtener_agenda_produccion_semanal(dias=7)
+        except Exception:
+            pass
+        try:
+            resultado["plan"] = obtener_plan_produccion_semanal(dias_historial=28, dias_proyeccion=7)
+        except Exception:
+            pass
+        crear_backup()
+        resultado['success'] = True
+        resultado['agendado_id'] = int(agendado_id or 0)
+        resultado['cantidad_lotes'] = cantidad_lotes
+        return jsonify(resultado)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/produccion/<int:produccion_id>/eliminar', methods=['POST'])
 def eliminar_produccion_registro(produccion_id):
     try:

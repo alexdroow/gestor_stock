@@ -2181,6 +2181,10 @@
             <div class="agenda-detalle-grid" id="agenda-detalle-grid">
                 <div class="plan-semanal-empty">Cargando detalle del evento...</div>
             </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:14px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="cerrarModalDetalleAgendaProduccion()">Cerrar</button>
+                <button type="button" class="btn btn-success btn-sm" id="agenda-detalle-confirm-btn" onclick="confirmarProduccionDesdeAgenda()" disabled>Confirmar produccion</button>
+            </div>
         </div>
     </div>
 
@@ -2246,6 +2250,7 @@
         let historialHasMore = false;
         let agendaProduccionCargando = false;
         let agendaDetalleCargando = false;
+        let agendaDetalleActual = null;
         let planSemanalCargando = false;
         let planSemanalRango = { desde: '', hasta: '' };
         const AGENDA_PRODUCCION_INICIAL = {{ (agenda_produccion_inicial or {"days": [], "resumen": {}, "fecha_desde": "", "fecha_hasta": ""})|tojson }};
@@ -2729,6 +2734,13 @@
             const modal = document.getElementById('modal-agenda-detalle');
             if (!modal) return;
             modal.classList.remove('active');
+            agendaDetalleActual = null;
+            const btn = document.getElementById('agenda-detalle-confirm-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Confirmar produccion';
+                btn.title = '';
+            }
         }
 
         function abrirModalDetalleAgendaProduccion(agendaId) {
@@ -2740,12 +2752,19 @@
             const meta = document.getElementById('agenda-detalle-meta');
             const resumenWrap = document.getElementById('agenda-detalle-resumen');
             const grid = document.getElementById('agenda-detalle-grid');
+            const btnConfirmar = document.getElementById('agenda-detalle-confirm-btn');
             if (!modal || !meta || !resumenWrap || !grid) return;
 
             modal.classList.add('active');
             meta.textContent = 'Cargando requerimientos del evento...';
             resumenWrap.innerHTML = '';
             grid.innerHTML = '<div class="plan-semanal-empty">Cargando detalle del evento...</div>';
+            agendaDetalleActual = null;
+            if (btnConfirmar) {
+                btnConfirmar.disabled = true;
+                btnConfirmar.textContent = 'Confirmar produccion';
+                btnConfirmar.title = '';
+            }
             agendaDetalleCargando = true;
 
             fetch(`/api/produccion/agenda/${agendadoId}/requerimientos?_ts=${Date.now()}`, {
@@ -2762,6 +2781,7 @@
                     const agenda = data?.agenda || {};
                     const resumen = data?.resumen || {};
                     const items = Array.isArray(data?.items) ? data.items : [];
+                    agendaDetalleActual = { agenda, resumen };
 
                     const receta = String(agenda.receta_nombre || 'Receta');
                     const lotes = formatoNumeroPlan(agenda.cantidad_lotes || 0);
@@ -2775,6 +2795,13 @@
                         <span class="plan-chip warning">Con faltante: ${formatoNumeroPlan(resumen.componentes_con_faltante || 0, 0)}</span>
                         ${Number(resumen.componentes_incompatibles || 0) > 0 ? `<span class="plan-chip warning">Sin conversion: ${formatoNumeroPlan(resumen.componentes_incompatibles || 0, 0)}</span>` : ''}
                     `;
+                    if (btnConfirmar) {
+                        const sinFaltantes = !Boolean(resumen.hay_faltantes) && Number(resumen.componentes_incompatibles || 0) <= 0;
+                        btnConfirmar.disabled = !sinFaltantes;
+                        btnConfirmar.title = sinFaltantes
+                            ? 'Confirma esta produccion y descuenta insumos como en "Producir".'
+                            : 'No se puede confirmar: hay faltantes o unidades incompatibles.';
+                    }
 
                     if (!items.length) {
                         grid.innerHTML = '<div class="plan-semanal-empty">Esta receta no tiene componentes configurados.</div>';
@@ -2818,9 +2845,57 @@
                 .catch((error) => {
                     meta.textContent = 'No se pudo obtener el detalle del evento.';
                     grid.innerHTML = `<div class="plan-semanal-empty">${escapeHtml(error.message || 'Error inesperado')}</div>`;
+                    if (btnConfirmar) {
+                        btnConfirmar.disabled = true;
+                        btnConfirmar.title = 'No se pudo cargar el detalle.';
+                    }
                 })
                 .finally(() => {
                     agendaDetalleCargando = false;
+                });
+        }
+
+        function confirmarProduccionDesdeAgenda() {
+            const agendaId = Number(agendaDetalleActual?.agenda?.id || 0);
+            if (!Number.isFinite(agendaId) || agendaId <= 0) return;
+            const resumen = agendaDetalleActual?.resumen || {};
+            if (Boolean(resumen.hay_faltantes) || Number(resumen.componentes_incompatibles || 0) > 0) {
+                alert('No se puede confirmar: faltan insumos o hay unidades incompatibles.');
+                return;
+            }
+            if (!confirm('Confirmar produccion de este item agendado? Esto descontara insumos y lo pasara a produccion realizada.')) {
+                return;
+            }
+            const btn = document.getElementById('agenda-detalle-confirm-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Confirmando...';
+            }
+            fetch(`/api/produccion/agenda/${agendaId}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+                .then(async (r) => {
+                    const data = await r.json().catch(() => ({}));
+                    if (!r.ok || !data.success) {
+                        throw new Error(data.error || 'No se pudo confirmar la produccion');
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    const lotes = Number(data.cantidad_lotes || 0);
+                    const prod = Number(data.cantidad_resultado || 0);
+                    alert(`✅ Produccion confirmada.\n- Lotes ejecutados: ${formatoNumeroLocal(lotes)}\n- Cantidad producida: ${formatoNumeroLocal(prod)}`);
+                    cerrarModalDetalleAgendaProduccion();
+                    reloadProduccionKeepingState();
+                })
+                .catch((error) => {
+                    alert('[ERROR] ' + (error?.message || 'No se pudo confirmar la produccion'));
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = 'Confirmar produccion';
+                    }
                 });
         }
 
