@@ -551,15 +551,12 @@ def init_db():
     """Inicializa la base de datos si no existe"""
     try:
         conn = sqlite3.connect(DB_PATH)
-        # En algunos hostings (picos de I/O, cuota, fs temporal), WAL puede fallar.
-        # No debemos botar la app por eso durante el arranque.
+        # En PythonAnywhere/NFS WAL puede causar "locking protocol".
+        # Forzamos DELETE para evitar fallos de lock en bootstrap.
         try:
-            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA journal_mode=DELETE")
         except sqlite3.OperationalError:
-            try:
-                conn.execute("PRAGMA journal_mode=DELETE")
-            except sqlite3.OperationalError:
-                pass
+            pass
         try:
             conn.execute("PRAGMA synchronous=NORMAL")
         except sqlite3.OperationalError:
@@ -1352,15 +1349,11 @@ def get_db():
     """Obtiene conexión a la base de datos con configuración optimizada"""
     conn = sqlite3.connect(DB_PATH, timeout=30)  # Aumentar timeout a 30 segundos
     conn.row_factory = sqlite3.Row
-    # Importante: no tumbar toda la app si SQLite no puede cambiar journal
-    # (ej: cuota llena / fs read-only / disk I/O transient en hosting).
+    # En hosting compartido, DELETE es más estable que WAL para locking.
     try:
-        conn.execute("PRAGMA journal_mode=WAL")  # Modo WAL para mejor concurrencia
+        conn.execute("PRAGMA journal_mode=DELETE")
     except sqlite3.OperationalError:
-        try:
-            conn.execute("PRAGMA journal_mode=DELETE")
-        except sqlite3.OperationalError:
-            pass
+        pass
     try:
         conn.execute("PRAGMA synchronous=NORMAL")
     except sqlite3.OperationalError:

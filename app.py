@@ -349,11 +349,11 @@ def inject_app_globals():
 
 try:
     init_db()
-except sqlite3.OperationalError as _init_err:
-    # En PythonAnywhere puede aparecer "locking protocol" durante reload;
-    # no debemos botar todo el WSGI por este error transitorio.
-    if "locking protocol" in str(_init_err).lower():
-        print(f"[WARN] init_db omitida temporalmente por locking protocol: {_init_err}")
+except Exception as _init_err:
+    # Blindaje de arranque en hosting: no tumbar WSGI por errores transitorios de lock.
+    _err_txt = str(_init_err).lower()
+    if ("locking protocol" in _err_txt) or ("database is locked" in _err_txt):
+        print(f"[WARN] init_db omitida temporalmente por lock sqlite: {_init_err}")
     else:
         raise
 
