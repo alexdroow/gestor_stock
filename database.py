@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import os
 import math
 import unicodedata
 import re
@@ -1334,6 +1335,15 @@ def init_db():
         conn.commit()  # <-- COMMIT ANTES DE CERRAR
         conn.close()   # <-- CERRAR AL FINAL
         print(f"[OK] Base de datos inicializada en: {DB_PATH}")
+    except sqlite3.OperationalError as e:
+        # En algunos despliegues (p. ej. PythonAnywhere durante reload),
+        # SQLite puede devolver "locking protocol" de forma transitoria.
+        # Si la DB ya existe, dejamos continuar el arranque.
+        if "locking protocol" in str(e).lower() and os.path.exists(DB_PATH):
+            print(f"[WARN] init_db omitida temporalmente por locking protocol: {e}")
+            return
+        print(f"[ERROR] {e}")
+        raise
     except Exception as e:
         print(f"[ERROR] {e}")
         raise
