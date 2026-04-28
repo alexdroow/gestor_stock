@@ -338,10 +338,19 @@
             <span class="icon">&#128249;</span>
             <span>C&aacute;maras</span>
         </a>
-        <a href="/settings" class="nav-item">
-            <span class="icon">&#9881;</span>
-            <span>Configuraci&oacute;n</span>
-        </a>
+        <details class="nav-group" id="nav-group-settings">
+            <summary class="nav-item">
+                <span class="nav-item-main">
+                    <span class="icon">&#9881;</span>
+                    <span>Configuraci&oacute;n</span>
+                </span>
+                <span class="nav-caret">&#9662;</span>
+            </summary>
+            <div class="nav-submenu">
+                <a href="/settings" class="nav-subitem">General</a>
+                <a href="/settings/clientes" class="nav-subitem">Clientes</a>
+            </div>
+        </details>
     </nav>
 
     <div class="sidebar-footer">v{{ app_version }} &bull; Sucr&eacute;e Pasteler&iacute;a</div>
@@ -352,6 +361,15 @@
             if (!details) return;
             const currentPath = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
             if (currentPath === '/insumos') {
+                details.open = true;
+            }
+        })();
+
+        (function () {
+            const details = document.getElementById('nav-group-settings');
+            if (!details) return;
+            const currentPath = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+            if (currentPath === '/settings' || currentPath === '/settings/clientes') {
                 details.open = true;
             }
         })();

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes - Configuracion</title>
+    <style>
+        :root { --primary:#f59e0b; --secondary:#f97316; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:#f8fafc; color:#0f172a; }
+        .main-content { flex: 1; margin-left:260px; padding:32px 40px; max-width: calc(100% - 260px); }
+        .page-header { margin-bottom: 20px; }
+        .page-title { font-size:32px; font-weight:700; }
+        .page-subtitle { color:#64748b; margin-top:6px; }
+        .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden; margin-bottom:16px; }
+        .card-body { padding:16px; }
+        .filters { display:grid; grid-template-columns: 1.2fr 180px 180px 180px 120px; gap:10px; align-items:end; }
+        .field label { display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px; text-transform:uppercase; letter-spacing:.03em; }
+        .field input, .field select { width:100%; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; font-size:14px; }
+        .btn { border:none; border-radius:10px; cursor:pointer; font-weight:700; padding:10px 12px; }
+        .btn-primary { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:#fff; }
+        .btn-secondary { background:#e2e8f0; color:#0f172a; }
+        .meta { color:#64748b; font-size:13px; margin: 4px 2px 10px; }
+        .layout { display:grid; grid-template-columns: minmax(360px, 1.1fr) minmax(420px, 1.4fr); gap:14px; }
+        .list { max-height: 68vh; overflow:auto; }
+        .cliente-item { border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer; background:#fff; }
+        .cliente-item.active { border-color:#f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,.16); }
+        .cliente-head { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+        .cliente-name { font-weight:800; font-size:15px; }
+        .cliente-sub { color:#64748b; font-size:12px; margin-top:4px; }
+        .pill { font-size:11px; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; border-radius:999px; padding:2px 8px; font-weight:700; }
+        .cliente-actions { display:flex; gap:8px; margin-top:10px; }
+        .btn-wa { background:#22c55e; color:#fff; }
+        .timeline { max-height:68vh; overflow:auto; }
+        .event { border:1px solid #e2e8f0; border-radius:10px; padding:10px; margin-bottom:8px; background:#fff; }
+        .event-top { display:flex; justify-content:space-between; gap:8px; font-size:12px; color:#475569; margin-bottom:6px; }
+        .event-title { font-size:14px; font-weight:700; color:#0f172a; margin-bottom:4px; }
+        .event-data { font-size:12px; color:#334155; display:grid; grid-template-columns:1fr 1fr; gap:4px 8px; }
+        .empty { color:#64748b; font-size:13px; padding:14px; text-align:center; border:1px dashed #cbd5e1; border-radius:10px; }
+        @media (max-width:1200px){ .filters{grid-template-columns:1fr 1fr 1fr;} .layout{grid-template-columns:1fr;} .main-content{margin-left:240px;max-width:calc(100% - 240px);padding:24px;} }
+        @media (max-width:768px){ .main-content{margin-left:0;max-width:100%;padding:16px;} .filters{grid-template-columns:1fr;} }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+<div style="display:flex;min-height:100vh;">
+    {% include "_sidebar.html" %}
+    <main class="main-content">
+        <div class="page-header">
+            <h1 class="page-title">Clientes</h1>
+            <p class="page-subtitle">Base de datos de contactos y actividad (agenda, tienda y ventas).</p>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="filters">
+                    <div class="field">
+                        <label>Buscar</label>
+                        <input type="text" id="f-q" placeholder="Nombre, telefono, email, codigo...">
+                    </div>
+                    <div class="field">
+                        <label>Desde</label>
+                        <input type="date" id="f-desde">
+                    </div>
+                    <div class="field">
+                        <label>Hasta</label>
+                        <input type="date" id="f-hasta">
+                    </div>
+                    <div class="field">
+                        <label>Tipo de evento</label>
+                        <select id="f-tipo">
+                            <option value="todos">Todos</option>
+                            <option value="agenda_torta">Agendo torta</option>
+                            <option value="compra_presencial">Compra presencial</option>
+                            <option value="compra_online">Compra online</option>
+                            <option value="compra_app">Compra App</option>
+                            <option value="registro_tienda">Registro tienda</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="btn-buscar">Buscar</button>
+                </div>
+                <div class="meta" id="clientes-meta">Cargando...</div>
+            </div>
+        </div>
+
+        <div class="layout">
+            <div class="card">
+                <div class="card-body list" id="clientes-list"></div>
+            </div>
+            <div class="card">
+                <div class="card-body timeline" id="clientes-timeline">
+                    <div class="empty">Selecciona un cliente para ver su historial.</div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+let _clientes = [];
+let _selected = "";
+
+function esc(v){ return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function fmtMoney(v){ const n = Number(v||0); return `$${Math.max(0, Math.round(n)).toLocaleString("es-CL")}`; }
+function paramsActuales(){
+    return {
+        q: (document.getElementById("f-q").value || "").trim(),
+        desde: (document.getElementById("f-desde").value || "").trim(),
+        hasta: (document.getElementById("f-hasta").value || "").trim(),
+        tipo: (document.getElementById("f-tipo").value || "todos").trim(),
+    };
+}
+async function cargarClientes(){
+    const meta = document.getElementById("clientes-meta");
+    const list = document.getElementById("clientes-list");
+    const p = paramsActuales();
+    const qs = new URLSearchParams();
+    Object.entries(p).forEach(([k,v])=>{ if(v) qs.set(k, v); });
+    meta.textContent = "Cargando clientes...";
+    list.innerHTML = '<div class="empty">Cargando...</div>';
+    try{
+        const r = await fetch(`/api/clientes/registro?${qs.toString()}`, { cache: "no-store" });
+        const d = await r.json();
+        if(!r.ok || !d.success) throw new Error(d.error || "No se pudo cargar clientes");
+        _clientes = Array.isArray(d.clientes) ? d.clientes : [];
+        meta.textContent = `Clientes: ${Number(d?.resumen?.total_clientes||0)} | Interacciones: ${Number(d?.resumen?.total_interacciones||0)}`;
+        renderClientes();
+    }catch(err){
+        meta.textContent = "Error al cargar clientes.";
+        list.innerHTML = `<div class="empty">${esc(err.message || "Error inesperado")}</div>`;
+    }
+}
+function renderClientes(){
+    const list = document.getElementById("clientes-list");
+    if(!_clientes.length){
+        list.innerHTML = '<div class="empty">Sin resultados para los filtros seleccionados.</div>';
+        document.getElementById("clientes-timeline").innerHTML = '<div class="empty">Selecciona un cliente para ver su historial.</div>';
+        return;
+    }
+    list.innerHTML = _clientes.map(c=>{
+        const key = String(c.key || "");
+        const active = key === _selected ? " active" : "";
+        const name = c.nombre || c.email || c.telefono || "Cliente";
+        const tel = c.telefono || "-";
+        const email = c.email || "-";
+        const waBtn = c.whatsapp_url ? `<button class="btn btn-wa" onclick="event.stopPropagation();window.open('${esc(c.whatsapp_url)}','_blank','noopener,noreferrer')">WhatsApp</button>` : "";
+        return `
+            <div class="cliente-item${active}" onclick="seleccionarCliente('${esc(key)}')">
+                <div class="cliente-head">
+                    <div>
+                        <div class="cliente-name">${esc(name)}</div>
+                        <div class="cliente-sub">Tel: ${esc(tel)}</div>
+                        <div class="cliente-sub">Email: ${esc(email)}</div>
+                    </div>
+                    <span class="pill">${Number(c.total_interacciones || 0)} evento(s)</span>
+                </div>
+                <div class="cliente-sub">Ultimo: ${esc(c.ultima_fecha || "-")} · ${esc(c.ult_tipo || "-")}</div>
+                <div class="cliente-actions">${waBtn}</div>
+            </div>
+        `;
+    }).join("");
+    if(!_selected && _clientes.length){
+        _selected = String(_clientes[0].key || "");
+    }
+    renderTimeline();
+}
+function seleccionarCliente(key){
+    _selected = String(key || "");
+    renderClientes();
+}
+function renderTimeline(){
+    const box = document.getElementById("clientes-timeline");
+    const cli = _clientes.find(x => String(x.key||"") === _selected);
+    if(!cli){
+        box.innerHTML = '<div class="empty">Selecciona un cliente para ver su historial.</div>';
+        return;
+    }
+    const rows = Array.isArray(cli.interacciones) ? cli.interacciones : [];
+    if(!rows.length){
+        box.innerHTML = '<div class="empty">Este cliente aun no tiene interacciones registradas.</div>';
+        return;
+    }
+    box.innerHTML = rows.map(r=>`
+        <div class="event">
+            <div class="event-top">
+                <span>${esc(r.tipo_label || "-")}</span>
+                <span>${esc(r.fecha_registro || r.fecha_objetivo || "-")}</span>
+            </div>
+            <div class="event-title">${esc(r.nombre || cli.nombre || "Cliente")}</div>
+            <div class="event-data">
+                <div><strong>Fecha solicitada:</strong> ${esc(r.fecha_objetivo || "-")}</div>
+                <div><strong>Codigo:</strong> ${esc(r.codigo_ref || "-")}</div>
+                <div><strong>Origen:</strong> ${esc(r.origen || "-")}</div>
+                <div><strong>Total:</strong> ${esc(fmtMoney(r.total_ref || 0))}</div>
+            </div>
+        </div>
+    `).join("");
+}
+
+document.getElementById("btn-buscar").addEventListener("click", cargarClientes);
+document.getElementById("f-q").addEventListener("keydown", (e)=>{ if(e.key === "Enter"){ e.preventDefault(); cargarClientes(); }});
+cargarClientes();
+</script>
+</body>
+</html>
+

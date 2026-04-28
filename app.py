@@ -14753,6 +14753,242 @@ def settings():
     )
 
 
+def _normalizar_telefono_contacto(raw):
+    texto = str(raw or "").strip()
+    dig = re.sub(r"\D+", "", texto)
+    if not dig:
+        return ""
+    if dig.startswith("56"):
+        return dig
+    if len(dig) == 9 and dig.startswith("9"):
+        return f"56{dig}"
+    if len(dig) >= 8:
+        return dig
+    return ""
+
+
+def _parse_fecha_iso_segura(raw):
+    valor = str(raw or "").strip()
+    if not valor:
+        return None
+    base = valor.split(" ")[0].strip()
+    try:
+        return datetime.strptime(base, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _label_origen_evento(item):
+    fuente = str(item.get("fuente") or "").strip().lower()
+    origen = str(item.get("origen") or "").strip().lower()
+    tipo = str(item.get("tipo") or "").strip().lower()
+    if fuente == "agenda":
+        if origen == "tienda_online":
+            return "Agendo torta (tienda online)"
+        return "Agendo torta (manual)" if tipo == "torta" else "Agenda manual"
+    if fuente == "venta":
+        if origen == "tienda_online":
+            return "Compra tienda online"
+        if origen == "presencial":
+            return "Compra presencial"
+        if origen == "uber_eats":
+            return "Compra Uber Eats"
+        if origen == "pedidosya":
+            return "Compra PedidosYa"
+        return f"Compra {origen}" if origen else "Compra"
+    if fuente == "cliente_tienda":
+        return "Registro cliente tienda"
+    return "Registro"
+
+
+@app.route('/settings/clientes')
+def settings_clientes():
+    return render_template('settings_clientes.html', app_version=APP_VERSION)
+
+
+@app.route('/api/clientes/registro', methods=['GET'])
+def api_clientes_registro():
+    try:
+        q = str(request.args.get('q') or '').strip().lower()
+        fecha_desde = str(request.args.get('desde') or '').strip()
+        fecha_hasta = str(request.args.get('hasta') or '').strip()
+        tipo_filtro = str(request.args.get('tipo') or 'todos').strip().lower()
+
+        desde_dt = _parse_fecha_iso_segura(fecha_desde) if fecha_desde else None
+        hasta_dt = _parse_fecha_iso_segura(fecha_hasta) if fecha_hasta else None
+        if desde_dt and hasta_dt and desde_dt > hasta_dt:
+            desde_dt, hasta_dt = hasta_dt, desde_dt
+
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                'agenda' AS fuente,
+                id,
+                COALESCE(NULLIF(TRIM(cliente), ''), '') AS nombre,
+                LOWER(TRIM(COALESCE(cliente_email, ''))) AS email,
+                TRIM(COALESCE(cliente_telefono, telefono, '')) AS telefono,
+                COALESCE(NULLIF(TRIM(tipo), ''), 'torta') AS tipo,
+                CASE
+                    WHEN LOWER(COALESCE(ingredientes, '')) LIKE '%reserva desde tienda online%' THEN 'tienda_online'
+                    ELSE 'manual'
+                END AS origen,
+                COALESCE(NULLIF(TRIM(fecha), ''), '') AS fecha_objetivo,
+                COALESCE(NULLIF(TRIM(creado), ''), '') AS fecha_registro,
+                COALESCE(NULLIF(TRIM(codigo_pedido), ''), '') AS codigo_ref,
+                COALESCE(total, 0) AS total_ref
+            FROM agenda_eventos
+            WHERE COALESCE(NULLIF(TRIM(cliente), ''), NULLIF(TRIM(telefono), ''), NULLIF(TRIM(cliente_telefono), ''), NULLIF(TRIM(cliente_email), '')) IS NOT NULL
+            """
+        )
+        agenda_rows = [dict(r) for r in cursor.fetchall()]
+
+        cursor.execute(
+            """
+            SELECT
+                'venta' AS fuente,
+                id,
+                COALESCE(NULLIF(TRIM(cliente_nombre), ''), '') AS nombre,
+                LOWER(TRIM(COALESCE(cliente_email, ''))) AS email,
+                TRIM(COALESCE(cliente_telefono, '')) AS telefono,
+                'venta' AS tipo,
+                LOWER(TRIM(COALESCE(canal_venta, 'presencial'))) AS origen,
+                COALESCE(SUBSTR(fecha_hora, 1, 10), '') AS fecha_objetivo,
+                COALESCE(NULLIF(TRIM(fecha_hora), ''), '') AS fecha_registro,
+                COALESCE(NULLIF(TRIM(codigo_pedido), ''), '') AS codigo_ref,
+                COALESCE(total_monto, 0) AS total_ref
+            FROM ventas
+            WHERE COALESCE(NULLIF(TRIM(cliente_nombre), ''), NULLIF(TRIM(cliente_telefono), ''), NULLIF(TRIM(cliente_email), '')) IS NOT NULL
+            """
+        )
+        venta_rows = [dict(r) for r in cursor.fetchall()]
+
+        cursor.execute(
+            """
+            SELECT
+                'cliente_tienda' AS fuente,
+                id,
+                COALESCE(NULLIF(TRIM(nombre), ''), '') AS nombre,
+                LOWER(TRIM(COALESCE(email, ''))) AS email,
+                TRIM(COALESCE(telefono, '')) AS telefono,
+                'registro' AS tipo,
+                'tienda_online' AS origen,
+                COALESCE(SUBSTR(creado_en, 1, 10), '') AS fecha_objetivo,
+                COALESCE(NULLIF(TRIM(creado_en), ''), '') AS fecha_registro,
+                '' AS codigo_ref,
+                0 AS total_ref
+            FROM tienda_clientes
+            WHERE COALESCE(NULLIF(TRIM(nombre), ''), NULLIF(TRIM(telefono), ''), NULLIF(TRIM(email), '')) IS NOT NULL
+            """
+        )
+        cliente_rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+
+        interacciones_raw = agenda_rows + venta_rows + cliente_rows
+        interacciones = []
+        for row in interacciones_raw:
+            nombre = str(row.get('nombre') or '').strip()
+            email = str(row.get('email') or '').strip().lower()
+            tel = str(row.get('telefono') or '').strip()
+            tel_norm = _normalizar_telefono_contacto(tel)
+            fecha_obj = str(row.get('fecha_objetivo') or '').strip()
+            fecha_reg = str(row.get('fecha_registro') or '').strip() or fecha_obj
+            label = _label_origen_evento(row)
+            row_tipo = str(row.get('tipo') or '').strip().lower()
+            tipo_filter_key = 'otro'
+            if row.get('fuente') == 'agenda':
+                tipo_filter_key = 'agenda_torta'
+            elif row.get('fuente') == 'venta':
+                origen = str(row.get('origen') or '').strip().lower()
+                tipo_filter_key = 'compra_presencial' if origen == 'presencial' else ('compra_online' if origen == 'tienda_online' else 'compra_app')
+            elif row.get('fuente') == 'cliente_tienda':
+                tipo_filter_key = 'registro_tienda'
+
+            fecha_ref_dt = _parse_fecha_iso_segura(fecha_obj) or _parse_fecha_iso_segura(fecha_reg)
+            if desde_dt and (not fecha_ref_dt or fecha_ref_dt < desde_dt):
+                continue
+            if hasta_dt and (not fecha_ref_dt or fecha_ref_dt > hasta_dt):
+                continue
+
+            searchable = " ".join([
+                nombre,
+                email,
+                tel,
+                tel_norm,
+                label,
+                str(row.get('codigo_ref') or ''),
+            ]).lower()
+            if q and q not in searchable:
+                continue
+            if tipo_filtro != 'todos' and tipo_filtro != tipo_filter_key:
+                continue
+
+            interacciones.append({
+                'fuente': row.get('fuente'),
+                'id': int(row.get('id') or 0),
+                'nombre': nombre,
+                'email': email,
+                'telefono': tel,
+                'telefono_norm': tel_norm,
+                'tipo': row_tipo,
+                'origen': str(row.get('origen') or '').strip().lower(),
+                'tipo_label': label,
+                'tipo_filtro': tipo_filter_key,
+                'fecha_objetivo': fecha_obj,
+                'fecha_registro': fecha_reg,
+                'codigo_ref': str(row.get('codigo_ref') or '').strip(),
+                'total_ref': float(row.get('total_ref') or 0),
+            })
+
+        interacciones.sort(key=lambda x: (x.get('fecha_registro') or x.get('fecha_objetivo') or '', x.get('id') or 0), reverse=True)
+
+        clientes_map = {}
+        for it in interacciones:
+            key = (it.get('email') or '').strip().lower() or (it.get('telefono_norm') or '').strip() or f"tmp-{it.get('fuente')}-{it.get('id')}"
+            c = clientes_map.get(key)
+            if not c:
+                c = {
+                    'key': key,
+                    'nombre': it.get('nombre') or '',
+                    'email': it.get('email') or '',
+                    'telefono': it.get('telefono') or '',
+                    'telefono_norm': it.get('telefono_norm') or '',
+                    'ultima_fecha': it.get('fecha_registro') or it.get('fecha_objetivo') or '',
+                    'ult_tipo': it.get('tipo_label') or '',
+                    'total_interacciones': 0,
+                    'interacciones': [],
+                }
+                clientes_map[key] = c
+            if not c['nombre'] and it.get('nombre'):
+                c['nombre'] = it.get('nombre')
+            if not c['email'] and it.get('email'):
+                c['email'] = it.get('email')
+            if not c['telefono'] and it.get('telefono'):
+                c['telefono'] = it.get('telefono')
+                c['telefono_norm'] = it.get('telefono_norm') or c['telefono_norm']
+            c['total_interacciones'] += 1
+            c['interacciones'].append(it)
+
+        clientes = list(clientes_map.values())
+        clientes.sort(key=lambda x: x.get('ultima_fecha') or '', reverse=True)
+        for c in clientes:
+            phone = str(c.get('telefono_norm') or '').strip()
+            c['whatsapp_url'] = f"https://wa.me/{phone}" if phone else ''
+
+        return jsonify({
+            'success': True,
+            'clientes': clientes,
+            'resumen': {
+                'total_clientes': len(clientes),
+                'total_interacciones': len(interacciones),
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'clientes': [], 'resumen': {'total_clientes': 0, 'total_interacciones': 0}}), 500
+
+
 def _sanitize_admin_username(valor):
     raw = str(valor or "").strip().lower()
     raw = re.sub(r"[^a-z0-9._-]", "", raw)
