@@ -14801,6 +14801,26 @@ def _label_origen_evento(item):
     return "Registro"
 
 
+def _split_detalle_lineas(raw_texto, titulo_default="Detalle"):
+    texto = str(raw_texto or "").replace("\r", "\n")
+    if not texto.strip():
+        return [{"titulo": titulo_default, "items": ["-"]}]
+    secciones = []
+    actual = {"titulo": titulo_default, "items": []}
+    for linea in [ln.strip() for ln in texto.split("\n") if ln.strip()]:
+        if linea.endswith(":") and len(linea) <= 90:
+            if actual["items"]:
+                secciones.append(actual)
+            actual = {"titulo": linea[:-1].strip() or titulo_default, "items": []}
+            continue
+        if str(actual.get("titulo") or "").strip().lower() == "builder json":
+            continue
+        actual["items"].append(linea)
+    if actual["items"]:
+        secciones.append(actual)
+    return secciones or [{"titulo": titulo_default, "items": ["-"]}]
+
+
 @app.route('/settings/clientes')
 def settings_clientes():
     return render_template('settings_clientes.html', app_version=APP_VERSION)
@@ -14987,6 +15007,160 @@ def api_clientes_registro():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'clientes': [], 'resumen': {'total_clientes': 0, 'total_interacciones': 0}}), 500
+
+
+@app.route('/api/clientes/registro/detalle', methods=['GET'])
+def api_clientes_registro_detalle():
+    conn = None
+    try:
+        fuente = str(request.args.get('fuente') or '').strip().lower()
+        item_id = int(request.args.get('id') or 0)
+        if fuente not in ('agenda', 'venta') or item_id <= 0:
+            return jsonify({"success": False, "error": "Parametros invalidos"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+
+        if fuente == 'agenda':
+            cursor.execute(
+                """
+                SELECT id, fecha, hora_inicio, hora_fin, hora_entrega, tipo, titulo, cliente, telefono,
+                       cliente_email, cliente_telefono, direccion, es_envio, ingredientes, total, abono,
+                       motivo, estado, codigo_pedido, creado
+                FROM agenda_eventos
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (item_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({"success": False, "error": "Evento no encontrado"}), 404
+            ev = dict(row)
+            nombre = str(ev.get("cliente") or "").strip() or "Cliente"
+            telefono = str(ev.get("cliente_telefono") or ev.get("telefono") or "").strip()
+            email = str(ev.get("cliente_email") or "").strip()
+            total = float(ev.get("total") or 0)
+            abono = float(ev.get("abono") or 0)
+            secciones = _split_detalle_lineas(ev.get("ingredientes") or "", "Detalle pedido")
+            resumen = [
+                {"label": "Cliente", "value": nombre},
+                {"label": "Telefono", "value": telefono or "-"},
+                {"label": "Correo", "value": email or "-"},
+                {"label": "Codigo pedido", "value": str(ev.get("codigo_pedido") or "-")},
+                {"label": "Fecha solicitada", "value": str(ev.get("fecha") or "-")},
+                {"label": "Hora inicio", "value": str(ev.get("hora_inicio") or "-")},
+                {"label": "Hora entrega/retiro", "value": str(ev.get("hora_entrega") or "-")},
+                {"label": "Entrega", "value": "Despacho" if int(ev.get("es_envio") or 0) == 1 else "Retiro"},
+                {"label": "Direccion", "value": str(ev.get("direccion") or "-")},
+                {"label": "Estado", "value": str(ev.get("estado") or "-")},
+            ]
+            return jsonify({
+                "success": True,
+                "detalle": {
+                    "fuente": "agenda",
+                    "titulo": str(ev.get("titulo") or "Pedido agenda"),
+                    "subtitulo": str(ev.get("creado") or ""),
+                    "total": total,
+                    "abono": abono,
+                    "resumen": resumen,
+                    "secciones": secciones,
+                }
+            })
+
+        cursor.execute(
+            """
+            SELECT id, fecha_hora, canal_venta, cliente_nombre, cliente_email, cliente_telefono,
+                   codigo_pedido, codigo_operacion, total_monto, descuento_codigo, descuento_monto,
+                   metodo_pago, observaciones
+            FROM ventas
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (item_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Venta no encontrada"}), 404
+        venta = dict(row)
+        venta_id = int(venta.get("id") or 0)
+
+        cursor.execute(
+            """
+            SELECT vd.producto_id, COALESCE(p.nombre, '') AS producto_nombre, vd.cantidad, vd.precio_unitario
+            FROM venta_detalles vd
+            LEFT JOIN productos p ON p.id = vd.producto_id
+            WHERE vd.venta_id = ?
+            ORDER BY vd.id ASC
+            """,
+            (venta_id,),
+        )
+        items_rows = [dict(r) for r in cursor.fetchall()]
+        if not items_rows:
+            cursor.execute(
+                """
+                SELECT vi.producto_id, COALESCE(vi.producto_nombre, '') AS producto_nombre, vi.cantidad, 0 AS precio_unitario
+                FROM venta_items vi
+                WHERE vi.venta_id = ?
+                ORDER BY vi.id ASC
+                """,
+                (venta_id,),
+            )
+            items_rows = [dict(r) for r in cursor.fetchall()]
+
+        items = []
+        for it in items_rows:
+            nombre = str(it.get("producto_nombre") or "").strip() or f"Producto #{int(it.get('producto_id') or 0)}"
+            cantidad = int(it.get("cantidad") or 0)
+            precio_u = float(it.get("precio_unitario") or 0)
+            subtotal = float(max(0, cantidad) * max(0.0, precio_u))
+            items.append({
+                "nombre": nombre,
+                "cantidad": cantidad,
+                "precio_unitario": precio_u,
+                "subtotal": subtotal,
+            })
+
+        total = float(venta.get("total_monto") or 0)
+        descuento = float(venta.get("descuento_monto") or 0)
+        resumen = [
+            {"label": "Cliente", "value": str(venta.get("cliente_nombre") or "Cliente")},
+            {"label": "Telefono", "value": str(venta.get("cliente_telefono") or "-")},
+            {"label": "Correo", "value": str(venta.get("cliente_email") or "-")},
+            {"label": "Canal", "value": str(venta.get("canal_venta") or "-")},
+            {"label": "Fecha", "value": str(venta.get("fecha_hora") or "-")},
+            {"label": "Codigo pedido", "value": str(venta.get("codigo_pedido") or "-")},
+            {"label": "Codigo operacion", "value": str(venta.get("codigo_operacion") or "-")},
+            {"label": "Metodo pago", "value": str(venta.get("metodo_pago") or "-")},
+        ]
+        secciones = [{
+            "titulo": "Detalle de compra",
+            "items": [
+                f"{it['nombre']} | Cant: {it['cantidad']} | P/U: ${int(round(it['precio_unitario'])):,} | Subtotal: ${int(round(it['subtotal'])):,}".replace(",", ".")
+                for it in items
+            ] or ["-"]
+        }]
+        obs = str(venta.get("observaciones") or "").strip()
+        if obs:
+            secciones.append({"titulo": "Observaciones", "items": [obs]})
+
+        return jsonify({
+            "success": True,
+            "detalle": {
+                "fuente": "venta",
+                "titulo": f"Compra #{venta_id}",
+                "subtitulo": str(venta.get("fecha_hora") or ""),
+                "total": total,
+                "descuento": descuento,
+                "resumen": resumen,
+                "secciones": secciones,
+            }
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 def _sanitize_admin_username(valor):

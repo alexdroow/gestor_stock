@@ -49,6 +49,24 @@
         .event-title { font-size:14px; font-weight:700; color:#0f172a; margin-bottom:4px; }
         .event-data { font-size:12px; color:#334155; display:grid; grid-template-columns:1fr 1fr; gap:4px 8px; }
         .empty { color:#64748b; font-size:13px; padding:14px; text-align:center; border:1px dashed #cbd5e1; border-radius:10px; }
+        .event { cursor: pointer; }
+        .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.6); z-index:12000; display:none; align-items:center; justify-content:center; padding:18px; }
+        .modal-backdrop.open { display:flex; }
+        .modal-panel { width:min(860px,96vw); max-height:88vh; overflow:auto; background:#fff; border:1px solid #e2e8f0; border-radius:14px; box-shadow:0 22px 42px rgba(2,6,23,.35); }
+        .modal-head { position:sticky; top:0; background:#fff; border-bottom:1px solid #e2e8f0; padding:14px 16px; display:flex; justify-content:space-between; gap:8px; z-index:1; }
+        .modal-title { font-size:18px; font-weight:800; color:#0f172a; }
+        .modal-subtitle { font-size:12px; color:#64748b; margin-top:4px; }
+        .modal-close { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:10px; padding:6px 10px; font-weight:700; cursor:pointer; }
+        .modal-body { padding:14px 16px 18px; }
+        .d-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin-bottom:12px; }
+        .d-row { font-size:13px; }
+        .d-k { color:#64748b; font-weight:700; }
+        .d-v { color:#0f172a; font-weight:600; margin-left:4px; }
+        .d-section { border:1px solid #e2e8f0; border-radius:10px; padding:10px; margin-bottom:10px; }
+        .d-section h4 { font-size:13px; margin:0 0 8px; color:#0f172a; }
+        .d-section ul { margin:0; padding-left:18px; }
+        .d-section li { font-size:13px; color:#334155; margin-bottom:4px; }
+        .d-total { margin-top:8px; font-size:14px; font-weight:800; color:#0f172a; }
         body.dark-mode { background:#0f172a; color:#f8fafc; }
         body.dark-mode .sidebar { background:#1e293b; border-color:#334155; }
         body.dark-mode .logo { border-color:#334155; }
@@ -65,6 +83,11 @@
         body.dark-mode .cliente-item.active { border-color:#f59e0b; }
         body.dark-mode .event-title, body.dark-mode .cliente-name { color:#f8fafc; }
         body.dark-mode .empty { border-color:#475569; color:#cbd5e1; }
+        body.dark-mode .modal-panel, body.dark-mode .modal-head { background:#1e293b; border-color:#334155; }
+        body.dark-mode .modal-title, body.dark-mode .d-v, body.dark-mode .d-section h4, body.dark-mode .d-total { color:#f8fafc; }
+        body.dark-mode .modal-subtitle, body.dark-mode .d-k, body.dark-mode .d-section li { color:#cbd5e1; }
+        body.dark-mode .modal-close { background:#0f172a; border-color:#475569; color:#f8fafc; }
+        body.dark-mode .d-section { border-color:#334155; }
         @media (max-width:1200px){ .filters{grid-template-columns:1fr 1fr 1fr;} .layout{grid-template-columns:1fr;} .main-content{margin-left:240px;max-width:calc(100% - 240px);padding:24px;} }
         @media (max-width:1024px){ .sidebar { width:240px; } }
         @media (max-width:768px){ .sidebar{transform:translateX(-100%);} .main-content{margin-left:0;max-width:100%;padding:16px;} .filters{grid-template-columns:1fr;} }
@@ -124,10 +147,25 @@
         </div>
     </main>
 </div>
+<div class="modal-backdrop" id="detalle-modal">
+    <div class="modal-panel">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="detalle-title">Detalle</div>
+                <div class="modal-subtitle" id="detalle-subtitle"></div>
+            </div>
+            <button type="button" class="modal-close" id="detalle-close">Cerrar</button>
+        </div>
+        <div class="modal-body" id="detalle-body">
+            <div class="empty">Cargando detalle...</div>
+        </div>
+    </div>
+</div>
 
 <script>
 let _clientes = [];
 let _selected = "";
+let _detalleBusy = false;
 
 function esc(v){ return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#39;"); }
 function fmtMoney(v){ const n = Number(v||0); return `$${Math.max(0, Math.round(n)).toLocaleString("es-CL")}`; }
@@ -210,7 +248,7 @@ function renderTimeline(){
         return;
     }
     box.innerHTML = rows.map(r=>`
-        <div class="event">
+        <div class="event" ondblclick="abrirDetalleEvento('${esc(r.fuente || "")}', ${Number(r.id || 0)})" title="Doble click para ver detalle">
             <div class="event-top">
                 <span>${esc(r.tipo_label || "-")}</span>
                 <span>${esc(r.fecha_registro || r.fecha_objetivo || "-")}</span>
@@ -225,9 +263,62 @@ function renderTimeline(){
         </div>
     `).join("");
 }
+function openDetalleModal(){ document.getElementById("detalle-modal").classList.add("open"); }
+function closeDetalleModal(){ document.getElementById("detalle-modal").classList.remove("open"); }
+function renderDetalle(det){
+    const body = document.getElementById("detalle-body");
+    const resumen = Array.isArray(det?.resumen) ? det.resumen : [];
+    const secciones = Array.isArray(det?.secciones) ? det.secciones : [];
+    const resumenHtml = resumen.map(r=>`<div class="d-row"><span class="d-k">${esc(r.label || "-")}:</span><span class="d-v">${esc(r.value || "-")}</span></div>`).join("");
+    const secHtml = secciones.map(sec=>`
+        <div class="d-section">
+            <h4>${esc(sec.titulo || "Detalle")}</h4>
+            <ul>
+                ${(Array.isArray(sec.items) ? sec.items : ["-"]).map(it=>`<li>${esc(it || "-")}</li>`).join("")}
+            </ul>
+        </div>
+    `).join("");
+    const total = Number(det?.total || 0);
+    const abono = Number(det?.abono || 0);
+    const descuento = Number(det?.descuento || 0);
+    body.innerHTML = `
+        <div class="d-grid">${resumenHtml}</div>
+        ${secHtml || '<div class="empty">Sin detalle adicional.</div>'}
+        ${total > 0 ? `<div class="d-total">Total: ${esc(fmtMoney(total))}</div>` : ""}
+        ${abono > 0 ? `<div class="d-total">Abono: ${esc(fmtMoney(abono))}</div>` : ""}
+        ${descuento > 0 ? `<div class="d-total">Descuento: ${esc(fmtMoney(descuento))}</div>` : ""}
+    `;
+}
+async function abrirDetalleEvento(fuente, id){
+    const fuenteOk = String(fuente || "").trim();
+    const idOk = Number(id || 0);
+    if(!fuenteOk || idOk <= 0 || _detalleBusy) return;
+    _detalleBusy = true;
+    const body = document.getElementById("detalle-body");
+    document.getElementById("detalle-title").textContent = "Detalle de evento";
+    document.getElementById("detalle-subtitle").textContent = "";
+    body.innerHTML = '<div class="empty">Cargando detalle...</div>';
+    openDetalleModal();
+    try{
+        const qs = new URLSearchParams({ fuente: fuenteOk, id: String(idOk) });
+        const r = await fetch(`/api/clientes/registro/detalle?${qs.toString()}`, { cache: "no-store" });
+        const d = await r.json();
+        if(!r.ok || !d.success) throw new Error(d.error || "No se pudo cargar el detalle");
+        const det = d.detalle || {};
+        document.getElementById("detalle-title").textContent = String(det.titulo || "Detalle");
+        document.getElementById("detalle-subtitle").textContent = String(det.subtitulo || "");
+        renderDetalle(det);
+    }catch(err){
+        body.innerHTML = `<div class="empty">${esc(err.message || "Error inesperado")}</div>`;
+    }finally{
+        _detalleBusy = false;
+    }
+}
 
 document.getElementById("btn-buscar").addEventListener("click", cargarClientes);
 document.getElementById("f-q").addEventListener("keydown", (e)=>{ if(e.key === "Enter"){ e.preventDefault(); cargarClientes(); }});
+document.getElementById("detalle-close").addEventListener("click", closeDetalleModal);
+document.getElementById("detalle-modal").addEventListener("click", (e)=>{ if(e.target.id === "detalle-modal") closeDetalleModal(); });
 cargarClientes();
 </script>
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
