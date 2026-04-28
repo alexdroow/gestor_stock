@@ -290,7 +290,7 @@ from database import (
     obtener_insumo_detalle, actualizar_insumo,
     limpiar_producciones_antiguas, obtener_historial_produccion_semanal,
     obtener_plan_produccion_semanal, obtener_agenda_produccion_semanal,
-    agendar_produccion_manual, eliminar_produccion_agendada,
+    agendar_produccion_manual, eliminar_produccion_agendada, completar_produccion_agendada,
     obtener_requerimientos_agenda_produccion,
     obtener_producto_detalle, actualizar_producto,
     procesar_lote_rapido_insumos, actualizar_preferencias_scan_insumo,
@@ -9136,10 +9136,10 @@ def api_confirmar_agendado_produccion(agendado_id):
         if not resultado.get('success'):
             return jsonify(resultado), 400
 
-        eliminar_res = eliminar_produccion_agendada(agendado_id)
-        if not eliminar_res.get('success'):
+        completar_res = completar_produccion_agendada(agendado_id)
+        if not completar_res.get('success'):
             # La produccion ya fue aplicada; devolvemos warning sin ocultar exito.
-            resultado['warning'] = f"Produccion aplicada, pero no se pudo quitar de agenda: {eliminar_res.get('error')}"
+            resultado['warning'] = f"Produccion aplicada, pero no se pudo marcar agenda como completada: {completar_res.get('error')}"
 
         try:
             limpiar_producciones_antiguas(meses=6)

@@ -6056,6 +6056,37 @@ def eliminar_produccion_agendada(agendado_id):
         conn.close()
 
 
+def completar_produccion_agendada(agendado_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        agendado_id_int = int(agendado_id or 0)
+        if agendado_id_int <= 0:
+            return {"success": False, "error": "Registro invalido"}
+
+        cursor.execute("SELECT id FROM produccion_agendada WHERE id = ?", (agendado_id_int,))
+        existe = cursor.fetchone()
+        if not existe:
+            return {"success": False, "error": "Registro no encontrado"}
+
+        cursor.execute(
+            """
+            UPDATE produccion_agendada
+            SET estado = 'completada',
+                actualizado = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (agendado_id_int,),
+        )
+        conn.commit()
+        return {"success": True, "completado_id": agendado_id_int}
+    except Exception as exc:
+        conn.rollback()
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+
+
 def obtener_agenda_produccion_semanal(dias=7, fecha_base=None):
     """
     Lista la produccion agendada manual para una ventana semanal simple,
