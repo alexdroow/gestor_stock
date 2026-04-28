@@ -1338,8 +1338,8 @@ def init_db():
     except sqlite3.OperationalError as e:
         # En algunos despliegues (p. ej. PythonAnywhere durante reload),
         # SQLite puede devolver "locking protocol" de forma transitoria.
-        # Si la DB ya existe, dejamos continuar el arranque.
-        if "locking protocol" in str(e).lower() and os.path.exists(DB_PATH):
+        # Dejamos continuar el arranque para evitar caida del WSGI.
+        if "locking protocol" in str(e).lower():
             print(f"[WARN] init_db omitida temporalmente por locking protocol: {e}")
             return
         print(f"[ERROR] {e}")
