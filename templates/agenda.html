@@ -5309,14 +5309,19 @@
             const esTorta = String(evento.tipo || '').trim().toLowerCase() === 'torta';
             const detalleEvento = String(evento.ingredientes || '');
             const detalleNorm = detalleEvento.toLowerCase();
-            if (esTorta && (detalleNorm.includes('--- catalogo torta ---') || detalleNorm.includes('--- builder json ---') || detalleNorm.includes('--- datos torta ---'))) {
+            if (esTorta) {
                 modoAgendarTorta = true;
+                modoAdminManualTorta = true;
                 mostrarBloqueTortaManual(true);
                 document.getElementById('modal-titulo').textContent = 'Editar Torta Agendada';
                 document.getElementById('evento-tipo').value = 'torta';
                 document.getElementById('evento-tipo').disabled = true;
                 await cargarCatalogoTortaManual(true);
-                aplicarDetalleTortaManualDesdeTexto(detalleEvento);
+                if (detalleNorm.includes('--- catalogo torta ---') || detalleNorm.includes('--- builder json ---') || detalleNorm.includes('--- datos torta ---')) {
+                    aplicarDetalleTortaManualDesdeTexto(detalleEvento);
+                } else {
+                    renderTortaBuilder();
+                }
             } else {
                 mostrarBloqueTortaManual(false);
             }
