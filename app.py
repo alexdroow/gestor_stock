@@ -347,15 +347,18 @@ def inject_app_globals():
     return {"app_version": APP_VERSION}
 
 
-try:
-    init_db()
-except Exception as _init_err:
-    # Blindaje de arranque en hosting: no tumbar WSGI por errores transitorios de lock.
-    _err_txt = str(_init_err).lower()
-    if ("locking protocol" in _err_txt) or ("database is locked" in _err_txt):
-        print(f"[WARN] init_db omitida temporalmente por lock sqlite: {_init_err}")
-    else:
-        raise
+if not os.path.exists(DB_PATH):
+    try:
+        init_db()
+    except Exception as _init_err:
+        # Blindaje de arranque en hosting: no tumbar WSGI por errores transitorios de lock.
+        _err_txt = str(_init_err).lower()
+        if ("locking protocol" in _err_txt) or ("database is locked" in _err_txt):
+            print(f"[WARN] init_db omitida temporalmente por lock sqlite: {_init_err}")
+        else:
+            raise
+else:
+    print(f"[INFO] init_db omitida: DB existente en {DB_PATH}")
 
 # Migrar base de datos (agregar columnas nuevas)
 from database import migrar_db
