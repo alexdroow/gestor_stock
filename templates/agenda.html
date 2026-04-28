@@ -2178,6 +2178,17 @@
                             <label>Nota de diseno</label>
                             <textarea id="torta-nota" rows="2" placeholder="Color, estilo, texto topper, etc." oninput="syncTotalTortaBuilderConFormulario()"></textarea>
                         </div>
+                        <label class="checkbox-group" style="margin-bottom:8px;">
+                            <input type="checkbox" id="torta-admin-manual-mode" onchange="toggleModoAdminManualTorta(this.checked)">
+                            <span>Modo admin manual: permitir sobrecupo y confirmar sin rellenos obligatorios</span>
+                        </label>
+                        <div class="form-group">
+                            <label>Otros valores manuales (descripcion + valor)</label>
+                            <div class="torta-builder-list" id="torta-otros-cargos-list">
+                                <div class="form-hint">Sin cargos extra.</div>
+                            </div>
+                            <button type="button" class="btn-mini-add" onclick="agregarOtroCargoTortaBuilder()">+ Agregar valor</button>
+                        </div>
                         <div class="torta-builder-total">
                             <span>Total estimado catalogo</span>
                             <span id="torta-builder-total">$0</span>
@@ -2458,6 +2469,7 @@
         let notasAgenda = [];
         let eventoEditando = null;
         let modoAgendarTorta = false;
+        let modoAdminManualTorta = false;
         let tortaCatalogoPublico = null;
         let tortaBuilder = null;
         let tortaCatalogoCargado = false;
@@ -2582,6 +2594,7 @@
                 topper_id: '',
                 referencia_urls: [],
                 nota: '',
+                otros_cargos: [],
             };
         }
         if (!tortaBuilder) tortaBuilder = _tortaBuilderVacio();
@@ -2636,6 +2649,9 @@
             });
             const topper = _catalogFind('toppers', tortaBuilder.topper_id);
             total += Math.max(0, _normalizarNumero(topper && topper.precio, 0));
+            (tortaBuilder.otros_cargos || []).forEach((item) => {
+                total += Math.max(0, _normalizarNumero(item && item.valor, 0));
+            });
             return Math.round(total);
         }
 
@@ -2675,6 +2691,13 @@
                 .filter(Boolean)
                 .slice(0, 8);
             tortaBuilder.nota = String(tortaBuilder.nota || '').trim().slice(0, 500);
+            tortaBuilder.otros_cargos = (Array.isArray(tortaBuilder.otros_cargos) ? tortaBuilder.otros_cargos : [])
+                .map((x) => ({
+                    descripcion: String((x && x.descripcion) || '').trim().slice(0, 120),
+                    valor: Math.max(0, Math.round(_normalizarNumero(x && x.valor, 0))),
+                }))
+                .filter((x) => x.descripcion || x.valor > 0)
+                .slice(0, 12);
         }
 
         function renderTortaBuilder() {
@@ -2689,6 +2712,8 @@
             const topperSel = document.getElementById('torta-topper-select');
             const refList = document.getElementById('torta-ref-list');
             const notaEl = document.getElementById('torta-nota');
+            const otrosCargosList = document.getElementById('torta-otros-cargos-list');
+            const adminModeChk = document.getElementById('torta-admin-manual-mode');
 
             if (!tortaCatalogoCargado || !categorias.length) {
                 if (catSel) catSel.innerHTML = '<option value="">Sin categorias</option>';
@@ -2697,6 +2722,7 @@
                 if (extrasList) extrasList.innerHTML = '<div class="form-hint">No hay extras disponibles.</div>';
                 if (topperSel) topperSel.innerHTML = '<option value="">Sin topper</option>';
                 if (refList) refList.innerHTML = '<div class="form-hint">Sin fotos de referencia.</div>';
+                if (otrosCargosList) otrosCargosList.innerHTML = '<div class="form-hint">Sin cargos extra.</div>';
                 if (saboresHint) saboresHint.textContent = 'Configura el catalogo de tortas en tienda para habilitar opciones.';
                 syncTotalTortaBuilderConFormulario();
                 return;
@@ -2768,7 +2794,60 @@
             }
 
             if (notaEl) notaEl.value = String(tortaBuilder.nota || '');
+            if (adminModeChk) adminModeChk.checked = Boolean(modoAdminManualTorta);
+            if (otrosCargosList) {
+                const rows = Array.isArray(tortaBuilder.otros_cargos) ? tortaBuilder.otros_cargos : [];
+                if (!rows.length) {
+                    otrosCargosList.innerHTML = '<div class="form-hint">Sin cargos extra.</div>';
+                } else {
+                    otrosCargosList.innerHTML = rows.map((item, idx) => `
+                        <div class="torta-builder-row" style="gap:8px;align-items:center;">
+                            <input type="text" value="${escapeHtml(String(item.descripcion || ''))}" placeholder="Descripcion" style="flex:1;min-width:180px;" oninput="actualizarOtroCargoTortaBuilder(${idx}, 'descripcion', this.value)">
+                            <input type="number" min="0" step="1" value="${Math.max(0, _normalizarNumero(item.valor, 0))}" placeholder="0" style="width:110px;" oninput="actualizarOtroCargoTortaBuilder(${idx}, 'valor', this.value)">
+                            <button type="button" class="btn-mini-danger" onclick="eliminarOtroCargoTortaBuilder(${idx})">Eliminar</button>
+                        </div>
+                    `).join('');
+                }
+            }
             syncTotalTortaBuilderConFormulario();
+        }
+
+        function toggleModoAdminManualTorta(checked) {
+            modoAdminManualTorta = Boolean(checked);
+            renderTortaBuilder();
+            cargarDisponibilidadHorariaTorta(false);
+        }
+
+        function agregarOtroCargoTortaBuilder() {
+            if (!tortaBuilder) tortaBuilder = _tortaBuilderVacio();
+            if (!Array.isArray(tortaBuilder.otros_cargos)) tortaBuilder.otros_cargos = [];
+            if (tortaBuilder.otros_cargos.length >= 12) {
+                alert('Maximo 12 cargos manuales.');
+                return;
+            }
+            tortaBuilder.otros_cargos.push({ descripcion: '', valor: 0 });
+            renderTortaBuilder();
+        }
+
+        function actualizarOtroCargoTortaBuilder(index, field, value) {
+            if (!tortaBuilder || !Array.isArray(tortaBuilder.otros_cargos)) return;
+            const idx = Number(index);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= tortaBuilder.otros_cargos.length) return;
+            if (field === 'descripcion') {
+                tortaBuilder.otros_cargos[idx].descripcion = String(value || '').slice(0, 120);
+            } else if (field === 'valor') {
+                tortaBuilder.otros_cargos[idx].valor = Math.max(0, Math.round(_normalizarNumero(value, 0)));
+            }
+            _normalizarBuilderState();
+            syncTotalTortaBuilderConFormulario();
+        }
+
+        function eliminarOtroCargoTortaBuilder(index) {
+            if (!tortaBuilder || !Array.isArray(tortaBuilder.otros_cargos)) return;
+            const idx = Number(index);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= tortaBuilder.otros_cargos.length) return;
+            tortaBuilder.otros_cargos.splice(idx, 1);
+            renderTortaBuilder();
         }
 
         async function cargarCatalogoTortaManual(force = false) {
@@ -2861,8 +2940,11 @@
                 const sinCupos = Boolean(d.sin_cupos);
                 const selected = fecha === fechaSeleccionada;
                 const className = `torta-dispo-day ${sinCupos ? 'disabled' : ''} ${selected ? 'selected' : ''}`.trim();
-                const estado = sinCupos ? 'Sin cupos' : 'Con cupo';
+                const estado = sinCupos ? (modoAdminManualTorta ? 'Sin cupos (admin)' : 'Sin cupos') : 'Con cupo';
                 if (sinCupos) {
+                    if (modoAdminManualTorta) {
+                        return `<button type="button" class="${className}" onclick="seleccionarDiaDisponibilidadTorta('${escapeHtml(fecha)}')"><span>${escapeHtml(info.dia)}</span><small>${escapeHtml(estado)}</small></button>`;
+                    }
                     return `<div class="${className}"><span>${escapeHtml(info.dia)}</span><small>${escapeHtml(estado)}</small></div>`;
                 }
                 return `<button type="button" class="${className}" onclick="seleccionarDiaDisponibilidadTorta('${escapeHtml(fecha)}')"><span>${escapeHtml(info.dia)}</span><small>${escapeHtml(estado)}</small></button>`;
@@ -2938,17 +3020,23 @@
                 }
 
                 const horaActual = valorCampo('evento-hora-inicio');
-                hintHoras.textContent = `Fecha ${fecha}: selecciona una hora disponible.`;
+                hintHoras.textContent = modoAdminManualTorta
+                    ? `Fecha ${fecha}: puedes usar horas disponibles u ocupadas (modo admin).`
+                    : `Fecha ${fecha}: selecciona una hora disponible.`;
                 grid.innerHTML = horas.map((h) => {
                     const inicio = String(h.hora_inicio || h.hora || '').slice(0, 5);
                     const fin = String(h.hora_fin || '').slice(0, 5);
                     const disponible = Boolean(h.disponible);
                     const cupos = Number(h.cupos_disponibles || 0);
                     const label = inicio && fin ? `${inicio} - ${fin}` : (inicio || 'Horario');
-                    const selected = disponible && horaActual && inicio === horaActual;
-                    const className = `torta-dispo-slot ${disponible ? '' : 'disabled'} ${selected ? 'selected' : ''}`.trim();
-                    const cupoTxt = disponible ? `${Math.max(0, cupos)} cupo(s)` : 'Sin cupo';
+                    const selected = horaActual && inicio === horaActual;
+                    const selectable = disponible || modoAdminManualTorta;
+                    const className = `torta-dispo-slot ${selectable ? '' : 'disabled'} ${selected ? 'selected' : ''}`.trim();
+                    const cupoTxt = disponible ? `${Math.max(0, cupos)} cupo(s)` : (modoAdminManualTorta ? 'Sin cupo (admin)' : 'Sin cupo');
                     if (!disponible) {
+                        if (modoAdminManualTorta) {
+                            return `<button type="button" class="${className}" onclick="seleccionarHorarioDisponibleTorta('${escapeHtml(inicio)}','${escapeHtml(fin)}')"><span>${escapeHtml(label)}</span><small>${escapeHtml(cupoTxt)}</small></button>`;
+                        }
                         return `<div class="${className}"><span>${escapeHtml(label)}</span><small>${escapeHtml(cupoTxt)}</small></div>`;
                     }
                     return `<button type="button" class="${className}" onclick="seleccionarHorarioDisponibleTorta('${escapeHtml(inicio)}','${escapeHtml(fin)}')"><span>${escapeHtml(label)}</span><small>${escapeHtml(cupoTxt)}</small></button>`;
@@ -3083,6 +3171,7 @@
                 sabores,
                 extras,
                 topper,
+                otros_cargos: [...(tortaBuilder.otros_cargos || [])],
                 referencia_urls: [...(tortaBuilder.referencia_urls || [])],
                 nota: tortaBuilder.nota,
                 subtotal: _tortaBuilderSubtotal(),
@@ -3092,6 +3181,7 @@
                     sabor_ids: [...(tortaBuilder.sabor_ids || [])],
                     extra_items: [...(tortaBuilder.extra_items || [])],
                     topper_id: String(tortaBuilder.topper_id || ''),
+                    otros_cargos: [...(tortaBuilder.otros_cargos || [])],
                     referencia_urls: [...(tortaBuilder.referencia_urls || [])],
                     nota: String(tortaBuilder.nota || ''),
                 },
@@ -3112,6 +3202,9 @@
             const topperItems = data.topper
                 ? [`- ${data.topper.nombre} (${formatoMonedaCLP(data.topper.precio || 0)})`]
                 : ['- Sin topper'];
+            const otrosCargosItems = (Array.isArray(data.otros_cargos) && data.otros_cargos.length)
+                ? data.otros_cargos.map((x) => `- ${String(x.descripcion || 'Cargo manual')} (${formatoMonedaCLP(x.valor || 0)})`)
+                : ['- -'];
             const refsTxt = data.referencia_urls.length ? data.referencia_urls.join(' | ') : '-';
             const bloques = [
                 '--- Catalogo torta ---',
@@ -3123,6 +3216,8 @@
                 ...extrasItems,
                 'Topper:',
                 ...topperItems,
+                'Otros cargos:',
+                ...otrosCargosItems,
                 `Referencias: ${refsTxt}`,
                 `Nota catalogo: ${data.nota || '-'}`,
                 `Subtotal estimado productos: ${formatoMonedaCLP(data.subtotal)}`,
@@ -3166,6 +3261,12 @@
                         ? parsed.extra_items.map((x) => ({ id: String((x && x.id) || ''), qty: Math.max(1, _normalizarNumero(x && x.qty, 1)) })).filter((x) => x.id)
                         : [],
                     topper_id: String(parsed.topper_id || ''),
+                    otros_cargos: Array.isArray(parsed.otros_cargos)
+                        ? parsed.otros_cargos.map((x) => ({
+                            descripcion: String((x && x.descripcion) || '').trim().slice(0, 120),
+                            valor: Math.max(0, Math.round(_normalizarNumero(x && x.valor, 0))),
+                        }))
+                        : [],
                     referencia_urls: Array.isArray(parsed.referencia_urls) ? parsed.referencia_urls.map((x) => String(x || '').trim()).filter(Boolean) : [],
                     nota: String(parsed.nota || '').trim(),
                 };
@@ -3549,8 +3650,10 @@
                     return;
                 }
                 if (!guardadoBorrador && (!Array.isArray(dataTorta.sabores) || !dataTorta.sabores.length)) {
-                    alert('Selecciona al menos un sabor/relleno.');
-                    return;
+                    if (!modoAdminManualTorta) {
+                        alert('Selecciona al menos un sabor/relleno.');
+                        return;
+                    }
                 }
                 const detalleManual = detalleTortaManualArmado();
                 if (String(detalleManual || '').trim()) {
@@ -5034,6 +5137,7 @@
             document.getElementById('modal-evento').classList.remove('active');
             eventoEditando = null;
             modoAgendarTorta = false;
+            modoAdminManualTorta = false;
             document.getElementById('evento-id').value = '';
             document.getElementById('evento-codigo-pedido').value = '';
             document.getElementById('evento-envio').checked = false;
@@ -5162,6 +5266,7 @@
         function agendarTortaManual() {
             nuevoEvento();
             modoAgendarTorta = true;
+            modoAdminManualTorta = true;
             document.getElementById('modal-titulo').textContent = 'Agendar Torta Manual';
             document.getElementById('evento-tipo').value = 'torta';
             document.getElementById('evento-tipo').disabled = true;
@@ -5178,6 +5283,7 @@
             
             eventoEditando = evento;
             modoAgendarTorta = false;
+            modoAdminManualTorta = false;
             document.getElementById('modal-titulo').textContent = esEventoBorrador(evento) ? 'Editar Borrador' : 'Editar Evento';
             document.getElementById('btn-eliminar').style.display = 'inline-block';
             document.getElementById('evento-tipo').disabled = false;
