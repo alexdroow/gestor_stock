@@ -347,7 +347,8 @@ def inject_app_globals():
     return {"app_version": APP_VERSION}
 
 
-if not os.path.exists(DB_PATH):
+RUN_BOOTSTRAP_DB_ON_START = str(os.getenv("GESTORSTOCK_BOOTSTRAP_DB", "0")).strip().lower() in {"1", "true", "yes", "on"}
+if RUN_BOOTSTRAP_DB_ON_START:
     try:
         init_db()
     except Exception as _init_err:
@@ -358,7 +359,7 @@ if not os.path.exists(DB_PATH):
         else:
             raise
 else:
-    print(f"[INFO] init_db omitida: DB existente en {DB_PATH}")
+    print(f"[INFO] init_db desactivada en bootstrap (DB: {DB_PATH})")
 
 # Migrar base de datos (agregar columnas nuevas)
 from database import migrar_db
