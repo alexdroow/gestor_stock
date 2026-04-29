@@ -1787,6 +1787,8 @@ def _obtener_cfg_agenda_tienda(cfg_tienda=None):
     if slot_minutes not in {30, 60, 90, 120}:
         slot_minutes = 60
     slot_capacity = _clamp_int(cfg.get("agenda_slot_capacity"), default=1, min_value=1, max_value=20)
+    day_close_min_orders = _clamp_int(cfg.get("agenda_day_close_min_orders"), default=3, min_value=1, max_value=20)
+    buffer_minutes = _clamp_int(cfg.get("agenda_event_buffer_minutes"), default=120, min_value=0, max_value=360)
     start_h = _hora_hhmm_o_default(cfg.get("agenda_hour_start"), "09:00")
     end_h = _hora_hhmm_o_default(cfg.get("agenda_hour_end"), "19:00")
     start_m = _hhmm_a_minutos(start_h) or 9 * 60
@@ -1801,6 +1803,8 @@ def _obtener_cfg_agenda_tienda(cfg_tienda=None):
         "days_ahead": days_ahead,
         "slot_minutes": slot_minutes,
         "slot_capacity": slot_capacity,
+        "day_close_min_orders": day_close_min_orders,
+        "event_buffer_minutes": buffer_minutes,
         "hour_start": _minutos_a_hhmm(start_m),
         "hour_end": _minutos_a_hhmm(end_m),
         "start_minutes": start_m,
@@ -2099,7 +2103,7 @@ def _cotizar_envio_checkout_tienda(lat, lng, cfg_tienda=None, hora_inicio=None):
     return quote
 
 
-def _rangos_ocupados_evento_agenda(evento, slot_minutes):
+def _rangos_ocupados_evento_agenda(evento, slot_minutes, buffer_minutes=0):
     tipo = str(evento.get("tipo") or "").strip().lower()
     hora_inicio = _hhmm_a_minutos(evento.get("hora_inicio"))
     hora_fin = _hhmm_a_minutos(evento.get("hora_fin"))
@@ -2114,12 +2118,20 @@ def _rangos_ocupados_evento_agenda(evento, slot_minutes):
         return {"bloqueo_dia": True, "rangos": []}
     if hora_fin is None or hora_fin <= hora_inicio:
         hora_fin = min(24 * 60, hora_inicio + slot_minutes)
-    return {"bloqueo_dia": False, "rangos": [(hora_inicio, hora_fin, False)]}
+    try:
+        extra = max(0, int(buffer_minutes or 0))
+    except (TypeError, ValueError):
+        extra = 0
+    inicio_final = max(0, hora_inicio - extra)
+    fin_final = min(24 * 60, hora_fin + extra)
+    return {"bloqueo_dia": False, "rangos": [(inicio_final, fin_final, False)]}
 
 
 def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fecha_hasta):
     slot_minutes = int(cfg_agenda["slot_minutes"])
     slot_capacity = int(cfg_agenda["slot_capacity"])
+    day_close_min_orders = max(1, int(cfg_agenda.get("day_close_min_orders") or 3))
+    event_buffer_minutes = max(0, int(cfg_agenda.get("event_buffer_minutes") or 120))
     start_m = int(cfg_agenda["start_minutes"])
     end_m = int(cfg_agenda["end_minutes"])
     days_ahead = int(cfg_agenda["days_ahead"])
@@ -2168,9 +2180,11 @@ def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fech
             minute_cursor += slot_minutes
 
         eventos_dia = list(eventos_por_fecha.get(fecha_iso, []))
+        pedidos_activos_dia = sum(1 for ev in eventos_dia if str(ev.get("tipo") or "").strip().lower() != "bloqueo")
+        cierre_por_cupos_dia = pedidos_activos_dia >= day_close_min_orders
         bloqueo_dia = False
         for ev in eventos_dia:
-            occ = _rangos_ocupados_evento_agenda(ev, slot_minutes)
+            occ = _rangos_ocupados_evento_agenda(ev, slot_minutes, buffer_minutes=event_buffer_minutes)
             if occ.get("bloqueo_dia"):
                 bloqueo_dia = True
                 break
@@ -2185,7 +2199,7 @@ def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fech
         horas_payload = []
         sin_cupos_total = True
         for slot in slots:
-            if bloqueo_dia or slot["bloqueado"]:
+            if cierre_por_cupos_dia or bloqueo_dia or slot["bloqueado"]:
                 disponible = False
                 ocupados = slot_capacity
                 cupos_disponibles = 0
@@ -2214,6 +2228,8 @@ def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fech
                 "label": f"{dias_semana_es[dia_dt.weekday()]} {dia_dt.strftime('%d/%m')}",
                 "sin_cupos": bool(sin_cupos_total),
                 "bloqueado_dia": bool(bloqueo_dia),
+                "cierre_por_cupos_dia": bool(cierre_por_cupos_dia),
+                "pedidos_activos_dia": int(pedidos_activos_dia),
                 "horas": horas_payload,
             }
         )
@@ -2896,6 +2912,8 @@ def _default_tienda_personalizacion():
         "agenda_hour_end": "19:00",
         "agenda_slot_minutes": 60,
         "agenda_slot_capacity": 1,
+        "agenda_day_close_min_orders": 3,
+        "agenda_event_buffer_minutes": 120,
         "agenda_form_button_text": "Reservar horario",
         "agenda_confirm_title": "Confirmar reserva",
         "agenda_confirm_warning": "Verifica muy bien tu telefono: sera el medio principal de contacto para tu reserva.",
@@ -3133,6 +3151,18 @@ def _normalizar_tienda_personalizacion(payload):
     except (TypeError, ValueError):
         slot_capacity = int(base["agenda_slot_capacity"])
     clean["agenda_slot_capacity"] = max(1, min(20, slot_capacity))
+
+    try:
+        day_close = int(data.get("agenda_day_close_min_orders") or base["agenda_day_close_min_orders"])
+    except (TypeError, ValueError):
+        day_close = int(base["agenda_day_close_min_orders"])
+    clean["agenda_day_close_min_orders"] = max(1, min(20, day_close))
+
+    try:
+        event_buffer = int(data.get("agenda_event_buffer_minutes") or base["agenda_event_buffer_minutes"])
+    except (TypeError, ValueError):
+        event_buffer = int(base["agenda_event_buffer_minutes"])
+    clean["agenda_event_buffer_minutes"] = max(0, min(360, event_buffer))
 
     clean["agenda_card_bg"] = _normalizar_color_hex(data.get("agenda_card_bg"), base["agenda_card_bg"])
     clean["agenda_card_border"] = _normalizar_color_hex(data.get("agenda_card_border"), base["agenda_card_border"])
