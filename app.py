@@ -378,6 +378,7 @@ else:
 
 FACTURAS_DIR = os.path.join(DATA_DIR, "facturas")
 FACTURAS_RESPALDO_LOCAL_DIR = os.path.join(DATA_DIR, "facturas_respaldo_local")
+BACKUP_ORQUESTACION_CONFIG_PATH = os.path.join(DATA_DIR, "backup_orquestacion_config.json")
 ALLOWED_FACTURA_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 os.makedirs(FACTURAS_DIR, exist_ok=True)
 os.makedirs(FACTURAS_RESPALDO_LOCAL_DIR, exist_ok=True)
@@ -448,6 +449,57 @@ def _normalizar_texto_busqueda(valor):
     texto = unicodedata.normalize("NFKD", texto)
     texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
     return " ".join(texto.split())
+
+
+def _backup_orquestacion_default():
+    return {
+        "enabled": True,
+        "local_backup_root": r"C:\Visual Studio Code\gestor_stock\backups\pythonanywhere_full",
+        "schedule_day": "sunday",
+        "schedule_time": "23:00",
+        "pythonanywhere_user": "alexdroow",
+        "pythonanywhere_host": "ssh.pythonanywhere.com",
+        "remote_project_dir": "/home/alexdroow/gestor_stock",
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+def _normalizar_backup_orquestacion(payload):
+    base = _backup_orquestacion_default()
+    data = dict(payload or {})
+    out = dict(base)
+    out["enabled"] = bool(data.get("enabled", base["enabled"]))
+    out["local_backup_root"] = str(data.get("local_backup_root") or base["local_backup_root"]).strip()[:260] or base["local_backup_root"]
+    out["schedule_day"] = str(data.get("schedule_day") or base["schedule_day"]).strip().lower()
+    if out["schedule_day"] not in {"sunday"}:
+        out["schedule_day"] = "sunday"
+    hhmm = str(data.get("schedule_time") or base["schedule_time"]).strip()
+    out["schedule_time"] = hhmm if _parse_hora_hhmm(hhmm) else base["schedule_time"]
+    out["pythonanywhere_user"] = str(data.get("pythonanywhere_user") or base["pythonanywhere_user"]).strip()[:80] or base["pythonanywhere_user"]
+    out["pythonanywhere_host"] = str(data.get("pythonanywhere_host") or base["pythonanywhere_host"]).strip()[:120] or base["pythonanywhere_host"]
+    out["remote_project_dir"] = str(data.get("remote_project_dir") or base["remote_project_dir"]).strip()[:220] or base["remote_project_dir"]
+    out["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    return out
+
+
+def _leer_backup_orquestacion():
+    base = _backup_orquestacion_default()
+    try:
+        if not os.path.exists(BACKUP_ORQUESTACION_CONFIG_PATH):
+            return base
+        with open(BACKUP_ORQUESTACION_CONFIG_PATH, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+        return _normalizar_backup_orquestacion(raw)
+    except Exception:
+        return base
+
+
+def _guardar_backup_orquestacion(payload):
+    cfg = _normalizar_backup_orquestacion(payload)
+    os.makedirs(os.path.dirname(BACKUP_ORQUESTACION_CONFIG_PATH), exist_ok=True)
+    with open(BACKUP_ORQUESTACION_CONFIG_PATH, "w", encoding="utf-8") as fh:
+        json.dump(cfg, fh, ensure_ascii=False, indent=2)
+    return cfg
 
 
 def _buscar_insumo_por_nombre_cursor(cursor, nombre):
@@ -14810,17 +14862,20 @@ def settings():
         config_alertas = obtener_config_alertas()
         config_clima_sidebar = obtener_config_clima_sidebar()
         config_updater = obtener_config_updater()
+        config_backup_orquestacion = _leer_backup_orquestacion()
         recordatorios = obtener_recordatorios_agenda_pendientes()
     except Exception:
         config_alertas = {}
         config_clima_sidebar = {}
         config_updater = {}
+        config_backup_orquestacion = _backup_orquestacion_default()
         recordatorios = []
     return render_template(
         'settings.html',
         config_alertas=config_alertas,
         config_clima_sidebar=config_clima_sidebar,
         config_updater=config_updater,
+        config_backup_orquestacion=config_backup_orquestacion,
         admin_users_count=_admin_users_count(),
         admin_legacy_user=_obtener_admin_legacy_username(),
         app_version=APP_VERSION,
@@ -16303,6 +16358,25 @@ def obtener_directorio_backup_api():
         )
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/backup/orquestacion-config', methods=['GET'])
+def api_backup_orquestacion_get():
+    try:
+        cfg = _leer_backup_orquestacion()
+        return jsonify({"success": True, "config": cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "config": _backup_orquestacion_default()}), 500
+
+
+@app.route('/api/backup/orquestacion-config', methods=['POST'])
+def api_backup_orquestacion_save():
+    try:
+        payload = request.get_json(silent=True) or {}
+        cfg = _guardar_backup_orquestacion(payload)
+        return jsonify({"success": True, "config": cfg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/backup/abrir-carpeta', methods=['POST'])

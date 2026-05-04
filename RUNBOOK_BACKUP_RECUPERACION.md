@@ -18,6 +18,7 @@ tools\install_weekly_backup_task.ps1
 ```
 
 Esto crea la tarea `GestorStockWeeklyFullBackup` para domingo 23:00.
+La tarea ejecuta `tools\backup_agent_run_from_web_config.ps1`, que primero lee la configuracion guardada en `/settings` y luego lanza el backup real.
 
 ## Ejecutar backup manual
 ```powershell

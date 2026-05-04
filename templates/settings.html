@@ -649,6 +649,47 @@
 
             <div class="card">
                 <div class="card-header">
+                    <h3 class="card-title">&#128190; Respaldo local automatizado (Agente)</h3>
+                </div>
+                <div class="card-body">
+                    <p style="color:#64748b; font-size:13px; margin-bottom:12px;">
+                        Configura aqui la carpeta destino y parametros del backup remoto. Luego instala el agente local en tu PC para que se ejecute cada domingo a las 23:00.
+                    </p>
+                    <div class="updater-grid">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Carpeta local destino</label>
+                            <input type="text" id="bk-local-root" class="form-control" placeholder="C:\\Visual Studio Code\\gestor_stock\\backups\\pythonanywhere_full">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Usuario PythonAnywhere</label>
+                            <input type="text" id="bk-pa-user" class="form-control" placeholder="alexdroow">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Host SSH</label>
+                            <input type="text" id="bk-pa-host" class="form-control" placeholder="ssh.pythonanywhere.com">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Ruta proyecto remoto</label>
+                            <input type="text" id="bk-pa-remote" class="form-control" placeholder="/home/alexdroow/gestor_stock">
+                        </div>
+                        <label class="config-item" style="margin-bottom:0;">
+                            <input type="checkbox" id="bk-enabled">
+                            <div>
+                                <div class="config-item-title">Activar backup semanal</div>
+                                <div class="config-item-sub">Domingos 23:00 (agente local en tu PC).</div>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="updater-actions">
+                        <button type="button" class="btn btn-primary" onclick="guardarConfigBackupOrquestacion()">Guardar configuraciÃ³n backup</button>
+                        <button type="button" class="btn btn-secondary" onclick="copiarComandoInstalarAgente()">Copiar comando de instalaciÃ³n</button>
+                    </div>
+                    <div class="updater-status" id="bk-status">Cargando configuraciÃ³n...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
                     <h3 class="card-title">&#128260; Actualizador remoto (GitHub)</h3>
                 </div>
                 <div class="card-body">
@@ -973,6 +1014,69 @@
                 .catch(err => mostrarMensajeBackup('[ERROR] ' + err.message, false));
         }
 
+        function setBackupOrqStatus(text, ok = null) {
+            const el = document.getElementById('bk-status');
+            if (!el) return;
+            el.textContent = text || '';
+            if (ok === true) el.style.color = '#10b981';
+            else if (ok === false) el.style.color = '#ef4444';
+            else el.style.color = '';
+        }
+
+        function cargarConfigBackupOrquestacion() {
+            fetch('/api/backup/orquestacion-config')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo cargar configuracion backup');
+                    const c = data.config || {};
+                    const enabled = document.getElementById('bk-enabled');
+                    const localRoot = document.getElementById('bk-local-root');
+                    const paUser = document.getElementById('bk-pa-user');
+                    const paHost = document.getElementById('bk-pa-host');
+                    const paRemote = document.getElementById('bk-pa-remote');
+                    if (enabled) enabled.checked = !!c.enabled;
+                    if (localRoot) localRoot.value = c.local_backup_root || '';
+                    if (paUser) paUser.value = c.pythonanywhere_user || 'alexdroow';
+                    if (paHost) paHost.value = c.pythonanywhere_host || 'ssh.pythonanywhere.com';
+                    if (paRemote) paRemote.value = c.remote_project_dir || '/home/alexdroow/gestor_stock';
+                    setBackupOrqStatus('Configuracion de backup cargada.');
+                })
+                .catch(err => setBackupOrqStatus('[ERROR] ' + err.message, false));
+        }
+
+        function guardarConfigBackupOrquestacion() {
+            const payload = {
+                enabled: !!document.getElementById('bk-enabled')?.checked,
+                local_backup_root: (document.getElementById('bk-local-root')?.value || '').trim(),
+                schedule_day: 'sunday',
+                schedule_time: '23:00',
+                pythonanywhere_user: (document.getElementById('bk-pa-user')?.value || '').trim(),
+                pythonanywhere_host: (document.getElementById('bk-pa-host')?.value || '').trim(),
+                remote_project_dir: (document.getElementById('bk-pa-remote')?.value || '').trim(),
+            };
+            fetch('/api/backup/orquestacion-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'No se pudo guardar configuracion backup');
+                    setBackupOrqStatus('✅ Configuracion backup guardada. Ejecuta instalacion local del agente.', true);
+                })
+                .catch(err => setBackupOrqStatus('[ERROR] ' + err.message, false));
+        }
+
+        async function copiarComandoInstalarAgente() {
+            const cmd = 'powershell -ExecutionPolicy Bypass -File tools\\\\install_weekly_backup_task.ps1';
+            try {
+                await navigator.clipboard.writeText(cmd);
+                setBackupOrqStatus('Comando copiado. Ejecutalo en PowerShell dentro de C:\\Visual Studio Code\\gestor_stock', true);
+            } catch (_) {
+                setBackupOrqStatus('No se pudo copiar automaticamente. Ejecuta: ' + cmd, false);
+            }
+        }
+
         function guardarConfigAlertas() {
             const payload = {
                 notificaciones_activas: document.getElementById('cfg-notificaciones').checked,
@@ -1292,6 +1396,7 @@
 
         actualizarUltimoBackup();
         actualizarRutasBackup();
+        cargarConfigBackupOrquestacion();
         cargarConfigUpdater();
         cargarConfigClimaSidebar(true);
         cargarUsuariosAdmin();

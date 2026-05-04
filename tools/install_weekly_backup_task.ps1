@@ -1,5 +1,5 @@
 ﻿param(
-  [string]$ScriptPath = "C:\\Visual Studio Code\\gestor_stock\\tools\\backup_pythonanywhere_weekly.ps1",
+  [string]$ScriptPath = "C:\\Visual Studio Code\\gestor_stock\\tools\\backup_agent_run_from_web_config.ps1",
   [string]$TaskName = "GestorStockWeeklyFullBackup",
   [string]$StartTime = "23:00"
 )
