@@ -52,3 +52,12 @@ Adicionalmente, cada subida de factura crea espejo en:
 `DATA_DIR/facturas_respaldo_local/<cliente>/<YYYY>/<MM>/`
 
 Con un `.json` por archivo para trazabilidad.
+
+## Backfill de facturas ya cargadas
+Si ya tenias facturas cargadas antes de activar el espejo, ejecuta:
+
+```powershell
+python tools\backfill_facturas_respaldo_local.py
+```
+
+El script recorre `facturas_archivo` y copia los archivos existentes al respaldo local por `cliente/anio/mes`.
