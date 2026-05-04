@@ -377,8 +377,10 @@ else:
     print("[INFO] migrar_db/bootstrap admin desactivados en bootstrap")
 
 FACTURAS_DIR = os.path.join(DATA_DIR, "facturas")
+FACTURAS_RESPALDO_LOCAL_DIR = os.path.join(DATA_DIR, "facturas_respaldo_local")
 ALLOWED_FACTURA_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 os.makedirs(FACTURAS_DIR, exist_ok=True)
+os.makedirs(FACTURAS_RESPALDO_LOCAL_DIR, exist_ok=True)
 LEGACY_FACTURAS_DIRS = []
 for legacy_root in LEGACY_DATA_DIRS:
     candidate = os.path.abspath(os.path.join(legacy_root, "facturas"))
@@ -392,6 +394,51 @@ def _normalizar_nombre_carpeta(valor):
     limpio = re.sub(r"[^a-zA-Z0-9_-]+", "_", str(valor or "").strip())
     limpio = limpio.strip("_")
     return limpio[:80] or "sin_proveedor"
+
+
+def _registrar_respaldo_local_factura(abs_path, proveedor, fecha_factura, numero_factura, original_name):
+    """
+    Copia espejo local para facilitar recuperacion y busqueda por cliente/mes/anio.
+    Estructura:
+      DATA_DIR/facturas_respaldo_local/<cliente>/<YYYY>/<MM>/*
+    """
+    try:
+        if not abs_path or not os.path.exists(abs_path):
+            return {"success": False, "error": "archivo_origen_no_existe"}
+        cliente_slug = _normalizar_nombre_carpeta(proveedor or "sin_cliente")
+        try:
+            dt = datetime.strptime(str(fecha_factura or ""), "%Y-%m-%d")
+        except Exception:
+            dt = datetime.now()
+        carpeta_destino = os.path.join(
+            FACTURAS_RESPALDO_LOCAL_DIR,
+            cliente_slug,
+            f"{dt.year}",
+            f"{dt.month:02d}",
+        )
+        os.makedirs(carpeta_destino, exist_ok=True)
+
+        ext = os.path.splitext(str(original_name or ""))[1].lower() or os.path.splitext(abs_path)[1].lower() or ".bin"
+        base = secure_filename(os.path.splitext(str(original_name or "factura"))[0]) or "factura"
+        nombre = f"{dt.strftime('%Y%m%d')}_{uuid.uuid4().hex[:8]}_{base}{ext}"
+        destino = os.path.abspath(os.path.join(carpeta_destino, nombre))
+        shutil.copy2(abs_path, destino)
+
+        meta = {
+            "proveedor_cliente": str(proveedor or "").strip(),
+            "fecha_factura": str(fecha_factura or ""),
+            "numero_factura": str(numero_factura or "").strip(),
+            "archivo_origen": str(abs_path),
+            "archivo_respaldo": str(destino),
+            "creado_en": datetime.now().isoformat(timespec="seconds"),
+        }
+        meta_path = f"{destino}.json"
+        with open(meta_path, "w", encoding="utf-8") as fh:
+            json.dump(meta, fh, ensure_ascii=False, indent=2)
+        return {"success": True, "path": destino}
+    except Exception as e:
+        print(f"[WARN] No se pudo crear respaldo local de factura: {e}")
+        return {"success": False, "error": str(e)}
 
 
 def _normalizar_texto_busqueda(valor):
@@ -16109,6 +16156,13 @@ def api_subir_facturas():
             unique_name = f"{fecha_dt.strftime('%Y%m%d')}_{uuid.uuid4().hex[:8]}_{base_name}{ext}"
             abs_path = os.path.abspath(os.path.join(base_dir, unique_name))
             archivo.save(abs_path)
+            _registrar_respaldo_local_factura(
+                abs_path=abs_path,
+                proveedor=proveedor,
+                fecha_factura=fecha_factura,
+                numero_factura=numero_factura,
+                original_name=original_name,
+            )
 
             archivo_bytes = os.path.getsize(abs_path) if os.path.exists(abs_path) else 0
             ruta_relativa = os.path.relpath(abs_path, FACTURAS_DIR).replace('\\', '/')
