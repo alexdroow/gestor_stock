@@ -5077,9 +5077,8 @@
         }
 
         function _nivelDescuentoPctCliente() {
-            const pct = Number(clienteRegistrado?.nivel?.descuento_pct || 0);
-            if (!Number.isFinite(pct)) return 0;
-            return Math.max(0, Math.min(100, pct));
+            // Sistema de nivel temporalmente desactivado: solo cupones manuales.
+            return 0;
         }
 
         function _descuentoNivelMonto(subtotal) {

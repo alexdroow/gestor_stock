@@ -12173,6 +12173,7 @@ def api_tienda_checkout():
                 despacho_monto = float(shipping_quote.get("shipping_fee") or 0)
 
         descuento_monto = 0.0
+        # Descuento por nivel desactivado temporalmente por negocio.
         descuento_nivel_monto = 0.0
         descuento_nivel_pct = 0.0
         cupon_aplicado = None
@@ -12187,14 +12188,7 @@ def api_tienda_checkout():
         finally:
             if conn_cli:
                 conn_cli.close()
-        if cliente_prev and isinstance(cliente_prev.get("nivel"), dict):
-            try:
-                descuento_nivel_pct = float((cliente_prev.get("nivel") or {}).get("descuento_pct") or 0)
-            except (TypeError, ValueError):
-                descuento_nivel_pct = 0.0
-            descuento_nivel_pct = max(0.0, min(100.0, descuento_nivel_pct))
-            if descuento_nivel_pct > 0:
-                descuento_nivel_monto = round(subtotal * (descuento_nivel_pct / 100.0), 2)
+        # Nota: el sistema de nivel se mantiene en BD pero no aplica en checkout.
         if cupon_codigo:
             cupon = _obtener_cupon_por_codigo(cupon_codigo)
             valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref)
