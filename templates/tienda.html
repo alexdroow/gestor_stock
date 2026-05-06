@@ -3668,6 +3668,7 @@
         let checkoutShippingQuote = null;
         let checkoutShippingError = "";
         let flowPagoHabilitado = false;
+        let paymentPricingCfg = { flow_enabled: false, rate: 0.0319, iva: 0.19, fixed: 0 };
         let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
         let historialEstadoPollTimer = null;
@@ -4962,6 +4963,31 @@
             return String(p.categoria_tienda || "General").trim() || "General";
         }
 
+        function _flowPriceFromBase(baseAmount, applyFixed = false) {
+            const base = Math.max(0, Number(baseAmount || 0));
+            if (!flowPagoHabilitado) return base;
+            const rate = Math.max(0, Number(paymentPricingCfg?.rate || 0));
+            const iva = Math.max(0, Number(paymentPricingCfg?.iva || 0));
+            const fixed = applyFixed ? Math.max(0, Number(paymentPricingCfg?.fixed || 0)) : 0;
+            const factor = 1 - (rate * (1 + iva));
+            if (!(factor > 0)) return base;
+            return Math.max(0, Math.ceil((base + fixed) / factor));
+        }
+
+        function _metodoPagoCheckoutActual() {
+            if (flowPagoHabilitado && checkoutPagoFlowEl?.checked) return "flow";
+            return "transferencia";
+        }
+
+        function _precioUnitarioItemPorMetodo(it, metodoPago) {
+            const metodo = String(metodoPago || "transferencia").toLowerCase();
+            const base = Math.max(0, Number(it?.precio_base_unitario ?? it?.precio_unitario ?? 0));
+            if (metodo === "flow" && flowPagoHabilitado) {
+                return Math.max(0, Number(it?.precio_flow_unitario ?? _flowPriceFromBase(base)));
+            }
+            return base;
+        }
+
         function cumpleBusqueda(p) {
             const q = String(searchInputEl.value || "").trim().toLowerCase();
             if (!q) return true;
@@ -5012,8 +5038,10 @@
         }
 
         function cardHtml(p, compact = false) {
-            const oldPrice = n(p.precio_base);
-            const finalPrice = n(p.precio_final);
+            const oldPriceBase = n(p.precio_base);
+            const finalPriceBase = n(p.precio_final);
+            const oldPrice = flowPagoHabilitado ? _flowPriceFromBase(oldPriceBase) : oldPriceBase;
+            const finalPrice = flowPagoHabilitado ? _flowPriceFromBase(finalPriceBase) : finalPriceBase;
             const hasDiscount = n(p.descuento_tienda_pct) > 0 && oldPrice > finalPrice;
             const desc = String(p.descripcion_tienda || "").trim();
             const stock = Math.max(0, Number(p.max_compra || 0));
@@ -7500,11 +7528,15 @@
                 if (it.cantidad >= max) return msg(`Maximo ${max} unidad(es) para ${p.nombre}.`, true);
                 it.cantidad += 1;
             } else {
+                const precioBase = n(p.precio_final);
+                const precioFlow = flowPagoHabilitado ? _flowPriceFromBase(precioBase) : precioBase;
                 carrito.push({
                     id: p.id,
                     nombre: p.nombre,
                     cantidad: 1,
-                    precio_unitario: n(p.precio_final)
+                    precio_base_unitario: precioBase,
+                    precio_flow_unitario: precioFlow,
+                    precio_unitario: precioFlow
                 });
             }
             limpiarCuponAplicado();
@@ -7591,6 +7623,12 @@
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                 flowPagoHabilitado = Boolean(data.flow_enabled);
+                paymentPricingCfg = {
+                    flow_enabled: flowPagoHabilitado,
+                    rate: Math.max(0, Number(data?.payment_pricing?.rate ?? 0.0319)),
+                    iva: Math.max(0, Number(data?.payment_pricing?.iva ?? 0.19)),
+                    fixed: Math.max(0, Number(data?.payment_pricing?.fixed ?? 0)),
+                };
                 if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = flowPagoHabilitado ? "" : "none";
                 if (!flowPagoHabilitado && checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
                 renderCategoriasMenu();
@@ -8157,7 +8195,8 @@
         }
 
         function _checkoutCalcularTotales() {
-            const subtotal = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
+            const metodo = _metodoPagoCheckoutActual();
+            const subtotal = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodo)), 0);
             const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
             const despacho = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0)) : 0;
             const total = Math.max(0, subtotal - descuento + despacho);
@@ -8372,10 +8411,16 @@
             if (checkoutDireccionBuscarEl) {
                 checkoutDireccionBuscarEl.value = String(clienteRegistrado?.direccion_default || "").trim();
             }
+            if (flowPagoHabilitado && checkoutPagoFlowEl) {
+                checkoutPagoFlowEl.checked = true;
+            } else if (checkoutPagoTransferenciaEl) {
+                checkoutPagoTransferenciaEl.checked = true;
+            }
+            const metodoPrecio = _metodoPagoCheckoutActual();
             const items = carrito.map((it) => ({
                 nombre: String(it.nombre || ""),
                 cantidad: Number(it.cantidad || 0),
-                subtotal: Number(it.cantidad || 0) * Number(it.precio_unitario || 0),
+                subtotal: Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPrecio),
             }));
             const subtotal = items.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
             const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
@@ -8455,19 +8500,20 @@
         async function enviarCheckoutCliente(datosCliente) {
             msg("Procesando compra...");
             const entregaCheckout = MODO_PRESENCIAL ? "retiro" : checkoutEntregaTipo;
+            const metodoPagoActual = _metodoPagoCheckoutActual();
             const itemsSnapshot = carrito.map((it) => ({
                 id: it.id,
                 nombre: it.nombre,
                 cantidad: Number(it.cantidad || 0),
-                precio_unitario: Number(it.precio_unitario || 0),
-                subtotal: Number(it.cantidad || 0) * Number(it.precio_unitario || 0),
+                precio_unitario: _precioUnitarioItemPorMetodo(it, metodoPagoActual),
+                subtotal: Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPagoActual),
             }));
             const subtotalSnapshot = itemsSnapshot.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
             const descuentoSnapshot = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
             const despachoSnapshot = (entregaCheckout === "despacho" && _checkoutShippingVisible()) ? Math.max(0, Number(checkoutShippingQuote?.shipping_fee || 0)) : 0;
             const totalSnapshot = Math.max(0, subtotalSnapshot - descuentoSnapshot + despachoSnapshot);
             const payload = {
-                items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: it.precio_unitario })),
+                items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: _precioUnitarioItemPorMetodo(it, metodoPagoActual) })),
                 codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
                 cliente_nombre: String(datosCliente?.nombre || "").trim(),
                 cliente_email: normalizarEmailCliente(datosCliente?.email),
@@ -8482,7 +8528,7 @@
                 lng: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lng || 0) : null,
                 shipping_quote: entregaCheckout === "despacho" ? (checkoutShippingQuote || null) : null,
                 metodo_pago: (() => {
-                    if (flowPagoHabilitado && checkoutPagoFlowEl?.checked) return "flow";
+                    if (metodoPagoActual === "flow") return "flow";
                     return "transferencia";
                 })(),
             };
@@ -9154,6 +9200,8 @@
         document.getElementById("modal-checkout-confirm")?.addEventListener("click", confirmarCheckoutDesdeResumen);
         checkoutEntregaRetiroEl?.addEventListener("click", () => _setCheckoutEntregaTipo("retiro"));
         checkoutEntregaDespachoEl?.addEventListener("click", () => _setCheckoutEntregaTipo("despacho"));
+        checkoutPagoTransferenciaEl?.addEventListener("change", _renderTotalesResumenCheckout);
+        checkoutPagoFlowEl?.addEventListener("change", _renderTotalesResumenCheckout);
         checkoutHoraRetiroEl?.addEventListener("change", async () => {
             _actualizarAyudaHoraCheckout();
             if (checkoutEntregaTipo === "despacho" && checkoutDireccionConfirmada) {

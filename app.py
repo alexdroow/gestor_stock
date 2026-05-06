@@ -2231,6 +2231,40 @@ def _flow_cfg():
     }
 
 
+def _flow_fee_cfg():
+    try:
+        rate_pct = float(os.environ.get("GESTIONSTOCK_FLOW_FEE_RATE_PCT") or 3.19)
+    except Exception:
+        rate_pct = 3.19
+    try:
+        iva_pct = float(os.environ.get("GESTIONSTOCK_FLOW_FEE_IVA_PCT") or 19.0)
+    except Exception:
+        iva_pct = 19.0
+    try:
+        fixed_clp = float(os.environ.get("GESTIONSTOCK_FLOW_FEE_FIXED_CLP") or 0)
+    except Exception:
+        fixed_clp = 0
+    rate = max(0.0, rate_pct / 100.0)
+    iva = max(0.0, iva_pct / 100.0)
+    fixed = max(0.0, fixed_clp)
+    return {"rate": rate, "iva": iva, "fixed": fixed}
+
+
+def _flow_gross_from_net(net_amount, fee_cfg=None, apply_fixed=True):
+    fee = fee_cfg or _flow_fee_cfg()
+    net = max(0.0, float(net_amount or 0))
+    if net <= 0:
+        return 0.0
+    rate = max(0.0, float(fee.get("rate") or 0))
+    iva = max(0.0, float(fee.get("iva") or 0))
+    fixed = max(0.0, float(fee.get("fixed") or 0)) if apply_fixed else 0.0
+    factor = 1.0 - (rate * (1.0 + iva))
+    if factor <= 0:
+        return float(net)
+    gross = (net + fixed) / factor
+    return float(max(0.0, math.ceil(gross)))
+
+
 def _flow_sign(params, secret_key):
     keys = sorted([k for k in params.keys() if k != "s"])
     to_sign = "".join([f"{k}{params[k]}" for k in keys])
@@ -4647,6 +4681,10 @@ def api_tienda_productos():
                 "mensaje_post_pedido": str(config.get("mensaje_post_pedido") or "").strip(),
                 "personalizacion": _obtener_tienda_personalizacion(),
                 "flow_enabled": bool(_flow_cfg().get("enabled")),
+                "payment_pricing": {
+                    "flow_enabled": bool(_flow_cfg().get("enabled")),
+                    **_flow_fee_cfg(),
+                },
             }
         )
     except Exception as e:
@@ -12052,6 +12090,7 @@ def api_tienda_checkout():
             int(p.get("id") or 0): _serializar_producto_tienda(p, categorias_map=categorias_map, now_local=now_local)
             for p in _obtener_productos_para_venta()
         }
+        fee_cfg = _flow_fee_cfg()
         items_limpios = []
         items_serializados = []
         items_notificacion = []
@@ -12076,7 +12115,10 @@ def api_tienda_checkout():
             if cantidad > max_compra:
                 return jsonify({'success': False, 'error': f'{prod.get("nombre")}: maximo {max_compra} unidad(es)'}), 400
 
-            precio_final = float(prod.get("precio_final") or 0)
+            precio_final_base = float(prod.get("precio_final") or 0)
+            precio_final = precio_final_base
+            if metodo_pago_preferido == "flow":
+                precio_final = _flow_gross_from_net(precio_final_base, fee_cfg=fee_cfg, apply_fixed=False)
             items_limpios.append(
                 {
                     "id": pid,
@@ -12089,6 +12131,7 @@ def api_tienda_checkout():
                     "id": pid,
                     "cantidad": cantidad,
                     "precio_unitario": precio_final,
+                    "precio_unitario_base": precio_final_base,
                     "descuento_tienda_pct": float(prod.get("descuento_tienda_pct") or 0),
                 }
             )
