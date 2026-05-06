@@ -4670,7 +4670,11 @@
                 const productosWaEnc = encodeURIComponent(productos);
                 const totalWaEnc = encodeURIComponent(`$${Math.round(totalMonto).toLocaleString('es-CL')}`);
                 const waBtn = `<button type="button" onclick="_abrirWhatsappPedidoCliente(${Number(p.id || 0)}, '${telEnc}', '${nombreEnc}', '${timerWaEnc}', '${productosWaEnc}', '${totalWaEnc}')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">WhatsApp cliente</button>`;
-                const opcionesTimerPendiente = estado === 'recibido' ? `
+                const pagoFlowPendiente = Boolean(p?.pago_flow_pendiente);
+                const pagoAlerta = pagoFlowPendiente
+                    ? `<div style="margin-top:6px;font-size:.84rem;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;padding:6px 8px;border-radius:8px;font-weight:700;">Pago por Flow pendiente. Espera confirmacion para aceptar y comenzar preparacion.</div>`
+                    : '';
+                const opcionesTimerPendiente = (estado === 'recibido' && !pagoFlowPendiente) ? `
                     <div style="margin-top:6px;padding:6px;border:1px dashed #fca5a5;border-radius:8px;background:#fff7ed;">
                         <div style="font-size:.78rem;color:#9a3412;font-weight:800;margin-bottom:4px;">Aceptar y definir tiempo:</div>
                         <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -4693,12 +4697,13 @@
                         ${entregaTipo === 'despacho' ? `<div style="font-size:.9rem;color:#334155;">Despacho: <strong>$${Math.round(despachoMonto).toLocaleString('es-CL')}</strong></div>` : ''}
                         <div style="font-size:.9rem;color:#334155;margin-top:6px;"><strong>Productos:</strong> ${productos}</div>
                         <div style="font-size:.9rem;color:#0f172a;margin-top:6px;"><strong>Estado:</strong> ${estadoTxt}</div>
+                        ${pagoAlerta}
                         ${timerHtml}
                         ${opcionesTimerPendiente}
                         <div style="font-size:.92rem;color:#111827;font-weight:700;">Total: $${Math.round(totalMonto).toLocaleString('es-CL')}</div>
                         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-                            <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'confirmado')" style="border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Aceptar</button>
-                            <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'preparando')" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Preparando</button>
+                            <button type="button" ${pagoFlowPendiente ? 'disabled title="Pago Flow pendiente"' : `onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'confirmado')"`} style="border:1px solid #cbd5e1;background:${pagoFlowPendiente ? '#e5e7eb' : '#fff'};color:${pagoFlowPendiente ? '#94a3b8' : '#1e293b'};padding:6px 10px;border-radius:8px;font-weight:700;cursor:${pagoFlowPendiente ? 'not-allowed' : 'pointer'};">Aceptar</button>
+                            <button type="button" ${pagoFlowPendiente ? 'disabled title="Pago Flow pendiente"' : `onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'preparando')"`} style="border:1px solid ${pagoFlowPendiente ? '#cbd5e1' : '#fdba74'};background:${pagoFlowPendiente ? '#e5e7eb' : '#fff7ed'};color:${pagoFlowPendiente ? '#94a3b8' : '#9a3412'};padding:6px 10px;border-radius:8px;font-weight:700;cursor:${pagoFlowPendiente ? 'not-allowed' : 'pointer'};">Preparando</button>
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo</button>
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'entregado')" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">${btnEntregadoTxt}</button>
                             <button type="button" onclick="_abrirChatPedidoOnline(${Number(p.id || 0)}, '${emailEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Chat cliente</button>
@@ -5040,10 +5045,11 @@
                     const telEnc = encodeURIComponent(tel);
                     const nomEnc = encodeURIComponent(nom);
                     const timerHtml = _timerPedidoRenderHtml(p);
+                    const pagoFlowPendiente = Boolean(p?.pago_flow_pendiente);
                     const pendingBadge = estadoRaw === 'recibido'
                         ? '<span style="margin-left:6px;font-size:.72rem;color:#b91c1c;border:1px solid #fecaca;background:#fef2f2;border-radius:999px;padding:1px 6px;font-weight:800;">Pendiente</span>'
                         : '';
-                    const quickTimerHub = estadoRaw === 'recibido' ? `
+                    const quickTimerHub = (estadoRaw === 'recibido' && !pagoFlowPendiente) ? `
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_aceptarPedidoConTimer(${id}, 10)" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">10m</button>
                             <button type="button" onclick="_aceptarPedidoConTimer(${id}, 15)" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">15m</button>
@@ -5052,6 +5058,9 @@
                             <button type="button" onclick="_aceptarPedidoConTimer(${id}, 45)" style="border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">+30</button>
                         </div>
                     ` : '';
+                    const pagoFlowWarn = pagoFlowPendiente
+                        ? '<div style="margin-top:6px;font-size:.79rem;color:#92400e;border:1px solid #f59e0b;background:#fffbeb;padding:5px 7px;border-radius:8px;font-weight:700;">Flow pendiente: esperar confirmacion de pago.</div>'
+                        : '';
                     const timerWa = _timerPedidoLabel(Number(p?.timer_minutos || 0)) || 'sin tiempo definido';
                     const timerWaEnc = encodeURIComponent(timerWa);
                     const productosWa = String(p.productos || '').trim() || '-';
@@ -5063,6 +5072,7 @@
                         <div style="font-size:.85rem;color:#475569;">${nom}</div>
                         <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
                         <div style="font-size:.8rem;color:#334155;">${estado} · ${entrega}${hora ? ` · ${hora}` : ''}</div>
+                        ${pagoFlowWarn}
                         ${timerHtml}
                         ${quickTimerHub}
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">

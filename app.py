@@ -1694,6 +1694,11 @@ def _pedido_estado_label(estado):
     return labels.get(est, "Recibido")
 
 
+def _pedido_pago_flow_pendiente(metodo_pago_raw):
+    metodo = str(metodo_pago_raw or "").strip().lower()
+    return metodo in {"flow_pendiente", "flow_pending", "flow"}
+
+
 PEDIDO_TIMER_OPCIONES_MIN = (10, 15, 25, 30, 45)
 
 
@@ -6610,6 +6615,7 @@ def api_tienda_admin_cupones_delete(cupon_id):
 def api_tienda_admin_pedidos_nuevos():
     conn = None
     try:
+        _ensure_ventas_metodo_pago_column()
         since_id = int(request.args.get("since_id") or 0)
         conn = get_db()
         cursor = conn.cursor()
@@ -6626,6 +6632,7 @@ def api_tienda_admin_pedidos_nuevos():
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.codigo_pedido,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
+                   COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo') AS metodo_pago,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
                    v.hora_retiro,
@@ -6648,6 +6655,14 @@ def api_tienda_admin_pedidos_nuevos():
         rows = []
         for r in cursor.fetchall():
             item = dict(r)
+            flow_pending = _pedido_pago_flow_pendiente(item.get("metodo_pago"))
+            item["pago_flow_pendiente"] = flow_pending
+            item["pago_bloquea_preparacion"] = flow_pending
+            item["pago_alerta"] = (
+                "Pago por Flow pendiente de confirmacion. Espera aprobacion para aceptar y preparar."
+                if flow_pending
+                else ""
+            )
             item.update(
                 _pedido_timer_payload(
                     item.get("pedido_estado"),
@@ -6671,6 +6686,7 @@ def api_tienda_admin_pedidos_chat_activos():
         return jsonify({"success": False, "error": "No autorizado"}), 401
     conn = None
     try:
+        _ensure_ventas_metodo_pago_column()
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
@@ -6678,6 +6694,7 @@ def api_tienda_admin_pedidos_chat_activos():
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
+                   COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo') AS metodo_pago,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
                    v.hora_retiro,
@@ -6698,6 +6715,14 @@ def api_tienda_admin_pedidos_chat_activos():
         rows = []
         for r in cursor.fetchall():
             item = dict(r)
+            flow_pending = _pedido_pago_flow_pendiente(item.get("metodo_pago"))
+            item["pago_flow_pendiente"] = flow_pending
+            item["pago_bloquea_preparacion"] = flow_pending
+            item["pago_alerta"] = (
+                "Pago por Flow pendiente de confirmacion. Espera aprobacion para aceptar y preparar."
+                if flow_pending
+                else ""
+            )
             item.update(
                 _pedido_timer_payload(
                     item.get("pedido_estado"),
@@ -6724,6 +6749,7 @@ def api_tienda_admin_pedido_estado(venta_id):
         return jsonify({"success": False, "error": "No autorizado"}), 401
     conn = None
     try:
+        _ensure_ventas_metodo_pago_column()
         data = request.get_json(silent=True) or {}
         nuevo_estado = _normalizar_pedido_estado(data.get("estado"))
         raw_timer = data.get("timer_minutos")
@@ -6735,7 +6761,8 @@ def api_tienda_admin_pedido_estado(venta_id):
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT id, pedido_timer_minutos, pedido_timer_inicio
+            SELECT id, pedido_timer_minutos, pedido_timer_inicio,
+                   COALESCE(NULLIF(TRIM(metodo_pago), ''), 'efectivo') AS metodo_pago
             FROM ventas
             WHERE id = ? AND canal_venta = 'tienda_online'
             LIMIT 1
@@ -6746,6 +6773,11 @@ def api_tienda_admin_pedido_estado(venta_id):
         if not actual:
             return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
         actual = dict(actual)
+        if _pedido_pago_flow_pendiente(actual.get("metodo_pago")) and nuevo_estado in {"confirmado", "preparando", "listo", "entregado"}:
+            return jsonify({
+                "success": False,
+                "error": "Pago Flow pendiente. Espera la confirmacion del pago para aceptar y preparar el pedido."
+            }), 409
         actual_timer = _normalizar_pedido_timer_minutos(actual.get("pedido_timer_minutos"))
         actual_inicio = actual.get("pedido_timer_inicio")
 
