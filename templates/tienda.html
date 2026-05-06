@@ -62,11 +62,26 @@
             z-index: 20;
             background: #fff;
             border-bottom: 1px solid var(--line);
-            padding: 10px 18px;
+            padding: 12px 20px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 12px;
+            justify-content: space-between;
+            gap: 14px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+        }
+        .brand-with-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: fit-content;
+        }
+        .brand-logo {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid #fde7c3;
+            box-shadow: 0 8px 20px rgba(251, 146, 60, .22);
         }
         .mobile-menu-btn {
             display: none;
@@ -101,14 +116,45 @@
             font-weight: 800;
             color: #1f2937;
         }
+        .topbar-nav {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 2px;
+            scrollbar-width: thin;
+        }
+        .topbar-nav-btn {
+            border: 1px solid transparent;
+            background: transparent;
+            color: #374151;
+            border-radius: 999px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: .92rem;
+            white-space: nowrap;
+        }
+        .topbar-nav-btn:hover {
+            border-color: #fde2c2;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .topbar-nav-btn.active {
+            border-color: #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+        }
         .search {
             width: min(460px, 100%);
         }
         .search input {
             width: 100%;
             border: 1px solid #d1d5db;
-            border-radius: 10px;
-            padding: 9px 10px;
+            border-radius: 999px;
+            padding: 10px 14px;
         }
         .layout {
             max-width: var(--layout-max-width);
@@ -2210,11 +2256,27 @@
             display: inline-flex;
             align-items: center;
         }
-        body.mobile-ui .topbar-actions {
+        body.mobile-ui .topbar-actions,
+        body.mobile-ui .topbar-nav,
+        body.mobile-ui .search {
             display: none !important;
         }
         body.mobile-ui .mobile-menu-btn {
             display: none !important;
+        }
+        body.mobile-ui .topbar {
+            justify-content: center !important;
+            padding: 10px 12px !important;
+        }
+        body.mobile-ui .brand-with-logo {
+            justify-content: center;
+        }
+        body.mobile-ui #brand-text {
+            display: none !important;
+        }
+        body.mobile-ui .brand-logo {
+            width: 52px;
+            height: 52px;
         }
         body.mobile-ui .mobile-agenda-summary-fab.active {
             display: inline-flex;
@@ -2830,14 +2892,24 @@
         }
         @media (max-width: 900px) {
             .topbar {
-                justify-content: space-between;
+                justify-content: center;
                 padding: 10px 12px;
             }
             .mobile-menu-btn {
-                display: inline-block;
+                display: none;
             }
             .brand {
                 font-size: .95rem;
+            }
+            .brand-logo {
+                width: 52px;
+                height: 52px;
+            }
+            #brand-text,
+            .topbar-nav,
+            .search,
+            .topbar-actions {
+                display: none !important;
             }
             .search {
                 width: 100%;
@@ -2903,7 +2975,11 @@
 <body>
     <header class="topbar">
         <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()">Menu</button>
-        <div class="brand" id="brand-text">Tienda en linea</div>
+        <div class="brand brand-with-logo">
+            <img class="brand-logo" id="brand-logo" src="/static/watermark_logo_full_backup.png" alt="Sucree Pasteleria">
+            <div class="brand" id="brand-text">Tienda en linea</div>
+        </div>
+        <nav class="topbar-nav" id="topbar-nav"></nav>
         <div class="search">
             <input id="search-input" type="search" placeholder="Buscar productos...">
         </div>
@@ -3437,6 +3513,7 @@
         const mobileTotalEl = document.getElementById("mobile-total");
         const msgEl = document.getElementById("msg");
         const brandTextEl = document.getElementById("brand-text");
+        const topbarNavEl = document.getElementById("topbar-nav");
         const searchInputEl = document.getElementById("search-input");
         const menuTitleEl = document.getElementById("menu-title");
         const secOfertasTitleEl = document.getElementById("sec-ofertas-title");
@@ -5181,6 +5258,22 @@
                 const active = c === categoriaActiva ? "active" : "";
                 return `<button type="button" class="cat-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
             }).join("");
+            if (topbarNavEl) {
+                const navAgenda = agendaEnabled
+                    ? `<button type="button" class="topbar-nav-btn ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA')">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
+                    : "";
+                topbarNavEl.innerHTML = navAgenda + all.map((c) => {
+                    const label = c === "TODOS"
+                        ? "Inicio"
+                        : c === "DESTACADOS"
+                            ? "Destacados"
+                        : c === "OFERTAS"
+                            ? "Ofertas"
+                            : c;
+                    const active = c === categoriaActiva ? "active" : "";
+                    return `<button type="button" class="topbar-nav-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
+                }).join("");
+            }
             if (mobileCatStripEl) {
                 const agendaChip = agendaEnabled
                     ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA')">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
