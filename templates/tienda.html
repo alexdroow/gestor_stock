@@ -1653,6 +1653,38 @@
             font-weight: 800;
             color: #334155;
         }
+        .checkout-pago-options {
+            display: grid;
+            gap: 8px;
+        }
+        .checkout-pago-option {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 9px;
+            width: 100%;
+            margin: 0;
+            color: #0f172a;
+            font-size: .92rem;
+            line-height: 1.2;
+        }
+        .checkout-pago-option input[type="radio"] {
+            margin: 0;
+            flex: 0 0 auto;
+        }
+        .checkout-pago-flow-icon {
+            width: 18px;
+            height: 18px;
+            object-fit: contain;
+            border-radius: 4px;
+            flex: 0 0 auto;
+        }
+        .checkout-pago-option-text {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
         .checkout-delivery-toggle {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -3222,14 +3254,17 @@
             </div>
             <div class="checkout-delivery-wrap" id="checkout-pago-wrap">
                 <div class="checkout-delivery-title">Metodo de pago</div>
-                <div style="display:grid;gap:8px;">
-                    <label style="display:flex;align-items:center;gap:8px;">
+                <div class="checkout-pago-options">
+                    <label class="checkout-pago-option">
                         <input type="radio" name="checkout-metodo-pago" id="checkout-pago-transferencia" value="transferencia" checked>
-                        <span>Transferencia</span>
+                        <span class="checkout-pago-option-text">Transferencia</span>
                     </label>
-                    <label style="display:flex;align-items:center;gap:8px;" id="checkout-pago-flow-row">
+                    <label class="checkout-pago-option" id="checkout-pago-flow-row">
                         <input type="radio" name="checkout-metodo-pago" id="checkout-pago-flow" value="flow">
-                        <span>Flow (tarjetas y otros medios)</span>
+                        <span class="checkout-pago-option-text">
+                            <img class="checkout-pago-flow-icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAVFBMVEWSnjLe/wDb/wDc/wDf/wCPmjOMljSQnDPi/wCOmDTV9wueri3T9A3L6hSqviizyyPP7xHA2xyluCqHjzbI5hfE4RmhsiyYpi+KkzW61B+uxCbY+wZ+XLB+AAABAklEQVQ4je1RW5LDIAzDL2IgIUDTvHr/e66TdHd2pu0NqoEPI9mWjXNfvEA+Ml0IRkr+mDnfSxWJur2v0SUl0HUDGH8FnWV1dq5YKkFpAsiLBH80C7OEsUnW/VSskeot7ED9LU0U9xDumpL2t8r1EPjGNDQ3EYxZsfaak/IyEM/x7JkmRCTd0DoAJy9cNsJIhGAaM7IpIcU6M8YG7KXjx2Av1BPiwx8W9khx9RloMBv3XKhEqzY7Rr6mWnuwJYxAcVEkqzs+iLfgi5ZwThnYvJgAOVcm4mHdaTqofPFuYc7izKA5zLVm78SH57YugaIcUbMrhtdNt8X9T3jzFx+ZL/7wA3iTC0NFr/3RAAAAAElFTkSuQmCC" alt="Flow">
+                            Flow (tarjetas y otros medios)
+                        </span>
                     </label>
                 </div>
             </div>
