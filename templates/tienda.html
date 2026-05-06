@@ -3220,6 +3220,19 @@
                     <div class="checkout-shipping-warning" id="checkout-shipping-warning"></div>
                 </div>
             </div>
+            <div class="checkout-delivery-wrap" id="checkout-pago-wrap">
+                <div class="checkout-delivery-title">Metodo de pago</div>
+                <div style="display:grid;gap:8px;">
+                    <label style="display:flex;align-items:center;gap:8px;">
+                        <input type="radio" name="checkout-metodo-pago" id="checkout-pago-transferencia" value="transferencia" checked>
+                        <span>Transferencia</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;" id="checkout-pago-flow-row">
+                        <input type="radio" name="checkout-metodo-pago" id="checkout-pago-flow" value="flow">
+                        <span>Flow (tarjetas y otros medios)</span>
+                    </label>
+                </div>
+            </div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-checkout-cancel">Volver</button>
                 <button class="btn-primary" type="button" id="modal-checkout-confirm">Confirmar compra</button>
@@ -3409,6 +3422,9 @@
         const checkoutShippingQuoteEl = document.getElementById("checkout-shipping-quote");
         const checkoutShippingWarningEl = document.getElementById("checkout-shipping-warning");
         const checkoutDespachoNoticeEl = document.getElementById("checkout-despacho-notice");
+        const checkoutPagoTransferenciaEl = document.getElementById("checkout-pago-transferencia");
+        const checkoutPagoFlowEl = document.getElementById("checkout-pago-flow");
+        const checkoutPagoFlowRowEl = document.getElementById("checkout-pago-flow-row");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoOrderChipEl = document.getElementById("modal-exito-order-chip");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
@@ -3609,6 +3625,7 @@
         let checkoutDireccionPin = { lat: -33.510911, lng: -70.784909 };
         let checkoutShippingQuote = null;
         let checkoutShippingError = "";
+        let flowPagoHabilitado = false;
         let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
         let historialEstadoPollTimer = null;
@@ -7495,6 +7512,9 @@
                 }
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
+                flowPagoHabilitado = Boolean(data.flow_enabled);
+                if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = flowPagoHabilitado ? "" : "none";
+                if (!flowPagoHabilitado && checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
                 renderCategoriasMenu();
                 renderSecciones();
                 _renderAgendaPastelResumen();
@@ -8383,6 +8403,10 @@
                 lat: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lat || 0) : null,
                 lng: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lng || 0) : null,
                 shipping_quote: entregaCheckout === "despacho" ? (checkoutShippingQuote || null) : null,
+                metodo_pago: (() => {
+                    if (flowPagoHabilitado && checkoutPagoFlowEl?.checked) return "flow";
+                    return "transferencia";
+                })(),
             };
             const norm = _normalizarDatosCheckoutCliente(datosCliente);
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
@@ -8394,6 +8418,16 @@
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
+                if (data.requires_flow_redirect && data.flow_redirect_url) {
+                    cerrarModalCliente();
+                    cerrarModalCheckoutResumen();
+                    checkoutClientePendiente = null;
+                    carrito = [];
+                    renderCart();
+                    msg("Redirigiendo a Flow para completar el pago...");
+                    window.location.href = String(data.flow_redirect_url);
+                    return;
+                }
                 ultimoComprobantePedido = {
                     venta_id: Number(data.venta_id || 0),
                     codigo_operacion: String(data.codigo_operacion || ""),
@@ -8452,6 +8486,22 @@
                 return abrirModalCheckoutResumen(clienteRegistrado);
             }
             modalClienteEl.classList.add("active");
+        }
+
+        function _notificarRetornoFlowDesdeUrl() {
+            try {
+                const p = new URLSearchParams(window.location.search || "");
+                const flow = String(p.get("flow") || "").trim().toLowerCase();
+                if (!flow) return;
+                if (flow === "paid") msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                else if (flow === "pending") msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
+                else if (flow === "error") msg("No se pudo confirmar el pago en Flow. Reintenta o usa transferencia.", true);
+                p.delete("flow");
+                p.delete("venta_id");
+                const q = p.toString();
+                const next = `${window.location.pathname}${q ? "?" + q : ""}${window.location.hash || ""}`;
+                window.history.replaceState({}, "", next);
+            } catch (_e) {}
         }
 
         function cerrarModalCliente() {
@@ -9214,6 +9264,7 @@
         _setAgendaEntregaTipo("retiro");
         _updateAgendaDespachoStepState();
         _agendaApplyMobileWizard(false);
+        _notificarRetornoFlowDesdeUrl();
         _aplicarEscalaMovilDinamica();
         renderCart();
         _toggleMobileAgendaSummaryFab();
