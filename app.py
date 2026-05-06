@@ -224,6 +224,8 @@ def _ruta_es_publica(path):
         return True
     if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/presencial", "/tienda/presencial/", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
+    if ruta.startswith("/tienda/flow/"):
+        return True
     if ruta.startswith("/api/tienda/"):
         return True
     return False
@@ -274,8 +276,7 @@ def _proteger_area_admin():
         return redirect(url_for("tienda_publica"))
     if path.startswith("/api/"):
         return jsonify({"success": False, "error": "Acceso no autorizado."}), 401
-    destino = request.full_path if request.query_string else request.path
-    return redirect(url_for("admin_login", next=destino))
+    return redirect(url_for("tienda_publica"))
 
 _GO2RTC_PROCESS = None
 

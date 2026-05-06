@@ -3673,6 +3673,7 @@
         let historialComprasCliente = [];
         let cuponesClienteDisponibles = [];
         let carritoVacioTexto = "El carrito esta vacio.";
+        const FLOW_CHECKOUT_DRAFT_KEY = "tienda_flow_checkout_draft_v1";
         let tiendaUiCfg = {};
         let agendaDias = [];
         let agendaFechaActiva = "";
@@ -4333,6 +4334,27 @@
                 if (!ultimoComprobantePedido || !Number(ultimoComprobantePedido.venta_id || 0)) return;
                 localStorage.setItem("tienda_ultimo_pedido", JSON.stringify(ultimoComprobantePedido));
             } catch (_) {}
+        }
+
+        function _guardarFlowCheckoutDraft(draft) {
+            try {
+                localStorage.setItem(FLOW_CHECKOUT_DRAFT_KEY, JSON.stringify(draft || {}));
+            } catch (_) {}
+        }
+
+        function _cargarFlowCheckoutDraft() {
+            try {
+                const raw = localStorage.getItem(FLOW_CHECKOUT_DRAFT_KEY);
+                if (!raw) return null;
+                const obj = JSON.parse(raw);
+                return (obj && typeof obj === "object") ? obj : null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function _limpiarFlowCheckoutDraft() {
+            try { localStorage.removeItem(FLOW_CHECKOUT_DRAFT_KEY); } catch (_) {}
         }
 
         function _renderPedidoActivoTienda() {
@@ -8459,6 +8481,24 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
                 if (data.requires_flow_redirect && data.flow_redirect_url) {
+                    _guardarFlowCheckoutDraft({
+                        venta_id: Number(data.venta_id || 0),
+                        codigo_operacion: String(data.codigo_operacion || ""),
+                        fecha_hora_local: new Date().toLocaleString("es-CL"),
+                        estado: "recibido",
+                        estado_actualizado: "",
+                        cliente_nombre: String(datosCliente?.nombre || ""),
+                        cliente_email: String(datosCliente?.email || ""),
+                        cliente_telefono: String(datosCliente?.telefono || ""),
+                        subtotal: Number(data.subtotal || subtotalSnapshot || 0),
+                        descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
+                        total: Number(data.total_monto || totalSnapshot || 0),
+                        entrega_tipo: String(data.entrega_tipo || payload.entrega_tipo || "retiro"),
+                        hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
+                        direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
+                        despacho_monto: Number(data.despacho_monto || despachoSnapshot || 0),
+                        items: itemsSnapshot,
+                    });
                     cerrarModalCliente();
                     cerrarModalCheckoutResumen();
                     checkoutClientePendiente = null;
@@ -8533,9 +8573,33 @@
                 const p = new URLSearchParams(window.location.search || "");
                 const flow = String(p.get("flow") || "").trim().toLowerCase();
                 if (!flow) return;
-                if (flow === "paid") msg("Pago confirmado por Flow. Pedido registrado correctamente.");
-                else if (flow === "pending") msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
-                else if (flow === "error") msg("No se pudo confirmar el pago en Flow. Reintenta o usa transferencia.", true);
+                const ventaId = Number(p.get("venta_id") || 0);
+                const draft = _cargarFlowCheckoutDraft();
+                if (draft && (!ventaId || Number(draft.venta_id || 0) === ventaId)) {
+                    ultimoComprobantePedido = {
+                        ...(ultimoComprobantePedido || {}),
+                        ...draft,
+                        venta_id: Number(ventaId || draft.venta_id || 0),
+                    };
+                    guardarUltimoPedidoLocal();
+                }
+                if (flow === "paid") {
+                    msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                    if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
+                        _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
+                    }
+                    _limpiarFlowCheckoutDraft();
+                } else if (flow === "pending") {
+                    msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
+                    if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
+                        _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "pending" });
+                    }
+                } else if (flow === "error") {
+                    msg("La compra no se concreto en Flow. Puedes reintentar o usar transferencia.", true);
+                    if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
+                        _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "error" });
+                    }
+                }
                 p.delete("flow");
                 p.delete("venta_id");
                 const q = p.toString();
@@ -8580,7 +8644,20 @@
             return `https://wa.me/${telefonoDestino}?text=${encodeURIComponent(mensaje)}`;
         }
 
-        function _renderPostCheckoutPopup(p) {
+        function _renderPostCheckoutPopup(p, options = {}) {
+            const mode = String(options?.mode || "success").toLowerCase();
+            const isSuccess = mode === "success";
+            const isPending = mode === "pending";
+            const titulo = isSuccess ? "Pedido recibido" : "Estado del pago";
+            const chipLabel = isSuccess ? `Pedido #${Number(p?.venta_id || 0) || "-"}` : "Pago no concretado";
+            const resumenTitulo = isSuccess
+                ? "Compra confirmada correctamente."
+                : (isPending
+                    ? "Tu pago con Flow quedo pendiente de confirmacion."
+                    : "La compra no se concreto en Flow.");
+            const resumenDetalle = isSuccess
+                ? `Guarda tu numero de pedido para seguimiento: #${Number(p?.venta_id || 0) || "-"}.`
+                : "Puedes reintentar el pago o elegir transferencia para completar tu pedido.";
             const ventaId = Number(p?.venta_id || 0);
             const entrega = String(p?.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
             const hora = String(p?.hora_retiro || "").trim();
@@ -8600,11 +8677,11 @@
             return `
                 <div id="post-checkout-popup-overlay" style="position:fixed;inset:0;z-index:100000;background:rgba(2,6,23,.58);display:flex;align-items:center;justify-content:center;padding:14px;">
                     <div style="width:min(560px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:14px;display:grid;gap:10px;box-shadow:0 20px 60px rgba(2,6,23,.28);">
-                        <h3 style="margin:0;color:#0f172a;">Pedido recibido</h3>
-                        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:800;font-size:.84rem;width:max-content;">Pedido #${ventaId || "-"}</div>
+                        <h3 style="margin:0;color:#0f172a;">${titulo}</h3>
+                        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:800;font-size:.84rem;width:max-content;">${chipLabel}</div>
                         <div style="border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;padding:10px;color:#334155;font-size:.92rem;">
-                            <div><strong>Compra confirmada correctamente.</strong></div>
-                            <div>Guarda tu numero de pedido para seguimiento: <strong>#${ventaId || "-"}</strong>.</div>
+                            <div><strong>${resumenTitulo}</strong></div>
+                            <div>${resumenDetalle}</div>
                             <div>Entrega: <strong>${esc(entrega)}</strong>${hora ? ` · Hora: <strong>${esc(hora)}</strong>` : ""}</div>
                             ${entrega === "Despacho" ? `<div>Direccion: <strong>${esc(direccion)}</strong></div>` : ""}
                         </div>
@@ -8617,7 +8694,7 @@
                             <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${total}</strong></div>
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-                            <button type="button" id="post-checkout-pdf" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Descargar ticket PDF</button>
+                            ${isSuccess ? `<button type="button" id="post-checkout-pdf" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Descargar ticket PDF</button>` : ""}
                             <a href="${wa}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;">Enviar WhatsApp pasteleria</a>
                             <button type="button" id="post-checkout-close" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Entendido</button>
                         </div>
@@ -8626,10 +8703,10 @@
             `;
         }
 
-        function _abrirPostCheckoutPopup(p) {
+        function _abrirPostCheckoutPopup(p, options = {}) {
             const old = document.getElementById("post-checkout-popup-overlay");
             if (old) old.remove();
-            document.body.insertAdjacentHTML("beforeend", _renderPostCheckoutPopup(p));
+            document.body.insertAdjacentHTML("beforeend", _renderPostCheckoutPopup(p, options));
             const overlay = document.getElementById("post-checkout-popup-overlay");
             const btnPdf = document.getElementById("post-checkout-pdf");
             const btnClose = document.getElementById("post-checkout-close");
