@@ -3274,6 +3274,7 @@
                     </label>
                 </div>
             </div>
+            <div id="checkout-status-msg" style="display:none;font-size:.85rem;border-radius:10px;padding:8px 10px;"></div>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-checkout-cancel">Volver</button>
                 <button class="btn-primary" type="button" id="modal-checkout-confirm">Confirmar compra</button>
@@ -3466,6 +3467,7 @@
         const checkoutPagoTransferenciaEl = document.getElementById("checkout-pago-transferencia");
         const checkoutPagoFlowEl = document.getElementById("checkout-pago-flow");
         const checkoutPagoFlowRowEl = document.getElementById("checkout-pago-flow-row");
+        const checkoutStatusMsgEl = document.getElementById("checkout-status-msg");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoOrderChipEl = document.getElementById("modal-exito-order-chip");
         const modalExitoTextoEl = document.getElementById("modal-exito-texto");
@@ -4935,6 +4937,27 @@
             }
             msgEl.textContent = safeText;
             msgEl.style.color = isErr ? "#b91c1c" : "#6b7280";
+        }
+
+        function setCheckoutStatusMsg(text, isErr = false) {
+            if (!checkoutStatusMsgEl) return;
+            const t = String(text || "").trim();
+            if (!t) {
+                checkoutStatusMsgEl.style.display = "none";
+                checkoutStatusMsgEl.textContent = "";
+                return;
+            }
+            checkoutStatusMsgEl.style.display = "block";
+            checkoutStatusMsgEl.textContent = t;
+            if (isErr) {
+                checkoutStatusMsgEl.style.color = "#991b1b";
+                checkoutStatusMsgEl.style.background = "#fef2f2";
+                checkoutStatusMsgEl.style.border = "1px solid #fecaca";
+            } else {
+                checkoutStatusMsgEl.style.color = "#0f5132";
+                checkoutStatusMsgEl.style.background = "#ecfdf5";
+                checkoutStatusMsgEl.style.border = "1px solid #a7f3d0";
+            }
         }
 
         function setEstadoTienda(abierta, mensaje) {
@@ -8395,6 +8418,7 @@
         function abrirModalCheckoutResumen(datosCliente) {
             if (!modalCheckoutResumenEl || !modalCheckoutClienteEl || !modalCheckoutDetalleEl) return;
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            setCheckoutStatusMsg("");
             const norm = _normalizarDatosCheckoutCliente(datosCliente);
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             checkoutClientePendiente = norm.value;
@@ -8463,11 +8487,13 @@
         function cerrarModalCheckoutResumen() {
             if (!modalCheckoutResumenEl) return;
             modalCheckoutResumenEl.classList.remove("active");
+            setCheckoutStatusMsg("");
             checkoutClientePendiente = null;
         }
 
         async function confirmarCheckoutDesdeResumen() {
             if (!checkoutClientePendiente) return msg("No hay datos de cliente para confirmar.", true);
+            setCheckoutStatusMsg("");
             const horaRetiro = String(checkoutHoraRetiroEl?.value || "").trim();
             if (!MODO_PRESENCIAL) {
                 if (!_esHoraCheckoutValida(horaRetiro)) {
@@ -8487,6 +8513,7 @@
                 btnConfirm.disabled = true;
                 btnConfirm.textContent = "Enviando...";
             }
+            setCheckoutStatusMsg("Procesando compra...");
             try {
                 return await enviarCheckoutCliente(checkoutClientePendiente);
             } finally {
@@ -8569,8 +8596,12 @@
                     carrito = [];
                     renderCart();
                     msg("Redirigiendo a Flow para completar el pago...");
+                    setCheckoutStatusMsg("Redirigiendo a Flow para completar el pago...");
                     window.location.href = String(data.flow_redirect_url);
                     return;
+                }
+                if (_metodoPagoCheckoutActual() === "flow") {
+                    throw new Error("No se pudo iniciar Flow. Intenta nuevamente en unos segundos.");
                 }
                 ultimoComprobantePedido = {
                     venta_id: Number(data.venta_id || 0),
@@ -8608,12 +8639,17 @@
                 cerrarModalCheckoutResumen();
                 checkoutClientePendiente = null;
                 abrirModalExito();
+                setCheckoutStatusMsg("");
                 msg("");
                 _trackTienda("checkout");
                 await cargarProductos();
                 if (clienteRegistrado) await cargarHistorialCliente();
             } catch (e) {
+                setCheckoutStatusMsg(e.message || "Error procesando compra", true);
                 msg(e.message || "Error procesando compra", true);
+                if (window.AppUX && typeof window.AppUX.toastError === "function") {
+                    window.AppUX.toastError(e.message || "Error procesando compra");
+                }
             }
         }
 
