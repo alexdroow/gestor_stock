@@ -60,6 +60,7 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = str(os.environ.get("GESTIONSTOCK_SESSION_SECURE") or "0").strip().lower() in {"1", "true", "yes", "on"}
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
+PUBLIC_BASE_URL = str(os.environ.get("GESTIONSTOCK_PUBLIC_BASE_URL") or "https://pasteleriasucree.cl").strip().rstrip("/")
 
 ADMIN_PIN_ENV = "GESTIONSTOCK_ADMIN_PIN"
 DEFAULT_ADMIN_PIN = "1234"
@@ -145,6 +146,13 @@ def _admin_users_count(conn=None):
     finally:
         if propia and conn is not None:
             conn.close()
+
+
+def _public_base_url(fallback=None):
+    base = str(PUBLIC_BASE_URL or "").strip().rstrip("/")
+    if base:
+        return base
+    return str(fallback or request.url_root or "").strip().rstrip("/")
 
 
 def _admin_find_user(username, conn=None):
@@ -7383,7 +7391,7 @@ def api_tienda_agenda_reserva_whatsapp_pasteleria(reserva_id):
             return jsonify({"success": False, "error": "Reserva no encontrada"}), 404
         reserva = dict(row)
         filename = _crear_pdf_reserva_agenda_tienda(reserva)
-        media_url = f"{str(request.url_root or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
+        media_url = f"{_public_base_url(request.url_root)}/static/tienda_pedidos_pdf/{quote(filename)}"
 
         contacto = nombre_origen or email_origen or str(reserva.get("cliente") or "").strip() or f"reserva #{int(reserva_id)}"
         body = (
@@ -11963,7 +11971,7 @@ def api_tienda_checkout():
             subtotal=float(subtotal),
             descuento=float(descuento_monto),
             total=float(total_neto),
-            host_url=request.url_root,
+            host_url=_public_base_url(request.url_root),
             entrega_tipo=entrega_tipo,
             hora_retiro=hora_retiro,
             direccion_entrega=(direccion_entrega if entrega_tipo == "despacho" else ""),
@@ -17155,7 +17163,7 @@ def api_agenda_evento_pdf(id):
             return jsonify({'success': False, 'error': 'Evento no encontrado'}), 404
         evento = dict(row)
         filename = _crear_pdf_reserva_agenda_tienda(evento)
-        media_url = f"{str(request.url_root or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
+        media_url = f"{_public_base_url(request.url_root)}/static/tienda_pedidos_pdf/{quote(filename)}"
         return jsonify({'success': True, 'media_url': media_url, 'filename': filename, 'codigo_pedido': str(evento.get('codigo_pedido') or '').strip()})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -17205,7 +17213,7 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
             return jsonify({'success': False, 'error': 'Telefono del cliente invalido o faltante'}), 400
 
         filename = _crear_pdf_reserva_agenda_tienda(evento)
-        media_url = f"{str(request.url_root or '').rstrip('/')}/static/tienda_pedidos_pdf/{quote(filename)}"
+        media_url = f"{_public_base_url(request.url_root)}/static/tienda_pedidos_pdf/{quote(filename)}"
 
         cliente_txt = cliente_req or str(evento.get('cliente') or '').strip() or 'cliente'
         tipo_txt = str(evento.get('tipo') or '').strip().capitalize() or 'Reserva'

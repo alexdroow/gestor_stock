@@ -1,5 +1,5 @@
 ﻿param(
-  [string]$AppBaseUrl = "https://alexdroow.pythonanywhere.com",
+  [string]$AppBaseUrl = "https://pasteleriasucree.cl",
   [string]$ProjectRoot = "C:\\Visual Studio Code\\gestor_stock"
 )
 
