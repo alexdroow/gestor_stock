@@ -2294,6 +2294,26 @@ def _ensure_ventas_metodo_pago_column():
             conn.close()
 
 
+def _ensure_ventas_flow_admin_alert_column():
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(ventas)")
+        cols = {str(r["name"]).strip().lower() for r in (cur.fetchall() or [])}
+        if "flow_admin_alertado" in cols:
+            return
+        # Default 1 para evitar alertar pedidos historicos ya existentes.
+        cur.execute("ALTER TABLE ventas ADD COLUMN flow_admin_alertado INTEGER DEFAULT 1")
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e or "").lower():
+            raise
+    finally:
+        if conn:
+            conn.close()
+
+
 def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount):
     conn = None
     try:
@@ -6617,6 +6637,7 @@ def api_tienda_admin_pedidos_nuevos():
     conn = None
     try:
         _ensure_ventas_metodo_pago_column()
+        _ensure_ventas_flow_admin_alert_column()
         since_id = int(request.args.get("since_id") or 0)
         conn = get_db()
         cursor = conn.cursor()
@@ -6634,6 +6655,7 @@ def api_tienda_admin_pedidos_nuevos():
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
                    COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo') AS metodo_pago,
+                   COALESCE(v.flow_admin_alertado, 1) AS flow_admin_alertado,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
                    v.hora_retiro,
@@ -6647,13 +6669,24 @@ def api_tienda_admin_pedidos_nuevos():
                 FROM venta_items
                 GROUP BY venta_id
             ) vp ON vp.venta_id = v.id
-            WHERE v.canal_venta = 'tienda_online' AND v.id > ?
+            WHERE v.canal_venta = 'tienda_online'
+              AND (
+                    (
+                        v.id > ?
+                        AND LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
+                    )
+                    OR (
+                        LOWER(TRIM(COALESCE(v.metodo_pago, ''))) = 'flow_pagado'
+                        AND COALESCE(v.flow_admin_alertado, 1) = 0
+                    )
+                  )
             ORDER BY v.id ASC
             LIMIT 50
             """,
             (since_id,),
         )
         rows = []
+        flow_ids_alertar = []
         for r in cursor.fetchall():
             item = dict(r)
             flow_pending = _pedido_pago_flow_pendiente(item.get("metodo_pago"))
@@ -6672,6 +6705,15 @@ def api_tienda_admin_pedidos_nuevos():
                 )
             )
             rows.append(item)
+            if str(item.get("metodo_pago") or "").strip().lower() == "flow_pagado" and int(item.get("flow_admin_alertado") or 0) == 0:
+                flow_ids_alertar.append(int(item.get("id") or 0))
+        if flow_ids_alertar:
+            placeholders = ",".join(["?"] * len(flow_ids_alertar))
+            cursor.execute(
+                f"UPDATE ventas SET flow_admin_alertado = 1 WHERE id IN ({placeholders})",
+                tuple(flow_ids_alertar),
+            )
+            conn.commit()
         max_id = max(since_id, max_online_id)
         return jsonify({"success": True, "pedidos": rows, "max_id": max_id})
     except Exception as e:
@@ -12101,6 +12143,7 @@ def api_tienda_checkout():
         conn = None
         try:
             _ensure_ventas_metodo_pago_column()
+            _ensure_ventas_flow_admin_alert_column()
             conn = get_db()
             cursor = conn.cursor()
             cursor.execute(
@@ -12110,6 +12153,7 @@ def api_tienda_checkout():
                     pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP,
                     pedido_timer_minutos = NULL, pedido_timer_inicio = NULL,
                     metodo_pago = ?,
+                    flow_admin_alertado = ?,
                     entrega_tipo = ?, hora_retiro = ?, direccion_entrega = ?, entrega_lat = ?, entrega_lng = ?, despacho_monto = ?, entrega_detalle_json = ?
                 WHERE id = ?
                 """,
@@ -12121,6 +12165,7 @@ def api_tienda_checkout():
                     (descuento_monto + descuento_nivel_monto),
                     total_neto,
                     ("flow_pendiente" if metodo_pago_preferido == "flow" else "transferencia"),
+                    (0 if metodo_pago_preferido == "flow" else 1),
                     entrega_tipo,
                     hora_retiro,
                     (direccion_entrega if entrega_tipo == "despacho" else None),
