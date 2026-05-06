@@ -5076,6 +5076,19 @@
             return Number.isFinite(x) ? x : 0;
         }
 
+        function _nivelDescuentoPctCliente() {
+            const pct = Number(clienteRegistrado?.nivel?.descuento_pct || 0);
+            if (!Number.isFinite(pct)) return 0;
+            return Math.max(0, Math.min(100, pct));
+        }
+
+        function _descuentoNivelMonto(subtotal) {
+            const base = Math.max(0, Number(subtotal || 0));
+            const pct = _nivelDescuentoPctCliente();
+            if (!(pct > 0) || !(base > 0)) return 0;
+            return Math.round((base * (pct / 100)) * 100) / 100;
+        }
+
         function nombreCategoria(p) {
             return String(p.categoria_tienda || "General").trim() || "General";
         }
@@ -7626,7 +7639,9 @@
             cartListEl.innerHTML = htmlItems;
             if (mobileCartListEl) mobileCartListEl.innerHTML = htmlItems;
             const subtotal = carrito.reduce((acc, it) => acc + (it.cantidad * it.precio_unitario), 0);
-            const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
+            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
             const total = Math.max(0, subtotal - descuento);
             subtotalMontoEl.textContent = money.format(subtotal);
             if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(subtotal);
@@ -8365,7 +8380,9 @@
         function _checkoutCalcularTotales() {
             const metodo = _metodoPagoCheckoutActual();
             const subtotal = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodo)), 0);
-            const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
+            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
             const despacho = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0)) : 0;
             const total = Math.max(0, subtotal - descuento + despacho);
             return { subtotal, descuento, despacho, total };
@@ -8680,10 +8697,11 @@
                 precio_unitario: _precioUnitarioItemPorMetodo(it, metodoPagoActual),
                 subtotal: Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPagoActual),
             }));
-            const subtotalSnapshot = itemsSnapshot.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
-            const descuentoSnapshot = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const despachoSnapshot = (entregaCheckout === "despacho" && _checkoutShippingVisible()) ? Math.max(0, Number(checkoutShippingQuote?.shipping_fee || 0)) : 0;
-            const totalSnapshot = Math.max(0, subtotalSnapshot - descuentoSnapshot + despachoSnapshot);
+            const totalsSnapshot = _checkoutCalcularTotales();
+            const subtotalSnapshot = Number(totalsSnapshot.subtotal || 0);
+            const descuentoSnapshot = Number(totalsSnapshot.descuento || 0);
+            const despachoSnapshot = Number(totalsSnapshot.despacho || 0);
+            const totalSnapshot = Number(totalsSnapshot.total || 0);
             const payload = {
                 items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: _precioUnitarioItemPorMetodo(it, metodoPagoActual) })),
                 codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
