@@ -2450,10 +2450,16 @@ def _flow_confirmar_token_y_actualizar(token):
         _ensure_ventas_metodo_pago_column()
         conn = get_db()
         cur = conn.cursor()
-        cur.execute(
-            "UPDATE ventas SET metodo_pago = ? WHERE id = ?",
-            ("flow_pagado" if paid else "flow_pendiente", venta_id),
-        )
+        if paid:
+            cur.execute(
+                "UPDATE ventas SET metodo_pago = ?, canal_venta = 'tienda_online' WHERE id = ?",
+                ("flow_pagado", venta_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE ventas SET metodo_pago = ?, canal_venta = 'tienda_online_flow_pendiente' WHERE id = ?",
+                ("flow_pendiente", venta_id),
+            )
         conn.commit()
     finally:
         if conn:
@@ -12226,6 +12232,7 @@ def api_tienda_checkout():
                     pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP,
                     pedido_timer_minutos = NULL, pedido_timer_inicio = NULL,
                     metodo_pago = ?,
+                    canal_venta = ?,
                     flow_admin_alertado = ?,
                     entrega_tipo = ?, hora_retiro = ?, direccion_entrega = ?, entrega_lat = ?, entrega_lng = ?, despacho_monto = ?, entrega_detalle_json = ?
                 WHERE id = ?
@@ -12238,6 +12245,7 @@ def api_tienda_checkout():
                     (descuento_monto + descuento_nivel_monto),
                     total_neto,
                     ("flow_pendiente" if metodo_pago_preferido == "flow" else "transferencia"),
+                    ("tienda_online_flow_pendiente" if metodo_pago_preferido == "flow" else "tienda_online"),
                     (0 if metodo_pago_preferido == "flow" else 1),
                     entrega_tipo,
                     hora_retiro,

@@ -4318,6 +4318,11 @@ def obtener_historial_ventas(fecha_desde=None, fecha_hasta=None):
     """Obtiene el historial de ventas con fechas formateadas"""
     conn = get_db()
     cursor = conn.cursor()
+    try:
+        cursor.execute("PRAGMA table_info(ventas)")
+        ventas_cols = {str(r["name"]).strip().lower() for r in (cursor.fetchall() or [])}
+    except Exception:
+        ventas_cols = set()
     
     query = """
         SELECT v.*, 
@@ -4334,15 +4339,21 @@ def obtener_historial_ventas(fecha_desde=None, fecha_hasta=None):
     """
     params = []
     
+    base_parts = ["LOWER(TRIM(COALESCE(v.canal_venta, 'presencial'))) <> 'tienda_online_flow_pendiente'"]
+    if "metodo_pago" in ventas_cols:
+        base_parts.append("LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'")
+    base_where = " AND ".join(base_parts)
     if fecha_desde and fecha_hasta:
-        query += " WHERE date(v.fecha_hora) BETWEEN ? AND ?"
+        query += f" WHERE {base_where} AND date(v.fecha_hora) BETWEEN ? AND ?"
         params = [fecha_desde, fecha_hasta]
     elif fecha_desde:
-        query += " WHERE date(v.fecha_hora) >= ?"
+        query += f" WHERE {base_where} AND date(v.fecha_hora) >= ?"
         params = [fecha_desde]
     elif fecha_hasta:
-        query += " WHERE date(v.fecha_hora) <= ?"
+        query += f" WHERE {base_where} AND date(v.fecha_hora) <= ?"
         params = [fecha_hasta]
+    else:
+        query += f" WHERE {base_where}"
     
     query += " GROUP BY v.id ORDER BY v.fecha_hora DESC"
     
