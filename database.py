@@ -702,6 +702,8 @@ def init_db():
                 estado TEXT DEFAULT 'completada'
             )
         ''')
+        # Migracion compatible: instalaciones antiguas pueden no tener metodo_pago.
+        _ensure_column(conn, "ventas", "metodo_pago", "TEXT DEFAULT 'efectivo'")
 
         # Ventas semanales manuales para comparativo con compras facturadas
         cursor.execute(
