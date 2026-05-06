@@ -2270,6 +2270,10 @@ def _ensure_flow_pago_table(cursor):
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
+    cursor.execute("PRAGMA table_info(tienda_flow_pagos)")
+    cols = {str(r["name"]).strip().lower() for r in (cursor.fetchall() or [])}
+    if "flow_redirect_url" not in cols:
+        cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN flow_redirect_url TEXT")
         """
         )
 
@@ -2314,7 +2318,7 @@ def _ensure_ventas_flow_admin_alert_column():
             conn.close()
 
 
-def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount):
+def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redirect_url=None):
     conn = None
     try:
         conn = get_db()
@@ -2322,16 +2326,23 @@ def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount):
         _ensure_flow_pago_table(cur)
         cur.execute(
             """
-            INSERT INTO tienda_flow_pagos (venta_id, commerce_order, flow_token, amount, estado, updated_at)
-            VALUES (?, ?, ?, ?, 'pendiente', CURRENT_TIMESTAMP)
+            INSERT INTO tienda_flow_pagos (venta_id, commerce_order, flow_token, amount, flow_redirect_url, estado, updated_at)
+            VALUES (?, ?, ?, ?, ?, 'pendiente', CURRENT_TIMESTAMP)
             ON CONFLICT(venta_id) DO UPDATE SET
                 commerce_order = excluded.commerce_order,
                 flow_token = excluded.flow_token,
                 amount = excluded.amount,
+                flow_redirect_url = COALESCE(excluded.flow_redirect_url, tienda_flow_pagos.flow_redirect_url),
                 estado = 'pendiente',
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (int(venta_id), str(commerce_order or "").strip(), str(flow_token or "").strip(), float(amount or 0)),
+            (
+                int(venta_id),
+                str(commerce_order or "").strip(),
+                str(flow_token or "").strip(),
+                float(amount or 0),
+                (str(flow_redirect_url or "").strip() or None),
+            ),
         )
         conn.commit()
     finally:
@@ -6909,12 +6920,14 @@ def api_tienda_admin_pedido_estado(venta_id):
 def api_tienda_pedido_estado(venta_id):
     conn = None
     try:
+        _ensure_ventas_metodo_pago_column()
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
             """
             SELECT id, fecha_hora, total_monto,
                    COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
+                   COALESCE(NULLIF(TRIM(metodo_pago), ''), 'efectivo') AS metodo_pago,
                    pedido_estado_actualizado,
                    pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
@@ -6927,6 +6940,20 @@ def api_tienda_pedido_estado(venta_id):
         if not row:
             return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
         item = dict(row)
+        flow_retry_url = ""
+        metodo_pago = str(item.get("metodo_pago") or "").strip().lower()
+        if metodo_pago in {"flow", "flow_pendiente", "flow_pagado"}:
+            try:
+                _ensure_flow_pago_table(cursor)
+                cursor.execute(
+                    "SELECT flow_redirect_url FROM tienda_flow_pagos WHERE venta_id = ? LIMIT 1",
+                    (int(venta_id),),
+                )
+                flow_row = cursor.fetchone()
+                if flow_row:
+                    flow_retry_url = str((dict(flow_row).get("flow_redirect_url")) or "").strip()
+            except Exception:
+                flow_retry_url = ""
         estado = _normalizar_pedido_estado(item.get("pedido_estado"))
         timer_payload = _pedido_timer_payload(
             estado,
@@ -6941,6 +6968,8 @@ def api_tienda_pedido_estado(venta_id):
                     "estado": estado,
                     "estado_label": _pedido_estado_label(estado),
                     "estado_actualizado": item.get("pedido_estado_actualizado"),
+                    "metodo_pago": metodo_pago,
+                    "flow_retry_url": flow_retry_url,
                     "fecha_hora": item.get("fecha_hora"),
                     "total_monto": float(item.get("total_monto") or 0),
                     **timer_payload,
@@ -12251,8 +12280,15 @@ def api_tienda_checkout():
             flow_url_base = str(flow_create.get("url") or "").strip().rstrip("/")
             if not flow_token or not flow_url_base:
                 return jsonify({'success': False, 'error': 'Flow no retorno URL de pago valida'}), 502
-            _guardar_flow_pago(venta_id=venta_id, commerce_order=commerce_order, flow_token=flow_token, amount=total_neto)
-            respuesta["flow_redirect_url"] = f"{flow_url_base}?token={quote(flow_token)}"
+            flow_redirect_url = f"{flow_url_base}?token={quote(flow_token)}"
+            _guardar_flow_pago(
+                venta_id=venta_id,
+                commerce_order=commerce_order,
+                flow_token=flow_token,
+                amount=total_neto,
+                flow_redirect_url=flow_redirect_url,
+            )
+            respuesta["flow_redirect_url"] = flow_redirect_url
             respuesta["flow_token"] = flow_token
             respuesta["requires_flow_redirect"] = True
             return jsonify(respuesta)

@@ -3060,6 +3060,7 @@
                 <div id="pedido-activo-meta" style="margin-top:6px;font-size:.82rem;color:#475569;"></div>
                 <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button type="button" id="pedido-activo-ver" class="btn-primary">Ver detalle</button>
+                    <button type="button" id="pedido-activo-flow-retry" class="btn-primary" style="display:none;background:#0284c7;border-color:#0284c7;">Pagar con Flow</button>
                     <button type="button" id="pedido-activo-chat-toggle" class="btn-primary" style="display:none;position:relative;">
                         Abrir chat
                         <span id="pedido-chat-badge" style="display:none;position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;border-radius:999px;min-width:20px;height:20px;line-height:20px;padding:0 6px;font-size:.72rem;font-weight:800;"></span>
@@ -3530,6 +3531,7 @@
         const pedidoActivoTextoEl = document.getElementById("pedido-activo-texto");
         const pedidoActivoMetaEl = document.getElementById("pedido-activo-meta");
         const pedidoActivoVerEl = document.getElementById("pedido-activo-ver");
+        const pedidoActivoFlowRetryEl = document.getElementById("pedido-activo-flow-retry");
         const pedidoActivoCerrarEl = document.getElementById("pedido-activo-cerrar");
         const pedidoActivoChatToggleEl = document.getElementById("pedido-activo-chat-toggle");
         const pedidoChatBadgeEl = document.getElementById("pedido-chat-badge");
@@ -4312,6 +4314,8 @@
                     subtotal: Number(obj?.subtotal || 0),
                     descuento: Number(obj?.descuento || 0),
                     total: Number(obj?.total || 0),
+                    metodo_pago: String(obj?.metodo_pago || ""),
+                    flow_retry_url: String(obj?.flow_retry_url || ""),
                     timer_minutos: Number(obj?.timer_minutos || 0) || null,
                     timer_label: String(obj?.timer_label || ""),
                     timer_inicio: String(obj?.timer_inicio || ""),
@@ -4382,28 +4386,40 @@
                 return;
             }
             pedidoActivoBoxEl.style.display = "";
+            const flowPendiente = _pedidoFlowPendienteCliente(p);
+            const estadoLabel = flowPendiente ? "Esperando pago" : _labelPedidoEstado(p.estado || "recibido");
             if (pedidoActivoTextoEl) {
-                pedidoActivoTextoEl.textContent = `Pedido #${Number(p.venta_id || 0)} - Estado: ${_labelPedidoEstado(p.estado || "recibido")}`;
+                pedidoActivoTextoEl.textContent = `Pedido #${Number(p.venta_id || 0)} - Estado: ${estadoLabel}`;
             }
             if (pedidoActivoMetaEl) {
                 const estadoAct = _formatFechaHoraChile(p.estado_actualizado);
                 const partes = [];
                 if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
+                if (flowPendiente) partes.push("Pago con Flow pendiente. Completa el pago para continuar.");
                 const timerTxt = _resumenTimerPedido(p);
-                if (timerTxt) partes.push(timerTxt);
+                if (!flowPendiente && timerTxt) partes.push(timerTxt);
                 pedidoActivoMetaEl.textContent = partes.join(" · ");
             }
             if (mobileOrderFabEl) mobileOrderFabEl.classList.add("active");
             if (mobileOrderStatusEl) {
-                mobileOrderStatusEl.textContent = `Pedido #${Number(p.venta_id || 0)} · ${_labelPedidoEstado(p.estado || "recibido")}`;
+                mobileOrderStatusEl.textContent = `Pedido #${Number(p.venta_id || 0)} · ${estadoLabel}`;
             }
             if (mobileOrderMetaEl) {
                 const estadoAct = _formatFechaHoraChile(p.estado_actualizado);
                 const partes = [];
                 if (estadoAct) partes.push(`Actualizado: ${estadoAct}`);
+                if (flowPendiente) partes.push("Pago con Flow pendiente");
                 const timerTxt = _resumenTimerPedido(p);
-                if (timerTxt) partes.push(timerTxt);
+                if (!flowPendiente && timerTxt) partes.push(timerTxt);
                 mobileOrderMetaEl.textContent = partes.join(" · ");
+            }
+            if (pedidoActivoFlowRetryEl) {
+                const retryUrl = String(p?.flow_retry_url || "").trim();
+                pedidoActivoFlowRetryEl.style.display = flowPendiente && retryUrl ? "" : "none";
+            }
+            if (pedidoActivoChatToggleEl) {
+                const showChat = !flowPendiente;
+                pedidoActivoChatToggleEl.style.display = showChat ? "" : "none";
             }
             _syncPedidoChatContext();
         }
@@ -4412,7 +4428,7 @@
             const cli = clienteRegistrado;
             if (!cli || !cli.email || !cli.telefono) return null;
             const v = ultimoComprobantePedido;
-            if (_debeMostrarPedidoActivo(v) && Number(v?.venta_id || 0) > 0 && !_estadoPedidoFinal(v?.estado)) {
+            if (_debeMostrarPedidoActivo(v) && Number(v?.venta_id || 0) > 0 && !_estadoPedidoFinal(v?.estado) && !_pedidoFlowPendienteCliente(v)) {
                 return { origen_tipo: "venta", origen_id: Number(v.venta_id), email: String(cli.email || ""), telefono: String(cli.telefono || "") };
             }
             try {
@@ -4452,7 +4468,7 @@
 
         function _renderPedidoChatBadge() {
             if (!pedidoActivoChatToggleEl) return;
-            const show = Boolean(pedidoChatContext);
+            const show = Boolean(pedidoChatContext) && !_pedidoFlowPendienteCliente(ultimoComprobantePedido);
             pedidoActivoChatToggleEl.style.display = show ? "" : "none";
             if (mobileOrderFabEl) mobileOrderFabEl.classList.toggle("active", show);
             if (!show) {
@@ -8493,6 +8509,8 @@
                         subtotal: Number(data.subtotal || subtotalSnapshot || 0),
                         descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
                         total: Number(data.total_monto || totalSnapshot || 0),
+                        metodo_pago: "flow_pendiente",
+                        flow_retry_url: String(data.flow_redirect_url || ""),
                         entrega_tipo: String(data.entrega_tipo || payload.entrega_tipo || "retiro"),
                         hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
                         direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
@@ -8520,6 +8538,8 @@
                     subtotal: Number(data.subtotal || subtotalSnapshot || 0),
                     descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
                     total: Number(data.total_monto || totalSnapshot || 0),
+                    metodo_pago: String(data.metodo_pago || "transferencia"),
+                    flow_retry_url: "",
                     entrega_tipo: String(data.entrega_tipo || payload.entrega_tipo || "retiro"),
                     hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
                     direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
@@ -8766,6 +8786,16 @@
             abrirModalExito(mensajePostPedido || "Pedido ingresado correctamente.");
         }
 
+        function reintentarPagoFlowPedidoActivo() {
+            const p = ultimoComprobantePedido || {};
+            const isPending = _pedidoFlowPendienteCliente(p);
+            const retryUrl = String(p?.flow_retry_url || "").trim();
+            if (!isPending || !retryUrl) {
+                return msg("No hay un pago Flow pendiente para reintentar.", true);
+            }
+            window.location.href = retryUrl;
+        }
+
         function _labelPedidoEstado(estado) {
             const map = {
                 recibido: "Recibido",
@@ -8776,6 +8806,11 @@
                 cancelado: "Cancelado",
             };
             return map[String(estado || "").toLowerCase()] || "Recibido";
+        }
+
+        function _pedidoFlowPendienteCliente(pedidoLike) {
+            const metodo = String(pedidoLike?.metodo_pago || "").trim().toLowerCase();
+            return metodo === "flow_pendiente" || metodo === "flow_pending";
         }
 
         function _labelPedidoTimer(minsRaw) {
@@ -8852,6 +8887,8 @@
                 if (!res.ok || !data.success) return;
                 const estado = String(((data.pedido || {}).estado) || "recibido");
                 const estadoActualizado = String(((data.pedido || {}).estado_actualizado) || "");
+                const metodoPago = String(((data.pedido || {}).metodo_pago) || "");
+                const flowRetryUrl = String(((data.pedido || {}).flow_retry_url) || "");
                 const timerMinutos = Number((data.pedido || {}).timer_minutos || 0) || null;
                 const timerLabel = String((data.pedido || {}).timer_label || "");
                 const timerInicio = String((data.pedido || {}).timer_inicio || "");
@@ -8860,6 +8897,8 @@
                     : null;
                 p.estado = estado;
                 p.estado_actualizado = estadoActualizado;
+                p.metodo_pago = metodoPago;
+                p.flow_retry_url = flowRetryUrl;
                 p.timer_minutos = timerMinutos;
                 p.timer_label = timerLabel;
                 p.timer_inicio = timerInicio;
@@ -9128,6 +9167,7 @@
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
+        pedidoActivoFlowRetryEl?.addEventListener("click", reintentarPagoFlowPedidoActivo);
         pedidoActivoChatToggleEl?.addEventListener("click", _abrirModalPedidoChat);
         pedidoActivoCerrarEl?.addEventListener("click", cerrarPedidoActivoBanner);
         mobileOrderFabEl?.addEventListener("click", abrirPedidoActivoMobile);
