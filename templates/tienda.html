@@ -5036,8 +5036,21 @@
         }
 
         function _metodoPagoCheckoutActual() {
-            if (flowPagoHabilitado && checkoutPagoFlowEl?.checked) return "flow";
+            const checked = document.querySelector('input[name="checkout-metodo-pago"]:checked');
+            const val = String(checked?.value || "").trim().toLowerCase();
+            if (flowPagoHabilitado && val === "flow") return "flow";
             return "transferencia";
+        }
+
+        function _redirigirAFlow(urlRaw) {
+            const url = String(urlRaw || "").trim();
+            if (!url) return;
+            try { window.location.assign(url); } catch (_e) {}
+            window.setTimeout(() => {
+                try {
+                    if (document.visibilityState === "visible") window.location.replace(url);
+                } catch (_e2) {}
+            }, 450);
         }
 
         function _precioUnitarioItemPorMetodo(it, metodoPago) {
@@ -8636,10 +8649,10 @@
                     renderCart();
                     msg("Redirigiendo a Flow para completar el pago...");
                     setCheckoutStatusMsg("Redirigiendo a Flow para completar el pago...");
-                    window.location.href = String(data.flow_redirect_url);
+                    _redirigirAFlow(data.flow_redirect_url);
                     return;
                 }
-                if (_metodoPagoCheckoutActual() === "flow") {
+                if (metodoPagoActual === "flow") {
                     throw new Error("No se pudo iniciar Flow. Intenta nuevamente en unos segundos.");
                 }
                 ultimoComprobantePedido = {
