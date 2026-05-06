@@ -2304,12 +2304,12 @@ def _ensure_flow_pago_table(cursor):
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
+        """
+    )
     cursor.execute("PRAGMA table_info(tienda_flow_pagos)")
     cols = {str(r["name"]).strip().lower() for r in (cursor.fetchall() or [])}
     if "flow_redirect_url" not in cols:
         cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN flow_redirect_url TEXT")
-        """
-        )
 
 
 def _ensure_ventas_metodo_pago_column():
@@ -6800,6 +6800,7 @@ def api_tienda_admin_pedidos_chat_activos():
             ) vp ON vp.venta_id = v.id
             WHERE v.canal_venta = 'tienda_online'
               AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
+              AND LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
             ORDER BY v.id DESC
             LIMIT 40
             """
