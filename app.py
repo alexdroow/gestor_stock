@@ -2265,7 +2265,27 @@ def _ensure_flow_pago_table(cursor):
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
-    )
+        )
+
+
+def _ensure_ventas_metodo_pago_column():
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(ventas)")
+        cols = {str(r["name"]).strip().lower() for r in (cur.fetchall() or [])}
+        if "metodo_pago" in cols:
+            return
+        cur.execute("ALTER TABLE ventas ADD COLUMN metodo_pago TEXT DEFAULT 'efectivo'")
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        # Compatibilidad ante condiciones de carrera o esquemas ya migrados.
+        if "duplicate column name" not in str(e or "").lower():
+            raise
+    finally:
+        if conn:
+            conn.close()
 
 
 def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount):
@@ -2356,6 +2376,7 @@ def _flow_confirmar_token_y_actualizar(token):
     # metodo_pago visible en historial/clientes
     conn = None
     try:
+        _ensure_ventas_metodo_pago_column()
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
@@ -12046,6 +12067,7 @@ def api_tienda_checkout():
         total_neto = float(total_productos) + float(despacho_monto or 0)
         conn = None
         try:
+            _ensure_ventas_metodo_pago_column()
             conn = get_db()
             cursor = conn.cursor()
             cursor.execute(
