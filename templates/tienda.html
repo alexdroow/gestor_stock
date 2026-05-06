@@ -1690,6 +1690,19 @@
             gap: 6px;
             flex-wrap: wrap;
         }
+        .checkout-transfer-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+            font-size: .74rem;
+            font-weight: 800;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
         .checkout-delivery-toggle {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -3263,7 +3276,10 @@
                 <div class="checkout-pago-options">
                     <label class="checkout-pago-option">
                         <input type="radio" name="checkout-metodo-pago" id="checkout-pago-transferencia" value="transferencia" checked>
-                        <span class="checkout-pago-option-text">Transferencia</span>
+                        <span class="checkout-pago-option-text">
+                            <span>Transferencia</span>
+                            <span class="checkout-transfer-badge" id="checkout-transfer-benefit" style="display:none;">Descuento</span>
+                        </span>
                     </label>
                     <label class="checkout-pago-option" id="checkout-pago-flow-row">
                         <input type="radio" name="checkout-metodo-pago" id="checkout-pago-flow" value="flow">
@@ -3467,6 +3483,7 @@
         const checkoutPagoTransferenciaEl = document.getElementById("checkout-pago-transferencia");
         const checkoutPagoFlowEl = document.getElementById("checkout-pago-flow");
         const checkoutPagoFlowRowEl = document.getElementById("checkout-pago-flow-row");
+        const checkoutTransferBenefitEl = document.getElementById("checkout-transfer-benefit");
         const checkoutStatusMsgEl = document.getElementById("checkout-status-msg");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
         const modalExitoOrderChipEl = document.getElementById("modal-exito-order-chip");
@@ -4995,6 +5012,27 @@
             const factor = 1 - (rate * (1 + iva));
             if (!(factor > 0)) return base;
             return Math.max(0, Math.ceil((base + fixed) / factor));
+        }
+
+        function _refreshTransferBenefitBadge() {
+            if (!checkoutTransferBenefitEl) return;
+            if (!flowPagoHabilitado) {
+                checkoutTransferBenefitEl.style.display = "none";
+                return;
+            }
+            const baseReferencia = 10000;
+            const flowReferencia = Math.max(baseReferencia, _flowPriceFromBase(baseReferencia, true));
+            let pct = 0;
+            if (flowReferencia > 0) {
+                pct = ((flowReferencia - baseReferencia) / flowReferencia) * 100;
+            }
+            pct = Math.max(0, pct);
+            if (pct <= 0.01) {
+                checkoutTransferBenefitEl.style.display = "none";
+                return;
+            }
+            checkoutTransferBenefitEl.style.display = "inline-flex";
+            checkoutTransferBenefitEl.textContent = `${pct.toFixed(1)}% OFF`;
         }
 
         function _metodoPagoCheckoutActual() {
@@ -7652,6 +7690,7 @@
                     iva: Math.max(0, Number(data?.payment_pricing?.iva ?? 0.19)),
                     fixed: Math.max(0, Number(data?.payment_pricing?.fixed ?? 0)),
                 };
+                _refreshTransferBenefitBadge();
                 if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = flowPagoHabilitado ? "" : "none";
                 if (!flowPagoHabilitado && checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
                 renderCategoriasMenu();
