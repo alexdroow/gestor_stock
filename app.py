@@ -1158,7 +1158,7 @@ def tienda_publica():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=False)
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=False, agenda_beta=False)
 
 
 @app.route('/tienda/agendar')
@@ -1167,7 +1167,19 @@ def tienda_publica_agendar():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False)
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False, agenda_beta=False)
+
+
+@app.route('/tienda/agendar-beta')
+def tienda_publica_agendar_beta():
+    # Version de prueba: flujo cuestionario por pasos (inspirado en onboarding).
+    if not session.get(_ADMIN_SESSION_KEY):
+        return redirect(url_for("admin_login", next=request.full_path if request.query_string else request.path))
+    try:
+        personalizacion = _obtener_tienda_personalizacion()
+    except Exception:
+        personalizacion = _default_tienda_personalizacion()
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False, agenda_beta=True)
 
 
 @app.route('/tienda/presencial')
@@ -1176,7 +1188,7 @@ def tienda_publica_presencial():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=True)
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=True, agenda_beta=False)
 
 
 @app.route('/tienda/preview')
@@ -1192,7 +1204,7 @@ def tienda_preview_admin():
             personalizacion = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template("tienda.html", tienda_personalizacion=personalizacion, force_agenda=force_agenda, modo_presencial=False)
+    return render_template("tienda.html", tienda_personalizacion=personalizacion, force_agenda=force_agenda, modo_presencial=False, agenda_beta=False)
 
 
 def _parse_fecha_yyyy_mm_dd(valor):

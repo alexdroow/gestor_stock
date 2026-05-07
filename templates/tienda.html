@@ -3041,6 +3041,11 @@
                 <h2 id="agenda-section-title">Agenda tu pedido</h2>
                 <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
                 <button type="button" class="agenda-subtitle-toggle" id="agenda-subtitle-toggle">Ver detalles</button>
+                {% if agenda_beta %}
+                <div style="margin:10px 0 0;padding:10px 12px;border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:10px;font-size:.9rem;font-weight:700;">
+                    Modo prueba activo: flujo tipo cuestionario por pasos.
+                </div>
+                {% endif %}
                 <div class="agenda-mobile-steps" id="agenda-mobile-steps">
                     <button type="button" class="agenda-mobile-step-btn" data-step="1">1. Tipo</button>
                     <button type="button" class="agenda-mobile-step-btn" data-step="2">2. Pedido</button>
@@ -3750,6 +3755,7 @@
         const _agendaUrlParamsInit = new URLSearchParams(window.location.search);
         const _forceAgendaFromServer = {{ 'true' if force_agenda else 'false' }};
         const _modoPresencialFromServer = {{ 'true' if modo_presencial else 'false' }};
+        const _agendaBetaFromServer = {{ 'true' if agenda_beta else 'false' }};
         const _forceAgendaFromQueryInit = ["agenda", "agendar", "reservas"].includes(String(_agendaUrlParamsInit.get("seccion") || "").trim().toLowerCase());
         const _forceAgendaFromHashInit = ["#agenda", "#agendar", "#reservas"].includes(String(window.location.hash || "").trim().toLowerCase());
         const _forceAgendaFromPathInit = String(window.location.pathname || "").toLowerCase().startsWith("/tienda/agendar");
@@ -5631,7 +5637,7 @@
         }
 
         function _agendaIsMobileWizardEnabled() {
-            return document.body.classList.contains("mobile-ui") && categoriaActiva === "AGENDA";
+            return categoriaActiva === "AGENDA" && (document.body.classList.contains("mobile-ui") || Boolean(_agendaBetaFromServer));
         }
 
         function _agendaPaso2Completo() {
