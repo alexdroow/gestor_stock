@@ -3747,7 +3747,7 @@
             <div class="agenda-cake-step-progress">
                 <span id="agenda-cake-flow-progress-fill"></span>
             </div>
-            <div class="agenda-cake-step-label" id="agenda-cake-flow-step-label">Paso 5 de 7: Resumen</div>
+            <div class="agenda-cake-step-label" id="agenda-cake-flow-step-label">Paso 5 de 6: Horario</div>
             <div class="agenda-cake-flow-pane active" data-flow-step="1">
                 <div class="agenda-mini-title">Paso 5: Elige horario</div>
                 <div id="agenda-cake-flow-days-host"></div>
@@ -3756,9 +3756,6 @@
             <div class="agenda-cake-flow-pane" data-flow-step="2">
                 <div class="agenda-mini-title">Paso 6: Entrega y datos</div>
                 <div id="agenda-cake-flow-form-host"></div>
-            </div>
-            <div class="agenda-cake-flow-pane" data-flow-step="3">
-                <div class="agenda-mini-title">Paso 7: Resumen final</div>
                 <div id="agenda-cake-flow-confirm-detail" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:240px;overflow:auto;margin-bottom:8px;"></div>
                 <aside class="agenda-cake-cart" style="border:0;padding:0;background:transparent;">
                     <ul id="agenda-cake-summary"></ul>
@@ -6063,10 +6060,10 @@
 
             if (Boolean(_agendaBetaFromServer)) {
                 const labels = {
-                    1: "Paso 1 de 4: Elige el tipo de pedido",
-                    2: "Paso 2 de 4: Personaliza tu pedido",
-                    3: "Paso 3 de 4: Selecciona fecha y hora",
-                    4: "Paso 4 de 4: Completa tus datos y confirma"
+                    1: "Paso 1 de 6: Elige el tipo de pedido",
+                    2: "Paso 2 de 6: Personaliza tu pedido",
+                    3: "Paso 3 de 6: Selecciona fecha y hora",
+                    4: "Paso 4 de 6: Completa tus datos y confirma"
                 };
                 if (agendaBetaQuestionEl) agendaBetaQuestionEl.textContent = labels[agendaMobileStep] || "Agenda tu pedido";
                 if (agendaBetaProgressFillEl) {
@@ -6320,19 +6317,19 @@
                 el.classList.toggle("active", s === agendaCakeFlowStep);
             });
             const labels = {
-                1: "Paso 5 de 7: Horario",
-                2: "Paso 6 de 7: Entrega y datos",
-                3: "Paso 7 de 7: Resumen final",
+                1: "Paso 5 de 6: Horario",
+                2: "Paso 6 de 6: Entrega y datos",
             };
             if (agendaCakeFlowLabelEl) agendaCakeFlowLabelEl.textContent = labels[agendaCakeFlowStep] || "Paso";
-            if (agendaCakeFlowProgressFillEl) agendaCakeFlowProgressFillEl.style.width = `${Math.round(((agendaCakeFlowStep + 4) / 7) * 100)}%`;
+            if (agendaCakeFlowProgressFillEl) agendaCakeFlowProgressFillEl.style.width = `${Math.round(((agendaCakeFlowStep + 4) / 6) * 100)}%`;
             if (agendaCakeFlowPrevEl) agendaCakeFlowPrevEl.disabled = agendaCakeFlowStep <= 1;
-            if (agendaCakeFlowNextEl) agendaCakeFlowNextEl.textContent = agendaCakeFlowStep >= 3 ? "Resumen listo" : "Siguiente";
+            if (agendaCakeFlowNextEl) agendaCakeFlowNextEl.textContent = agendaCakeFlowStep >= 2 ? "Resumen listo" : "Siguiente";
             if (agendaDaysListEl) agendaDaysListEl.style.display = agendaCakeFlowStep === 1 ? "" : "none";
             if (agendaHoursListEl) agendaHoursListEl.style.display = agendaCakeFlowStep === 1 ? "" : "none";
             if (agendaReservaFormEl) agendaReservaFormEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
-            if (agendaCakeFlowConfirmEl) agendaCakeFlowConfirmEl.style.display = agendaCakeFlowStep === 3 ? "" : "none";
-            if (agendaCakeFlowPdfEl) agendaCakeFlowPdfEl.style.display = agendaCakeFlowStep === 3 ? "" : "none";
+            if (agendaCakeFlowConfirmDetailEl) agendaCakeFlowConfirmDetailEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
+            if (agendaCakeFlowConfirmEl) agendaCakeFlowConfirmEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
+            if (agendaCakeFlowPdfEl) agendaCakeFlowPdfEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
         }
 
         function _agendaIrASeleccionHorario() {
@@ -10242,12 +10239,13 @@
                     return;
                 }
             }
-            if (agendaCakeFlowStep >= 3) {
+            if (agendaCakeFlowStep >= 2) {
+                reservarAgendaDesdeTienda({ inlineFlow: true }).catch(() => {});
                 return;
             }
-            agendaCakeFlowStep = Math.min(3, Number(agendaCakeFlowStep || 1) + 1);
+            agendaCakeFlowStep = Math.min(2, Number(agendaCakeFlowStep || 1) + 1);
             _renderAgendaCakeSummary();
-            if (agendaCakeFlowStep === 3) {
+            if (agendaCakeFlowStep === 2) {
                 reservarAgendaDesdeTienda({ inlineFlow: true }).catch(() => {});
             }
             _agendaCakeApplyFlowStep();
