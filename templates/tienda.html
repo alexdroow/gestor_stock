@@ -6062,12 +6062,13 @@
                 const labels = {
                     1: "Paso 1 de 6: Elige el tipo de pedido",
                     2: "Paso 2 de 6: Personaliza tu pedido",
-                    3: "Paso 3 de 6: Selecciona fecha y hora",
-                    4: "Paso 4 de 6: Completa tus datos y confirma"
+                    3: "Paso 5 de 6: Selecciona fecha y hora",
+                    4: "Paso 6 de 6: Completa retiro/despacho y confirma"
                 };
                 if (agendaBetaQuestionEl) agendaBetaQuestionEl.textContent = labels[agendaMobileStep] || "Agenda tu pedido";
                 if (agendaBetaProgressFillEl) {
-                    const pct = Math.max(25, Math.min(100, Math.round((agendaMobileStep / 4) * 100)));
+                    const pctMap = { 1: 17, 2: 34, 3: 84, 4: 100 };
+                    const pct = Number(pctMap[agendaMobileStep] || 17);
                     agendaBetaProgressFillEl.style.width = `${pct}%`;
                 }
                 if (agendaBetaPrevEl) agendaBetaPrevEl.disabled = agendaMobileStep <= 1;
