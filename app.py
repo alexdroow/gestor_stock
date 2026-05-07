@@ -12478,17 +12478,39 @@ def api_tienda_flow_confirm():
 @app.route('/tienda/flow/retorno', methods=['GET', 'POST'])
 def tienda_flow_retorno():
     # Retorno del navegador del cliente luego del checkout Flow
+    def _redirigir_con_cookie(base_url, estado, venta_id=0):
+        vid = int(venta_id or 0)
+        if estado == "paid":
+            destino = f"{base_url}/tienda?flow=paid&venta_id={vid}"
+        elif estado == "pending":
+            destino = f"{base_url}/tienda?flow=pending&venta_id={vid}"
+        else:
+            destino = f"{base_url}/tienda?flow=error&venta_id={vid}"
+        resp = redirect(destino)
+        # Fallback movil: si se pierde query/localStorage, tienda.html lee esta cookie.
+        resp.set_cookie(
+            "flow_return_status",
+            f"{estado}:{vid}:{int(time.time())}",
+            max_age=60 * 20,
+            secure=True,
+            httponly=False,
+            samesite="Lax",
+            path="/",
+        )
+        return resp
+
     try:
         token = str(request.values.get("token") or "").strip()
         result = _flow_confirmar_token_y_actualizar(token)
         base = _public_base_url(request.url_root)
         if not result.get("success"):
-            return redirect(f"{base}/tienda?flow=error")
+            return _redirigir_con_cookie(base, "error", 0)
         if bool(result.get("paid")):
-            return redirect(f"{base}/tienda?flow=paid&venta_id={int(result.get('venta_id') or 0)}")
-        return redirect(f"{base}/tienda?flow=pending&venta_id={int(result.get('venta_id') or 0)}")
+            return _redirigir_con_cookie(base, "paid", int(result.get("venta_id") or 0))
+        return _redirigir_con_cookie(base, "pending", int(result.get("venta_id") or 0))
     except Exception:
-        return redirect(f"{_public_base_url(request.url_root)}/tienda?flow=error")
+        base = _public_base_url(request.url_root)
+        return _redirigir_con_cookie(base, "error", 0)
 
 
 @app.route('/api/tienda/flow/estado', methods=['GET'])

@@ -9012,6 +9012,20 @@
             try {
                 const p = new URLSearchParams(window.location.search || "");
                 const flow = String(p.get("flow") || "").trim().toLowerCase();
+                const _readCookie = (name) => {
+                    try {
+                        const n = `${name}=`;
+                        const parts = String(document.cookie || "").split(";");
+                        for (const raw of parts) {
+                            const c = String(raw || "").trim();
+                            if (c.startsWith(n)) return decodeURIComponent(c.substring(n.length));
+                        }
+                    } catch (_e) {}
+                    return "";
+                };
+                const _clearCookie = (name) => {
+                    try { document.cookie = `${name}=; Max-Age=0; path=/`; } catch (_e) {}
+                };
                 const track = _loadFlowReturnTracking();
                 const draft = _cargarFlowCheckoutDraft();
                 const fallbackVentaId = Number(track?.venta_id || 0) || Number(draft?.venta_id || 0) || Number(ultimoComprobantePedido?.venta_id || 0) || 0;
@@ -9022,7 +9036,32 @@
                     venta_id: Number(extra?.venta_id || fallbackVentaId || 0),
                     items: Array.isArray(extra?.items) ? extra.items : (Array.isArray(draft?.items) ? draft.items : (Array.isArray(ultimoComprobantePedido?.items) ? ultimoComprobantePedido.items : [])),
                 });
+                const cookieFlowRaw = _readCookie("flow_return_status");
+                let cookieFlow = "";
+                let cookieVenta = 0;
+                if (cookieFlowRaw) {
+                    const parts = String(cookieFlowRaw).split(":");
+                    cookieFlow = String(parts?.[0] || "").trim().toLowerCase();
+                    cookieVenta = Number(parts?.[1] || 0) || 0;
+                }
                 if (!flow) {
+                    if (cookieFlow === "paid" || cookieFlow === "pending" || cookieFlow === "error") {
+                        const check = await _esperarEstadoFlowFinal(cookieVenta || fallbackVentaId || 0, 8, 1200);
+                        if (check.ok || cookieFlow === "paid") {
+                            msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: cookieVenta || fallbackVentaId || 0 }), { mode: "success" });
+                            _limpiarFlowCheckoutDraft();
+                        } else if (cookieFlow === "pending") {
+                            msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
+                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: cookieVenta || fallbackVentaId || 0 }), { mode: "pending" });
+                        } else {
+                            msg("La compra no se concreto en Flow. Puedes reintentar o usar transferencia.", true);
+                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: cookieVenta || fallbackVentaId || 0 }), { mode: "error" });
+                        }
+                        _clearCookie("flow_return_status");
+                        _clearFlowReturnTracking();
+                        return;
+                    }
                     const ageMs = track ? (Date.now() - Number(track.ts || 0)) : Number.MAX_SAFE_INTEGER;
                     const hasRecentTrack = Boolean(track && ageMs >= 0 && ageMs <= 20 * 60 * 1000);
                     if (hasRecentTrack) {
@@ -9048,6 +9087,7 @@
                     }
                     return;
                 }
+                if (cookieFlowRaw) _clearCookie("flow_return_status");
                 const ventaId = Number(p.get("venta_id") || 0);
                 if (draft && (!ventaId || Number(draft.venta_id || 0) === ventaId)) {
                     ultimoComprobantePedido = {
