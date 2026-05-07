@@ -941,12 +941,21 @@
         .agenda-cake-step-pane.active {
             display: block;
         }
+        .agenda-cake-topper-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #fff, #f8fafc);
+            padding: 10px;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, .06);
+        }
         .agenda-cake-flow-pane { display: none; }
         .agenda-cake-flow-pane.active { display: block; }
         .agenda-flow-btn {
             flex: 1 1 0 !important;
             min-width: 0 !important;
-            height: 42px !important;
+            height: 34px !important;
+            padding: 4px 8px !important;
+            font-size: .82rem !important;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -3682,15 +3691,17 @@
                     </div>
                 </div>
                 <div class="agenda-cake-step-pane" data-step="4">
-                    <label>Topper</label>
-                    <div class="agenda-cake-pills" id="agenda-cake-topper-cards"></div>
-                    <label>Fotos referenciales
-                        <input id="agenda-cake-file" type="file" accept=".jpg,.jpeg,.png,.webp">
-                    </label>
-                    <div class="agenda-cake-files" id="agenda-cake-files"></div>
-                    <label>Indicaciones para decoracion
-                        <textarea id="agenda-cake-note" maxlength="500" placeholder="Colores, estilo, texto del topper, etc."></textarea>
-                    </label>
+                    <div class="agenda-cake-topper-card">
+                        <label>Topper</label>
+                        <div class="agenda-cake-pills" id="agenda-cake-topper-cards"></div>
+                        <label>Fotos referenciales
+                            <input id="agenda-cake-file" type="file" accept=".jpg,.jpeg,.png,.webp">
+                        </label>
+                        <div class="agenda-cake-files" id="agenda-cake-files"></div>
+                        <label>Indicaciones para decoracion
+                            <textarea id="agenda-cake-note" maxlength="500" placeholder="Colores, estilo, texto del topper, etc."></textarea>
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="modal-actions">
@@ -3713,6 +3724,16 @@
             </div>
             <div class="agenda-cake-step-label" id="agenda-cake-flow-step-label">Paso 5 de 7: Resumen</div>
             <div class="agenda-cake-flow-pane active" data-flow-step="1">
+                <div class="agenda-mini-title">Paso 5: Elige horario</div>
+                <div id="agenda-cake-flow-days-host"></div>
+                <div id="agenda-cake-flow-hours-host"></div>
+            </div>
+            <div class="agenda-cake-flow-pane" data-flow-step="2">
+                <div class="agenda-mini-title">Paso 6: Entrega y datos</div>
+                <div id="agenda-cake-flow-form-host"></div>
+            </div>
+            <div class="agenda-cake-flow-pane" data-flow-step="3">
+                <div class="agenda-mini-title">Paso 7: Resumen final</div>
                 <aside class="agenda-cake-cart" style="border:0;padding:0;background:transparent;">
                     <ul id="agenda-cake-summary"></ul>
                     <div class="agenda-cake-total">
@@ -3720,15 +3741,10 @@
                         <span id="agenda-cake-total">$0</span>
                     </div>
                 </aside>
-            </div>
-            <div class="agenda-cake-flow-pane" data-flow-step="2">
-                <div class="agenda-mini-title">Paso 6: Elige horario</div>
-                <div id="agenda-cake-flow-days-host"></div>
-                <div id="agenda-cake-flow-hours-host"></div>
-            </div>
-            <div class="agenda-cake-flow-pane" data-flow-step="3">
-                <div class="agenda-mini-title">Paso 7: Entrega y datos</div>
-                <div id="agenda-cake-flow-form-host"></div>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <button class="btn-primary agenda-flow-btn" type="button" id="agenda-cake-flow-confirm">Confirmar reserva</button>
+                    <button class="btn-muted agenda-flow-btn" type="button" id="agenda-cake-flow-pdf">Descargar PDF</button>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn-muted agenda-flow-btn" type="button" id="agenda-cake-flow-prev">Anterior</button>
@@ -3977,6 +3993,8 @@
         const agendaCakeFlowLabelEl = document.getElementById("agenda-cake-flow-step-label");
         const agendaCakeFlowProgressFillEl = document.getElementById("agenda-cake-flow-progress-fill");
         const agendaCakeCloseX2El = document.getElementById("agenda-cake-close-x-2");
+        const agendaCakeFlowConfirmEl = document.getElementById("agenda-cake-flow-confirm");
+        const agendaCakeFlowPdfEl = document.getElementById("agenda-cake-flow-pdf");
         const agendaCakeFlowDaysHostEl = document.getElementById("agenda-cake-flow-days-host");
         const agendaCakeFlowHoursHostEl = document.getElementById("agenda-cake-flow-hours-host");
         const agendaCakeFlowFormHostEl = document.getElementById("agenda-cake-flow-form-host");
@@ -6262,17 +6280,19 @@
                 el.classList.toggle("active", s === agendaCakeFlowStep);
             });
             const labels = {
-                1: "Paso 5 de 7: Resumen",
-                2: "Paso 6 de 7: Horario",
-                3: "Paso 7 de 7: Entrega y datos",
+                1: "Paso 5 de 7: Horario",
+                2: "Paso 6 de 7: Entrega y datos",
+                3: "Paso 7 de 7: Resumen final",
             };
             if (agendaCakeFlowLabelEl) agendaCakeFlowLabelEl.textContent = labels[agendaCakeFlowStep] || "Paso";
             if (agendaCakeFlowProgressFillEl) agendaCakeFlowProgressFillEl.style.width = `${Math.round(((agendaCakeFlowStep + 4) / 7) * 100)}%`;
             if (agendaCakeFlowPrevEl) agendaCakeFlowPrevEl.disabled = agendaCakeFlowStep <= 1;
-            if (agendaCakeFlowNextEl) agendaCakeFlowNextEl.textContent = agendaCakeFlowStep >= 3 ? "Confirmar reserva" : "Siguiente";
-            if (agendaDaysListEl) agendaDaysListEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
-            if (agendaHoursListEl) agendaHoursListEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
-            if (agendaReservaFormEl) agendaReservaFormEl.style.display = agendaCakeFlowStep === 3 ? "" : "none";
+            if (agendaCakeFlowNextEl) agendaCakeFlowNextEl.textContent = agendaCakeFlowStep >= 3 ? "Resumen listo" : "Siguiente";
+            if (agendaDaysListEl) agendaDaysListEl.style.display = agendaCakeFlowStep === 1 ? "" : "none";
+            if (agendaHoursListEl) agendaHoursListEl.style.display = agendaCakeFlowStep === 1 ? "" : "none";
+            if (agendaReservaFormEl) agendaReservaFormEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
+            if (agendaCakeFlowConfirmEl) agendaCakeFlowConfirmEl.style.display = agendaCakeFlowStep === 3 ? "" : "none";
+            if (agendaCakeFlowPdfEl) agendaCakeFlowPdfEl.style.display = agendaCakeFlowStep === 3 ? "" : "none";
         }
 
         function _agendaIrASeleccionHorario() {
@@ -10169,14 +10189,38 @@
             _agendaCakeApplyFlowStep();
         });
         agendaCakeFlowNextEl?.addEventListener("click", () => {
+            if (agendaCakeFlowStep === 1) {
+                if (!String(agendaHoraActiva || "").trim()) {
+                    _agendaMsg("Selecciona una hora disponible.", "err");
+                    return;
+                }
+            }
+            if (agendaCakeFlowStep === 2) {
+                const nombre = String(agendaNombreEl?.value || "").trim();
+                const email = String(agendaEmailEl?.value || "").trim();
+                const telefono = String(agendaTelefonoEl?.value || "").trim();
+                if (!nombre || !email || telefono.length < 8) {
+                    _agendaMsg("Completa nombre, correo y telefono.", "err");
+                    return;
+                }
+            }
             if (agendaCakeFlowStep >= 3) {
-                reservarAgendaDesdeTienda();
                 return;
             }
             agendaCakeFlowStep = Math.min(3, Number(agendaCakeFlowStep || 1) + 1);
+            _renderAgendaCakeSummary();
             _agendaCakeApplyFlowStep();
         });
         agendaCakeCloseX2El?.addEventListener("click", _cerrarModalAgendaCakeCart);
+        agendaCakeFlowConfirmEl?.addEventListener("click", () => {
+            reservarAgendaDesdeTienda();
+        });
+        agendaCakeFlowPdfEl?.addEventListener("click", () => {
+            try {
+                const payload = _buildAgendaPayload();
+                _descargarComprobanteReservaAgenda(payload || {}, 0);
+            } catch (_e) {}
+        });
         agendaCakeStepPrevEl?.addEventListener("click", () => {
             agendaCakeBuilderStep = Math.max(1, Number(agendaCakeBuilderStep || 1) - 1);
             _agendaCakeApplyStep();
@@ -10301,7 +10345,10 @@
             _scrollAgendaReservarEnMobile(0);
         });
         agendaBetaCloseEl?.addEventListener("click", () => {
-            cambiarCategoria("TODOS");
+            _cerrarModalAgendaCakeBuilder();
+            _cerrarModalAgendaCakeCart();
+            agendaMobileStep = 2;
+            _agendaApplyMobileWizard(false);
             document.body.classList.remove("agenda-beta-modal-open");
         });
         agendaSubtitleToggleEl?.addEventListener("click", () => {
