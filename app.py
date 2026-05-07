@@ -4687,6 +4687,7 @@ def api_tienda_productos():
                 "mensaje_post_pedido": str(config.get("mensaje_post_pedido") or "").strip(),
                 "personalizacion": _obtener_tienda_personalizacion(),
                 "flow_enabled": bool(_flow_cfg().get("enabled")),
+                "admin_flow_sim_enabled": bool(session.get(_ADMIN_SESSION_KEY)),
                 "payment_pricing": {
                     "flow_enabled": bool(_flow_cfg().get("enabled")),
                     **_flow_fee_cfg(),
@@ -12038,6 +12039,9 @@ def api_tienda_checkout():
         metodo_pago_preferido = str(data.get("metodo_pago") or "transferencia").strip().lower()
         if metodo_pago_preferido not in {"transferencia", "flow"}:
             metodo_pago_preferido = "transferencia"
+        flow_sim_status = str(data.get("flow_simulation_status") or "").strip().lower()
+        flow_sim_status = flow_sim_status if flow_sim_status in {"paid", "pending", "error"} else ""
+        flow_sim_enabled = bool(flow_sim_status and session.get(_ADMIN_SESSION_KEY))
         if metodo_pago_preferido == "flow" and not bool(flow_cfg.get("enabled")):
             return jsonify({'success': False, 'error': 'La pasarela Flow no esta disponible en este momento'}), 400
         items_req = data.get('items') or []
@@ -12306,6 +12310,63 @@ def api_tienda_checkout():
         respuesta["shipping_quote"] = shipping_quote if isinstance(shipping_quote, dict) else None
         respuesta["total_monto"] = round(total_neto, 2)
         respuesta["metodo_pago"] = metodo_pago_preferido
+
+        # Simulacion QA interna de Flow (solo admin autenticado).
+        if metodo_pago_preferido == "flow" and flow_sim_enabled:
+            sim_token = f"SIM-{venta_id}-{int(time.time())}"
+            sim_order = f"SIM-ORDER-{venta_id}-{int(time.time())}"
+            _guardar_flow_pago(
+                venta_id=venta_id,
+                commerce_order=sim_order,
+                flow_token=sim_token,
+                amount=total_neto,
+                flow_redirect_url=f"{_public_base_url(request.url_root)}/tienda?flow={flow_sim_status}&venta_id={venta_id}",
+            )
+            if flow_sim_status == "paid":
+                _actualizar_flow_pago(venta_id=venta_id, estado="pagado", flow_order=f"SIMPAID-{venta_id}", payment_data={"simulated": True, "status": "paid"})
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE ventas SET metodo_pago = 'flow_pagado', canal_venta = 'tienda_online', flow_admin_alertado = 0 WHERE id = ?",
+                    (venta_id,),
+                )
+                conn.commit()
+                conn.close()
+                _notificar_whatsapp_pedido_tienda_async(
+                    venta_id=venta_id,
+                    cliente_nombre=cliente_nombre,
+                    cliente_email=cliente_email,
+                    cliente_telefono=cliente_telefono,
+                    items=items_notificacion,
+                    subtotal=float(subtotal),
+                    descuento=float(descuento_monto),
+                    total=float(total_neto),
+                    host_url=_public_base_url(request.url_root),
+                    entrega_tipo=entrega_tipo,
+                    hora_retiro=hora_retiro,
+                    direccion_entrega=(direccion_entrega if entrega_tipo == "despacho" else ""),
+                    despacho_monto=float(despacho_monto or 0),
+                )
+            else:
+                _actualizar_flow_pago(
+                    venta_id=venta_id,
+                    estado="pendiente",
+                    flow_order=f"SIM-{flow_sim_status.upper()}-{venta_id}",
+                    payment_data={"simulated": True, "status": flow_sim_status},
+                )
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE ventas SET metodo_pago = 'flow_pendiente', canal_venta = 'tienda_online_flow_pendiente' WHERE id = ?",
+                    (venta_id,),
+                )
+                conn.commit()
+                conn.close()
+            respuesta["flow_simulated"] = True
+            respuesta["flow_result"] = flow_sim_status
+            respuesta["flow_token"] = sim_token
+            respuesta["requires_flow_redirect"] = False
+            return jsonify(respuesta)
 
         # Si el cliente selecciona Flow, creamos orden y devolvemos URL de redireccion.
         if metodo_pago_preferido == "flow":

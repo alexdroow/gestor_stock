@@ -3365,6 +3365,16 @@
                         </span>
                     </label>
                 </div>
+                <div id="checkout-flow-sim-wrap" style="display:none;margin-top:6px;border:1px dashed #93c5fd;background:#eff6ff;border-radius:10px;padding:8px;">
+                    <div style="font-size:.78rem;font-weight:800;color:#1d4ed8;margin-bottom:4px;">Modo QA admin (sin cobro real)</div>
+                    <label for="checkout-flow-sim-status" style="font-size:.78rem;color:#334155;">Resultado simulado de Flow</label>
+                    <select id="checkout-flow-sim-status" style="margin-top:4px;width:100%;border:1px solid #bfdbfe;border-radius:8px;padding:8px;background:#fff;">
+                        <option value="">Usar Flow real</option>
+                        <option value="paid">Simular pago aprobado</option>
+                        <option value="pending">Simular pago pendiente</option>
+                        <option value="error">Simular pago no concretado</option>
+                    </select>
+                </div>
             </div>
             <div id="checkout-status-msg" style="display:none;font-size:.85rem;border-radius:10px;padding:8px 10px;"></div>
             <div class="modal-actions">
@@ -3560,6 +3570,8 @@
         const checkoutPagoTransferenciaEl = document.getElementById("checkout-pago-transferencia");
         const checkoutPagoFlowEl = document.getElementById("checkout-pago-flow");
         const checkoutPagoFlowRowEl = document.getElementById("checkout-pago-flow-row");
+        const checkoutFlowSimWrapEl = document.getElementById("checkout-flow-sim-wrap");
+        const checkoutFlowSimStatusEl = document.getElementById("checkout-flow-sim-status");
         const checkoutTransferBenefitEl = document.getElementById("checkout-transfer-benefit");
         const checkoutStatusMsgEl = document.getElementById("checkout-status-msg");
         const modalExitoEl = document.getElementById("modal-exito-pedido");
@@ -3764,6 +3776,7 @@
         let checkoutShippingQuote = null;
         let checkoutShippingError = "";
         let flowPagoHabilitado = false;
+        let flowSimAdminEnabled = false;
         let paymentPricingCfg = { flow_enabled: false, rate: 0.0319, iva: 0.19, fixed: 0 };
         let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
@@ -5129,6 +5142,13 @@
             const val = String(checked?.value || "").trim().toLowerCase();
             if (flowPagoHabilitado && val === "flow") return "flow";
             return "transferencia";
+        }
+
+        function _syncFlowSimUi() {
+            if (!checkoutFlowSimWrapEl) return;
+            const show = Boolean(flowSimAdminEnabled && flowPagoHabilitado && checkoutPagoFlowEl?.checked);
+            checkoutFlowSimWrapEl.style.display = show ? "" : "none";
+            if (!show && checkoutFlowSimStatusEl) checkoutFlowSimStatusEl.value = "";
         }
 
         function _redirigirAFlow(urlRaw) {
@@ -7804,6 +7824,7 @@
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                 flowPagoHabilitado = Boolean(data.flow_enabled);
+                flowSimAdminEnabled = Boolean(data.admin_flow_sim_enabled);
                 paymentPricingCfg = {
                     flow_enabled: flowPagoHabilitado,
                     rate: Math.max(0, Number(data?.payment_pricing?.rate ?? 0.0319)),
@@ -7813,6 +7834,7 @@
                 _refreshTransferBenefitBadge();
                 if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = flowPagoHabilitado ? "" : "none";
                 if (!flowPagoHabilitado && checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
+                _syncFlowSimUi();
                 renderCategoriasMenu();
                 renderSecciones();
                 _renderAgendaPastelResumen();
@@ -8601,6 +8623,7 @@
             } else if (checkoutPagoTransferenciaEl) {
                 checkoutPagoTransferenciaEl.checked = true;
             }
+            _syncFlowSimUi();
             const metodoPrecio = _metodoPagoCheckoutActual();
             const items = carrito.map((it) => ({
                 nombre: String(it.nombre || ""),
@@ -8721,6 +8744,12 @@
                     return "transferencia";
                 })(),
             };
+            if (metodoPagoActual === "flow" && flowSimAdminEnabled && checkoutFlowSimStatusEl) {
+                const simStatus = String(checkoutFlowSimStatusEl.value || "").trim().toLowerCase();
+                if (simStatus === "paid" || simStatus === "pending" || simStatus === "error") {
+                    payload.flow_simulation_status = simStatus;
+                }
+            }
             const norm = _normalizarDatosCheckoutCliente(datosCliente);
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             try {
@@ -8731,6 +8760,105 @@
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo procesar la compra");
+                if (data.flow_simulated) {
+                    const sim = String(data.flow_result || "").trim().toLowerCase();
+                    if (sim === "paid") {
+                        ultimoComprobantePedido = {
+                            venta_id: Number(data.venta_id || 0),
+                            codigo_operacion: String(data.codigo_operacion || ""),
+                            fecha_hora_local: new Date().toLocaleString("es-CL"),
+                            estado: "recibido",
+                            estado_actualizado: "",
+                            cliente_nombre: String(datosCliente?.nombre || ""),
+                            cliente_email: String(datosCliente?.email || ""),
+                            cliente_telefono: String(datosCliente?.telefono || ""),
+                            subtotal: Number(data.subtotal || subtotalSnapshot || 0),
+                            descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
+                            total: Number(data.total_monto || totalSnapshot || 0),
+                            metodo_pago: "flow_pagado",
+                            flow_retry_url: "",
+                            entrega_tipo: String(data.entrega_tipo || payload.entrega_tipo || "retiro"),
+                            hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
+                            direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
+                            despacho_monto: Number(data.despacho_monto || despachoSnapshot || 0),
+                            items: itemsSnapshot,
+                        };
+                        guardarUltimoPedidoLocal();
+                        _renderPedidoActivoTienda();
+                        _startPedidoEstadoPoll();
+                        carrito = [];
+                        codigoDescuentoEl.value = "";
+                        if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = "";
+                        cuponAplicado = { codigo: "", descuento_monto: 0 };
+                        renderCart();
+                        cerrarModalCliente();
+                        cerrarModalCheckoutResumen();
+                        checkoutClientePendiente = null;
+                        _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
+                        msg("Simulacion Flow: pago aprobado.");
+                    } else if (sim === "pending") {
+                        _guardarFlowCheckoutDraft({
+                            venta_id: Number(data.venta_id || 0),
+                            codigo_operacion: String(data.codigo_operacion || ""),
+                            fecha_hora_local: new Date().toLocaleString("es-CL"),
+                            estado: "recibido",
+                            estado_actualizado: "",
+                            cliente_nombre: String(datosCliente?.nombre || ""),
+                            cliente_email: String(datosCliente?.email || ""),
+                            cliente_telefono: String(datosCliente?.telefono || ""),
+                            subtotal: Number(data.subtotal || subtotalSnapshot || 0),
+                            descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
+                            total: Number(data.total_monto || totalSnapshot || 0),
+                            metodo_pago: "flow_pendiente",
+                            flow_retry_url: "",
+                            entrega_tipo: String(data.entrega_tipo || payload.entrega_tipo || "retiro"),
+                            hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
+                            direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
+                            despacho_monto: Number(data.despacho_monto || despachoSnapshot || 0),
+                            items: itemsSnapshot,
+                        });
+                        cerrarModalCliente();
+                        cerrarModalCheckoutResumen();
+                        checkoutClientePendiente = null;
+                        carrito = [];
+                        renderCart();
+                        _abrirPostCheckoutPopup(_cargarFlowCheckoutDraft() || {}, { mode: "pending" });
+                        msg("Simulacion Flow: pago pendiente.");
+                    } else {
+                        _guardarFlowCheckoutDraft({
+                            venta_id: Number(data.venta_id || 0),
+                            codigo_operacion: String(data.codigo_operacion || ""),
+                            fecha_hora_local: new Date().toLocaleString("es-CL"),
+                            estado: "recibido",
+                            estado_actualizado: "",
+                            cliente_nombre: String(datosCliente?.nombre || ""),
+                            cliente_email: String(datosCliente?.email || ""),
+                            cliente_telefono: String(datosCliente?.telefono || ""),
+                            subtotal: Number(data.subtotal || subtotalSnapshot || 0),
+                            descuento: Number(data.descuento_monto || descuentoSnapshot || 0),
+                            total: Number(data.total_monto || totalSnapshot || 0),
+                            metodo_pago: "flow_pendiente",
+                            flow_retry_url: "",
+                            entrega_tipo: String(data.entrega_tipo || payload.entrega_tipo || "retiro"),
+                            hora_retiro: String(data.hora_retiro || payload.hora_retiro || ""),
+                            direccion_entrega: String(data.direccion_entrega || payload.direccion || ""),
+                            despacho_monto: Number(data.despacho_monto || despachoSnapshot || 0),
+                            items: itemsSnapshot,
+                        });
+                        cerrarModalCliente();
+                        cerrarModalCheckoutResumen();
+                        checkoutClientePendiente = null;
+                        carrito = [];
+                        renderCart();
+                        _abrirPostCheckoutPopup(_cargarFlowCheckoutDraft() || {}, { mode: "error" });
+                        msg("Simulacion Flow: pago no concretado.");
+                    }
+                    setCheckoutStatusMsg("");
+                    _trackTienda("checkout");
+                    await cargarProductos();
+                    if (clienteRegistrado) await cargarHistorialCliente();
+                    return;
+                }
                 if (data.requires_flow_redirect && data.flow_redirect_url) {
                     _guardarFlowCheckoutDraft({
                         venta_id: Number(data.venta_id || 0),
@@ -9433,8 +9561,14 @@
         document.getElementById("modal-checkout-confirm")?.addEventListener("click", confirmarCheckoutDesdeResumen);
         checkoutEntregaRetiroEl?.addEventListener("click", () => _setCheckoutEntregaTipo("retiro"));
         checkoutEntregaDespachoEl?.addEventListener("click", () => _setCheckoutEntregaTipo("despacho"));
-        checkoutPagoTransferenciaEl?.addEventListener("change", _renderTotalesResumenCheckout);
-        checkoutPagoFlowEl?.addEventListener("change", _renderTotalesResumenCheckout);
+        checkoutPagoTransferenciaEl?.addEventListener("change", () => {
+            _syncFlowSimUi();
+            _renderTotalesResumenCheckout();
+        });
+        checkoutPagoFlowEl?.addEventListener("change", () => {
+            _syncFlowSimUi();
+            _renderTotalesResumenCheckout();
+        });
         checkoutHoraRetiroEl?.addEventListener("change", async () => {
             _actualizarAyudaHoraCheckout();
             if (checkoutEntregaTipo === "despacho" && checkoutDireccionConfirmada) {
