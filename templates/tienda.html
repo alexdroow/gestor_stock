@@ -690,6 +690,91 @@
             margin-top: 7px;
             cursor: pointer;
         }
+        .agenda-beta-head {
+            display: none;
+            border: 1px solid #dbe4ef;
+            background: #fff;
+            border-radius: 14px;
+            padding: 12px;
+            margin: 10px 0 14px;
+        }
+        .agenda-beta-progress {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+        .agenda-beta-progress > span {
+            display: block;
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #f97316, #fb923c);
+            transition: width .25s ease;
+        }
+        .agenda-beta-question {
+            margin: 10px 0 0;
+            font-size: 1.06rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .agenda-beta-nav {
+            display: none;
+            gap: 8px;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0 0;
+        }
+        .agenda-beta-nav .btn {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .agenda-beta-nav .btn.primary {
+            border-color: #ea580c;
+            background: #f97316;
+            color: #fff;
+        }
+        body.agenda-beta-mode .topbar-nav,
+        body.agenda-beta-mode .search,
+        body.agenda-beta-mode .left-nav,
+        body.agenda-beta-mode #sec-ofertas,
+        body.agenda-beta-mode #sec-destacados,
+        body.agenda-beta-mode #categorias-wrap,
+        body.agenda-beta-mode .cart-panel,
+        body.agenda-beta-mode .mobile-cat-strip {
+            display: none !important;
+        }
+        body.agenda-beta-mode .layout {
+            grid-template-columns: 1fr !important;
+            max-width: 980px;
+        }
+        body.agenda-beta-mode .content {
+            max-width: 880px;
+            margin: 0 auto;
+        }
+        body.agenda-beta-mode .agenda-section {
+            border: 1px solid #dbe4ef;
+            border-radius: 16px;
+            padding: 14px;
+            background: #fff;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+        }
+        body.agenda-beta-mode .agenda-beta-head,
+        body.agenda-beta-mode .agenda-beta-nav {
+            display: block;
+        }
+        body.agenda-beta-mode .agenda-beta-nav {
+            display: flex;
+        }
+        body.agenda-beta-mode .agenda-mobile-steps,
+        body.agenda-beta-mode .agenda-subtitle-toggle {
+            display: none !important;
+        }
         .agenda-pastel-wrap {
             border: 1px solid #dbe4ef;
             border-radius: 12px;
@@ -2972,7 +3057,7 @@
     </style>
     <style id="tienda-custom-css"></style>
 </head>
-<body>
+<body{% if agenda_beta %} class="agenda-beta-mode"{% endif %}>
     <header class="topbar">
         <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()">Menu</button>
         <div class="brand brand-with-logo">
@@ -3041,6 +3126,10 @@
                 <h2 id="agenda-section-title">Agenda tu pedido</h2>
                 <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
                 <button type="button" class="agenda-subtitle-toggle" id="agenda-subtitle-toggle">Ver detalles</button>
+                <div class="agenda-beta-head" id="agenda-beta-head">
+                    <div class="agenda-beta-progress"><span id="agenda-beta-progress-fill"></span></div>
+                    <div class="agenda-beta-question" id="agenda-beta-question">Paso 1: Elige el tipo de pedido</div>
+                </div>
                 {% if agenda_beta %}
                 <div style="margin:10px 0 0;padding:10px 12px;border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:10px;font-size:.9rem;font-weight:700;">
                     Modo prueba activo: flujo tipo cuestionario por pasos.
@@ -3118,6 +3207,10 @@
                     <button class="checkout-btn" id="agenda-btn-reservar" type="button">Reservar horario</button>
                     <div class="agenda-status" id="agenda-status-msg"></div>
                 </form>
+                <div class="agenda-beta-nav" id="agenda-beta-nav">
+                    <button type="button" class="btn" id="agenda-beta-prev">Anterior</button>
+                    <button type="button" class="btn primary" id="agenda-beta-next">Siguiente</button>
+                </div>
             </div>
 
             <div id="categorias-wrap"></div>
@@ -3674,6 +3767,11 @@
         const agendaSubtitleEl = document.getElementById("agenda-section-subtitle");
         const agendaSubtitleToggleEl = document.getElementById("agenda-subtitle-toggle");
         const agendaMobileStepsEl = document.getElementById("agenda-mobile-steps");
+        const agendaBetaHeadEl = document.getElementById("agenda-beta-head");
+        const agendaBetaProgressFillEl = document.getElementById("agenda-beta-progress-fill");
+        const agendaBetaQuestionEl = document.getElementById("agenda-beta-question");
+        const agendaBetaPrevEl = document.getElementById("agenda-beta-prev");
+        const agendaBetaNextEl = document.getElementById("agenda-beta-next");
         const agendaCakeWrapEl = document.getElementById("agenda-cake-wrap");
         const agendaCakeGridEl = document.getElementById("agenda-cake-grid");
         const agendaCakeOpenCartEl = document.getElementById("agenda-cake-open-cart");
@@ -5718,6 +5816,26 @@
             if (agendaHoursListEl) agendaHoursListEl.style.display = showStep3 ? "" : "none";
             if (agendaReservaFormEl) agendaReservaFormEl.style.display = showStep4 ? "" : "none";
             if (secAgendaReservasEl) secAgendaReservasEl.setAttribute("data-mobile-step", String(agendaMobileStep));
+
+            if (Boolean(_agendaBetaFromServer)) {
+                const labels = {
+                    1: "Paso 1 de 4: Elige el tipo de pedido",
+                    2: "Paso 2 de 4: Personaliza tu pedido",
+                    3: "Paso 3 de 4: Selecciona fecha y hora",
+                    4: "Paso 4 de 4: Completa tus datos y confirma"
+                };
+                if (agendaBetaQuestionEl) agendaBetaQuestionEl.textContent = labels[agendaMobileStep] || "Agenda tu pedido";
+                if (agendaBetaProgressFillEl) {
+                    const pct = Math.max(25, Math.min(100, Math.round((agendaMobileStep / 4) * 100)));
+                    agendaBetaProgressFillEl.style.width = `${pct}%`;
+                }
+                if (agendaBetaPrevEl) agendaBetaPrevEl.disabled = agendaMobileStep <= 1;
+                if (agendaBetaNextEl) {
+                    agendaBetaNextEl.textContent = agendaMobileStep >= 4 ? "Revisar y confirmar" : "Siguiente";
+                    agendaBetaNextEl.disabled = false;
+                }
+                if (agendaBetaHeadEl) agendaBetaHeadEl.style.display = categoriaActiva === "AGENDA" ? "block" : "none";
+            }
 
             agendaMobileStepsEl?.querySelectorAll("[data-step]").forEach((btn) => {
                 const step = Number(btn.getAttribute("data-step") || 1);
@@ -9824,6 +9942,21 @@
                 agendaMobileStep = Math.max(1, Math.min(maxUnlocked, req));
                 _agendaApplyMobileWizard(false);
             });
+        });
+        agendaBetaPrevEl?.addEventListener("click", () => {
+            if (!Boolean(_agendaBetaFromServer)) return;
+            agendaMobileStep = Math.max(1, Number(agendaMobileStep || 1) - 1);
+            _agendaApplyMobileWizard(false);
+        });
+        agendaBetaNextEl?.addEventListener("click", () => {
+            if (!Boolean(_agendaBetaFromServer)) return;
+            const maxUnlocked = _agendaStepMaxUnlocked();
+            if (agendaMobileStep < 4) {
+                agendaMobileStep = Math.min(Math.max(1, maxUnlocked), Number(agendaMobileStep || 1) + 1);
+                _agendaApplyMobileWizard(false);
+                return;
+            }
+            _scrollAgendaReservarEnMobile(0);
         });
         agendaSubtitleToggleEl?.addEventListener("click", () => {
             agendaSubtitleExpanded = !agendaSubtitleExpanded;
