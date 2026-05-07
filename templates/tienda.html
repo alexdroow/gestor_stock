@@ -3734,6 +3734,7 @@
             </div>
             <div class="agenda-cake-flow-pane" data-flow-step="3">
                 <div class="agenda-mini-title">Paso 7: Resumen final</div>
+                <div id="agenda-cake-flow-confirm-detail" style="font-size:.9rem;color:#334155;border:1px solid #e5e7eb;border-radius:10px;padding:10px;max-height:240px;overflow:auto;margin-bottom:8px;"></div>
                 <aside class="agenda-cake-cart" style="border:0;padding:0;background:transparent;">
                     <ul id="agenda-cake-summary"></ul>
                     <div class="agenda-cake-total">
@@ -3998,6 +3999,7 @@
         const agendaCakeFlowDaysHostEl = document.getElementById("agenda-cake-flow-days-host");
         const agendaCakeFlowHoursHostEl = document.getElementById("agenda-cake-flow-hours-host");
         const agendaCakeFlowFormHostEl = document.getElementById("agenda-cake-flow-form-host");
+        const agendaCakeFlowConfirmDetailEl = document.getElementById("agenda-cake-flow-confirm-detail");
         const agendaCakeCloseXEl = document.getElementById("agenda-cake-close-x");
         const agendaCakeStepPrevEl = document.getElementById("agenda-cake-step-prev");
         const agendaCakeStepNextEl = document.getElementById("agenda-cake-step-next");
@@ -7857,7 +7859,8 @@
             }
         }
 
-        async function reservarAgendaDesdeTienda() {
+        async function reservarAgendaDesdeTienda(opts = {}) {
+            const inlineFlow = Boolean(opts && opts.inlineFlow);
             if (!Boolean(tiendaUiCfg.agenda_enabled)) return;
             const dia = _agendaDiaActual();
             if (!dia || !agendaFechaActiva) return _agendaMsg("Selecciona un dia de agenda.", "err");
@@ -7893,6 +7896,12 @@
             }
             agendaReservaPendiente = payload;
             _renderAgendaConfirmacion(payload);
+            if (inlineFlow) {
+                if (agendaCakeFlowConfirmDetailEl && agendaConfirmarDetalleEl) {
+                    agendaCakeFlowConfirmDetailEl.innerHTML = agendaConfirmarDetalleEl.innerHTML;
+                }
+                return payload;
+            }
             _abrirModalAgendaConfirmar();
         }
 
@@ -10195,25 +10204,29 @@
                     return;
                 }
             }
-            if (agendaCakeFlowStep === 2) {
-                const nombre = String(agendaNombreEl?.value || "").trim();
-                const email = String(agendaEmailEl?.value || "").trim();
-                const telefono = String(agendaTelefonoEl?.value || "").trim();
-                if (!nombre || !email || telefono.length < 8) {
-                    _agendaMsg("Completa nombre, correo y telefono.", "err");
-                    return;
-                }
-            }
             if (agendaCakeFlowStep >= 3) {
                 return;
             }
             agendaCakeFlowStep = Math.min(3, Number(agendaCakeFlowStep || 1) + 1);
             _renderAgendaCakeSummary();
+            if (agendaCakeFlowStep === 3) {
+                reservarAgendaDesdeTienda({ inlineFlow: true }).catch(() => {});
+            }
             _agendaCakeApplyFlowStep();
         });
         agendaCakeCloseX2El?.addEventListener("click", _cerrarModalAgendaCakeCart);
-        agendaCakeFlowConfirmEl?.addEventListener("click", () => {
-            reservarAgendaDesdeTienda();
+        agendaCakeFlowConfirmEl?.addEventListener("click", async () => {
+            const payload = await reservarAgendaDesdeTienda({ inlineFlow: true });
+            if (!payload) return;
+            const waWindow = window.open("", "_blank");
+            try {
+                if (waWindow && !waWindow.closed) {
+                    waWindow.document.open();
+                    waWindow.document.write("<!doctype html><html><head><meta charset='utf-8'><title>Procesando reserva...</title></head><body style='font-family:Segoe UI,Tahoma,sans-serif;padding:20px;background:#f8fafc;color:#0f172a;'><h3 style='margin-top:0'>Procesando reserva...</h3><p>Estamos generando tu comprobante y enviando la solicitud a pasteleria.</p></body></html>");
+                    waWindow.document.close();
+                }
+            } catch (_) {}
+            _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
         });
         agendaCakeFlowPdfEl?.addEventListener("click", () => {
             try {
