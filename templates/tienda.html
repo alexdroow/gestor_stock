@@ -3786,6 +3786,7 @@
         let cuponesClienteDisponibles = [];
         let carritoVacioTexto = "El carrito esta vacio.";
         const FLOW_CHECKOUT_DRAFT_KEY = "tienda_flow_checkout_draft_v1";
+        const FLOW_RETURN_TRACK_KEY = "tienda_flow_return_track_v1";
         let tiendaUiCfg = {};
         let agendaDias = [];
         let agendaFechaActiva = "";
@@ -4456,6 +4457,34 @@
             } catch (_) {}
         }
 
+        function _markFlowReturnTracking(ventaId) {
+            try {
+                localStorage.setItem(FLOW_RETURN_TRACK_KEY, JSON.stringify({
+                    venta_id: Number(ventaId || 0),
+                    ts: Date.now(),
+                }));
+            } catch (_) {}
+        }
+
+        function _loadFlowReturnTracking() {
+            try {
+                const raw = localStorage.getItem(FLOW_RETURN_TRACK_KEY);
+                if (!raw) return null;
+                const obj = JSON.parse(raw);
+                if (!obj || typeof obj !== "object") return null;
+                return {
+                    venta_id: Number(obj.venta_id || 0),
+                    ts: Number(obj.ts || 0),
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function _clearFlowReturnTracking() {
+            try { localStorage.removeItem(FLOW_RETURN_TRACK_KEY); } catch (_) {}
+        }
+
         function _cargarFlowCheckoutDraft() {
             try {
                 const raw = localStorage.getItem(FLOW_CHECKOUT_DRAFT_KEY);
@@ -4469,6 +4498,7 @@
 
         function _limpiarFlowCheckoutDraft() {
             try { localStorage.removeItem(FLOW_CHECKOUT_DRAFT_KEY); } catch (_) {}
+            _clearFlowReturnTracking();
         }
 
         function _renderPedidoActivoTienda() {
@@ -8887,6 +8917,7 @@
                     renderCart();
                     msg("Redirigiendo a Flow para completar el pago...");
                     setCheckoutStatusMsg("Redirigiendo a Flow para completar el pago...");
+                    _markFlowReturnTracking(Number(data.venta_id || 0));
                     _redirigirAFlow(data.flow_redirect_url);
                     return;
                 }
@@ -8981,7 +9012,31 @@
             try {
                 const p = new URLSearchParams(window.location.search || "");
                 const flow = String(p.get("flow") || "").trim().toLowerCase();
-                if (!flow) return;
+                if (!flow) {
+                    const track = _loadFlowReturnTracking();
+                    const draft = _cargarFlowCheckoutDraft();
+                    const ageMs = track ? (Date.now() - Number(track.ts || 0)) : Number.MAX_SAFE_INTEGER;
+                    const hasRecentTrack = Boolean(track && ageMs >= 0 && ageMs <= 20 * 60 * 1000);
+                    if (hasRecentTrack && draft && Number(draft.venta_id || 0) > 0) {
+                        ultimoComprobantePedido = {
+                            ...(ultimoComprobantePedido || {}),
+                            ...draft,
+                            venta_id: Number(draft.venta_id || 0),
+                        };
+                        guardarUltimoPedidoLocal();
+                        const check = await _esperarEstadoFlowFinal(Number(draft.venta_id || 0), 6, 1200);
+                        if (check.ok) {
+                            msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
+                            _limpiarFlowCheckoutDraft();
+                        } else {
+                            msg("La compra fue cancelada o aun no esta pagada en Flow.", true);
+                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "error" });
+                            _clearFlowReturnTracking();
+                        }
+                    }
+                    return;
+                }
                 const ventaId = Number(p.get("venta_id") || 0);
                 const draft = _cargarFlowCheckoutDraft();
                 if (draft && (!ventaId || Number(draft.venta_id || 0) === ventaId)) {
@@ -9027,6 +9082,7 @@
                         }
                     }
                 }
+                _clearFlowReturnTracking();
                 p.delete("flow");
                 p.delete("venta_id");
                 const q = p.toString();
@@ -9204,6 +9260,7 @@
             if (!isPending || !retryUrl) {
                 return msg("No hay un pago Flow pendiente para reintentar.", true);
             }
+            _markFlowReturnTracking(Number(p?.venta_id || 0));
             window.location.href = retryUrl;
         }
 
