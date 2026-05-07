@@ -2282,11 +2282,38 @@ def _flow_post(endpoint, params, cfg):
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
     )
-    raw = urlopen(req, timeout=25).read().decode("utf-8", errors="replace")
+    try:
+        raw = urlopen(req, timeout=25).read().decode("utf-8", errors="replace")
+    except HTTPError as http_err:
+        raw_err = ""
+        try:
+            raw_err = http_err.read().decode("utf-8", errors="replace")
+        except Exception:
+            raw_err = ""
+        try:
+            data_err = json.loads(raw_err or "{}")
+        except Exception:
+            data_err = {}
+        msg = ""
+        if isinstance(data_err, dict):
+            msg = str(data_err.get("message") or data_err.get("error") or "").strip()
+        if not msg:
+            msg = f"Flow HTTP {int(getattr(http_err, 'code', 400) or 400)}"
+        raise RuntimeError(msg)
     data = json.loads(raw or "{}")
     if isinstance(data, dict) and data.get("code"):
         raise RuntimeError(str(data.get("message") or f"Flow error {data.get('code')}"))
     return data
+
+
+def _flow_subject_safe(txt):
+    base = str(txt or "").strip() or "Compra tienda Sucree"
+    try:
+        base = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode("ascii")
+    except Exception:
+        pass
+    base = " ".join(base.split())
+    return base[:78]
 
 
 def _ensure_flow_pago_table(cursor):
@@ -12372,17 +12399,26 @@ def api_tienda_checkout():
         if metodo_pago_preferido == "flow":
             base = _public_base_url(request.url_root)
             commerce_order = f"VENTA-{venta_id}-{int(time.time())}"
-            subject = f"Compra tienda Sucree #{venta_id}"
+            subject = _flow_subject_safe(f"Compra tienda Sucree #{venta_id}")
+            flow_email = str(cliente_email or "").strip().lower()
+            if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", flow_email or ""):
+                flow_email = f"pedido{venta_id}@pasteleriasucree.cl"
             flow_params = {
                 "commerceOrder": commerce_order,
                 "subject": subject,
                 "currency": "CLP",
                 "amount": int(round(float(total_neto or 0))),
-                "email": cliente_email,
+                "email": flow_email,
                 "urlConfirmation": f"{base}/api/tienda/flow/confirm",
                 "urlReturn": f"{base}/tienda/flow/retorno",
             }
-            flow_create = _flow_post("/payment/create", flow_params, flow_cfg)
+            try:
+                flow_create = _flow_post("/payment/create", flow_params, flow_cfg)
+            except Exception:
+                # Reintento conservador ante validaciones estrictas de Flow con email.
+                flow_params_alt = dict(flow_params)
+                flow_params_alt["email"] = f"pedido{venta_id}@pasteleriasucree.cl"
+                flow_create = _flow_post("/payment/create", flow_params_alt, flow_cfg)
             flow_token = str(flow_create.get("token") or "").strip()
             flow_url_base = str(flow_create.get("url") or "").strip().rstrip("/")
             if not flow_token or not flow_url_base:
