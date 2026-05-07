@@ -885,6 +885,47 @@
             font-size: .86rem;
             color: #334155;
         }
+        .agenda-cake-step-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .agenda-cake-close-x {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            border-radius: 999px;
+            width: 34px;
+            height: 34px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .agenda-cake-step-progress {
+            margin: 8px 0 6px;
+            height: 7px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+        .agenda-cake-step-progress > span {
+            display: block;
+            height: 100%;
+            width: 25%;
+            background: linear-gradient(90deg, #f97316, #fb923c);
+        }
+        .agenda-cake-step-label {
+            font-size: .86rem;
+            font-weight: 800;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+        .agenda-cake-step-pane {
+            display: none;
+        }
+        .agenda-cake-step-pane.active {
+            display: block;
+        }
         .agenda-pastel-special-box textarea,
         .agenda-pastel-special-box input {
             width: 100%;
@@ -3570,44 +3611,61 @@
 
     <div class="modal-overlay agenda-cake-modal" id="modal-agenda-cake-builder">
         <div class="modal">
-            <h3 id="agenda-cake-builder-title">Arma tu torta</h3>
+            <div class="agenda-cake-step-head">
+                <h3 id="agenda-cake-builder-title">Arma tu torta</h3>
+                <button type="button" id="agenda-cake-close-x" class="agenda-cake-close-x" aria-label="Cerrar">x</button>
+            </div>
+            <div class="agenda-cake-step-progress">
+                <span id="agenda-cake-step-progress-fill"></span>
+            </div>
+            <div class="agenda-cake-step-label" id="agenda-cake-step-label">Paso 1 de 4: Tamano</div>
             <div class="agenda-cake-builder">
-                <div class="agenda-cake-head">
-                    <span id="agenda-cake-selected-cat-title"></span>
-                    <span id="agenda-cake-price-visibility"></span>
-                </div>
-                <div class="agenda-cake-top">
-                    <div class="agenda-cake-media">
-                        <img id="agenda-cake-selected-cat-image" src="" alt="Categoria torta">
-                        <div class="agenda-cake-media-body">
-                            <div class="agenda-mini-title">Descripcion</div>
-                            <div id="agenda-cake-selected-cat-desc" style="font-size:.88rem;color:#475569;line-height:1.35;"></div>
+                <div class="agenda-cake-step-pane" data-step="1">
+                    <div class="agenda-cake-head">
+                        <span id="agenda-cake-selected-cat-title"></span>
+                        <span id="agenda-cake-price-visibility"></span>
+                    </div>
+                    <div class="agenda-cake-top">
+                        <div class="agenda-cake-media">
+                            <img id="agenda-cake-selected-cat-image" src="" alt="Categoria torta">
+                            <div class="agenda-cake-media-body">
+                                <div class="agenda-mini-title">Descripcion</div>
+                                <div id="agenda-cake-selected-cat-desc" style="font-size:.88rem;color:#475569;line-height:1.35;"></div>
+                            </div>
+                        </div>
+                        <div class="agenda-cake-size-panel">
+                            <div class="agenda-mini-title">Tamanos disponibles</div>
+                            <div class="agenda-cake-size-grid" id="agenda-cake-size-cards"></div>
                         </div>
                     </div>
-                    <div class="agenda-cake-size-panel">
-                        <div class="agenda-mini-title">Tamanos disponibles</div>
-                        <div class="agenda-cake-size-grid" id="agenda-cake-size-cards"></div>
+                </div>
+                <div class="agenda-cake-step-pane" data-step="2">
+                    <div>
+                        <div class="agenda-mini-title">Sabores (maximo segun tamano)</div>
+                        <div class="agenda-cake-list" id="agenda-cake-flavors"></div>
                     </div>
                 </div>
-                <div>
-                    <div class="agenda-mini-title">Sabores (maximo segun tamano)</div>
-                    <div class="agenda-cake-list" id="agenda-cake-flavors"></div>
+                <div class="agenda-cake-step-pane" data-step="3">
+                    <div>
+                        <div class="agenda-mini-title">Extras</div>
+                        <div class="agenda-cake-list" id="agenda-cake-extras"></div>
+                    </div>
                 </div>
-                <div>
-                    <div class="agenda-mini-title">Extras</div>
-                    <div class="agenda-cake-list" id="agenda-cake-extras"></div>
+                <div class="agenda-cake-step-pane" data-step="4">
+                    <label>Topper</label>
+                    <div class="agenda-cake-pills" id="agenda-cake-topper-cards"></div>
+                    <label>Fotos referenciales
+                        <input id="agenda-cake-file" type="file" accept=".jpg,.jpeg,.png,.webp">
+                    </label>
+                    <div class="agenda-cake-files" id="agenda-cake-files"></div>
+                    <label>Indicaciones para decoracion
+                        <textarea id="agenda-cake-note" maxlength="500" placeholder="Colores, estilo, texto del topper, etc."></textarea>
+                    </label>
                 </div>
-                <label>Topper</label>
-                <div class="agenda-cake-pills" id="agenda-cake-topper-cards"></div>
-                <label>Fotos referenciales
-                    <input id="agenda-cake-file" type="file" accept=".jpg,.jpeg,.png,.webp">
-                </label>
-                <div class="agenda-cake-files" id="agenda-cake-files"></div>
-                <label>Indicaciones para decoracion
-                    <textarea id="agenda-cake-note" maxlength="500" placeholder="Colores, estilo, texto del topper, etc."></textarea>
-                </label>
             </div>
             <div class="modal-actions">
+                <button class="btn-muted" type="button" id="agenda-cake-step-prev">Anterior</button>
+                <button class="btn-primary" type="button" id="agenda-cake-step-next">Siguiente</button>
                 <button class="btn-muted" type="button" id="agenda-cake-close-builder">Cerrar</button>
                 <button class="btn-primary" type="button" id="agenda-cake-open-cart-2">Ver resumen</button>
             </div>
@@ -3866,6 +3924,11 @@
         const agendaCakeCloseCartEl = document.getElementById("agenda-cake-close-cart");
         const agendaCakeClearQuoteEl = document.getElementById("agenda-cake-clear-quote");
         const agendaCakeGoScheduleEl = document.getElementById("agenda-cake-go-schedule");
+        const agendaCakeCloseXEl = document.getElementById("agenda-cake-close-x");
+        const agendaCakeStepPrevEl = document.getElementById("agenda-cake-step-prev");
+        const agendaCakeStepNextEl = document.getElementById("agenda-cake-step-next");
+        const agendaCakeStepLabelEl = document.getElementById("agenda-cake-step-label");
+        const agendaCakeStepProgressFillEl = document.getElementById("agenda-cake-step-progress-fill");
         const agendaDetalleEl = document.getElementById("agenda-detalle");
         const agendaEntregaRetiroEl = document.getElementById("agenda-entrega-retiro");
         const agendaEntregaDespachoEl = document.getElementById("agenda-entrega-despacho");
@@ -4010,6 +4073,8 @@
             referencia_urls: [],
             nota: "",
         };
+        let agendaCakeBuilderStep = 1;
+        const AGENDA_BETA_DRAFT_KEY = "agenda_beta_cake_draft_v1";
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -6024,12 +6089,78 @@
             agendaCakeWrapEl.style.display = _isAgendaCakeVisible() ? "" : "none";
         }
 
+        function _agendaCakeDraftSave() {
+            if (!(Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui"))) return;
+            try {
+                const payload = {
+                    step: Number(agendaCakeBuilderStep || 1),
+                    categoria_id: String(agendaCakeCategoriaActiva || ""),
+                    selection: {
+                        size_id: String(agendaCakeSelection?.size_id || ""),
+                        sabor_ids: Array.isArray(agendaCakeSelection?.sabor_ids) ? [...agendaCakeSelection.sabor_ids] : [],
+                        extra_items: Array.isArray(agendaCakeSelection?.extra_items) ? [...agendaCakeSelection.extra_items] : [],
+                        topper_id: String(agendaCakeSelection?.topper_id || ""),
+                        referencia_urls: Array.isArray(agendaCakeSelection?.referencia_urls) ? [...agendaCakeSelection.referencia_urls] : [],
+                        nota: String(agendaCakeSelection?.nota || agendaCakeNoteEl?.value || "").trim(),
+                    },
+                };
+                localStorage.setItem(AGENDA_BETA_DRAFT_KEY, JSON.stringify(payload));
+            } catch (_e) {}
+        }
+
+        function _agendaCakeDraftLoad() {
+            if (!(Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui"))) return;
+            try {
+                const raw = localStorage.getItem(AGENDA_BETA_DRAFT_KEY);
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (data && typeof data === "object") {
+                    const catId = String(data.categoria_id || "").trim();
+                    if (catId) agendaCakeCategoriaActiva = catId;
+                    const sel = data.selection || {};
+                    agendaCakeSelection = {
+                        ...agendaCakeSelection,
+                        size_id: String(sel.size_id || ""),
+                        sabor_ids: Array.isArray(sel.sabor_ids) ? sel.sabor_ids.map((x) => String(x || "")).filter(Boolean) : [],
+                        extra_items: Array.isArray(sel.extra_items) ? sel.extra_items : [],
+                        topper_id: String(sel.topper_id || ""),
+                        referencia_urls: Array.isArray(sel.referencia_urls) ? sel.referencia_urls : [],
+                        nota: String(sel.nota || ""),
+                    };
+                    agendaCakeBuilderStep = Math.max(1, Math.min(4, Number(data.step || 1)));
+                    if (agendaCakeNoteEl) agendaCakeNoteEl.value = String(agendaCakeSelection.nota || "");
+                }
+            } catch (_e) {}
+        }
+
+        function _agendaCakeApplyStep() {
+            const panes = modalAgendaCakeBuilderEl?.querySelectorAll(".agenda-cake-step-pane") || [];
+            panes.forEach((el) => {
+                const s = Number(el.getAttribute("data-step") || 1);
+                el.classList.toggle("active", s === agendaCakeBuilderStep);
+            });
+            const labels = {
+                1: "Paso 1 de 4: Elige tamano",
+                2: "Paso 2 de 4: Elige rellenos/sabores",
+                3: "Paso 3 de 4: Elige extras",
+                4: "Paso 4 de 4: Topper e indicaciones",
+            };
+            if (agendaCakeStepLabelEl) agendaCakeStepLabelEl.textContent = labels[agendaCakeBuilderStep] || "Paso";
+            if (agendaCakeStepProgressFillEl) agendaCakeStepProgressFillEl.style.width = `${Math.round((agendaCakeBuilderStep / 4) * 100)}%`;
+            if (agendaCakeStepPrevEl) agendaCakeStepPrevEl.disabled = agendaCakeBuilderStep <= 1;
+            if (agendaCakeStepNextEl) agendaCakeStepNextEl.textContent = agendaCakeBuilderStep >= 4 ? "Ir a horario" : "Siguiente";
+            _agendaCakeDraftSave();
+        }
+
         function _abrirModalAgendaCakeBuilder() {
             if (!modalAgendaCakeBuilderEl) return;
+            _agendaCakeDraftLoad();
             modalAgendaCakeBuilderEl.classList.add("active");
+            _agendaCakeApplyStep();
         }
 
         function _cerrarModalAgendaCakeBuilder() {
+            _agendaCakeDraftSave();
             modalAgendaCakeBuilderEl?.classList.remove("active");
         }
 
@@ -6683,16 +6814,19 @@
                     agendaCakeDebugEl.textContent = `Error render: ${String(err?.message || err || "desconocido")}`;
                 }
             }
+            _agendaCakeApplyStep();
             _agendaApplyMobileWizard(true);
         }
 
         function agendaCakeSelectCategory(catId, opts = null) {
             agendaCakeCategoriaActiva = String(catId || "");
+            agendaCakeBuilderStep = 1;
             agendaCakeSelection.size_id = "";
             agendaCakeSelection.sabor_ids = [];
             agendaCakeSelection.extra_items = [];
             agendaCakeSelection.topper_id = "";
             _renderAgendaCakeBuilder();
+            _agendaCakeDraftSave();
             if (!opts || opts.openModal !== false) {
                 _abrirModalAgendaCakeBuilder();
             }
@@ -6706,13 +6840,16 @@
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
             const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
             agendaCakeSelection.sabor_ids = (agendaCakeSelection.sabor_ids || []).slice(0, maxSabores);
+            if (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui")) agendaCakeBuilderStep = Math.max(2, agendaCakeBuilderStep);
             if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
+            _agendaCakeDraftSave();
         }
 
         function agendaCakeSelectTopper(topperId) {
             agendaCakeSelection.topper_id = String(topperId || "");
             _renderAgendaCakeBuilder();
+            _agendaCakeDraftSave();
             agendaFechaActiva = "";
             agendaHoraActiva = "";
             cargarAgendaDisponibilidad(true);
@@ -7673,6 +7810,7 @@
             }
             if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
+            _agendaCakeDraftSave();
         }
 
         function agendaCakeChangeExtra(extraId, delta) {
@@ -7696,6 +7834,7 @@
             agendaCakeSelection.extra_items = rows.slice(0, maxItems);
             if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
+            _agendaCakeDraftSave();
         }
 
         function agendaCakeRemoveFile(index) {
@@ -7703,6 +7842,7 @@
             if (!Array.isArray(agendaCakeSelection.referencia_urls) || idx < 0 || idx >= agendaCakeSelection.referencia_urls.length) return;
             agendaCakeSelection.referencia_urls.splice(idx, 1);
             _renderAgendaCakeFiles();
+            _agendaCakeDraftSave();
         }
 
         function _startAgendaPoll() {
@@ -9920,9 +10060,26 @@
             _abrirModalAgendaCakeCart();
         });
         agendaCakeCloseBuilderEl?.addEventListener("click", _cerrarModalAgendaCakeBuilder);
+        agendaCakeCloseXEl?.addEventListener("click", _cerrarModalAgendaCakeBuilder);
         agendaCakeCloseCartEl?.addEventListener("click", _cerrarModalAgendaCakeCart);
         agendaCakeClearQuoteEl?.addEventListener("click", _agendaBorrarCotizacion);
         agendaCakeGoScheduleEl?.addEventListener("click", _agendaIrASeleccionHorario);
+        agendaCakeStepPrevEl?.addEventListener("click", () => {
+            agendaCakeBuilderStep = Math.max(1, Number(agendaCakeBuilderStep || 1) - 1);
+            _agendaCakeApplyStep();
+        });
+        agendaCakeStepNextEl?.addEventListener("click", () => {
+            if (agendaCakeBuilderStep >= 4) {
+                _cerrarModalAgendaCakeBuilder();
+                if (_agendaIsMobileWizardEnabled()) {
+                    agendaMobileStep = Math.max(3, agendaMobileStep || 1);
+                    _agendaApplyMobileWizard(false);
+                }
+                return;
+            }
+            agendaCakeBuilderStep = Math.min(4, Number(agendaCakeBuilderStep || 1) + 1);
+            _agendaCakeApplyStep();
+        });
         modalAgendaCakeBuilderEl?.addEventListener("click", (ev) => {
             if (ev.target === modalAgendaCakeBuilderEl) _cerrarModalAgendaCakeBuilder();
         });
@@ -10078,6 +10235,7 @@
         });
         agendaCakeNoteEl?.addEventListener("input", () => {
             agendaCakeSelection.nota = String(agendaCakeNoteEl.value || "").trim();
+            _agendaCakeDraftSave();
         });
         agendaCakeFileEl?.addEventListener("change", async () => {
             const file = agendaCakeFileEl.files && agendaCakeFileEl.files[0] ? agendaCakeFileEl.files[0] : null;
