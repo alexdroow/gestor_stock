@@ -739,24 +739,6 @@
             background: #f97316;
             color: #fff;
         }
-        body.agenda-beta-mode .topbar-nav,
-        body.agenda-beta-mode .search,
-        body.agenda-beta-mode .left-nav,
-        body.agenda-beta-mode #sec-ofertas,
-        body.agenda-beta-mode #sec-destacados,
-        body.agenda-beta-mode #categorias-wrap,
-        body.agenda-beta-mode .cart-panel,
-        body.agenda-beta-mode .mobile-cat-strip {
-            display: none !important;
-        }
-        body.agenda-beta-mode .layout {
-            grid-template-columns: 1fr !important;
-            max-width: 980px;
-        }
-        body.agenda-beta-mode .content {
-            max-width: 880px;
-            margin: 0 auto;
-        }
         body.agenda-beta-mode .agenda-section {
             border: 1px solid #dbe4ef;
             border-radius: 16px;
@@ -774,6 +756,45 @@
         body.agenda-beta-mode .agenda-mobile-steps,
         body.agenda-beta-mode .agenda-subtitle-toggle {
             display: none !important;
+        }
+        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open {
+            overflow: hidden;
+        }
+        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #sec-agenda-reservas {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 120000 !important;
+            border-radius: 0 !important;
+            border: 0 !important;
+            margin: 0 !important;
+            overflow-y: auto;
+            background: #fff !important;
+            padding: 14px 12px 88px !important;
+            box-shadow: none !important;
+        }
+        body.mobile-ui.agenda-beta-mode #agenda-beta-close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #fff;
+            color: #334155;
+            font-size: 1.1rem;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        body.agenda-beta-mode #agenda-beta-close {
+            display: none;
+        }
+        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #agenda-beta-close {
+            display: inline-flex;
+            position: sticky;
+            top: 0;
+            margin-left: auto;
+            z-index: 2;
         }
         .agenda-pastel-wrap {
             border: 1px solid #dbe4ef;
@@ -3115,6 +3136,7 @@
             </div>
 
             <div class="section agenda-section" id="sec-agenda-reservas" style="display:none;">
+                <button type="button" id="agenda-beta-close" aria-label="Cerrar">x</button>
                 <div class="agenda-type-bar">
                     <label id="agenda-type-label">Tipo de pedido</label>
                     <div class="agenda-type-actions">
@@ -3772,6 +3794,7 @@
         const agendaBetaQuestionEl = document.getElementById("agenda-beta-question");
         const agendaBetaPrevEl = document.getElementById("agenda-beta-prev");
         const agendaBetaNextEl = document.getElementById("agenda-beta-next");
+        const agendaBetaCloseEl = document.getElementById("agenda-beta-close");
         const agendaCakeWrapEl = document.getElementById("agenda-cake-wrap");
         const agendaCakeGridEl = document.getElementById("agenda-cake-grid");
         const agendaCakeOpenCartEl = document.getElementById("agenda-cake-open-cart");
@@ -3982,6 +4005,13 @@
         const _uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
         if (_forceMobileParam || _uaMobile) {
             document.body.classList.add("mobile-ui");
+        }
+        if (_uaMobile && !_forceMobileParam) {
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set("mobile", "1");
+                window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+            } catch (_e) {}
         }
 
         function _aplicarEscalaMovilDinamica() {
@@ -5738,10 +5768,26 @@
             return categoriaActiva === "AGENDA" && (document.body.classList.contains("mobile-ui") || Boolean(_agendaBetaFromServer));
         }
 
+        function _agendaBetaModalAplica() {
+            return Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui");
+        }
+
+        function _agendaBetaSyncModalState() {
+            if (!_agendaBetaModalAplica()) {
+                document.body.classList.remove("agenda-beta-modal-open");
+                return;
+            }
+            const isAgenda = String(categoriaActiva || "").toUpperCase() === "AGENDA";
+            document.body.classList.toggle("agenda-beta-modal-open", isAgenda);
+        }
+
         function _agendaPaso2Completo() {
             const tipo = String(agendaTipoActual || "").trim().toLowerCase();
             if (tipo === "torta") {
-                return Boolean(String(agendaCakeSelection?.size_id || "").trim()) && Array.isArray(agendaCakeSelection?.sabor_ids) && agendaCakeSelection.sabor_ids.length > 0;
+                const sizeSel = _catalogFind("sizes", agendaCakeSelection?.size_id);
+                const required = Math.max(1, Math.min(3, Number(sizeSel?.max_sabores || 1)));
+                const picked = Array.isArray(agendaCakeSelection?.sabor_ids) ? agendaCakeSelection.sabor_ids.length : 0;
+                return Boolean(String(agendaCakeSelection?.size_id || "").trim()) && picked >= required;
             }
             if (tipo === "pastel") {
                 if (String(agendaPastelMode || "catalogo") === "especial") {
@@ -7940,6 +7986,7 @@
             }
             renderCategoriasMenu();
             renderSecciones();
+            _agendaBetaSyncModalState();
             _agendaApplyMobileWizard(false);
         }
 
@@ -7948,7 +7995,7 @@
                 const url = new URL(window.location.href);
                 const isAgenda = String(cat || "").trim().toUpperCase() === "AGENDA";
                 if (isAgenda) {
-                    url.pathname = "/tienda/agendar";
+                    url.pathname = Boolean(_agendaBetaFromServer) ? "/tienda/agendar-beta" : "/tienda/agendar";
                     url.searchParams.delete("seccion");
                 } else {
                     url.pathname = "/tienda";
@@ -9900,6 +9947,8 @@
         });
         window.addEventListener("resize", _aplicarEscalaMovilDinamica);
         window.addEventListener("orientationchange", _aplicarEscalaMovilDinamica);
+        window.addEventListener("resize", _agendaBetaSyncModalState);
+        window.addEventListener("orientationchange", _agendaBetaSyncModalState);
         if (window.visualViewport) {
             window.visualViewport.addEventListener("resize", _aplicarEscalaMovilDinamica);
         }
@@ -9957,6 +10006,10 @@
                 return;
             }
             _scrollAgendaReservarEnMobile(0);
+        });
+        agendaBetaCloseEl?.addEventListener("click", () => {
+            cambiarCategoria("TODOS");
+            document.body.classList.remove("agenda-beta-modal-open");
         });
         agendaSubtitleToggleEl?.addEventListener("click", () => {
             agendaSubtitleExpanded = !agendaSubtitleExpanded;
@@ -10075,6 +10128,7 @@
         _startAgendaPoll();
         _setAgendaEntregaTipo("retiro");
         _updateAgendaDespachoStepState();
+        _agendaBetaSyncModalState();
         _agendaApplyMobileWizard(false);
         _notificarRetornoFlowDesdeUrl();
         _aplicarEscalaMovilDinamica();
