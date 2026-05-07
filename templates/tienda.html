@@ -8832,7 +8832,24 @@
             modalClienteEl.classList.add("active");
         }
 
-        function _notificarRetornoFlowDesdeUrl() {
+        async function _esperarEstadoFlowFinal(ventaId, maxIntentos = 10, esperaMs = 1400) {
+            const id = Number(ventaId || 0);
+            if (!(id > 0)) return { ok: false, estado: "desconocido" };
+            for (let i = 0; i < maxIntentos; i++) {
+                try {
+                    const res = await fetch(`/api/tienda/flow/estado?venta_id=${id}`, { headers: { Accept: "application/json" }, cache: "no-store" });
+                    const data = await res.json();
+                    if (res.ok && data?.success) {
+                        const estado = String(data?.estado || "").trim().toLowerCase();
+                        if (estado === "pagado") return { ok: true, estado: "pagado" };
+                    }
+                } catch (_e) {}
+                await new Promise((resolve) => setTimeout(resolve, esperaMs));
+            }
+            return { ok: false, estado: "pendiente" };
+        }
+
+        async function _notificarRetornoFlowDesdeUrl() {
             try {
                 const p = new URLSearchParams(window.location.search || "");
                 const flow = String(p.get("flow") || "").trim().toLowerCase();
@@ -8854,14 +8871,32 @@
                     }
                     _limpiarFlowCheckoutDraft();
                 } else if (flow === "pending") {
-                    msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
-                    if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
-                        _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "pending" });
+                    const check = await _esperarEstadoFlowFinal(ventaId || ultimoComprobantePedido?.venta_id || 0, 10, 1400);
+                    if (check.ok) {
+                        msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
+                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
+                        }
+                        _limpiarFlowCheckoutDraft();
+                    } else {
+                        msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
+                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
+                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "pending" });
+                        }
                     }
                 } else if (flow === "error") {
-                    msg("La compra no se concreto en Flow. Puedes reintentar o usar transferencia.", true);
-                    if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
-                        _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "error" });
+                    const check = await _esperarEstadoFlowFinal(ventaId || ultimoComprobantePedido?.venta_id || 0, 4, 1200);
+                    if (check.ok) {
+                        msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
+                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
+                        }
+                        _limpiarFlowCheckoutDraft();
+                    } else {
+                        msg("La compra no se concreto en Flow. Puedes reintentar o usar transferencia.", true);
+                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
+                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "error" });
+                        }
                     }
                 }
                 p.delete("flow");
