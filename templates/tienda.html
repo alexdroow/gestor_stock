@@ -5982,6 +5982,11 @@
         }
 
         function _agendaApplyMobileWizard(autoAdvance = false) {
+            const betaMobile = Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui");
+            const modalFlowActivo = betaMobile && (
+                Boolean(modalAgendaCakeBuilderEl?.classList.contains("active"))
+                || Boolean(modalAgendaCakeCartEl?.classList.contains("active"))
+            );
             if (!_agendaIsMobileWizardEnabled()) {
                 if (agendaMobileStepsEl) agendaMobileStepsEl.style.display = "none";
                 if (agendaSubtitleToggleEl) agendaSubtitleToggleEl.style.display = "none";
@@ -5995,6 +6000,11 @@
                 return;
             }
             if (agendaMobileStepsEl) agendaMobileStepsEl.style.display = "";
+            if (modalFlowActivo) {
+                // Evita que el wizard legacy oculte bloques movidos al modal beta.
+                if (agendaBetaHeadEl) agendaBetaHeadEl.style.display = categoriaActiva === "AGENDA" ? "block" : "none";
+                return;
+            }
             if (agendaSubtitleEl && agendaSubtitleToggleEl) {
                 const txt = String(agendaSubtitleEl.textContent || "").trim();
                 const longText = txt.length > 150;
@@ -10230,7 +10240,7 @@
         });
         agendaCakeFlowPdfEl?.addEventListener("click", () => {
             try {
-                const payload = _buildAgendaPayload();
+                const payload = _buildAgendaReservaPayload();
                 _descargarComprobanteReservaAgenda(payload || {}, 0);
             } catch (_e) {}
         });
