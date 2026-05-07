@@ -819,6 +819,17 @@
             overflow: auto;
             border-radius: 12px;
         }
+        body.mobile-ui.agenda-beta-mode .agenda-beta-nav {
+            display: none !important;
+        }
+        body.mobile-ui.agenda-beta-mode #agenda-btn-reservar {
+            background: #f97316 !important;
+            border-color: #ea580c !important;
+            color: #fff !important;
+            min-height: 44px !important;
+            font-size: .95rem !important;
+            font-weight: 800 !important;
+        }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .modal,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .modal {
             width: 100vw;
@@ -3934,6 +3945,7 @@
         const secAgendaReservasEl = document.getElementById("sec-agenda-reservas");
         const contentMainEl = document.querySelector("main.layout .content");
         const agendaTypeLabelEl = document.getElementById("agenda-type-label");
+        const agendaTypeBarEl = document.querySelector(".agenda-type-bar");
         const agendaSectionTitleEl = document.getElementById("agenda-section-title");
         const agendaSectionSubtitleEl = document.getElementById("agenda-section-subtitle");
         const agendaDaysListEl = document.getElementById("agenda-days-list");
@@ -6238,15 +6250,15 @@
                 el.classList.toggle("active", s === agendaCakeBuilderStep);
             });
             const labels = {
-                1: "Paso 1 de 4: Elige tamano",
-                2: "Paso 2 de 4: Elige rellenos/sabores",
-                3: "Paso 3 de 4: Elige extras",
-                4: "Paso 4 de 4: Topper e indicaciones",
+                1: "Paso 1 de 6: Elige tamano",
+                2: "Paso 2 de 6: Elige rellenos/sabores",
+                3: "Paso 3 de 6: Elige extras",
+                4: "Paso 4 de 6: Topper e indicaciones",
             };
             if (agendaCakeStepLabelEl) agendaCakeStepLabelEl.textContent = labels[agendaCakeBuilderStep] || "Paso";
-            if (agendaCakeStepProgressFillEl) agendaCakeStepProgressFillEl.style.width = `${Math.round((agendaCakeBuilderStep / 4) * 100)}%`;
+            if (agendaCakeStepProgressFillEl) agendaCakeStepProgressFillEl.style.width = `${Math.round((agendaCakeBuilderStep / 6) * 100)}%`;
             if (agendaCakeStepPrevEl) agendaCakeStepPrevEl.disabled = agendaCakeBuilderStep <= 1;
-            if (agendaCakeStepNextEl) agendaCakeStepNextEl.textContent = agendaCakeBuilderStep >= 4 ? "Ir a horario" : "Siguiente";
+            if (agendaCakeStepNextEl) agendaCakeStepNextEl.textContent = agendaCakeBuilderStep >= 4 ? "Ir a paso 5" : "Siguiente";
             _agendaCakeDraftSave();
         }
 
@@ -6266,6 +6278,7 @@
             if (!modalAgendaCakeCartEl) return;
             _renderAgendaCakeSummary();
             if (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui")) {
+                if (agendaTypeBarEl) agendaTypeBarEl.style.display = "none";
                 if (agendaCakeFlowDaysHostEl && agendaDaysListEl && agendaDaysListEl.parentElement !== agendaCakeFlowDaysHostEl) {
                     agendaCakeFlowDaysHostEl.appendChild(agendaDaysListEl);
                 }
@@ -6285,6 +6298,7 @@
         function _cerrarModalAgendaCakeCart() {
             modalAgendaCakeCartEl?.classList.remove("active");
             if (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui")) {
+                if (agendaTypeBarEl) agendaTypeBarEl.style.display = "";
                 if (secAgendaReservasEl && agendaDaysListEl && agendaDaysListEl.parentElement !== secAgendaReservasEl) {
                     secAgendaReservasEl.appendChild(agendaDaysListEl);
                 }
@@ -6820,7 +6834,7 @@
                 }
 
                 const sizeSelected = _catalogFind("sizes", agendaCakeSelection.size_id);
-                const maxSabores = Math.max(1, Number(sizeSelected?.max_sabores || 1));
+                const maxSabores = Math.min(3, Math.max(1, Number(sizeSelected?.max_sabores || 1)));
 
                 if (agendaCakeFlavorsEl) {
                     const sabores = _catalogListByCategoria("sabores");
@@ -6985,7 +6999,7 @@
         function agendaCakeSelectSize(sizeId) {
             agendaCakeSelection.size_id = String(sizeId || "");
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
-            const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
+            const maxSabores = Math.min(3, Math.max(1, Number(size?.max_sabores || 1)));
             agendaCakeSelection.sabor_ids = (agendaCakeSelection.sabor_ids || []).slice(0, maxSabores);
             if (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui")) agendaCakeBuilderStep = Math.max(2, agendaCakeBuilderStep);
             if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
