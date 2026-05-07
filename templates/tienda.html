@@ -796,6 +796,26 @@
             margin-left: auto;
             z-index: 2;
         }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active {
+            display: flex;
+            align-items: stretch;
+            justify-content: stretch;
+            padding: 0;
+            background: rgba(2, 6, 23, .78);
+            z-index: 130000;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .modal,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .modal {
+            width: 100vw;
+            max-width: 100vw;
+            height: 100vh;
+            max-height: 100vh;
+            border-radius: 0;
+            margin: 0;
+            overflow-y: auto;
+            padding: 14px 12px 22px;
+        }
         .agenda-pastel-wrap {
             border: 1px solid #dbe4ef;
             border-radius: 12px;
@@ -5906,6 +5926,9 @@
             _toggleAgendaPastelBuilder();
             if (normalizado === "torta" && agendaCakeCatalog) {
                 _renderAgendaCakeBuilder();
+                if (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui")) {
+                    window.setTimeout(() => _abrirModalAgendaCakeBuilder(), 80);
+                }
             } else if (normalizado === "pastel") {
                 _renderAgendaPastelResumen();
             } else {
