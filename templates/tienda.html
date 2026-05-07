@@ -9012,33 +9012,43 @@
             try {
                 const p = new URLSearchParams(window.location.search || "");
                 const flow = String(p.get("flow") || "").trim().toLowerCase();
+                const track = _loadFlowReturnTracking();
+                const draft = _cargarFlowCheckoutDraft();
+                const fallbackVentaId = Number(track?.venta_id || 0) || Number(draft?.venta_id || 0) || Number(ultimoComprobantePedido?.venta_id || 0) || 0;
+                const _payloadFlowFallback = (extra = {}) => ({
+                    ...(ultimoComprobantePedido || {}),
+                    ...(draft || {}),
+                    ...extra,
+                    venta_id: Number(extra?.venta_id || fallbackVentaId || 0),
+                    items: Array.isArray(extra?.items) ? extra.items : (Array.isArray(draft?.items) ? draft.items : (Array.isArray(ultimoComprobantePedido?.items) ? ultimoComprobantePedido.items : [])),
+                });
                 if (!flow) {
-                    const track = _loadFlowReturnTracking();
-                    const draft = _cargarFlowCheckoutDraft();
                     const ageMs = track ? (Date.now() - Number(track.ts || 0)) : Number.MAX_SAFE_INTEGER;
                     const hasRecentTrack = Boolean(track && ageMs >= 0 && ageMs <= 20 * 60 * 1000);
-                    if (hasRecentTrack && draft && Number(draft.venta_id || 0) > 0) {
-                        ultimoComprobantePedido = {
-                            ...(ultimoComprobantePedido || {}),
-                            ...draft,
-                            venta_id: Number(draft.venta_id || 0),
-                        };
-                        guardarUltimoPedidoLocal();
-                        const check = await _esperarEstadoFlowFinal(Number(draft.venta_id || 0), 6, 1200);
+                    if (hasRecentTrack) {
+                        const ventaSeguimiento = Number(draft?.venta_id || track?.venta_id || 0);
+                        if (draft && Number(draft.venta_id || 0) > 0) {
+                            ultimoComprobantePedido = {
+                                ...(ultimoComprobantePedido || {}),
+                                ...draft,
+                                venta_id: Number(draft.venta_id || 0),
+                            };
+                            guardarUltimoPedidoLocal();
+                        }
+                        const check = await _esperarEstadoFlowFinal(ventaSeguimiento, 6, 1200);
                         if (check.ok) {
                             msg("Pago confirmado por Flow. Pedido registrado correctamente.");
-                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
+                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "success" });
                             _limpiarFlowCheckoutDraft();
                         } else {
                             msg("La compra fue cancelada o aun no esta pagada en Flow.", true);
-                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "error" });
+                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "error" });
                             _clearFlowReturnTracking();
                         }
                     }
                     return;
                 }
                 const ventaId = Number(p.get("venta_id") || 0);
-                const draft = _cargarFlowCheckoutDraft();
                 if (draft && (!ventaId || Number(draft.venta_id || 0) === ventaId)) {
                     ultimoComprobantePedido = {
                         ...(ultimoComprobantePedido || {}),
@@ -9049,37 +9059,27 @@
                 }
                 if (flow === "paid") {
                     msg("Pago confirmado por Flow. Pedido registrado correctamente.");
-                    if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
-                        _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
-                    }
+                    _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "success" });
                     _limpiarFlowCheckoutDraft();
                 } else if (flow === "pending") {
-                    const check = await _esperarEstadoFlowFinal(ventaId || ultimoComprobantePedido?.venta_id || 0, 10, 1400);
+                    const check = await _esperarEstadoFlowFinal(ventaId || fallbackVentaId || 0, 10, 1400);
                     if (check.ok) {
                         msg("Pago confirmado por Flow. Pedido registrado correctamente.");
-                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
-                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
-                        }
+                        _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "success" });
                         _limpiarFlowCheckoutDraft();
                     } else {
                         msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
-                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
-                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "pending" });
-                        }
+                        _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "pending" });
                     }
                 } else if (flow === "error") {
-                    const check = await _esperarEstadoFlowFinal(ventaId || ultimoComprobantePedido?.venta_id || 0, 4, 1200);
+                    const check = await _esperarEstadoFlowFinal(ventaId || fallbackVentaId || 0, 4, 1200);
                     if (check.ok) {
                         msg("Pago confirmado por Flow. Pedido registrado correctamente.");
-                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
-                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "success" });
-                        }
+                        _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "success" });
                         _limpiarFlowCheckoutDraft();
                     } else {
                         msg("La compra no se concreto en Flow. Puedes reintentar o usar transferencia.", true);
-                        if (ultimoComprobantePedido && Number(ultimoComprobantePedido.venta_id || 0)) {
-                            _abrirPostCheckoutPopup(ultimoComprobantePedido, { mode: "error" });
-                        }
+                        _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "error" });
                     }
                 }
                 _clearFlowReturnTracking();
