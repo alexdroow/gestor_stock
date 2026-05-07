@@ -9076,15 +9076,19 @@
             const isSuccess = mode === "success";
             const isPending = mode === "pending";
             const titulo = isSuccess ? "Pedido recibido" : "Estado del pago";
-            const chipLabel = isSuccess ? `Pedido #${Number(p?.venta_id || 0) || "-"}` : "Pago no concretado";
+            const chipLabel = isSuccess
+                ? `Pedido #${Number(p?.venta_id || 0) || "-"}`
+                : (isPending ? "Pago pendiente de confirmacion" : "Pago no concretado");
             const resumenTitulo = isSuccess
                 ? "Compra confirmada correctamente."
                 : (isPending
-                    ? "Tu pago con Flow quedo pendiente de confirmacion."
+                    ? "Tu pedido aun NO esta pagado."
                     : "La compra no se concreto en Flow.");
             const resumenDetalle = isSuccess
                 ? `Guarda tu numero de pedido para seguimiento: #${Number(p?.venta_id || 0) || "-"}.`
-                : "Puedes reintentar el pago o elegir transferencia para completar tu pedido.";
+                : (isPending
+                    ? "En cuanto Flow confirme el pago, tu pedido se registrara automaticamente en SucréeStock."
+                    : "Puedes reintentar el pago o elegir transferencia para completar tu pedido.");
             const ventaId = Number(p?.venta_id || 0);
             const entrega = String(p?.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
             const hora = String(p?.hora_retiro || "").trim();

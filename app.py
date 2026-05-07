@@ -12502,10 +12502,22 @@ def api_tienda_flow_estado():
         _ensure_flow_pago_table(cur)
         cur.execute("SELECT * FROM tienda_flow_pagos WHERE venta_id = ? LIMIT 1", (venta_id,))
         row = cur.fetchone()
+        row_data = dict(row) if row else None
+        # Reconciliacion activa: si sigue pendiente, consultamos a Flow en vivo.
+        if row_data and str(row_data.get("estado") or "").strip().lower() == "pendiente":
+            token = str(row_data.get("flow_token") or "").strip()
+            if token and _flow_cfg().get("enabled"):
+                try:
+                    _flow_confirmar_token_y_actualizar(token)
+                    cur.execute("SELECT * FROM tienda_flow_pagos WHERE venta_id = ? LIMIT 1", (venta_id,))
+                    row = cur.fetchone()
+                    row_data = dict(row) if row else row_data
+                except Exception:
+                    pass
         conn.close()
-        if not row:
+        if not row_data:
             return jsonify({"success": True, "found": False, "estado": "no_registrado"})
-        data = dict(row)
+        data = row_data
         return jsonify({"success": True, "found": True, "estado": str(data.get("estado") or "pendiente"), "data": data})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
