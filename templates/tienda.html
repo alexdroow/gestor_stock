@@ -941,6 +941,21 @@
         .agenda-cake-step-pane.active {
             display: block;
         }
+        .agenda-cake-flow-pane { display: none; }
+        .agenda-cake-flow-pane.active { display: block; }
+        .agenda-flow-btn {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            height: 42px !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #modal-agenda-cake-cart .modal-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: nowrap;
+        }
         .agenda-pastel-special-box textarea,
         .agenda-pastel-special-box input {
             width: 100%;
@@ -3689,18 +3704,37 @@
 
     <div class="modal-overlay agenda-cake-modal" id="modal-agenda-cake-cart">
         <div class="modal">
-            <h3 id="agenda-cake-summary-title">Resumen de cotizacion</h3>
-            <aside class="agenda-cake-cart" style="border:0;padding:0;background:transparent;">
-                <ul id="agenda-cake-summary"></ul>
-                <div class="agenda-cake-total">
-                    <span id="agenda-cake-total-label">Total estimado</span>
-                    <span id="agenda-cake-total">$0</span>
-                </div>
-            </aside>
+            <div class="agenda-cake-step-head">
+                <h3 id="agenda-cake-summary-title">Resumen de cotizacion</h3>
+                <button type="button" id="agenda-cake-close-x-2" class="agenda-cake-close-x" aria-label="Cerrar">x</button>
+            </div>
+            <div class="agenda-cake-step-progress">
+                <span id="agenda-cake-flow-progress-fill"></span>
+            </div>
+            <div class="agenda-cake-step-label" id="agenda-cake-flow-step-label">Paso 5 de 7: Resumen</div>
+            <div class="agenda-cake-flow-pane active" data-flow-step="1">
+                <aside class="agenda-cake-cart" style="border:0;padding:0;background:transparent;">
+                    <ul id="agenda-cake-summary"></ul>
+                    <div class="agenda-cake-total">
+                        <span id="agenda-cake-total-label">Total estimado</span>
+                        <span id="agenda-cake-total">$0</span>
+                    </div>
+                </aside>
+            </div>
+            <div class="agenda-cake-flow-pane" data-flow-step="2">
+                <div class="agenda-mini-title">Paso 6: Elige horario</div>
+                <div id="agenda-cake-flow-days-host"></div>
+                <div id="agenda-cake-flow-hours-host"></div>
+            </div>
+            <div class="agenda-cake-flow-pane" data-flow-step="3">
+                <div class="agenda-mini-title">Paso 7: Entrega y datos</div>
+                <div id="agenda-cake-flow-form-host"></div>
+            </div>
             <div class="modal-actions">
-                <button class="btn-muted" type="button" id="agenda-cake-close-cart">Cerrar</button>
-                <button class="btn-muted" type="button" id="agenda-cake-clear-quote">Borrar cotizacion</button>
-                <button class="btn-primary" type="button" id="agenda-cake-go-schedule">Selecciona horario</button>
+                <button class="btn-muted agenda-flow-btn" type="button" id="agenda-cake-flow-prev">Anterior</button>
+                <button class="btn-muted agenda-flow-btn" type="button" id="agenda-cake-clear-quote">Borrar cotizacion</button>
+                <button class="btn-primary agenda-flow-btn" type="button" id="agenda-cake-flow-next">Siguiente</button>
+                <button class="btn-muted agenda-flow-btn" type="button" id="agenda-cake-close-cart">Cerrar</button>
             </div>
         </div>
     </div>
@@ -3938,7 +3972,14 @@
         const agendaCakeOpenCart2El = document.getElementById("agenda-cake-open-cart-2");
         const agendaCakeCloseCartEl = document.getElementById("agenda-cake-close-cart");
         const agendaCakeClearQuoteEl = document.getElementById("agenda-cake-clear-quote");
-        const agendaCakeGoScheduleEl = document.getElementById("agenda-cake-go-schedule");
+        const agendaCakeFlowPrevEl = document.getElementById("agenda-cake-flow-prev");
+        const agendaCakeFlowNextEl = document.getElementById("agenda-cake-flow-next");
+        const agendaCakeFlowLabelEl = document.getElementById("agenda-cake-flow-step-label");
+        const agendaCakeFlowProgressFillEl = document.getElementById("agenda-cake-flow-progress-fill");
+        const agendaCakeCloseX2El = document.getElementById("agenda-cake-close-x-2");
+        const agendaCakeFlowDaysHostEl = document.getElementById("agenda-cake-flow-days-host");
+        const agendaCakeFlowHoursHostEl = document.getElementById("agenda-cake-flow-hours-host");
+        const agendaCakeFlowFormHostEl = document.getElementById("agenda-cake-flow-form-host");
         const agendaCakeCloseXEl = document.getElementById("agenda-cake-close-x");
         const agendaCakeStepPrevEl = document.getElementById("agenda-cake-step-prev");
         const agendaCakeStepNextEl = document.getElementById("agenda-cake-step-next");
@@ -4089,6 +4130,7 @@
             nota: "",
         };
         let agendaCakeBuilderStep = 1;
+        let agendaCakeFlowStep = 1;
         const AGENDA_BETA_DRAFT_KEY = "agenda_beta_cake_draft_v1";
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
@@ -6179,11 +6221,58 @@
         function _abrirModalAgendaCakeCart() {
             if (!modalAgendaCakeCartEl) return;
             _renderAgendaCakeSummary();
+            if (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui")) {
+                if (agendaCakeFlowDaysHostEl && agendaDaysListEl && agendaDaysListEl.parentElement !== agendaCakeFlowDaysHostEl) {
+                    agendaCakeFlowDaysHostEl.appendChild(agendaDaysListEl);
+                }
+                if (agendaCakeFlowHoursHostEl && agendaHoursListEl && agendaHoursListEl.parentElement !== agendaCakeFlowHoursHostEl) {
+                    agendaCakeFlowHoursHostEl.appendChild(agendaHoursListEl);
+                }
+                if (agendaCakeFlowFormHostEl && agendaReservaFormEl && agendaReservaFormEl.parentElement !== agendaCakeFlowFormHostEl) {
+                    agendaCakeFlowFormHostEl.appendChild(agendaReservaFormEl);
+                }
+                if (agendaBtnReservarEl) agendaBtnReservarEl.style.display = "none";
+                agendaCakeFlowStep = 1;
+                _agendaCakeApplyFlowStep();
+            }
             modalAgendaCakeCartEl.classList.add("active");
         }
 
         function _cerrarModalAgendaCakeCart() {
             modalAgendaCakeCartEl?.classList.remove("active");
+            if (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui")) {
+                if (secAgendaReservasEl && agendaDaysListEl && agendaDaysListEl.parentElement !== secAgendaReservasEl) {
+                    secAgendaReservasEl.appendChild(agendaDaysListEl);
+                }
+                if (secAgendaReservasEl && agendaHoursListEl && agendaHoursListEl.parentElement !== secAgendaReservasEl) {
+                    secAgendaReservasEl.appendChild(agendaHoursListEl);
+                }
+                if (secAgendaReservasEl && agendaReservaFormEl && agendaReservaFormEl.parentElement !== secAgendaReservasEl) {
+                    secAgendaReservasEl.appendChild(agendaReservaFormEl);
+                }
+                if (agendaBtnReservarEl) agendaBtnReservarEl.style.display = "";
+                _agendaApplyMobileWizard(false);
+            }
+        }
+
+        function _agendaCakeApplyFlowStep() {
+            const panes = modalAgendaCakeCartEl?.querySelectorAll(".agenda-cake-flow-pane") || [];
+            panes.forEach((el) => {
+                const s = Number(el.getAttribute("data-flow-step") || 1);
+                el.classList.toggle("active", s === agendaCakeFlowStep);
+            });
+            const labels = {
+                1: "Paso 5 de 7: Resumen",
+                2: "Paso 6 de 7: Horario",
+                3: "Paso 7 de 7: Entrega y datos",
+            };
+            if (agendaCakeFlowLabelEl) agendaCakeFlowLabelEl.textContent = labels[agendaCakeFlowStep] || "Paso";
+            if (agendaCakeFlowProgressFillEl) agendaCakeFlowProgressFillEl.style.width = `${Math.round(((agendaCakeFlowStep + 4) / 7) * 100)}%`;
+            if (agendaCakeFlowPrevEl) agendaCakeFlowPrevEl.disabled = agendaCakeFlowStep <= 1;
+            if (agendaCakeFlowNextEl) agendaCakeFlowNextEl.textContent = agendaCakeFlowStep >= 3 ? "Confirmar reserva" : "Siguiente";
+            if (agendaDaysListEl) agendaDaysListEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
+            if (agendaHoursListEl) agendaHoursListEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
+            if (agendaReservaFormEl) agendaReservaFormEl.style.display = agendaCakeFlowStep === 3 ? "" : "none";
         }
 
         function _agendaIrASeleccionHorario() {
@@ -10075,7 +10164,19 @@
         agendaCakeCloseXEl?.addEventListener("click", _cerrarModalAgendaCakeBuilder);
         agendaCakeCloseCartEl?.addEventListener("click", _cerrarModalAgendaCakeCart);
         agendaCakeClearQuoteEl?.addEventListener("click", _agendaBorrarCotizacion);
-        agendaCakeGoScheduleEl?.addEventListener("click", _agendaIrASeleccionHorario);
+        agendaCakeFlowPrevEl?.addEventListener("click", () => {
+            agendaCakeFlowStep = Math.max(1, Number(agendaCakeFlowStep || 1) - 1);
+            _agendaCakeApplyFlowStep();
+        });
+        agendaCakeFlowNextEl?.addEventListener("click", () => {
+            if (agendaCakeFlowStep >= 3) {
+                reservarAgendaDesdeTienda();
+                return;
+            }
+            agendaCakeFlowStep = Math.min(3, Number(agendaCakeFlowStep || 1) + 1);
+            _agendaCakeApplyFlowStep();
+        });
+        agendaCakeCloseX2El?.addEventListener("click", _cerrarModalAgendaCakeCart);
         agendaCakeStepPrevEl?.addEventListener("click", () => {
             agendaCakeBuilderStep = Math.max(1, Number(agendaCakeBuilderStep || 1) - 1);
             _agendaCakeApplyStep();
