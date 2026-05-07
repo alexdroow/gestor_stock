@@ -5953,6 +5953,34 @@
             return categoriaActiva === "AGENDA" && (document.body.classList.contains("mobile-ui") || Boolean(_agendaBetaFromServer));
         }
 
+        function _agendaBetaSyncHeader() {
+            if (!Boolean(_agendaBetaFromServer)) return;
+            let text = "Paso 1 de 6: Elige el tipo de pedido";
+            let pct = 17;
+            const flowActive = Boolean(modalAgendaCakeCartEl?.classList.contains("active"));
+            if (flowActive) {
+                if (Number(agendaCakeFlowStep || 1) <= 1) {
+                    text = "Paso 5 de 6: Selecciona fecha y hora";
+                    pct = 84;
+                } else {
+                    text = "Paso 6 de 6: Completa retiro/despacho y confirma";
+                    pct = 100;
+                }
+            } else {
+                const map = {
+                    1: { t: "Paso 1 de 6: Elige el tipo de pedido", p: 17 },
+                    2: { t: "Paso 2 de 6: Personaliza tu pedido", p: 34 },
+                    3: { t: "Paso 5 de 6: Selecciona fecha y hora", p: 84 },
+                    4: { t: "Paso 6 de 6: Completa retiro/despacho y confirma", p: 100 },
+                };
+                const m = map[Number(agendaMobileStep || 1)] || map[1];
+                text = m.t;
+                pct = m.p;
+            }
+            if (agendaBetaQuestionEl) agendaBetaQuestionEl.textContent = text;
+            if (agendaBetaProgressFillEl) agendaBetaProgressFillEl.style.width = `${pct}%`;
+        }
+
         function _agendaBetaModalAplica() {
             return Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui");
         }
@@ -6026,6 +6054,7 @@
             if (modalFlowActivo) {
                 // Evita que el wizard legacy oculte bloques movidos al modal beta.
                 if (agendaBetaHeadEl) agendaBetaHeadEl.style.display = categoriaActiva === "AGENDA" ? "block" : "none";
+                _agendaBetaSyncHeader();
                 return;
             }
             if (agendaSubtitleEl && agendaSubtitleToggleEl) {
@@ -6059,18 +6088,7 @@
             if (secAgendaReservasEl) secAgendaReservasEl.setAttribute("data-mobile-step", String(agendaMobileStep));
 
             if (Boolean(_agendaBetaFromServer)) {
-                const labels = {
-                    1: "Paso 1 de 6: Elige el tipo de pedido",
-                    2: "Paso 2 de 6: Personaliza tu pedido",
-                    3: "Paso 5 de 6: Selecciona fecha y hora",
-                    4: "Paso 6 de 6: Completa retiro/despacho y confirma"
-                };
-                if (agendaBetaQuestionEl) agendaBetaQuestionEl.textContent = labels[agendaMobileStep] || "Agenda tu pedido";
-                if (agendaBetaProgressFillEl) {
-                    const pctMap = { 1: 17, 2: 34, 3: 84, 4: 100 };
-                    const pct = Number(pctMap[agendaMobileStep] || 17);
-                    agendaBetaProgressFillEl.style.width = `${pct}%`;
-                }
+                _agendaBetaSyncHeader();
                 if (agendaBetaPrevEl) agendaBetaPrevEl.disabled = agendaMobileStep <= 1;
                 if (agendaBetaNextEl) {
                     agendaBetaNextEl.textContent = agendaMobileStep >= 4 ? "Revisar y confirmar" : "Siguiente";
@@ -6289,6 +6307,7 @@
                 if (agendaBtnReservarEl) agendaBtnReservarEl.style.display = "none";
                 agendaCakeFlowStep = 1;
                 _agendaCakeApplyFlowStep();
+                _agendaBetaSyncHeader();
             }
             modalAgendaCakeCartEl.classList.add("active");
         }
@@ -6308,6 +6327,7 @@
                 }
                 if (agendaBtnReservarEl) agendaBtnReservarEl.style.display = "";
                 _agendaApplyMobileWizard(false);
+                _agendaBetaSyncHeader();
             }
         }
 
@@ -6331,6 +6351,7 @@
             if (agendaCakeFlowConfirmDetailEl) agendaCakeFlowConfirmDetailEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
             if (agendaCakeFlowConfirmEl) agendaCakeFlowConfirmEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
             if (agendaCakeFlowPdfEl) agendaCakeFlowPdfEl.style.display = agendaCakeFlowStep === 2 ? "" : "none";
+            _agendaBetaSyncHeader();
         }
 
         function _agendaIrASeleccionHorario() {
