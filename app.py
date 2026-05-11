@@ -2925,6 +2925,144 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             n = 0
         return f"${n:,}".replace(",", ".")
 
+    def _norm_text(value):
+        txt = str(value or "").strip().lower()
+        txt = txt.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").replace("ü", "u")
+        return " ".join(txt.split())
+
+    def _parse_resumen_cliente_catalogo(txt):
+        lines = [str(ln or "").strip() for ln in str(txt or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+        lines = [ln for ln in lines if ln]
+        if not lines:
+            return None
+        start = -1
+        for i, ln in enumerate(lines):
+            if _norm_text(ln.strip("- ").strip()) == "resumen de cotizacion (cliente)":
+                start = i + 1
+                break
+        if start < 0:
+            return None
+        block = []
+        for ln in lines[start:]:
+            if ln.startswith("---") and ln.endswith("---") and len(ln) > 6:
+                break
+            block.append(ln)
+        if not block:
+            return None
+        data = {"categoria": "", "tamano": "", "sabores": [], "extras": [], "topper": "", "nota": "", "referencias": []}
+        mode = ""
+        for raw in block:
+            ln = str(raw or "").strip()
+            low = _norm_text(ln)
+            if low.startswith("categoria:"):
+                data["categoria"] = ln.split(":", 1)[1].strip()
+                mode = ""
+                continue
+            if low.startswith("tamano:"):
+                data["tamano"] = ln.split(":", 1)[1].strip()
+                mode = ""
+                continue
+            if low == "sabores:":
+                mode = "sabores"
+                continue
+            if low == "extras:":
+                mode = "extras"
+                continue
+            if low == "topper:":
+                mode = "topper"
+                continue
+            if low.startswith("nota catalogo:"):
+                data["nota"] = ln.split(":", 1)[1].strip()
+                mode = ""
+                continue
+            if low.startswith("referencias:"):
+                val = ln.split(":", 1)[1].strip()
+                if val and val != "-":
+                    data["referencias"].append(val)
+                mode = "referencias"
+                continue
+            if mode in {"sabores", "extras", "topper", "referencias"} and ln.startswith("-"):
+                val = ln[1:].strip()
+                if not val or val == "-":
+                    continue
+                if mode == "sabores":
+                    data["sabores"].append(val)
+                elif mode == "extras":
+                    data["extras"].append(val)
+                elif mode == "topper":
+                    data["topper"] = val
+                else:
+                    data["referencias"].append(val)
+        return data
+
+    def _builder_from_resumen_cliente(txt):
+        parsed = _parse_resumen_cliente_catalogo(txt)
+        if not parsed:
+            return None
+        try:
+            cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
+            catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+        except Exception:
+            catalogo = {"categorias": [], "sizes": [], "sabores": [], "extras": [], "toppers": []}
+
+        def _id_by_name(rows, query_name):
+            want = _norm_text(query_name)
+            if not want:
+                return ""
+            for r in (rows or []):
+                rid = str((r or {}).get("id") or "").strip()
+                nm = _norm_text((r or {}).get("nombre"))
+                if rid and nm and (nm == want or nm in want or want in nm):
+                    return rid
+            return ""
+
+        def _name_qty(row_txt):
+            txt_row = str(row_txt or "").strip()
+            qty = 1
+            m = re.search(r"\bx\s*(\d+)\b", txt_row, re.IGNORECASE)
+            if m:
+                try:
+                    qty = max(1, int(m.group(1)))
+                except (TypeError, ValueError):
+                    qty = 1
+            txt_row = re.sub(r"\bx\s*\d+\b", "", txt_row, flags=re.IGNORECASE).strip()
+            txt_row = re.sub(r"\(.*?\)", "", txt_row).strip(" -")
+            return txt_row, qty
+
+        categoria_id = _id_by_name(catalogo.get("categorias"), parsed.get("categoria"))
+        tamano_name = re.sub(r"\(.*?\)", "", str(parsed.get("tamano") or "")).strip()
+        size_id = _id_by_name(catalogo.get("sizes"), tamano_name or parsed.get("tamano"))
+
+        sabor_ids = []
+        for s in (parsed.get("sabores") or []):
+            s_name, _ = _name_qty(s)
+            sid = _id_by_name(catalogo.get("sabores"), s_name)
+            if sid and sid not in sabor_ids:
+                sabor_ids.append(sid)
+
+        extra_items = []
+        for ex in (parsed.get("extras") or []):
+            ex_name, qty = _name_qty(ex)
+            ex_id = _id_by_name(catalogo.get("extras"), ex_name)
+            if ex_id:
+                extra_items.append({"id": ex_id, "qty": int(max(1, qty))})
+
+        topper_name, _ = _name_qty(parsed.get("topper"))
+        topper_id = _id_by_name(catalogo.get("toppers"), topper_name) if topper_name and _norm_text(topper_name) != "sin topper" else ""
+
+        builder = {
+            "categoria_id": categoria_id,
+            "size_id": size_id,
+            "sabor_ids": sabor_ids,
+            "extra_items": extra_items,
+            "topper_id": topper_id,
+            "referencia_urls": [str(x).strip() for x in (parsed.get("referencias") or []) if str(x).strip()],
+            "nota": str(parsed.get("nota") or "").strip(),
+        }
+        if not any([builder["categoria_id"], builder["size_id"], builder["sabor_ids"], builder["extra_items"], builder["topper_id"], builder["referencia_urls"], builder["nota"]]):
+            return None
+        return builder
+
     def _catalogo_section_from_builder(builder):
         if not isinstance(builder, dict):
             return None
@@ -3104,6 +3242,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     ingredientes_txt = reserva.get("ingredientes") or ""
     sections = _split_sections(ingredientes_txt, "Ingredientes / Detalles")
     builder_data = _parse_builder_json(ingredientes_txt)
+    if not builder_data:
+        builder_data = _builder_from_resumen_cliente(ingredientes_txt)
     builder_catalog_section = _catalogo_section_from_builder(builder_data) if builder_data else None
     if builder_catalog_section:
         filtered = [sec for sec in sections if str(sec.get("title") or "").strip().lower() != "catalogo torta"]
@@ -17924,6 +18064,166 @@ def api_agenda_evento_pdf(id):
         return jsonify({'success': True, 'media_url': media_url, 'filename': filename, 'codigo_pedido': str(evento.get('codigo_pedido') or '').strip()})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/agenda/backfill-builder-json', methods=['POST'])
+def api_agenda_backfill_builder_json():
+    conn = None
+    try:
+        def _norm_text(value):
+            txt = str(value or "").strip().lower()
+            txt = txt.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").replace("ü", "u")
+            return " ".join(txt.split())
+
+        def _parse_resumen_cliente_catalogo(txt):
+            lines = [str(ln or "").strip() for ln in str(txt or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+            lines = [ln for ln in lines if ln]
+            start = -1
+            for i, ln in enumerate(lines):
+                if _norm_text(ln.strip("- ").strip()) == "resumen de cotizacion (cliente)":
+                    start = i + 1
+                    break
+            if start < 0:
+                return None
+            data = {"categoria": "", "tamano": "", "sabores": [], "extras": [], "topper": "", "nota": "", "referencias": []}
+            mode = ""
+            for ln in lines[start:]:
+                if ln.startswith("---") and ln.endswith("---") and len(ln) > 6:
+                    break
+                low = _norm_text(ln)
+                if low.startswith("categoria:"):
+                    data["categoria"] = ln.split(":", 1)[1].strip()
+                    mode = ""
+                    continue
+                if low.startswith("tamano:"):
+                    data["tamano"] = ln.split(":", 1)[1].strip()
+                    mode = ""
+                    continue
+                if low == "sabores:":
+                    mode = "sabores"
+                    continue
+                if low == "extras:":
+                    mode = "extras"
+                    continue
+                if low == "topper:":
+                    mode = "topper"
+                    continue
+                if low.startswith("nota catalogo:"):
+                    data["nota"] = ln.split(":", 1)[1].strip()
+                    mode = ""
+                    continue
+                if low.startswith("referencias:"):
+                    val = ln.split(":", 1)[1].strip()
+                    if val and val != "-":
+                        data["referencias"].append(val)
+                    mode = "referencias"
+                    continue
+                if mode in {"sabores", "extras", "topper", "referencias"} and ln.startswith("-"):
+                    v = ln[1:].strip()
+                    if not v or v == "-":
+                        continue
+                    if mode == "sabores":
+                        data["sabores"].append(v)
+                    elif mode == "extras":
+                        data["extras"].append(v)
+                    elif mode == "topper":
+                        data["topper"] = v
+                    else:
+                        data["referencias"].append(v)
+            return data
+
+        def _id_by_name(rows, query_name):
+            want = _norm_text(query_name)
+            if not want:
+                return ""
+            for r in (rows or []):
+                rid = str((r or {}).get("id") or "").strip()
+                nm = _norm_text((r or {}).get("nombre"))
+                if rid and nm and (nm == want or nm in want or want in nm):
+                    return rid
+            return ""
+
+        def _name_qty(row_txt):
+            txt_row = str(row_txt or "").strip()
+            qty = 1
+            m = re.search(r"\bx\s*(\d+)\b", txt_row, re.IGNORECASE)
+            if m:
+                try:
+                    qty = max(1, int(m.group(1)))
+                except (TypeError, ValueError):
+                    qty = 1
+            txt_row = re.sub(r"\bx\s*\d+\b", "", txt_row, flags=re.IGNORECASE).strip()
+            txt_row = re.sub(r"\(.*?\)", "", txt_row).strip(" -")
+            return txt_row, qty
+
+        cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
+        catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, ingredientes
+            FROM agenda_eventos
+            WHERE lower(coalesce(tipo,''))='torta'
+              AND lower(coalesce(motivo,'')) LIKE '%reserva cliente tienda online%'
+              AND instr(coalesce(ingredientes,''), '--- Builder JSON ---') = 0
+              AND instr(coalesce(ingredientes,''), '--- Resumen de cotizacion (cliente) ---') > 0
+            ORDER BY id DESC
+            """
+        )
+        rows = cur.fetchall() or []
+        actualizados = 0
+        omitidos = 0
+        for row in rows:
+            rid = int((dict(row) or {}).get("id") or 0)
+            ingredientes = str((dict(row) or {}).get("ingredientes") or "")
+            parsed = _parse_resumen_cliente_catalogo(ingredientes)
+            if not parsed:
+                omitidos += 1
+                continue
+            categoria_id = _id_by_name(catalogo.get("categorias"), parsed.get("categoria"))
+            tamano_name = re.sub(r"\(.*?\)", "", str(parsed.get("tamano") or "")).strip()
+            size_id = _id_by_name(catalogo.get("sizes"), tamano_name or parsed.get("tamano"))
+            sabor_ids = []
+            for s in (parsed.get("sabores") or []):
+                s_name, _ = _name_qty(s)
+                sid = _id_by_name(catalogo.get("sabores"), s_name)
+                if sid and sid not in sabor_ids:
+                    sabor_ids.append(sid)
+            extra_items = []
+            for ex in (parsed.get("extras") or []):
+                ex_name, qty = _name_qty(ex)
+                ex_id = _id_by_name(catalogo.get("extras"), ex_name)
+                if ex_id:
+                    extra_items.append({"id": ex_id, "qty": int(max(1, qty))})
+            topper_name, _ = _name_qty(parsed.get("topper"))
+            topper_id = _id_by_name(catalogo.get("toppers"), topper_name) if topper_name and _norm_text(topper_name) != "sin topper" else ""
+            builder = {
+                "categoria_id": categoria_id,
+                "size_id": size_id,
+                "sabor_ids": sabor_ids,
+                "extra_items": extra_items,
+                "topper_id": topper_id,
+                "referencia_urls": [str(x).strip() for x in (parsed.get("referencias") or []) if str(x).strip()],
+                "nota": str(parsed.get("nota") or "").strip(),
+            }
+            if not any([builder["categoria_id"], builder["size_id"], builder["sabor_ids"], builder["extra_items"], builder["topper_id"], builder["referencia_urls"], builder["nota"]]):
+                omitidos += 1
+                continue
+            ingredientes_new = f"{ingredientes}\n--- Builder JSON ---\n{json.dumps(builder, ensure_ascii=False, separators=(',', ':'))}"
+            cur.execute("UPDATE agenda_eventos SET ingredientes=? WHERE id=?", (ingredientes_new, rid))
+            if cur.rowcount:
+                actualizados += 1
+        conn.commit()
+        return jsonify({"success": True, "actualizados": actualizados, "omitidos": omitidos, "evaluados": len(rows)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
