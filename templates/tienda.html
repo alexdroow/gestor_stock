@@ -6246,7 +6246,7 @@
             const tipo = String(agendaTipoActual || "").trim().toLowerCase();
             if (tipo === "torta") {
                 const sizeSel = _catalogFind("sizes", agendaCakeSelection?.size_id);
-                const required = Math.max(1, Math.min(3, Number(sizeSel?.max_sabores || 1)));
+                const required = Math.max(2, Math.min(3, Number(sizeSel?.max_sabores || 3)));
                 const picked = Array.isArray(agendaCakeSelection?.sabor_ids) ? agendaCakeSelection.sabor_ids.length : 0;
                 return Boolean(String(agendaCakeSelection?.size_id || "").trim()) && picked >= required;
             }
@@ -8181,7 +8181,7 @@
             if (payload.tipo === "torta") {
                 const cat = payload.catalogo_torta || {};
                 if (!String(cat.size_id || "").trim()) return _agendaMsg("Selecciona tamano de torta.", "err");
-                if (!Array.isArray(cat.sabor_ids) || !cat.sabor_ids.length) return _agendaMsg("Selecciona al menos un sabor.", "err");
+                if (!Array.isArray(cat.sabor_ids) || cat.sabor_ids.length < 2) return _agendaMsg("Selecciona al menos 2 rellenos.", "err");
             } else if (payload.tipo === "pastel") {
                 if (String(payload.pastel_modo || "catalogo") === "especial") {
                     if (String(payload.pastel_especial?.detalle || "").trim().length < 8) {
@@ -10546,6 +10546,13 @@
             _agendaCakeApplyStep();
         });
         agendaCakeStepNextEl?.addEventListener("click", () => {
+            if (agendaCakeBuilderStep === 2) {
+                const picked = Array.isArray(agendaCakeSelection?.sabor_ids) ? agendaCakeSelection.sabor_ids.length : 0;
+                if (picked < 2) {
+                    _agendaMsg("Debes elegir al menos 2 rellenos para continuar.", "err");
+                    return;
+                }
+            }
             if (agendaCakeBuilderStep >= 4) {
                 _cerrarModalAgendaCakeBuilder();
                 if (_agendaIsMobileWizardEnabled()) {
