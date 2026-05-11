@@ -4394,10 +4394,13 @@
         const _forceMobileParam = _urlParams.get("mobile") === "1";
         const _agendaDebugMode = _urlParams.get("agenda_debug") === "1";
         const _uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
-        if (_forceMobileParam || _uaMobile) {
+        const _mqMobile = Boolean(window.matchMedia && window.matchMedia("(max-width: 900px)").matches);
+        const _touchMobile = Number(navigator.maxTouchPoints || 0) > 0 && Math.min(window.screen?.width || 0, window.screen?.height || 0) <= 1024;
+        const _mobileDetected = Boolean(_forceMobileParam || _uaMobile || _mqMobile || _touchMobile);
+        if (_mobileDetected) {
             document.body.classList.add("mobile-ui");
         }
-        if (_uaMobile && !_forceMobileParam) {
+        if (_mobileDetected && !_forceMobileParam) {
             try {
                 const url = new URL(window.location.href);
                 url.searchParams.set("mobile", "1");
