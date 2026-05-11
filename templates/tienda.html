@@ -8235,14 +8235,18 @@
             const sid = String(flavorId || "");
             if (!sid) return;
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
-            const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
+            const maxSabores = Math.min(3, Math.max(1, Number(size?.max_sabores || 3)));
             const allowedFlavors = new Set(_catalogListByCategoria("sabores").map((x) => String(x?.id || "")));
             const current = (Array.isArray(agendaCakeSelection.sabor_ids) ? agendaCakeSelection.sabor_ids : []).filter((x) => allowedFlavors.has(String(x || "")));
             if (current.includes(sid)) {
                 agendaCakeSelection.sabor_ids = current.filter((x) => x !== sid);
             } else {
                 if (current.length >= maxSabores) {
-                    _agendaMsg(`Maximo ${maxSabores} sabor(es) para este tamano.`, "err");
+                    if (maxSabores >= 3) {
+                        _agendaMsg("Ya seleccionaste los 3 rellenos permitidos.", "err");
+                    } else {
+                        _agendaMsg(`Maximo ${maxSabores} relleno(s) para este tamano.`, "err");
+                    }
                     return;
                 }
                 agendaCakeSelection.sabor_ids = [...current, sid];
