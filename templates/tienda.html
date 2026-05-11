@@ -4201,9 +4201,8 @@
 
         function _aplicarEscalaMovilDinamica() {
             if (!document.body.classList.contains("mobile-ui")) return;
-            const vv = window.visualViewport || null;
-            const viewportWidth = Math.max(320, Math.round((vv && vv.width) || window.innerWidth || 390));
-            const viewportHeight = Math.max(480, Math.round((vv && vv.height) || window.innerHeight || 780));
+            const viewportWidth = Math.max(320, Math.round(window.innerWidth || 390));
+            const viewportHeight = Math.max(480, Math.round(window.innerHeight || 780));
             const shortSide = Math.max(320, Math.min(viewportWidth, viewportHeight));
             let scale = 1;
             let fontScale = 1;
@@ -4229,7 +4228,8 @@
             }
             scale = Math.max(0.78, Math.min(0.98, scale));
             fontScale = Math.max(0.64, Math.min(0.84, fontScale));
-            const browserInsetBottom = Math.max(0, Math.round((window.innerHeight || viewportHeight) - viewportHeight));
+            // Mantener botones fijos: no usar variaciones del viewport visual al hacer scroll.
+            const browserInsetBottom = 0;
             const reservePad = Math.round(210 * scale) + browserInsetBottom + 14;
             const reserveScrollMargin = reservePad + 24;
             const fabOffset = Number(tiendaUiCfg?.visual_fab_bottom_offset_mobile || TIENDA_UI_DEFAULTS.visual_fab_bottom_offset_mobile || 0);
@@ -10395,9 +10395,7 @@
         window.addEventListener("orientationchange", _aplicarEscalaMovilDinamica);
         window.addEventListener("resize", _agendaBetaSyncModalState);
         window.addEventListener("orientationchange", _agendaBetaSyncModalState);
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener("resize", _aplicarEscalaMovilDinamica);
-        }
+        // No escuchar visualViewport.resize para evitar que los FAB se muevan al hacer scroll en movil.
         if (clienteTelefonoEl) {
             clienteTelefonoEl.addEventListener("input", () => {
                 const onlyDigits = String(clienteTelefonoEl.value || "").replace(/\D+/g, "").slice(0, 8);
