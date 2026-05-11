@@ -1460,6 +1460,58 @@
             padding: 11px 12px;
             text-align: center;
         }
+        .event-countdown {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            background: #eef2ff;
+            color: #1d4ed8;
+        }
+        .event-countdown.warning {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+        .resumen-pedido-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .resumen-pedido-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .resumen-pedido-label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: .03em;
+            margin-bottom: 4px;
+        }
+        .resumen-pedido-value {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .resumen-pedido-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .notif-actions {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .notif-actions .btn-mini-outline {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
         
         .btn {
             padding: 10px 20px;
@@ -1768,6 +1820,9 @@
 
             #modal-evento .modal-footer .btn {
                 flex: 1 1 calc(50% - 8px);
+            }
+            .resumen-pedido-grid {
+                grid-template-columns: 1fr;
             }
         }
         
@@ -2348,6 +2403,21 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-resumen-evento">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Resumen del Pedido</h3>
+                <button onclick="cerrarResumenEvento()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="resumen-evento-contenido" class="form-hint">Selecciona un pedido para ver el resumen.</div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="irAEdicionDesdeResumen()" class="btn btn-success" id="btn-resumen-editar">Ir a ficha de edicion</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-config">
         <div class="modal">
             <div class="modal-header">
@@ -2480,6 +2550,7 @@
         let notaChecklistDraft = [];
         let fechaSeleccionada = '';
         let eventoDetalleSeleccionadoId = null;
+        let eventoResumenActualId = null;
         let geocodeDebounceTimer = null;
         let geocodeRequestId = 0;
         let tortaDispoRequestId = 0;
@@ -3521,6 +3592,7 @@
              
             // Actualizar cada minuto
             setInterval(verificarNotificaciones, 60000);
+            setInterval(actualizarContadoresAgenda, 30000);
             setInterval(() => cargarEventos({ silent: true, fromPolling: true }), 15000);
 
             const telefonoInput = document.getElementById('evento-telefono');
@@ -4910,7 +4982,7 @@
                         span.className = `day-event ${claseCssEvento(ev)}`;
                         const prefijo = esEventoBorrador(ev) ? '\uD83D\uDCDD ' : '';
                         span.textContent = ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`;
-                        span.title = 'Click: ver detalle del evento · Doble click: abrir evento';
+                        span.title = 'Click: ver resumen - Doble click: abrir resumen - Click derecho: ir directo a ficha';
                         span.onclick = (event) => {
                             event.stopPropagation();
                             seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), false);
@@ -4918,6 +4990,11 @@
                         span.ondblclick = (event) => {
                             event.stopPropagation();
                             seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), true);
+                        };
+                        span.oncontextmenu = (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), false, { directEdit: true });
                         };
                         contenedor.appendChild(span);
                     });
@@ -4939,14 +5016,173 @@
             }
         }
 
-        function seleccionarEventoAgenda(fecha, eventoId, abrirModal = false) {
+        function seleccionarEventoAgenda(fecha, eventoId, abrirModal = false, options = {}) {
             fechaSeleccionada = fecha;
             eventoDetalleSeleccionadoId = Number(eventoId || 0) || null;
             renderizarCalendario();
             renderizarDetalleHorarioDia();
-            if (abrirModal && eventoDetalleSeleccionadoId) {
+            if (!eventoDetalleSeleccionadoId) return;
+            if (options && options.directEdit) {
                 editarEvento(eventoDetalleSeleccionadoId);
+                return;
             }
+            abrirResumenEvento(eventoDetalleSeleccionadoId);
+        }
+
+        function _fechaHoraEvento(evento) {
+            if (!evento) return null;
+            const fecha = parseFechaISO(evento.fecha);
+            if (!fecha) return null;
+            const hora = String(evento.hora_entrega || evento.hora_inicio || '00:00').trim() || '00:00';
+            const mins = horaAMinutos(hora, 0) || 0;
+            return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), Math.floor(mins / 60), mins % 60, 0, 0);
+        }
+
+        function obtenerTextoCuentaRegresiva(evento) {
+            const dt = _fechaHoraEvento(evento);
+            if (!dt) return '';
+            const diffMin = Math.floor((dt.getTime() - Date.now()) / 60000);
+            if (diffMin <= 0) return 'En curso / vencido';
+            const dias = Math.floor(diffMin / 1440);
+            const horas = Math.floor((diffMin % 1440) / 60);
+            const mins = diffMin % 60;
+            if (dias > 0) return `Faltan ${dias}d ${horas}h`;
+            if (horas > 0) return `Faltan ${horas}h ${mins}m`;
+            return `Faltan ${mins} min`;
+        }
+
+        function claseCuentaRegresiva(evento) {
+            const dt = _fechaHoraEvento(evento);
+            if (!dt) return '';
+            const diffMin = Math.floor((dt.getTime() - Date.now()) / 60000);
+            return diffMin <= 30 && diffMin > 0 ? 'warning' : '';
+        }
+
+        function _resumenCatalogoTorta(evento) {
+            const out = { categoria: '-', tamano: '-', sabores: [] };
+            const txt = String((evento && evento.ingredientes) || '');
+            if (!txt) return out;
+            const secciones = detalleEnSecciones(txt, 'Detalle pedido');
+            const catalogo = secciones.find((s) => String((s && s.titulo) || '').trim().toLowerCase() === 'catalogo torta');
+            const items = Array.isArray(catalogo && catalogo.items) ? catalogo.items : [];
+            let inSabores = false;
+            items.forEach((raw) => {
+                const line = String(raw || '').trim();
+                if (!line) return;
+                const low = line.toLowerCase();
+                if (low.startsWith('categoria:')) {
+                    out.categoria = line.split(':').slice(1).join(':').trim() || '-';
+                    inSabores = false;
+                    return;
+                }
+                if (low.startsWith('tamano:') || low.startsWith('tama')) {
+                    out.tamano = line.split(':').slice(1).join(':').trim() || '-';
+                    inSabores = false;
+                    return;
+                }
+                if (low === 'sabores:') {
+                    inSabores = true;
+                    return;
+                }
+                if (low === 'extras:' || low === 'topper:' || low === 'otros cargos:') {
+                    inSabores = false;
+                    return;
+                }
+                if (inSabores && line.startsWith('-')) {
+                    const v = line.replace(/^-+\s*/, '').trim();
+                    if (v && v !== '-') out.sabores.push(v);
+                }
+            });
+            if (!out.sabores.length) out.sabores = ['Sin rellenos'];
+            return out;
+        }
+
+        function construirResumenEventoHtml(evento) {
+            if (!evento) return '<div class="form-hint">Pedido no encontrado.</div>';
+            const resumenTorta = _resumenCatalogoTorta(evento);
+            const fechaLarga = formatearFechaLarga(String(evento.fecha || ''));
+            const horaTxt = String(evento.hora_entrega || evento.hora_inicio || '-').substring(0, 5) || '-';
+            const entrega = evento.es_envio ? 'Despacho' : 'Retiro en tienda';
+            const direccion = evento.es_envio ? (String(evento.direccion || '-')) : 'Retiro en tienda';
+            const countdown = obtenerTextoCuentaRegresiva(evento);
+            const saboresHtml = (resumenTorta.sabores || []).map((s) => `<li>${escapeHtml(String(s || '-'))}</li>`).join('');
+            return `
+                <div class="resumen-pedido-grid">
+                    <div class="resumen-pedido-card">
+                        <div class="resumen-pedido-label">Fecha</div>
+                        <div class="resumen-pedido-value">${escapeHtml(fechaLarga)}</div>
+                    </div>
+                    <div class="resumen-pedido-card">
+                        <div class="resumen-pedido-label">Hora entrega/retiro</div>
+                        <div class="resumen-pedido-value">${escapeHtml(horaTxt)}</div>
+                    </div>
+                    <div class="resumen-pedido-card">
+                        <div class="resumen-pedido-label">Tipo y tamano</div>
+                        <div class="resumen-pedido-value">${escapeHtml(resumenTorta.categoria)}</div>
+                        <div style="margin-top:4px;">${escapeHtml(resumenTorta.tamano)}</div>
+                    </div>
+                    <div class="resumen-pedido-card">
+                        <div class="resumen-pedido-label">Entrega</div>
+                        <div class="resumen-pedido-value">${escapeHtml(entrega)}</div>
+                        <div style="margin-top:4px;">${escapeHtml(direccion)}</div>
+                    </div>
+                </div>
+                <div class="resumen-pedido-card">
+                    <div class="resumen-pedido-label">Rellenos</div>
+                    <ul class="resumen-pedido-list">${saboresHtml}</ul>
+                </div>
+                <div style="margin-top:10px;" class="event-countdown ${escapeHtml(claseCuentaRegresiva(evento))}">${escapeHtml(countdown || 'Sin hora')}</div>
+            `;
+        }
+
+        function abrirResumenEvento(idEvento) {
+            const idNum = Number(idEvento || 0);
+            if (!idNum) return;
+            const evento = eventos.find((e) => Number(e.id || 0) === idNum);
+            if (!evento) return;
+            eventoResumenActualId = idNum;
+            const box = document.getElementById('resumen-evento-contenido');
+            if (box) box.innerHTML = construirResumenEventoHtml(evento);
+            document.getElementById('modal-resumen-evento').classList.add('active');
+        }
+
+        function cerrarResumenEvento() {
+            document.getElementById('modal-resumen-evento').classList.remove('active');
+            eventoResumenActualId = null;
+        }
+
+        function irAEdicionDesdeResumen() {
+            const idNum = Number(eventoResumenActualId || 0);
+            if (!idNum) return;
+            cerrarResumenEvento();
+            editarEvento(idNum);
+        }
+
+        function abrirEventoDesdeNotificacion(idEvento) {
+            const idNum = Number(idEvento || 0);
+            if (!idNum) return;
+            abrirResumenEvento(idNum);
+        }
+
+        function actualizarContadoresAgenda() {
+            renderizarProximos();
+            renderizarBorradores();
+            renderizarDetalleHorarioDia();
+            verificarNotificaciones();
+        }
+
+        function _notificacionEntregaProxima(evento) {
+            const dt = _fechaHoraEvento(evento);
+            if (!dt) return null;
+            const mins = Math.floor((dt.getTime() - Date.now()) / 60000);
+            if (mins <= 0 || mins > 30) return null;
+            return {
+                urgente: true,
+                cuando: `Faltan ${mins} min`,
+                texto: `Entrega proxima: ${evento.titulo || 'Pedido'} - ${evento.cliente || 'Sin cliente'}`,
+                eventoId: Number(evento.id || 0),
+                accion: 'Ver pedido'
+            };
         }
 
         function renderizarDetalleHorarioDia() {
@@ -5022,14 +5258,14 @@
                         const clienteTxt = (evento.cliente || '').trim() || 'Sin cliente';
                         const detalleTxt = (evento.ingredientes || '').trim();
                         return `
-                            <div class="hour-slot-event ${claseCssEvento(evento)} ${seleccionado ? 'selected' : ''}" onclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, false)" ondblclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, true)">
+                            <div class="hour-slot-event ${claseCssEvento(evento)} ${seleccionado ? 'selected' : ''}" onclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, false)" ondblclick="seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, true)" oncontextmenu="event.preventDefault(); seleccionarEventoAgenda('${fechaSeleccionada}', ${eventoId}, false, { directEdit: true });">
                                 <div class="hour-slot-event-main">
                                     <span>${icono}</span>
                                     <span class="hour-slot-event-title">${escapeHtml(evento.titulo || 'Sin t&iacute;tulo')}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px;">
                                     <span class="hour-slot-event-time">${escapeHtml(horaTxt)}${esEventoBorrador(evento) ? ' · Borrador' : ''}</span>
-                                    <button class="btn-hour" onclick="event.stopPropagation(); editarEvento(${eventoId})">Editar</button>
+                                    <button class="btn-hour" onclick="event.stopPropagation(); editarEvento(${eventoId})">Ficha</button>
                                 </div>
                                 ${seleccionado ? `
                                     <div class="hour-slot-event-details">
@@ -5427,10 +5663,11 @@
                 const horaStr = e.hora_inicio ? e.hora_inicio.substring(0, 5) : '';
                 
                 return `
-                    <div class="event-item ${claseCssEvento(e)}" onclick="editarEvento(${e.id})">
+                    <div class="event-item ${claseCssEvento(e)}" onclick="abrirResumenEvento(${e.id})" oncontextmenu="event.preventDefault(); editarEvento(${e.id});">
                         <div class="event-time">${fechaStr} ${horaStr}</div>
                         <div class="event-title">${e.titulo}</div>
                         <div class="event-client">${e.cliente || 'Sin cliente'}</div>
+                        <span class="event-countdown ${claseCuentaRegresiva(e)}">${obtenerTextoCuentaRegresiva(e)}</span>
                         ${e.total ? `<span class="event-badge ${e.abono >= e.total ? 'pagado' : 'pendiente'}">
                             ${e.abono >= e.total ? '\u2713 Pagado' : `$${(e.total - (e.abono || 0)).toLocaleString()} restante`}
                         </span>` : ''}
@@ -5474,10 +5711,11 @@
                     : (e.fecha || '-');
                 const horaStr = (e.hora_entrega || e.hora_inicio || '').substring(0, 5);
                 return `
-                    <div class="event-item ${claseCssEvento(e)}" onclick="editarEvento(${Number(e.id || 0)})">
+                    <div class="event-item ${claseCssEvento(e)}" onclick="abrirResumenEvento(${Number(e.id || 0)})" oncontextmenu="event.preventDefault(); editarEvento(${Number(e.id || 0)});">
                         <div class="event-time">${escapeHtml(fechaStr)} ${escapeHtml(horaStr)}</div>
                         <div class="event-title">${escapeHtml(e.titulo || 'Sin t&iacute;tulo')}</div>
                         <div class="event-client">${escapeHtml(e.cliente || 'Por confirmar')}</div>
+                        <span class="event-countdown ${claseCuentaRegresiva(e)}">${escapeHtml(obtenerTextoCuentaRegresiva(e))}</span>
                     </div>
                 `;
             }).join('');
@@ -5539,12 +5777,12 @@
                 const horaStr = e.hora_inicio ? e.hora_inicio.substring(0, 5) : '';
 
                 return `
-                    <div class="event-item ${claseCssEvento(e)}" style="cursor:default;">
+                    <div class="event-item ${claseCssEvento(e)}" style="cursor:default;" onclick="abrirResumenEvento(${Number(e.id || 0)})" oncontextmenu="event.preventDefault(); editarEvento(${Number(e.id || 0)});">
                         <div class="event-time">${fechaStr} ${horaStr}</div>
                         <div class="event-title">${escapeHtml(e.titulo || 'Sin título')}</div>
                         <div class="event-client">${escapeHtml(e.cliente || 'Sin cliente')}</div>
                         <div class="event-item-actions">
-                            <button class="btn-mini-outline" onclick="editarEvento(${Number(e.id || 0)})">Editar</button>
+                            <button class="btn-mini-outline" onclick="event.stopPropagation(); editarEvento(${Number(e.id || 0)})">Editar</button>
                             <button class="btn-mini-danger" onclick="eliminarEventoDirecto(${Number(e.id || 0)})">Eliminar</button>
                         </div>
                     </div>
@@ -5640,17 +5878,24 @@
              
             eventos.forEach(e => {
                 if (e.tipo === 'bloqueo') return;
-                 
-                const fechaEvento = new Date(e.fecha + 'T' + (e.hora_inicio || '00:00'));
+                const estado = normalizarEstadoAgenda(e.estado, 'pendiente');
+                if (estado === 'cancelado' || estado === 'completado') return;
+
+                const fechaEvento = _fechaHoraEvento(e) || new Date(`${e.fecha}T${e.hora_inicio || '00:00'}`);
                 const minutosHasta = (fechaEvento - ahora) / (1000 * 60);
                 const minutosAlerta = e.alerta_minutos || 1440;
-                 
+
                 if (minutosHasta > 0 && minutosHasta <= minutosAlerta) {
                     notificaciones.push({
                         urgente: minutosHasta < 180,
                         cuando: obtenerTextoTiempo(minutosHasta),
                         texto: `${e.tipo === 'torta' ? '\uD83C\uDF82' : '\uD83D\uDCE6'} ${e.titulo} - ${e.cliente || 'Sin cliente'}`
                     });
+                }
+
+                const entregaProxima = _notificacionEntregaProxima(e);
+                if (entregaProxima) {
+                    notificaciones.push(entregaProxima);
                 }
             });
 
@@ -5682,6 +5927,7 @@
                 <div class="notif-item">
                     <div class="notif-when">${n.cuando}</div>
                     <div class="notif-text">${n.texto}</div>
+                    ${n.eventoId ? `<div class="notif-actions"><button class="btn-mini-outline" onclick="abrirEventoDesdeNotificacion(${Number(n.eventoId || 0)})">${escapeHtml(String(n.accion || 'Ver pedido'))}</button></div>` : ''}
                 </div>
             `).join('');
         }
@@ -6037,6 +6283,8 @@
 </body>
 </html>               
                 
+
+
 
 
 
