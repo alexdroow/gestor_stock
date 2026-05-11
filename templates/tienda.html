@@ -7127,7 +7127,10 @@
                             const cb = document.createElement("input");
                             cb.type = "checkbox";
                             cb.checked = agendaCakeSelection.sabor_ids.includes(sid);
-                            cb.addEventListener("change", () => agendaCakeToggleFlavor(sid));
+                            cb.addEventListener("change", () => {
+                                const ok = agendaCakeToggleFlavor(sid);
+                                if (!ok) cb.checked = false;
+                            });
 
                             const text = document.createElement("span");
                             text.textContent = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` (${money.format(Number(s.precio || 0))})` : ""}`;
@@ -8233,7 +8236,7 @@
 
         function agendaCakeToggleFlavor(flavorId) {
             const sid = String(flavorId || "");
-            if (!sid) return;
+            if (!sid) return false;
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
             const maxSabores = Math.min(3, Math.max(1, Number(size?.max_sabores || 3)));
             const allowedFlavors = new Set(_catalogListByCategoria("sabores").map((x) => String(x?.id || "")));
@@ -8247,13 +8250,14 @@
                     } else {
                         _agendaMsg(`Maximo ${maxSabores} relleno(s) para este tamano.`, "err");
                     }
-                    return;
+                    return false;
                 }
                 agendaCakeSelection.sabor_ids = [...current, sid];
             }
             if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
             _agendaCakeDraftSave();
+            return true;
         }
 
         function agendaCakeChangeExtra(extraId, delta) {
