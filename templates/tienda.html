@@ -38,6 +38,7 @@
             --mobile-reserve-scroll-margin: 240px;
             --mobile-cats-bubble-bottom: 112px;
             --mobile-ui-font-size: 100%;
+            --agenda-modal-ui-scale: 1;
             --layout-max-width: 1360px;
             --grid-min-desktop: 240px;
             --grid-min-mobile: 160px;
@@ -802,7 +803,7 @@
             align-items: stretch;
             justify-content: stretch;
             padding: 0;
-            background: rgba(2, 6, 23, .78);
+            background: #ffffff;
             z-index: 130000;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-confirmar.active {
@@ -837,9 +838,12 @@
             height: 100vh;
             max-height: 100vh;
             border-radius: 0;
+            border: 0;
             margin: 0;
             overflow-y: auto;
-            padding: 14px 12px 22px;
+            padding: 10px 8px 14px;
+            box-shadow: none;
+            font-size: calc(1rem * var(--agenda-modal-ui-scale));
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active button,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active button,
@@ -855,6 +859,22 @@
             padding: 8px 10px !important;
             min-height: 36px !important;
             border-radius: 8px !important;
+        }
+        body.mobile-ui.agenda-beta-mode #agenda-cake-step-prev,
+        body.mobile-ui.agenda-beta-mode #agenda-cake-step-next,
+        body.mobile-ui.agenda-beta-mode #agenda-cake-close-builder,
+        body.mobile-ui.agenda-beta-mode #agenda-cake-open-cart,
+        body.mobile-ui.agenda-beta-mode #agenda-cake-open-cart-2,
+        body.mobile-ui.agenda-beta-mode #agenda-beta-prev,
+        body.mobile-ui.agenda-beta-mode #agenda-beta-next,
+        body.mobile-ui.agenda-beta-mode #agenda-cake-close-x,
+        body.mobile-ui.agenda-beta-mode #agenda-cake-close-x-2 {
+            padding: 4px 6px !important;
+            min-height: 20px !important;
+            min-width: 20px !important;
+            font-size: .62rem !important;
+            border-radius: 6px !important;
+            line-height: 1.05 !important;
         }
         .agenda-pastel-wrap {
             border: 1px solid #dbe4ef;
@@ -4235,6 +4255,13 @@
             const fabOffset = Number(tiendaUiCfg?.visual_fab_bottom_offset_mobile || TIENDA_UI_DEFAULTS.visual_fab_bottom_offset_mobile || 0);
             const waOffset = Number(tiendaUiCfg?.visual_whatsapp_bottom_offset_mobile || TIENDA_UI_DEFAULTS.visual_whatsapp_bottom_offset_mobile || 0);
             const uiScaleCfg = Number(tiendaUiCfg?.visual_mobile_ui_scale || TIENDA_UI_DEFAULTS.visual_mobile_ui_scale || 100) / 100;
+            let agendaModalScale = 1;
+            if (shortSide <= 340) agendaModalScale = 0.84;
+            else if (shortSide <= 360) agendaModalScale = 0.88;
+            else if (shortSide <= 390) agendaModalScale = 0.92;
+            else if (shortSide <= 430) agendaModalScale = 0.96;
+            if (viewportHeight <= 680) agendaModalScale = Math.max(0.80, agendaModalScale - 0.04);
+            else if (viewportHeight >= 900) agendaModalScale = Math.min(1.0, agendaModalScale + 0.02);
             const fabBottom = 12 + browserInsetBottom + fabOffset;
             const menuFabHeight = Math.round(33 * scale);
             const summaryBottom = fabBottom + menuFabHeight + 12;
@@ -4257,6 +4284,7 @@
             root.style.setProperty("--mobile-reserve-scroll-margin", `${reserveScrollMargin}px`);
             root.style.setProperty("--mobile-cats-bubble-bottom", `${catsBottom}px`);
             root.style.setProperty("--mobile-ui-font-size", `${Math.round(fontScale * uiScaleCfg * 100)}%`);
+            root.style.setProperty("--agenda-modal-ui-scale", `${agendaModalScale.toFixed(3)}`);
             _reflowMobileFloatingButtons();
         }
 
