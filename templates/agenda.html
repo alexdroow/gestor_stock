@@ -5330,6 +5330,7 @@
                         <div class="hour-slot-empty">Sin eventos en este tramo.</div>
                         <div>
                             <button class="btn-hour" onclick="seleccionarDia('${fechaSeleccionada}', '${minutosAHora(inicio)}')">+ Agendar ${minutosAHora(inicio)}</button>
+                            <button class="btn-hour" style="margin-left:6px;" onclick="bloquearTramoHorarioManual('${fechaSeleccionada}', '${minutosAHora(inicio)}', '${minutosAHora(fin)}')">⛔ Apagar tramo</button>
                         </div>
                     `;
                 }
@@ -5367,6 +5368,53 @@
                     ${bloquesHtml.join('')}
                 </div>
             `;
+        }
+
+        async function bloquearTramoHorarioManual(fecha, horaInicio, horaFin) {
+            const fechaTxt = String(fecha || '').trim();
+            const inicioTxt = String(horaInicio || '').trim();
+            const finTxt = String(horaFin || '').trim();
+            if (!fechaTxt || !inicioTxt || !finTxt) {
+                alert('No se pudo identificar el tramo horario.');
+                return;
+            }
+            const ok = confirm(`¿Apagar manualmente el tramo ${inicioTxt} - ${finTxt} del día ${fechaTxt}?\nSe bloqueará también para la tienda online.`);
+            if (!ok) return;
+            const payload = {
+                tipo: 'bloqueo',
+                titulo: `Bloqueo ${inicioTxt}-${finTxt}`,
+                fecha: fechaTxt,
+                hora_inicio: inicioTxt,
+                hora_fin: finTxt,
+                hora_entrega: null,
+                cliente: null,
+                telefono: null,
+                es_envio: false,
+                direccion: null,
+                ingredientes: null,
+                total: 0,
+                abono: 0,
+                motivo: 'Bloqueo manual por tramo horario',
+                alerta_minutos: 1440,
+                estado: 'pendiente',
+            };
+            try {
+                mostrarLoading(true);
+                const res = await fetch('/api/agenda/evento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo bloquear el tramo.');
+                }
+                await cargarEventos();
+            } catch (err) {
+                alert(String(err && err.message ? err.message : 'No se pudo bloquear el tramo.'));
+            } finally {
+                mostrarLoading(false);
+            }
         }
         
         function formatearFecha(fecha) {
