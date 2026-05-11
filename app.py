@@ -2895,6 +2895,152 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             sections.append(current)
         return sections or [{"title": default_title, "items": ["-"]}]
 
+    def _parse_builder_json(txt):
+        try:
+            raw_lines = str(txt or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            in_builder = False
+            json_line = ""
+            for raw in raw_lines:
+                line = str(raw or "").strip()
+                if not line:
+                    continue
+                if line.startswith("---") and line.endswith("---") and len(line) > 6:
+                    title = str(line.strip("- ").strip() or "").lower()
+                    in_builder = (title == "builder json")
+                    continue
+                if in_builder and line.startswith("{") and line.endswith("}"):
+                    json_line = line
+                    break
+            if not json_line:
+                return None
+            data = json.loads(json_line)
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
+
+    def _fmt_clp_pdf(value):
+        try:
+            n = int(round(float(value or 0)))
+        except (TypeError, ValueError):
+            n = 0
+        return f"${n:,}".replace(",", ".")
+
+    def _catalogo_section_from_builder(builder):
+        if not isinstance(builder, dict):
+            return None
+        try:
+            cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
+            catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+        except Exception:
+            catalogo = {"categorias": [], "sizes": [], "sabores": [], "extras": [], "toppers": []}
+
+        def _idx(rows):
+            out = {}
+            for r in (rows or []):
+                key = str((r or {}).get("id") or "").strip().lower()
+                if key:
+                    out[key] = dict(r or {})
+            return out
+
+        categorias = _idx(catalogo.get("categorias"))
+        sizes = _idx(catalogo.get("sizes"))
+        sabores = _idx(catalogo.get("sabores"))
+        extras = _idx(catalogo.get("extras"))
+        toppers = _idx(catalogo.get("toppers"))
+
+        categoria_id = str(builder.get("categoria_id") or "").strip().lower()
+        size_id = str(builder.get("size_id") or "").strip().lower()
+        sabor_ids = builder.get("sabor_ids") if isinstance(builder.get("sabor_ids"), list) else []
+        extra_items = builder.get("extra_items") if isinstance(builder.get("extra_items"), list) else []
+        topper_id = str(builder.get("topper_id") or "").strip().lower()
+        refs = builder.get("referencia_urls") if isinstance(builder.get("referencia_urls"), list) else []
+        nota = str(builder.get("nota") or "").strip()
+        otros_cargos = builder.get("otros_cargos") if isinstance(builder.get("otros_cargos"), list) else []
+
+        categoria = categorias.get(categoria_id) or {}
+        size = sizes.get(size_id) or {}
+
+        sabores_rows = []
+        seen = set()
+        for raw_sid in sabor_ids:
+            sid = str(raw_sid or "").strip().lower()
+            if not sid or sid in seen:
+                continue
+            row = sabores.get(sid)
+            if not row:
+                continue
+            sabores_rows.append(row)
+            seen.add(sid)
+
+        extras_rows = []
+        for raw_item in extra_items:
+            item = dict(raw_item or {})
+            eid = str(item.get("id") or "").strip().lower()
+            row = extras.get(eid)
+            if not row:
+                continue
+            try:
+                qty = int(item.get("qty") or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            if qty <= 0:
+                continue
+            extras_rows.append({"nombre": row.get("nombre"), "precio": float(row.get("precio") or 0), "qty": qty})
+
+        topper = toppers.get(topper_id) if topper_id else None
+
+        subtotal = float(size.get("precio") or 0)
+        subtotal += sum(float(s.get("precio") or 0) for s in sabores_rows)
+        subtotal += sum(float(x.get("precio") or 0) * int(x.get("qty") or 0) for x in extras_rows)
+        if topper:
+            subtotal += float(topper.get("precio") or 0)
+        subtotal += sum(max(0.0, float((dict(x or {})).get("valor") or 0)) for x in otros_cargos)
+
+        items = [
+            f"Categoria: {categoria.get('nombre') or '-'}",
+            f"Tamano: {(size.get('nombre') or '-')} ({_fmt_clp_pdf(size.get('precio') or 0)})",
+            "Sabores:",
+        ]
+        if sabores_rows:
+            for s in sabores_rows:
+                items.append(f"- {s.get('nombre') or '-'} ({_fmt_clp_pdf(s.get('precio') or 0)})")
+        else:
+            items.append("- -")
+        items.append("Extras:")
+        if extras_rows:
+            for ex in extras_rows:
+                items.append(f"- {ex.get('nombre') or '-'} x{int(ex.get('qty') or 0)} ({_fmt_clp_pdf(float(ex.get('precio') or 0) * int(ex.get('qty') or 0))})")
+        else:
+            items.append("- -")
+        items.append("Topper:")
+        if topper:
+            items.append(f"- {topper.get('nombre') or '-'} ({_fmt_clp_pdf(topper.get('precio') or 0)})")
+        else:
+            items.append("- Sin topper")
+        items.append("Otros cargos:")
+        if otros_cargos:
+            printed = False
+            for cargo in otros_cargos:
+                c = dict(cargo or {})
+                desc = str(c.get("descripcion") or "").strip() or "Cargo manual"
+                try:
+                    val = float(c.get("valor") or 0)
+                except (TypeError, ValueError):
+                    val = 0.0
+                if val <= 0:
+                    continue
+                items.append(f"- {desc} ({_fmt_clp_pdf(val)})")
+                printed = True
+            if not printed:
+                items.append("- -")
+        else:
+            items.append("- -")
+        refs_ok = [str(r or "").strip() for r in refs if str(r or "").strip()]
+        items.append(f"Referencias: {' | '.join(refs_ok) if refs_ok else '-'}")
+        items.append(f"Nota catalogo: {nota or '-'}")
+        items.append(f"Subtotal estimado productos: {_fmt_clp_pdf(subtotal)}")
+        return {"title": "Catalogo torta", "items": items}
+
     c = canvas.Canvas(abs_path, pagesize=A4)
     _, height = A4
     y = height - 44
@@ -2955,7 +3101,25 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.drawString(margin, y, "Detalle del Pedido")
     y -= 16
 
-    for section in _split_sections(reserva.get("ingredientes") or "", "Ingredientes / Detalles"):
+    ingredientes_txt = reserva.get("ingredientes") or ""
+    sections = _split_sections(ingredientes_txt, "Ingredientes / Detalles")
+    builder_data = _parse_builder_json(ingredientes_txt)
+    builder_catalog_section = _catalogo_section_from_builder(builder_data) if builder_data else None
+    if builder_catalog_section:
+        filtered = [sec for sec in sections if str(sec.get("title") or "").strip().lower() != "catalogo torta"]
+        inserted = False
+        merged = []
+        for sec in filtered:
+            merged.append(sec)
+            t = str(sec.get("title") or "").strip().lower()
+            if not inserted and (t in {"ingredientes / detalles", "detalle pedido"}):
+                merged.append(builder_catalog_section)
+                inserted = True
+        if not inserted:
+            merged.insert(0, builder_catalog_section)
+        sections = merged
+
+    for section in sections:
         _ensure_space(26, reset_font=False)
         c.setFillColorRGB(0.96, 0.97, 0.99)
         c.roundRect(margin, y - 11, right - margin, 16, 3, stroke=0, fill=1)
