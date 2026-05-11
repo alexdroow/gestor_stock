@@ -7764,6 +7764,34 @@ def api_tienda_agenda_reservar():
                     ingredientes = f"{ingredientes}\n- {ref}"
             else:
                 ingredientes = f"{ingredientes}\nReferencias: -"
+            try:
+                if isinstance(catalogo_torta_payload, dict) and catalogo_torta_payload:
+                    builder_raw = {
+                        "categoria_id": str(catalogo_torta_payload.get("categoria_id") or ""),
+                        "size_id": str(catalogo_torta_payload.get("size_id") or ""),
+                        "sabor_ids": list(catalogo_torta_payload.get("sabor_ids") or []),
+                        "extra_items": list(catalogo_torta_payload.get("extra_items") or []),
+                        "topper_id": str(catalogo_torta_payload.get("topper_id") or ""),
+                        "referencia_urls": list(catalogo_torta_payload.get("referencia_urls") or []),
+                        "nota": str(catalogo_torta_payload.get("nota") or ""),
+                    }
+                else:
+                    builder_raw = {
+                        "categoria_id": str(categoria_row.get("id") or ""),
+                        "size_id": str(size_row.get("id") or ""),
+                        "sabor_ids": [str((sb or {}).get("id") or "") for sb in sabores_rows if str((sb or {}).get("id") or "")],
+                        "extra_items": [
+                            {"id": str((ex or {}).get("id") or ""), "qty": int((ex or {}).get("qty") or 0)}
+                            for ex in extras_rows
+                            if str((ex or {}).get("id") or "")
+                        ],
+                        "topper_id": str((topper_row or {}).get("id") or "") if topper_row else "",
+                        "referencia_urls": refs,
+                        "nota": str(catalogo_torta_resumen.get("nota") or ""),
+                    }
+                ingredientes = f"{ingredientes}\n--- Builder JSON ---\n{json.dumps(builder_raw, ensure_ascii=False, separators=(',', ':'))}"
+            except Exception:
+                pass
         if tipo_pedido == "pastel":
             if pastel_modo == "catalogo" and pastel_catalogo_resumen:
                 ingredientes = f"{ingredientes}\n--- Resumen de cotizacion (cliente) ---"
