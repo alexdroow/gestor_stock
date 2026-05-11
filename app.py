@@ -1167,17 +1167,14 @@ def tienda_publica_agendar():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False, agenda_beta=False)
+    # Agenda beta pasa a ser la version oficial en la ruta publica de agenda.
+    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False, agenda_beta=True)
 
 
 @app.route('/tienda/agendar-beta')
 def tienda_publica_agendar_beta():
-    # Version de prueba: flujo cuestionario por pasos (inspirado en onboarding).
-    try:
-        personalizacion = _obtener_tienda_personalizacion()
-    except Exception:
-        personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False, agenda_beta=True)
+    # Compatibilidad: mantenemos la ruta antigua apuntando a la oficial.
+    return redirect(url_for('tienda_publica_agendar'))
 
 
 @app.route('/tienda/presencial')

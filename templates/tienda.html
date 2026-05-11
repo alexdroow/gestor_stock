@@ -3277,7 +3277,7 @@
                     <div class="agenda-beta-progress"><span id="agenda-beta-progress-fill"></span></div>
                     <div class="agenda-beta-question" id="agenda-beta-question">Paso 1: Elige el tipo de pedido</div>
                 </div>
-                {% if agenda_beta %}
+                {% if agenda_beta and (request.args.get('agenda_debug') in ['1', 'true', 'yes', 'on']) %}
                 <div style="margin:10px 0 0;padding:10px 12px;border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:10px;font-size:.9rem;font-weight:700;">
                     Modo prueba activo: flujo tipo cuestionario por pasos.
                 </div>
@@ -4257,6 +4257,42 @@
             root.style.setProperty("--mobile-reserve-scroll-margin", `${reserveScrollMargin}px`);
             root.style.setProperty("--mobile-cats-bubble-bottom", `${catsBottom}px`);
             root.style.setProperty("--mobile-ui-font-size", `${Math.round(fontScale * uiScaleCfg * 100)}%`);
+            _reflowMobileFloatingButtons();
+        }
+
+        function _reflowMobileFloatingButtons() {
+            if (!document.body.classList.contains("mobile-ui")) return;
+            const isVisible = (el) => {
+                if (!el) return false;
+                const st = window.getComputedStyle(el);
+                return st.display !== "none" && st.visibility !== "hidden" && st.opacity !== "0";
+            };
+            const rootStyles = window.getComputedStyle(document.documentElement);
+            const px = (val, fallback = 12) => {
+                const n = Number.parseFloat(String(val || "").replace("px", "").trim());
+                return Number.isFinite(n) ? n : fallback;
+            };
+            const baseBottom = px(rootStyles.getPropertyValue("--mobile-fab-bottom"), 12);
+            const gap = 10;
+            let rightBottom = baseBottom;
+
+            if (isVisible(mobileAgendaSummaryFabEl) && mobileAgendaSummaryFabEl.classList.contains("active")) {
+                mobileAgendaSummaryFabEl.style.bottom = `${Math.round(rightBottom)}px`;
+                rightBottom += Math.max(40, Math.round(mobileAgendaSummaryFabEl.offsetHeight || 40)) + gap;
+            }
+            if (isVisible(mobileOrderFabEl) && mobileOrderFabEl.classList.contains("active")) {
+                mobileOrderFabEl.style.bottom = `${Math.round(rightBottom)}px`;
+                rightBottom += Math.max(36, Math.round(mobileOrderFabEl.offsetHeight || 36)) + gap;
+            }
+            if (isVisible(waFabEl)) {
+                const waFloor = px(rootStyles.getPropertyValue("--mobile-wa-bottom"), baseBottom + 120);
+                const waBottom = Math.max(waFloor, rightBottom);
+                waFabEl.style.bottom = `${Math.round(waBottom)}px`;
+                rightBottom = waBottom + Math.max(44, Math.round(waFabEl.offsetHeight || 44)) + gap;
+            }
+            if (isVisible(pedidoChatToastEl)) {
+                pedidoChatToastEl.style.bottom = `${Math.round(rightBottom)}px`;
+            }
         }
         const TIENDA_UI_DEFAULTS = {
             brand_text: "Tienda en linea",
@@ -4930,6 +4966,7 @@
             const show = Boolean(pedidoChatContext) && !_pedidoFlowPendienteCliente(ultimoComprobantePedido);
             pedidoActivoChatToggleEl.style.display = show ? "" : "none";
             if (mobileOrderFabEl) mobileOrderFabEl.classList.toggle("active", show);
+            _reflowMobileFloatingButtons();
             if (!show) {
                 if (pedidoChatBadgeEl) {
                     pedidoChatBadgeEl.style.display = "none";
@@ -6030,6 +6067,7 @@
                 && String(agendaTipoActual || "").trim().toLowerCase() === "torta";
             mobileAgendaSummaryFabEl.classList.toggle("active", show);
             mobileAgendaSummaryFabEl.setAttribute("aria-hidden", show ? "false" : "true");
+            _reflowMobileFloatingButtons();
         }
 
         function _agendaApplyMobileWizard(autoAdvance = false) {
@@ -8345,7 +8383,7 @@
                 const url = new URL(window.location.href);
                 const isAgenda = String(cat || "").trim().toUpperCase() === "AGENDA";
                 if (isAgenda) {
-                    url.pathname = Boolean(_agendaBetaFromServer) ? "/tienda/agendar-beta" : "/tienda/agendar";
+                    url.pathname = "/tienda/agendar";
                     url.searchParams.delete("seccion");
                 } else {
                     url.pathname = "/tienda";
