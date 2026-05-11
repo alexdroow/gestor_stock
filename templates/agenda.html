@@ -5287,7 +5287,15 @@
                     statusText = 'Bloqueado';
                     const bloqueoPrincipal = bloqueosSlot[0].evento;
                     const motivo = bloqueoPrincipal.motivo || bloqueoPrincipal.titulo || 'Horario bloqueado';
-                    detalleHtml = `<div class="hour-slot-empty">&#9940; ${escapeHtml(motivo)}</div>`;
+                    const idsBloqueo = bloqueosSlot
+                        .map((x) => Number((x && x.evento && x.evento.id) || 0))
+                        .filter((n) => Number.isFinite(n) && n > 0);
+                    detalleHtml = `
+                        <div class="hour-slot-empty">&#9940; ${escapeHtml(motivo)}</div>
+                        <div>
+                            <button class="btn-hour" onclick="liberarTramoHorarioManual('${fechaSeleccionada}', '${minutosAHora(inicio)}', '${minutosAHora(fin)}', '${idsBloqueo.join(',')}')">Liberar tramo</button>
+                        </div>
+                    `;
                 } else if (eventosSlot.length > 0) {
                     statusClass = 'ocupado';
                     statusText = `Ocupado (${eventosSlot.length})`;
@@ -5412,6 +5420,37 @@
                 await cargarEventos();
             } catch (err) {
                 alert(String(err && err.message ? err.message : 'No se pudo bloquear el tramo.'));
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
+        async function liberarTramoHorarioManual(fecha, horaInicio, horaFin, idsCsv) {
+            const fechaTxt = String(fecha || '').trim();
+            const inicioTxt = String(horaInicio || '').trim();
+            const finTxt = String(horaFin || '').trim();
+            const ids = String(idsCsv || '')
+                .split(',')
+                .map((x) => Number(String(x || '').trim()))
+                .filter((n) => Number.isFinite(n) && n > 0);
+            if (!fechaTxt || !inicioTxt || !finTxt || !ids.length) {
+                alert('No se pudo identificar el bloqueo del tramo.');
+                return;
+            }
+            const ok = confirm(`¿Liberar el tramo ${inicioTxt} - ${finTxt} del día ${fechaTxt}?`);
+            if (!ok) return;
+            try {
+                mostrarLoading(true);
+                for (const idEvento of ids) {
+                    const res = await fetch(`/api/agenda/evento/${idEvento}`, { method: 'DELETE' });
+                    const data = await res.json();
+                    if (!res.ok || !data.success) {
+                        throw new Error(data.error || `No se pudo liberar el bloqueo #${idEvento}`);
+                    }
+                }
+                await cargarEventos();
+            } catch (err) {
+                alert(String(err && err.message ? err.message : 'No se pudo liberar el tramo.'));
             } finally {
                 mostrarLoading(false);
             }
@@ -6377,6 +6416,7 @@
 </body>
 </html>               
                 
+
 
 
 
