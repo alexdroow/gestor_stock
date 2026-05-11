@@ -57,6 +57,8 @@
         }
         html.launcher-compact .calendar-day {
             min-height: 78px;
+            height: 78px;
+            max-height: 78px;
             padding: 6px;
         }
         html.launcher-compact .day-event {
@@ -410,6 +412,7 @@
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             grid-template-rows: 40px repeat(6, 1fr);
+            align-content: stretch;
         }
         
         .calendar-day-header {
@@ -427,10 +430,13 @@
             border-right: 1px solid #e2e8f0;
             border-bottom: 1px solid #e2e8f0;
             padding: 8px;
-            min-height: 100px;
+            min-height: 112px;
+            height: 112px;
+            max-height: 112px;
             cursor: pointer;
             transition: all 0.2s;
             position: relative;
+            overflow: hidden;
         }
         
         .calendar-day:hover:not(.blocked):not(.empty) {
@@ -475,6 +481,8 @@
             display: flex;
             flex-direction: column;
             gap: 2px;
+            max-height: calc(100% - 22px);
+            overflow: hidden;
         }
         
         .day-event {
@@ -484,6 +492,9 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            min-height: 18px;
+            line-height: 14px;
+            flex: 0 0 auto;
         }
         
         .day-event.torta {
