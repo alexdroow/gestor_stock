@@ -81,8 +81,44 @@
             align-items: center;
             text-decoration: none;
         }
-        .brand-banner-mobile {
+        .brand-banner-wrap {
             display: none;
+            position: relative;
+            width: min(96vw, 560px);
+            max-width: 100%;
+        }
+        .brand-banner-home {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            text-decoration: none;
+        }
+        .brand-banner-mobile {
+            display: block;
+            width: 100%;
+            max-height: 120px;
+            height: auto;
+            object-fit: contain;
+            object-position: center;
+        }
+        .brand-banner-zone {
+            position: absolute;
+            z-index: 2;
+            display: block;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+        .brand-banner-zone-ig {
+            right: 2%;
+            top: 8%;
+            width: 36%;
+            height: 34%;
+        }
+        .brand-banner-zone-wa {
+            right: 2%;
+            top: 52%;
+            width: 36%;
+            height: 34%;
         }
         .brand-logo {
             width: 66px;
@@ -2594,22 +2630,13 @@
             width: 100%;
         }
         body.mobile-ui .brand-home-link {
-            justify-content: center;
-            width: 100%;
+            display: none !important;
         }
         body.mobile-ui #brand-text {
             display: none !important;
         }
-        body.mobile-ui .brand-logo {
-            display: none !important;
-        }
-        body.mobile-ui .brand-banner-mobile {
+        body.mobile-ui .brand-banner-wrap {
             display: block !important;
-            width: min(96vw, 560px);
-            max-height: 120px;
-            height: auto;
-            object-fit: contain;
-            object-position: center;
         }
         body.mobile-ui .mobile-agenda-summary-fab.active {
             display: inline-flex;
@@ -3599,8 +3626,13 @@
         <div class="brand brand-with-logo">
             <a class="brand-home-link" href="/tienda" title="Ir a tienda principal" aria-label="Ir a tienda principal">
                 <img class="brand-logo" id="brand-logo" src="/static/watermark_logo_full_backup.png" alt="Sucree Pasteleria">
-                <img class="brand-banner-mobile" src="/static/pasteleria_sucree.png" alt="Pasteleria Sucree banner">
             </a>
+            <div class="brand-banner-wrap" aria-label="Banner Pasteleria Sucree">
+                <a class="brand-banner-home" href="/tienda" aria-label="Ir a tienda principal"></a>
+                <img class="brand-banner-mobile" src="/static/pasteleria_sucree.png" alt="Pasteleria Sucree banner">
+                <a class="brand-banner-zone brand-banner-zone-ig" href="https://www.instagram.com/pasteleria_sucree" target="_blank" rel="noopener noreferrer" aria-label="Abrir Instagram Pasteleria Sucree"></a>
+                <a class="brand-banner-zone brand-banner-zone-wa" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta." target="_blank" rel="noopener noreferrer" aria-label="Abrir WhatsApp Pasteleria Sucree"></a>
+            </div>
             <div class="brand" id="brand-text">Tienda en linea</div>
         </div>
         <nav class="topbar-nav" id="topbar-nav"></nav>
