@@ -4466,8 +4466,7 @@
         const _ua = String(navigator.userAgent || "").toLowerCase();
         const _isPhoneUA = /(iphone|ipod|windows phone|iemobile|opera mini|blackberry|bb10|mobile safari|android)/i.test(_ua);
         const _isTabletOrDesktopUA = /(ipad|tablet|macintosh|windows nt|linux x86_64|cros)/i.test(_ua);
-        const _androidNeedsMobileToken = _ua.includes("android") ? (_ua.includes("mobile") || _ua.includes("phone")) : true;
-        const _mobileDetected = Boolean(_isPhoneUA && !_isTabletOrDesktopUA && _androidNeedsMobileToken);
+        const _mobileDetected = Boolean(_isPhoneUA && !_isTabletOrDesktopUA);
         if (_mobileDetected) {
             document.body.classList.add("mobile-ui");
         }

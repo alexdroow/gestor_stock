@@ -1158,8 +1158,6 @@ def _request_is_phone_mobile():
         return False
     is_phone = bool(re.search(r"(iphone|ipod|windows phone|iemobile|opera mini|blackberry|bb10|mobile safari|android)", ua))
     is_tablet_or_desktop = bool(re.search(r"(ipad|tablet|macintosh|windows nt|linux x86_64|cros)", ua))
-    if "android" in ua and "mobile" not in ua and "phone" not in ua:
-        return False
     return is_phone and not is_tablet_or_desktop
 
 
