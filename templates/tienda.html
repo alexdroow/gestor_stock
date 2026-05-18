@@ -3401,8 +3401,10 @@
             display: flex !important;
             flex-direction: column !important;
             min-height: 0 !important;
-            overflow: hidden !important;
+            overflow: auto !important;
             gap: 8px !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-size-grid,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-list,
@@ -3415,6 +3417,22 @@
             overflow: auto !important;
             -webkit-overflow-scrolling: touch !important;
             touch-action: pan-y !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active [data-flow-step="1"].agenda-cake-flow-pane.active #agenda-cake-flow-days-host {
+            flex: 0 0 auto !important;
+            overflow: visible !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active [data-flow-step="1"].agenda-cake-flow-pane.active #agenda-cake-flow-hours-host {
+            flex: 1 1 auto !important;
+            min-height: 180px !important;
+            max-height: none !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+            padding-bottom: 12px !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .modal-actions {
+            z-index: 2 !important;
         }
         </style>
     <style id="tienda-custom-css"></style>
