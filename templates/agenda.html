@@ -6236,6 +6236,41 @@
                 const n = Number(value || 0);
                 return `$${Math.max(0, n).toLocaleString('es-CL')}`;
             };
+            const parseMoneda = (value) => {
+                const txt = String(value || '');
+                const m = txt.match(/\$?\s*([0-9][0-9\.\,]*)/);
+                if (!m || !m[1]) return 0;
+                const normalized = String(m[1]).replace(/\./g, '').replace(/,/g, '.');
+                const n = Number(normalized);
+                return Number.isFinite(n) ? Math.max(0, n) : 0;
+            };
+            const extraerResumenPagoDesdeDetalle = (detalleTxt, totalFormulario) => {
+                const lines = String(detalleTxt || '').replace(/\r\n?/g, '\n').split('\n').map((x) => String(x || '').trim());
+                let subtotalDetectado = 0;
+                let descuentoDetectado = 0;
+                let totalDetectado = 0;
+                lines.forEach((line) => {
+                    const low = line.toLowerCase();
+                    if (low.startsWith('subtotal estimado productos:')) subtotalDetectado = parseMoneda(line);
+                    else if (low.startsWith('descuento aplicado:')) descuentoDetectado = parseMoneda(line);
+                    else if (low.startsWith('total estimado productos:')) totalDetectado = parseMoneda(line);
+                });
+                const totalForm = Math.max(0, Number(totalFormulario || 0));
+                let totalSinDescuento = subtotalDetectado > 0 ? subtotalDetectado : totalForm;
+                let descuento = Math.max(0, descuentoDetectado);
+                let totalConDescuento = totalForm > 0 ? totalForm : totalDetectado;
+                if (descuento <= 0 && subtotalDetectado > 0 && totalDetectado > 0 && subtotalDetectado >= totalDetectado) {
+                    descuento = Math.max(0, subtotalDetectado - totalDetectado);
+                }
+                if (totalConDescuento <= 0) totalConDescuento = Math.max(0, totalSinDescuento - descuento);
+                if (totalSinDescuento <= 0) totalSinDescuento = totalConDescuento;
+                if (descuento > totalSinDescuento) descuento = totalSinDescuento;
+                return {
+                    totalSinDescuento: Math.max(0, Math.round(totalSinDescuento)),
+                    descuento: Math.max(0, Math.round(descuento)),
+                    totalConDescuento: Math.max(0, Math.round(totalConDescuento)),
+                };
+            };
 
             const limpiarNombreArchivo = (texto) => {
                 const raw = (texto || 'evento').toString().trim();
@@ -6351,7 +6386,11 @@
             // Tarjeta resumen rápida
             const total = Number(e.total || 0);
             const abono = Number(e.abono || 0);
-            const restante = Math.max(0, total - abono);
+            const resumenPago = extraerResumenPagoDesdeDetalle(e.ingredientes, total);
+            const totalSinDescuento = Number(resumenPago.totalSinDescuento || total || 0);
+            const descuentoAplicado = Number(resumenPago.descuento || 0);
+            const totalConDescuento = Number(resumenPago.totalConDescuento || total || 0);
+            const totalFinal = Math.max(0, totalConDescuento - abono);
             ensurePage(20);
             doc.setFillColor(...colors.card);
             doc.setDrawColor(...colors.border);
@@ -6364,10 +6403,27 @@
             doc.setFontSize(9);
             doc.setTextColor(...colors.muted);
             doc.text(`Modalidad: ${e.es_envio ? 'Envío a domicilio' : 'Retiro en local'}`, margin + 4, y + 12);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
             doc.setTextColor(...colors.successText);
-            doc.text(`Saldo: ${money(restante)}`, margin + contentWidth - 4, y + 10, { align: 'right' });
+            if (descuentoAplicado > 0) {
+                const totalSinTxt = money(totalSinDescuento);
+                const totalConTxt = money(totalConDescuento);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8.5);
+                doc.setTextColor(...colors.muted);
+                doc.text(`Total: ${totalSinTxt}`, margin + contentWidth - 4, y + 6.5, { align: 'right' });
+                const txtW = doc.getTextWidth(`Total: ${totalSinTxt}`);
+                doc.setDrawColor(...colors.muted);
+                doc.setLineWidth(0.4);
+                doc.line(margin + contentWidth - 4 - txtW, y + 5.2, margin + contentWidth - 4, y + 5.2);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11.5);
+                doc.setTextColor(...colors.successText);
+                doc.text(`Total: ${totalConTxt}`, margin + contentWidth - 4, y + 11.5, { align: 'right' });
+            } else {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(12);
+                doc.text(`Total: ${money(totalSinDescuento)}`, margin + contentWidth - 4, y + 10, { align: 'right' });
+            }
             y += 22;
 
             drawSectionTitle('Datos del Cliente');
@@ -6415,22 +6471,24 @@
             drawDetalleSecciones('Ingredientes / Detalles', e.ingredientes);
 
             drawSectionTitle('Resumen de Pago');
-            ensurePage(34);
+            ensurePage(40);
             doc.setFillColor(...colors.successBg);
             doc.setDrawColor(167, 243, 208);
-            doc.rect(margin, y, contentWidth, 28, 'FD');
+            doc.rect(margin, y, contentWidth, 34, 'FD');
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
             doc.setTextColor(...colors.dark);
             doc.text('Total', margin + 4, y + 8);
-            doc.text('Abono', margin + 4, y + 15);
-            doc.text('Saldo pendiente', margin + 4, y + 22);
+            doc.text('Descuentos', margin + 4, y + 15);
+            doc.text('Abono', margin + 4, y + 22);
+            doc.text('Total Final', margin + 4, y + 29);
             doc.setFont('helvetica', 'bold');
-            doc.text(money(total), margin + contentWidth - 4, y + 8, { align: 'right' });
-            doc.text(money(abono), margin + contentWidth - 4, y + 15, { align: 'right' });
+            doc.text(money(totalSinDescuento), margin + contentWidth - 4, y + 8, { align: 'right' });
+            doc.text(money(descuentoAplicado), margin + contentWidth - 4, y + 15, { align: 'right' });
+            doc.text(money(abono), margin + contentWidth - 4, y + 22, { align: 'right' });
             doc.setTextColor(...colors.successText);
-            doc.text(money(restante), margin + contentWidth - 4, y + 22, { align: 'right' });
-            y += 34;
+            doc.text(money(totalFinal), margin + contentWidth - 4, y + 29, { align: 'right' });
+            y += 40;
 
             drawSectionTitle('T\u00e9rminos y Condiciones');
             const terminosPedido = [
