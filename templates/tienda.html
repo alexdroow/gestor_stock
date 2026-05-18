@@ -3439,6 +3439,41 @@
             z-index: 2 !important;
             grid-row: 5 !important;
         }
+        /* Override final (movil): paso 5 con scroll interno y botonera fija visible */
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .modal {
+            overflow: hidden !important;
+            display: grid !important;
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+            grid-row: 4 !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host {
+            flex: 0 0 auto !important;
+            overflow: visible !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-hours-host {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+            padding-bottom: 10px !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .modal-actions {
+            grid-row: 5 !important;
+            position: sticky !important;
+            bottom: 0 !important;
+            background: #fff !important;
+            border-top: 1px solid #e2e8f0 !important;
+            padding-top: 6px !important;
+            z-index: 5 !important;
+        }
         </style>
     <style id="tienda-custom-css"></style>
 </head>
@@ -4429,9 +4464,10 @@
         const _urlParams = new URLSearchParams(window.location.search);
         const _agendaDebugMode = _urlParams.get("agenda_debug") === "1";
         const _ua = String(navigator.userAgent || "").toLowerCase();
-        const _mobileDetected =
-            /(iphone|ipod|windows phone|iemobile|opera mini|blackberry|bb10|mobile safari|android.*mobile)/i.test(_ua) &&
-            !/(ipad|tablet|macintosh|windows nt|linux x86_64)/i.test(_ua);
+        const _isPhoneUA = /(iphone|ipod|windows phone|iemobile|opera mini|blackberry|bb10|mobile safari|android)/i.test(_ua);
+        const _isTabletOrDesktopUA = /(ipad|tablet|macintosh|windows nt|linux x86_64|cros)/i.test(_ua);
+        const _androidNeedsMobileToken = _ua.includes("android") ? (_ua.includes("mobile") || _ua.includes("phone")) : true;
+        const _mobileDetected = Boolean(_isPhoneUA && !_isTabletOrDesktopUA && _androidNeedsMobileToken);
         if (_mobileDetected) {
             document.body.classList.add("mobile-ui");
         }
