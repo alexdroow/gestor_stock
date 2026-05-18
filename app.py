@@ -7551,6 +7551,8 @@ def api_tienda_agenda_disponibilidad():
 
         fecha_desde = str(request.args.get("fecha_desde") or "").strip()
         fecha_hasta = str(request.args.get("fecha_hasta") or "").strip()
+        admin_scope = str(request.args.get("admin_scope") or "").strip().lower()
+        admin_manual_scope = admin_scope == "agenda_manual" and bool(session.get(_ADMIN_SESSION_KEY))
         tipo_reserva = _normalizar_tipo_reserva_tienda(request.args.get("tipo"))
         topper_id = str(request.args.get("topper_id") or "").strip().lower()
         topper_96h = tipo_reserva == "torta" and _topper_requiere_96h(topper_id=topper_id)
@@ -7585,10 +7587,28 @@ def api_tienda_agenda_disponibilidad():
             )
         hoy_dt = datetime.now(ZoneInfo("America/Santiago")).date()
         hoy_iso = hoy_dt.strftime("%Y-%m-%d")
+        # Solo para agenda manual de SucreeStock (admin): ampliar ventana hasta fin del mes siguiente.
+        if admin_manual_scope:
+            first_this_month = hoy_dt.replace(day=1)
+            first_next_month = (first_this_month + timedelta(days=32)).replace(day=1)
+            first_after_next = (first_next_month + timedelta(days=32)).replace(day=1)
+            fecha_hasta_max_dt = first_after_next - timedelta(days=1)
+        else:
+            fecha_hasta_max_dt = hoy_dt + timedelta(days=max(1, int(cfg["days_ahead"])) - 1)
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha_desde):
             fecha_desde = hoy_iso
+        fecha_desde_dt = datetime.strptime(fecha_desde, "%Y-%m-%d").date()
+        if fecha_desde_dt > fecha_hasta_max_dt:
+            fecha_desde_dt = fecha_hasta_max_dt
+            fecha_desde = fecha_desde_dt.strftime("%Y-%m-%d")
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha_hasta):
-            fecha_hasta = (datetime.strptime(fecha_desde, "%Y-%m-%d") + timedelta(days=int(cfg["days_ahead"]) - 1)).strftime("%Y-%m-%d")
+            fecha_hasta = fecha_hasta_max_dt.strftime("%Y-%m-%d")
+        else:
+            fecha_hasta_dt = datetime.strptime(fecha_hasta, "%Y-%m-%d").date()
+            if fecha_hasta_dt > fecha_hasta_max_dt:
+                fecha_hasta = fecha_hasta_max_dt.strftime("%Y-%m-%d")
+            if fecha_hasta_dt < fecha_desde_dt:
+                fecha_hasta = fecha_desde_dt.strftime("%Y-%m-%d")
 
         conn = get_db()
         cursor = conn.cursor()
@@ -7628,7 +7648,7 @@ def api_tienda_agenda_disponibilidad():
                 "pastel_fuera_lista": bool(pastel_fuera_lista),
                 "min_horas_categoria": int(min_horas_categoria or 0),
                 "cfg": {
-                    "days_ahead": int(cfg["days_ahead"]),
+                    "days_ahead": max(1, (fecha_hasta_max_dt - fecha_desde_dt).days + 1),
                     "slot_minutes": int(cfg["slot_minutes"]),
                     "slot_capacity": int(cfg["slot_capacity"]),
                     "hour_start": str(cfg["hour_start"]),
