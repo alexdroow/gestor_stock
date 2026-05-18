@@ -768,9 +768,9 @@
             border-radius: 0 !important;
             border: 0 !important;
             margin: 0 !important;
-            overflow-y: auto;
+            overflow: hidden !important;
             background: #fff !important;
-            padding: 14px 12px 88px !important;
+            padding: 8px 8px 0 !important;
             box-shadow: none !important;
         }
         body.mobile-ui.agenda-beta-mode #agenda-beta-close {
@@ -811,6 +811,9 @@
             padding: 0;
             background: #ffffff;
             z-index: 130000;
+            position: fixed !important;
+            inset: 0 !important;
+            overflow: hidden !important;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-confirmar.active {
             display: flex !important;
@@ -846,10 +849,13 @@
             border-radius: 0;
             border: 0;
             margin: 0;
-            overflow-y: auto;
-            padding: 10px 8px 14px;
+            overflow: hidden;
+            padding: 8px 8px 10px;
             box-shadow: none;
             font-size: calc(1rem * var(--agenda-modal-ui-scale));
+            display: grid;
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+            gap: 6px;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-step-head,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-step-head {
@@ -876,6 +882,8 @@
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-builder,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-builder {
             gap: 4px;
+            min-height: 0;
+            overflow: hidden;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-head {
             margin: 0 0 2px;
@@ -898,47 +906,26 @@
             min-height: 36px !important;
             border-radius: 8px !important;
         }
-        body.mobile-ui.agenda-beta-mode #agenda-cake-step-prev,
-        body.mobile-ui.agenda-beta-mode #agenda-cake-step-next,
-        body.mobile-ui.agenda-beta-mode #agenda-cake-close-builder,
-        body.mobile-ui.agenda-beta-mode #agenda-cake-open-cart,
-        body.mobile-ui.agenda-beta-mode #agenda-cake-open-cart-2,
-        body.mobile-ui.agenda-beta-mode #agenda-beta-prev,
-        body.mobile-ui.agenda-beta-mode #agenda-beta-next,
-        body.mobile-ui.agenda-beta-mode #agenda-cake-close-x,
-        body.mobile-ui.agenda-beta-mode #agenda-cake-close-x-2 {
-            padding: 3px 5px !important;
-            min-height: 16px !important;
-            min-width: 16px !important;
-            font-size: .50rem !important;
-            border-radius: 6px !important;
-            line-height: 1.05 !important;
+        /* Limpieza de version antigua: mantener escala legible y sin scroll externo en modales agenda */
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-step-pane.active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            gap: 6px !important;
         }
-        /* Unificar botoneria compacta para TODOS los pasos (1 al 6) en modales agenda */
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-size-grid button,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-list button,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-chip,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-chip button,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-card,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-topper-card button,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-day-btn,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-hour-btn,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-delivery-btn,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-btn-reservar,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-flow-btn {
-            font-size: .50rem !important;
-            min-height: 24px !important;
-            padding: 3px 6px !important;
-            border-radius: 7px !important;
-            line-height: 1.08 !important;
-        }
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-day-btn,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-hour-btn {
-            min-height: 32px !important;
-        }
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-day-btn small,
-        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-hour-btn small {
-            font-size: .72rem !important;
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-size-grid,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-list,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-files,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-form-host,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-confirm-detail {
+            min-height: 0 !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
         }
         .agenda-pastel-wrap {
             border: 1px solid #dbe4ef;
@@ -3296,10 +3283,11 @@
             margin: 0 !important;
             padding: 10px 10px 12px !important;
             gap: 8px !important;
-            overflow-y: auto !important;
+            overflow: hidden !important;
             box-shadow: none !important;
             display: grid !important;
             align-content: start !important;
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto !important;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-step-head,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-step-head {
@@ -3327,6 +3315,8 @@
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-builder {
             padding: 8px !important;
             gap: 8px !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-top {
             grid-template-columns: 1fr !important;
@@ -3365,6 +3355,9 @@
             margin: 2px 0 0 !important;
             padding: 0 !important;
             align-items: stretch !important;
+            position: sticky !important;
+            bottom: 0 !important;
+            background: #fff !important;
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .btn-primary,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .btn-muted,
@@ -3402,6 +3395,26 @@
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-day-btn small,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-hour-btn small {
             font-size: .74rem !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-step-pane.active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            gap: 8px !important;
+        }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-size-grid,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-list,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-files,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-form-host,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-cake-flow-confirm-detail {
+            min-height: 0 !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
         }
         </style>
     <style id="tienda-custom-css"></style>
