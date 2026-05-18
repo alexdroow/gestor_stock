@@ -3467,12 +3467,30 @@
             padding: 10px 10px 12px !important;
             box-shadow: none !important;
         }
-        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+        body.mobile-ui #modal-agenda-cake-builder.active .agenda-cake-builder,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-builder {
             grid-row: 4 !important;
             min-height: 0 !important;
             overflow: hidden !important;
             display: flex !important;
             flex-direction: column !important;
+        }
+        body.mobile-ui #modal-agenda-cake-builder.active .agenda-cake-step-pane.active,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active {
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+            padding-bottom: 8px !important;
+            display: block !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+            grid-row: 4 !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            display: block !important;
         }
         body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host {
             flex: 0 0 auto !important;
