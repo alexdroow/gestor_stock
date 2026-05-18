@@ -7609,10 +7609,17 @@ def api_tienda_agenda_disponibilidad():
                 fecha_hasta = fecha_hasta_max_dt.strftime("%Y-%m-%d")
             if fecha_hasta_dt < fecha_desde_dt:
                 fecha_hasta = fecha_desde_dt.strftime("%Y-%m-%d")
+        fecha_hasta_dt = datetime.strptime(fecha_hasta, "%Y-%m-%d").date()
 
         conn = get_db()
         cursor = conn.cursor()
-        data = _calcular_disponibilidad_agenda_tienda(cursor, cfg, fecha_desde, fecha_hasta)
+        cfg_dispo = dict(cfg or {})
+        if admin_manual_scope:
+            cfg_dispo["days_ahead"] = max(
+                int(cfg_dispo.get("days_ahead") or 1),
+                max(1, (fecha_hasta_dt - fecha_desde_dt).days + 1),
+            )
+        data = _calcular_disponibilidad_agenda_tienda(cursor, cfg_dispo, fecha_desde, fecha_hasta)
         now_local = datetime.now(ZoneInfo("America/Santiago"))
         dias_filtrados = []
         for dia in (data.get("dias") or []):
@@ -7648,7 +7655,7 @@ def api_tienda_agenda_disponibilidad():
                 "pastel_fuera_lista": bool(pastel_fuera_lista),
                 "min_horas_categoria": int(min_horas_categoria or 0),
                 "cfg": {
-                    "days_ahead": max(1, (fecha_hasta_max_dt - fecha_desde_dt).days + 1),
+                    "days_ahead": max(1, (fecha_hasta_dt - fecha_desde_dt).days + 1),
                     "slot_minutes": int(cfg["slot_minutes"]),
                     "slot_capacity": int(cfg["slot_capacity"]),
                     "hour_start": str(cfg["hour_start"]),
