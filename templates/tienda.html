@@ -3464,6 +3464,16 @@
             visibility: hidden !important;
             pointer-events: none !important;
         }
+        /* Agenda movil (sin depender de modal): ocultar flotantes de tienda */
+        body.mobile-ui.agenda-mobile-active #mobile-menu-fab,
+        body.mobile-ui.agenda-mobile-active #mobile-cart-fab,
+        body.mobile-ui.agenda-mobile-active #mobile-agenda-summary-fab,
+        body.mobile-ui.agenda-mobile-active #mobile-order-fab,
+        body.mobile-ui.agenda-mobile-active #wa-fab {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
         body.mobile-ui #modal-agenda-cake-builder.active .modal,
         body.mobile-ui #modal-agenda-cake-cart.active .modal {
             overflow: hidden !important;
@@ -8541,6 +8551,10 @@
 
         function renderSecciones() {
             const agendaMode = categoriaActiva === "AGENDA";
+            document.body.classList.toggle(
+                "agenda-mobile-active",
+                Boolean(document.body.classList.contains("mobile-ui") && agendaMode)
+            );
             if (agendaQuickBtnEl) agendaQuickBtnEl.classList.toggle("active", agendaMode);
             if (mobileCatStripEl) mobileCatStripEl.style.display = agendaMode ? "none" : "";
             if (secOfertasEl) secOfertasEl.style.display = agendaMode ? "none" : "";
