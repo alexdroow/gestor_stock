@@ -10763,9 +10763,11 @@
             _agendaCakeApplyStep();
         });
         modalAgendaCakeBuilderEl?.addEventListener("click", (ev) => {
+            if (!document.body.classList.contains("mobile-ui")) return;
             if (ev.target === modalAgendaCakeBuilderEl) _cerrarModalAgendaCakeBuilder();
         });
         modalAgendaCakeCartEl?.addEventListener("click", (ev) => {
+            if (!document.body.classList.contains("mobile-ui")) return;
             if (ev.target === modalAgendaCakeCartEl) _cerrarModalAgendaCakeCart();
         });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
