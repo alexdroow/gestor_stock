@@ -10750,10 +10750,12 @@
                 }
             }
             if (agendaCakeBuilderStep >= 4) {
-                _cerrarModalAgendaCakeBuilder();
                 if (_agendaIsMobileWizardEnabled()) {
+                    _cerrarModalAgendaCakeBuilder();
                     agendaMobileStep = Math.max(3, agendaMobileStep || 1);
                     _agendaApplyMobileWizard(false);
+                } else {
+                    _abrirModalAgendaCakeCart();
                 }
                 return;
             }
