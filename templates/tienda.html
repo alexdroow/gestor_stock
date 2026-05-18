@@ -81,6 +81,9 @@
             align-items: center;
             text-decoration: none;
         }
+        .brand-banner-mobile {
+            display: none;
+        }
         .brand-logo {
             width: 66px;
             height: 66px;
@@ -2583,16 +2586,25 @@
         }
         body.mobile-ui .brand-with-logo {
             justify-content: center;
+            width: 100%;
         }
         body.mobile-ui .brand-home-link {
             justify-content: center;
+            width: 100%;
         }
         body.mobile-ui #brand-text {
             display: none !important;
         }
         body.mobile-ui .brand-logo {
-            width: 58px;
-            height: 58px;
+            display: none !important;
+        }
+        body.mobile-ui .brand-banner-mobile {
+            display: block !important;
+            width: min(96vw, 560px);
+            max-height: 120px;
+            height: auto;
+            object-fit: contain;
+            object-position: center;
         }
         body.mobile-ui .mobile-agenda-summary-fab.active {
             display: inline-flex;
@@ -3582,6 +3594,7 @@
         <div class="brand brand-with-logo">
             <a class="brand-home-link" href="/tienda" title="Ir a tienda principal" aria-label="Ir a tienda principal">
                 <img class="brand-logo" id="brand-logo" src="/static/watermark_logo_full_backup.png" alt="Sucree Pasteleria">
+                <img class="brand-banner-mobile" src="/static/pasteleria_sucree.png" alt="Pasteleria Sucree banner">
             </a>
             <div class="brand" id="brand-text">Tienda en linea</div>
         </div>
