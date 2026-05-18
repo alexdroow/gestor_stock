@@ -2386,7 +2386,7 @@
             width: 100%;
             max-width: 100%;
             margin: 0;
-            padding: 12px;
+            padding: calc(124px + env(safe-area-inset-top, 0px)) 12px 12px;
             grid-template-columns: 1fr;
             gap: 12px;
         }
@@ -2581,6 +2581,11 @@
             display: none !important;
         }
         body.mobile-ui .topbar {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 120 !important;
             justify-content: center !important;
             padding: 10px 12px !important;
         }
