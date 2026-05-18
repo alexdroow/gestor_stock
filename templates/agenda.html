@@ -2290,6 +2290,21 @@
                             </div>
                             <button type="button" class="btn-mini-add" onclick="agregarOtroCargoTortaBuilder()">+ Agregar valor</button>
                         </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Descuento manual</label>
+                                <select id="torta-descuento-tipo" onchange="cambiarDescuentoTortaBuilder()">
+                                    <option value="ninguno">Sin descuento</option>
+                                    <option value="monto">Monto fijo ($)</option>
+                                    <option value="porcentaje">Porcentaje (%)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Valor descuento</label>
+                                <input type="number" id="torta-descuento-valor" min="0" step="1" placeholder="0" oninput="actualizarValorDescuentoTortaBuilder(this.value)">
+                                <p class="form-hint" id="torta-descuento-preview">Sin descuento aplicado.</p>
+                            </div>
+                        </div>
                         <div class="torta-builder-total">
                             <span>Total estimado catalogo</span>
                             <span id="torta-builder-total">$0</span>
@@ -2712,6 +2727,8 @@
                 referencia_urls: [],
                 nota: '',
                 otros_cargos: [],
+                descuento_tipo: 'ninguno',
+                descuento_valor: 0,
             };
         }
         if (!tortaBuilder) tortaBuilder = _tortaBuilderVacio();
@@ -2772,13 +2789,40 @@
             return Math.round(total);
         }
 
+        function _tortaBuilderTotales() {
+            const subtotal = Math.max(0, Math.round(_tortaBuilderSubtotal()));
+            const tipo = String(tortaBuilder?.descuento_tipo || 'ninguno').trim().toLowerCase();
+            const valor = Math.max(0, _normalizarNumero(tortaBuilder?.descuento_valor, 0));
+            let descuento = 0;
+            if (tipo === 'monto') {
+                descuento = valor;
+            } else if (tipo === 'porcentaje') {
+                const pct = Math.max(0, Math.min(100, valor));
+                descuento = Math.round(subtotal * (pct / 100));
+            }
+            descuento = Math.max(0, Math.min(subtotal, Math.round(descuento)));
+            const total = Math.max(0, subtotal - descuento);
+            return { subtotal, descuento, total, tipo, valor };
+        }
+
         function syncTotalTortaBuilderConFormulario() {
-            const total = _tortaBuilderSubtotal();
+            const calc = _tortaBuilderTotales();
             const totalEl = document.getElementById('evento-total');
-            if (totalEl) totalEl.value = total > 0 ? String(total) : '';
+            if (totalEl) totalEl.value = calc.total > 0 ? String(calc.total) : '';
             calcularRestante();
             const totalTxt = document.getElementById('torta-builder-total');
-            if (totalTxt) totalTxt.textContent = formatoMonedaCLP(total);
+            if (totalTxt) totalTxt.textContent = formatoMonedaCLP(calc.total);
+            const preview = document.getElementById('torta-descuento-preview');
+            if (preview) {
+                if (calc.descuento > 0) {
+                    const etiqueta = calc.tipo === 'porcentaje'
+                        ? `${Math.max(0, Math.min(100, Math.round(calc.valor)))}%`
+                        : formatoMonedaCLP(calc.valor);
+                    preview.textContent = `Descuento aplicado: ${etiqueta} (-${formatoMonedaCLP(calc.descuento)})`;
+                } else {
+                    preview.textContent = 'Sin descuento aplicado.';
+                }
+            }
         }
 
         function _normalizarBuilderState() {
@@ -2814,6 +2858,12 @@
                     valor: Math.max(0, Math.round(_normalizarNumero(x && x.valor, 0))),
                 }))
                 .slice(0, 12);
+            const dTipo = String(tortaBuilder.descuento_tipo || 'ninguno').trim().toLowerCase();
+            tortaBuilder.descuento_tipo = ['ninguno', 'monto', 'porcentaje'].includes(dTipo) ? dTipo : 'ninguno';
+            const dVal = Math.max(0, _normalizarNumero(tortaBuilder.descuento_valor, 0));
+            tortaBuilder.descuento_valor = tortaBuilder.descuento_tipo === 'porcentaje'
+                ? Math.max(0, Math.min(100, Math.round(dVal)))
+                : Math.round(dVal);
         }
 
         function renderTortaBuilder() {
@@ -2830,6 +2880,8 @@
             const notaEl = document.getElementById('torta-nota');
             const otrosCargosList = document.getElementById('torta-otros-cargos-list');
             const adminModeChk = document.getElementById('torta-admin-manual-mode');
+            const descuentoTipoEl = document.getElementById('torta-descuento-tipo');
+            const descuentoValorEl = document.getElementById('torta-descuento-valor');
 
             if (!tortaCatalogoCargado || !categorias.length) {
                 if (catSel) catSel.innerHTML = '<option value="">Sin categorias</option>';
@@ -2911,6 +2963,8 @@
 
             if (notaEl) notaEl.value = String(tortaBuilder.nota || '');
             if (adminModeChk) adminModeChk.checked = Boolean(modoAdminManualTorta);
+            if (descuentoTipoEl) descuentoTipoEl.value = String(tortaBuilder.descuento_tipo || 'ninguno');
+            if (descuentoValorEl) descuentoValorEl.value = Math.max(0, _normalizarNumero(tortaBuilder.descuento_valor, 0));
             if (otrosCargosList) {
                 const rows = Array.isArray(tortaBuilder.otros_cargos) ? tortaBuilder.otros_cargos : [];
                 if (!rows.length) {
@@ -2932,6 +2986,19 @@
             modoAdminManualTorta = Boolean(checked);
             renderTortaBuilder();
             cargarDisponibilidadHorariaTorta(false);
+        }
+
+        function cambiarDescuentoTortaBuilder() {
+            const tipo = valorCampo('torta-descuento-tipo').toLowerCase();
+            tortaBuilder.descuento_tipo = ['ninguno', 'monto', 'porcentaje'].includes(tipo) ? tipo : 'ninguno';
+            _normalizarBuilderState();
+            syncTotalTortaBuilderConFormulario();
+        }
+
+        function actualizarValorDescuentoTortaBuilder(value) {
+            tortaBuilder.descuento_valor = Math.max(0, _normalizarNumero(value, 0));
+            _normalizarBuilderState();
+            syncTotalTortaBuilderConFormulario();
         }
 
         function agregarOtroCargoTortaBuilder() {
@@ -3281,6 +3348,7 @@
             }).filter(Boolean);
             const topper = _catalogFind('toppers', tortaBuilder.topper_id);
             tortaBuilder.nota = valorCampo('torta-nota').slice(0, 500);
+            const calc = _tortaBuilderTotales();
             return {
                 categoria,
                 size,
@@ -3290,7 +3358,11 @@
                 otros_cargos: [...(tortaBuilder.otros_cargos || [])],
                 referencia_urls: [...(tortaBuilder.referencia_urls || [])],
                 nota: tortaBuilder.nota,
-                subtotal: _tortaBuilderSubtotal(),
+                subtotal: calc.subtotal,
+                descuento_monto: calc.descuento,
+                total: calc.total,
+                descuento_tipo: calc.tipo,
+                descuento_valor: calc.valor,
                 raw: {
                     categoria_id: String(tortaBuilder.categoria_id || ''),
                     size_id: String(tortaBuilder.size_id || ''),
@@ -3300,6 +3372,10 @@
                     otros_cargos: [...(tortaBuilder.otros_cargos || [])],
                     referencia_urls: [...(tortaBuilder.referencia_urls || [])],
                     nota: String(tortaBuilder.nota || ''),
+                    descuento_tipo: String(calc.tipo || 'ninguno'),
+                    descuento_valor: Number(calc.valor || 0),
+                    descuento_monto: Number(calc.descuento || 0),
+                    total: Number(calc.total || 0),
                 },
             };
         }
@@ -3337,6 +3413,8 @@
                 `Referencias: ${refsTxt}`,
                 `Nota catalogo: ${data.nota || '-'}`,
                 `Subtotal estimado productos: ${formatoMonedaCLP(data.subtotal)}`,
+                `Descuento aplicado: ${data.descuento_monto > 0 ? `-${formatoMonedaCLP(data.descuento_monto)}` : '-'}`,
+                `Total estimado productos: ${formatoMonedaCLP(data.total)}`,
                 '--- Builder JSON ---',
                 JSON.stringify(data.raw),
                 '--- Entrega ---',
@@ -3385,6 +3463,10 @@
                         : [],
                     referencia_urls: Array.isArray(parsed.referencia_urls) ? parsed.referencia_urls.map((x) => String(x || '').trim()).filter(Boolean) : [],
                     nota: String(parsed.nota || '').trim(),
+                    descuento_tipo: ['ninguno', 'monto', 'porcentaje'].includes(String(parsed.descuento_tipo || '').trim().toLowerCase())
+                        ? String(parsed.descuento_tipo || '').trim().toLowerCase()
+                        : 'ninguno',
+                    descuento_valor: Math.max(0, _normalizarNumero(parsed.descuento_valor, 0)),
                 };
             } catch (_) {
                 tortaBuilder = _tortaBuilderVacio();

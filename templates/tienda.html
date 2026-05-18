@@ -3406,6 +3406,10 @@
             -webkit-overflow-scrolling: touch !important;
             touch-action: pan-y !important;
         }
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-flow-pane {
+            grid-row: 4 !important;
+            min-height: 0 !important;
+        }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-size-grid,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-list,
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-files,
@@ -3433,11 +3437,12 @@
         }
         body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .modal-actions {
             z-index: 2 !important;
+            grid-row: 5 !important;
         }
         </style>
     <style id="tienda-custom-css"></style>
 </head>
-<body{% if agenda_beta %} class="agenda-beta-mode"{% endif %}>
+<body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
     <header class="topbar">
         <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()">Menu</button>
         <div class="brand brand-with-logo">
@@ -8257,6 +8262,16 @@
             if (_agendaIsMobileWizardEnabled()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaDiaHora();
             _agendaApplyMobileWizard(true);
+            if (document.body.classList.contains("mobile-ui") && modalAgendaCakeCartEl?.classList.contains("active") && Number(agendaCakeFlowStep || 1) === 1) {
+                window.setTimeout(() => {
+                    try {
+                        if (agendaCakeFlowHoursHostEl) {
+                            agendaCakeFlowHoursHostEl.scrollTop = 0;
+                            agendaCakeFlowHoursHostEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }
+                    } catch (_) {}
+                }, 40);
+            }
         }
 
         function seleccionarAgendaHora(hora) {

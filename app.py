@@ -1152,13 +1152,29 @@ def admin_logout():
     return redirect(url_for('admin_login'))
 
 
+def _request_is_phone_mobile():
+    ua = str(request.headers.get("User-Agent") or "").lower()
+    if not ua:
+        return False
+    is_phone = bool(re.search(r"(iphone|ipod|android.*mobile|windows phone|iemobile|opera mini|blackberry|bb10|mobile safari)", ua))
+    is_tablet_or_desktop = bool(re.search(r"(ipad|tablet|macintosh|windows nt|linux x86_64|cros)", ua))
+    return is_phone and not is_tablet_or_desktop
+
+
 @app.route('/tienda')
 def tienda_publica():
     try:
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=False, agenda_beta=False)
+    return render_template(
+        'tienda.html',
+        tienda_personalizacion=personalizacion,
+        force_agenda=False,
+        modo_presencial=False,
+        agenda_beta=False,
+        mobile_detected=_request_is_phone_mobile(),
+    )
 
 
 @app.route('/tienda/agendar')
@@ -1168,7 +1184,14 @@ def tienda_publica_agendar():
     except Exception:
         personalizacion = _default_tienda_personalizacion()
     # Agenda beta pasa a ser la version oficial en la ruta publica de agenda.
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=True, modo_presencial=False, agenda_beta=True)
+    return render_template(
+        'tienda.html',
+        tienda_personalizacion=personalizacion,
+        force_agenda=True,
+        modo_presencial=False,
+        agenda_beta=True,
+        mobile_detected=_request_is_phone_mobile(),
+    )
 
 
 @app.route('/tienda/agendar-beta')
@@ -1183,7 +1206,14 @@ def tienda_publica_presencial():
         personalizacion = _obtener_tienda_personalizacion()
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template('tienda.html', tienda_personalizacion=personalizacion, force_agenda=False, modo_presencial=True, agenda_beta=False)
+    return render_template(
+        'tienda.html',
+        tienda_personalizacion=personalizacion,
+        force_agenda=False,
+        modo_presencial=True,
+        agenda_beta=False,
+        mobile_detected=_request_is_phone_mobile(),
+    )
 
 
 @app.route('/tienda/preview')
@@ -1199,7 +1229,14 @@ def tienda_preview_admin():
             personalizacion = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    return render_template("tienda.html", tienda_personalizacion=personalizacion, force_agenda=force_agenda, modo_presencial=False, agenda_beta=False)
+    return render_template(
+        "tienda.html",
+        tienda_personalizacion=personalizacion,
+        force_agenda=force_agenda,
+        modo_presencial=False,
+        agenda_beta=False,
+        mobile_detected=_request_is_phone_mobile(),
+    )
 
 
 def _parse_fecha_yyyy_mm_dd(valor):
@@ -3094,6 +3131,14 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         refs = builder.get("referencia_urls") if isinstance(builder.get("referencia_urls"), list) else []
         nota = str(builder.get("nota") or "").strip()
         otros_cargos = builder.get("otros_cargos") if isinstance(builder.get("otros_cargos"), list) else []
+        descuento_tipo = str(builder.get("descuento_tipo") or "ninguno").strip().lower()
+        if descuento_tipo not in {"ninguno", "monto", "porcentaje"}:
+            descuento_tipo = "ninguno"
+        try:
+            descuento_valor = float(builder.get("descuento_valor") or 0)
+        except (TypeError, ValueError):
+            descuento_valor = 0.0
+        descuento_valor = max(0.0, descuento_valor)
 
         categoria = categorias.get(categoria_id) or {}
         size = sizes.get(size_id) or {}
@@ -3133,6 +3178,13 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         if topper:
             subtotal += float(topper.get("precio") or 0)
         subtotal += sum(max(0.0, float((dict(x or {})).get("valor") or 0)) for x in otros_cargos)
+        descuento_monto = 0.0
+        if descuento_tipo == "monto":
+            descuento_monto = descuento_valor
+        elif descuento_tipo == "porcentaje":
+            descuento_monto = subtotal * (max(0.0, min(100.0, descuento_valor)) / 100.0)
+        descuento_monto = max(0.0, min(subtotal, descuento_monto))
+        total_catalogo = max(0.0, subtotal - descuento_monto)
 
         items = [
             f"Categoria: {categoria.get('nombre') or '-'}",
@@ -3177,6 +3229,14 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         items.append(f"Referencias: {' | '.join(refs_ok) if refs_ok else '-'}")
         items.append(f"Nota catalogo: {nota or '-'}")
         items.append(f"Subtotal estimado productos: {_fmt_clp_pdf(subtotal)}")
+        if descuento_monto > 0:
+            if descuento_tipo == "porcentaje":
+                items.append(f"Descuento aplicado: {int(round(max(0.0, min(100.0, descuento_valor))))}% (-{_fmt_clp_pdf(descuento_monto)})")
+            else:
+                items.append(f"Descuento aplicado: -{_fmt_clp_pdf(descuento_monto)}")
+        else:
+            items.append("Descuento aplicado: -")
+        items.append(f"Total estimado productos: {_fmt_clp_pdf(total_catalogo)}")
         return {"title": "Catalogo torta", "items": items}
 
     c = canvas.Canvas(abs_path, pagesize=A4)
