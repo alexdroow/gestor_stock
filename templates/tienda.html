@@ -798,7 +798,10 @@
             z-index: 2;
         }
         body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #mobile-cart-fab,
-        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #mobile-order-fab {
+        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #mobile-order-fab,
+        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #mobile-menu-fab,
+        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #mobile-agenda-summary-fab,
+        body.mobile-ui.agenda-beta-mode.agenda-beta-modal-open #wa-fab {
             display: none !important;
             visibility: hidden !important;
             pointer-events: none !important;
@@ -3451,6 +3454,15 @@
             overflow: hidden !important;
             align-items: stretch !important;
             justify-content: stretch !important;
+        }
+        body.mobile-ui.agenda-cake-modal-open #mobile-menu-fab,
+        body.mobile-ui.agenda-cake-modal-open #mobile-cart-fab,
+        body.mobile-ui.agenda-cake-modal-open #mobile-agenda-summary-fab,
+        body.mobile-ui.agenda-cake-modal-open #mobile-order-fab,
+        body.mobile-ui.agenda-cake-modal-open #wa-fab {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
         }
         body.mobile-ui #modal-agenda-cake-builder.active .modal,
         body.mobile-ui #modal-agenda-cake-cart.active .modal {
@@ -6670,12 +6682,14 @@
             if (!modalAgendaCakeBuilderEl) return;
             _agendaCakeDraftLoad();
             modalAgendaCakeBuilderEl.classList.add("active");
+            _toggleAgendaCakeFloatingUi();
             _agendaCakeApplyStep();
         }
 
         function _cerrarModalAgendaCakeBuilder() {
             _agendaCakeDraftSave();
             modalAgendaCakeBuilderEl?.classList.remove("active");
+            _toggleAgendaCakeFloatingUi();
         }
 
         function _abrirModalAgendaCakeCart() {
@@ -6698,6 +6712,7 @@
                 _agendaBetaSyncHeader();
             }
             modalAgendaCakeCartEl.classList.add("active");
+            _toggleAgendaCakeFloatingUi();
         }
 
         function _cerrarModalAgendaCakeCart() {
@@ -6717,6 +6732,13 @@
                 _agendaApplyMobileWizard(false);
                 _agendaBetaSyncHeader();
             }
+            _toggleAgendaCakeFloatingUi();
+        }
+
+        function _toggleAgendaCakeFloatingUi() {
+            const modalActive = Boolean(modalAgendaCakeBuilderEl?.classList.contains("active") || modalAgendaCakeCartEl?.classList.contains("active"));
+            document.body.classList.toggle("agenda-cake-modal-open", modalActive && document.body.classList.contains("mobile-ui"));
+            _reflowMobileFloatingButtons();
         }
 
         function _agendaCakeApplyFlowStep() {
