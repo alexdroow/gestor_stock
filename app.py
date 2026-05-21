@@ -7571,6 +7571,24 @@ def api_tienda_admin_flow_validar_pago():
                     "at": _now_chile_iso(),
                 },
             )
+            # Al confirmar manualmente, mover pedido a preparacion con tiempo base
+            # para que cliente y panel vean estado operativo inmediato.
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE ventas
+                SET pedido_estado = 'preparando',
+                    pedido_estado_actualizado = CURRENT_TIMESTAMP,
+                    pedido_timer_minutos = COALESCE(NULLIF(pedido_timer_minutos, 0), 25),
+                    pedido_timer_inicio = COALESCE(NULLIF(TRIM(pedido_timer_inicio), ''), CURRENT_TIMESTAMP)
+                WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+                """,
+                (venta_id,),
+            )
+            conn.commit()
+            conn.close()
+            conn = None
             _actualizar_flow_pago(
                 venta_id=venta_id,
                 estado="pagado",

@@ -10373,6 +10373,7 @@
                             <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${total}</strong></div>
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            <button type="button" id="post-checkout-refresh" style="border:1px solid #0ea5e9;background:#e0f2fe;color:#0c4a6e;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Refresh</button>
                             ${(isPending && retryUrl) ? `<button type="button" id="post-checkout-retry-flow" style="border:1px solid #0284c7;background:#0284c7;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Ir a pagar</button>` : ""}
                             ${isSuccess ? `<button type="button" id="post-checkout-pdf" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Descargar ticket PDF</button>` : ""}
                             <a href="${wa}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;">Enviar WhatsApp pasteleria</a>
@@ -10390,6 +10391,7 @@
             const overlay = document.getElementById("post-checkout-popup-overlay");
             const btnPdf = document.getElementById("post-checkout-pdf");
             const btnRetryFlow = document.getElementById("post-checkout-retry-flow");
+            const btnRefresh = document.getElementById("post-checkout-refresh");
             const btnClose = document.getElementById("post-checkout-close");
             btnPdf?.addEventListener("click", () => window.descargarComprobanteUltimoPedido && window.descargarComprobanteUltimoPedido());
             btnRetryFlow?.addEventListener("click", () => {
@@ -10403,8 +10405,31 @@
                 _setFlowVerificandoOverlay(true, "Abriendo pasarela Flow para reintentar el pago...");
                 _redirigirAFlow(retryUrl);
             });
+            btnRefresh?.addEventListener("click", async () => {
+                btnRefresh.disabled = true;
+                const old = btnRefresh.textContent;
+                btnRefresh.textContent = "Verificando...";
+                try {
+                    await _pollEstadoPedidoCliente();
+                    const pedidoRef = ultimoComprobantePedido || p || {};
+                    const mode = _popupModeByPedido(pedidoRef);
+                    _abrirPostCheckoutPopup(pedidoRef, { mode });
+                } catch (_) {
+                } finally {
+                    btnRefresh.disabled = false;
+                    btnRefresh.textContent = old || "Refresh";
+                }
+            });
             btnClose?.addEventListener("click", () => overlay?.remove());
             overlay?.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+        }
+
+        function _popupModeByPedido(pedidoLike) {
+            const estado = String(pedidoLike?.estado || pedidoLike?.pedido_estado || "").trim().toLowerCase();
+            const metodo = String(pedidoLike?.metodo_pago || "").trim().toLowerCase();
+            if (metodo === "flow_pagado" || ["confirmado", "preparando", "listo", "entregado"].includes(estado)) return "success";
+            if (metodo === "flow_pendiente" || metodo === "flow_pending" || metodo === "flow") return "pending";
+            return "failed";
         }
 
         function _abrirVentanaResumenPedidoFallback(p) {
