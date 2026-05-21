@@ -2381,6 +2381,16 @@ def _ensure_flow_pago_table(cursor):
     cols = {str(r["name"]).strip().lower() for r in (cursor.fetchall() or [])}
     if "flow_redirect_url" not in cols:
         cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN flow_redirect_url TEXT")
+    if "checkout_backup_json" not in cols:
+        cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN checkout_backup_json TEXT")
+    if "notified_admin" not in cols:
+        cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN notified_admin INTEGER DEFAULT 0")
+    if "notified_at" not in cols:
+        cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN notified_at TEXT")
+    if "confirm_attempts" not in cols:
+        cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN confirm_attempts INTEGER DEFAULT 0")
+    if "last_error" not in cols:
+        cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN last_error TEXT")
 
 
 def _ensure_ventas_metodo_pago_column():
@@ -2423,7 +2433,7 @@ def _ensure_ventas_flow_admin_alert_column():
             conn.close()
 
 
-def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redirect_url=None):
+def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redirect_url=None, checkout_backup=None):
     conn = None
     try:
         conn = get_db()
@@ -2431,13 +2441,14 @@ def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redire
         _ensure_flow_pago_table(cur)
         cur.execute(
             """
-            INSERT INTO tienda_flow_pagos (venta_id, commerce_order, flow_token, amount, flow_redirect_url, estado, updated_at)
-            VALUES (?, ?, ?, ?, ?, 'pendiente', CURRENT_TIMESTAMP)
+            INSERT INTO tienda_flow_pagos (venta_id, commerce_order, flow_token, amount, flow_redirect_url, checkout_backup_json, estado, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'pendiente', CURRENT_TIMESTAMP)
             ON CONFLICT(venta_id) DO UPDATE SET
                 commerce_order = excluded.commerce_order,
                 flow_token = excluded.flow_token,
                 amount = excluded.amount,
                 flow_redirect_url = COALESCE(excluded.flow_redirect_url, tienda_flow_pagos.flow_redirect_url),
+                checkout_backup_json = COALESCE(excluded.checkout_backup_json, tienda_flow_pagos.checkout_backup_json),
                 estado = 'pendiente',
                 updated_at = CURRENT_TIMESTAMP
             """,
@@ -2447,6 +2458,7 @@ def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redire
                 str(flow_token or "").strip(),
                 float(amount or 0),
                 (str(flow_redirect_url or "").strip() or None),
+                (json.dumps(checkout_backup, ensure_ascii=False) if isinstance(checkout_backup, dict) else None),
             ),
         )
         conn.commit()
@@ -2481,7 +2493,11 @@ def _actualizar_flow_pago(venta_id, estado, flow_order=None, payment_data=None):
         cur.execute(
             """
             UPDATE tienda_flow_pagos
-            SET estado = ?, flow_order = COALESCE(?, flow_order), payment_data_json = COALESCE(?, payment_data_json), updated_at = CURRENT_TIMESTAMP
+            SET estado = ?,
+                flow_order = COALESCE(?, flow_order),
+                payment_data_json = COALESCE(?, payment_data_json),
+                confirm_attempts = COALESCE(confirm_attempts, 0) + 1,
+                updated_at = CURRENT_TIMESTAMP
             WHERE venta_id = ?
             """,
             (
@@ -2492,6 +2508,197 @@ def _actualizar_flow_pago(venta_id, estado, flow_order=None, payment_data=None):
             ),
         )
         conn.commit()
+    finally:
+        if conn:
+            conn.close()
+
+
+def _set_flow_error(venta_id, error_msg):
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_flow_pago_table(cur)
+        cur.execute(
+            """
+            UPDATE tienda_flow_pagos
+            SET confirm_attempts = COALESCE(confirm_attempts, 0) + 1,
+                last_error = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE venta_id = ?
+            """,
+            (str(error_msg or "")[:500], int(venta_id)),
+        )
+        conn.commit()
+    finally:
+        if conn:
+            conn.close()
+
+
+def _finalizar_venta_flow_pagada(venta_id, status_payload=None):
+    venta_id = int(venta_id or 0)
+    if venta_id <= 0:
+        return
+    conn = None
+    notify_payload = None
+    try:
+        _ensure_ventas_metodo_pago_column()
+        _ensure_ventas_flow_admin_alert_column()
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_flow_pago_table(cur)
+        cur.execute(
+            """
+            UPDATE ventas
+            SET metodo_pago = 'flow_pagado',
+                canal_venta = 'tienda_online',
+                flow_admin_alertado = 0
+            WHERE id = ?
+            """,
+            (venta_id,),
+        )
+        cur.execute(
+            """
+            UPDATE tienda_flow_pagos
+            SET estado = 'pagado',
+                payment_data_json = COALESCE(?, payment_data_json),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE venta_id = ?
+            """,
+            (
+                (json.dumps(status_payload, ensure_ascii=False) if isinstance(status_payload, dict) else None),
+                venta_id,
+            ),
+        )
+        cur.execute("SELECT notified_admin FROM tienda_flow_pagos WHERE venta_id = ? LIMIT 1", (venta_id,))
+        row_n = cur.fetchone()
+        notified_admin = int((dict(row_n).get("notified_admin") if row_n else 0) or 0)
+        if notified_admin == 0:
+            cur.execute(
+                """
+                SELECT id, total_monto, cliente_nombre, cliente_email, cliente_telefono,
+                       COALESCE(NULLIF(TRIM(entrega_tipo), ''), 'retiro') AS entrega_tipo,
+                       COALESCE(NULLIF(TRIM(hora_retiro), ''), '') AS hora_retiro,
+                       COALESCE(NULLIF(TRIM(direccion_entrega), ''), '') AS direccion_entrega,
+                       COALESCE(despacho_monto, 0) AS despacho_monto,
+                       COALESCE(descuento_monto, 0) AS descuento_monto
+                FROM ventas
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (venta_id,),
+            )
+            row_v = cur.fetchone()
+            if row_v:
+                venta = dict(row_v)
+                cur.execute(
+                    """
+                    SELECT producto_id, producto_nombre, cantidad, precio_unitario
+                    FROM venta_items
+                    WHERE venta_id = ?
+                    ORDER BY id ASC
+                    """,
+                    (venta_id,),
+                )
+                items = []
+                subtotal = 0.0
+                for rr in (cur.fetchall() or []):
+                    d = dict(rr)
+                    qty = int(d.get("cantidad") or 0)
+                    pu = float(d.get("precio_unitario") or 0)
+                    subtotal += pu * qty
+                    items.append(
+                        {
+                            "id": int(d.get("producto_id") or 0),
+                            "nombre": str(d.get("producto_nombre") or "").strip() or "Producto",
+                            "cantidad": qty,
+                            "precio_unitario": pu,
+                        }
+                    )
+                notify_payload = {
+                    "venta_id": venta_id,
+                    "cliente_nombre": str(venta.get("cliente_nombre") or ""),
+                    "cliente_email": str(venta.get("cliente_email") or ""),
+                    "cliente_telefono": str(venta.get("cliente_telefono") or ""),
+                    "items": items,
+                    "subtotal": float(subtotal or 0),
+                    "descuento": float(venta.get("descuento_monto") or 0),
+                    "total": float(venta.get("total_monto") or 0),
+                    "entrega_tipo": str(venta.get("entrega_tipo") or "retiro"),
+                    "hora_retiro": str(venta.get("hora_retiro") or ""),
+                    "direccion_entrega": str(venta.get("direccion_entrega") or ""),
+                    "despacho_monto": float(venta.get("despacho_monto") or 0),
+                }
+                cur.execute(
+                    """
+                    UPDATE tienda_flow_pagos
+                    SET notified_admin = 1,
+                        notified_at = CURRENT_TIMESTAMP
+                    WHERE venta_id = ?
+                    """,
+                    (venta_id,),
+                )
+        conn.commit()
+    finally:
+        if conn:
+            conn.close()
+    if notify_payload:
+        try:
+            _notificar_whatsapp_pedido_tienda_async(
+                venta_id=notify_payload["venta_id"],
+                cliente_nombre=notify_payload["cliente_nombre"],
+                cliente_email=notify_payload["cliente_email"],
+                cliente_telefono=notify_payload["cliente_telefono"],
+                items=notify_payload["items"],
+                subtotal=notify_payload["subtotal"],
+                descuento=notify_payload["descuento"],
+                total=notify_payload["total"],
+                host_url=_public_base_url(request.url_root),
+                entrega_tipo=notify_payload["entrega_tipo"],
+                hora_retiro=notify_payload["hora_retiro"],
+                direccion_entrega=notify_payload["direccion_entrega"],
+                despacho_monto=notify_payload["despacho_monto"],
+            )
+        except Exception:
+            pass
+
+
+def _flow_reconciliar_pendientes(limit=25, horas=72):
+    conn = None
+    reconciliados = 0
+    try:
+        cfg = _flow_cfg()
+        if not cfg.get("enabled"):
+            return {"ok": True, "reconciliados": 0}
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_flow_pago_table(cur)
+        cur.execute(
+            """
+            SELECT flow_token
+            FROM tienda_flow_pagos
+            WHERE estado = 'pendiente'
+              AND flow_token IS NOT NULL
+              AND TRIM(flow_token) <> ''
+              AND datetime(created_at) >= datetime('now', ?)
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (f"-{int(max(1, horas))} hours", int(max(1, limit))),
+        )
+        tokens = [str(dict(r).get("flow_token") or "").strip() for r in (cur.fetchall() or [])]
+        conn.close()
+        conn = None
+        for tk in tokens:
+            if not tk:
+                continue
+            try:
+                rr = _flow_confirmar_token_y_actualizar(tk)
+                if rr.get("success") and rr.get("paid"):
+                    reconciliados += 1
+            except Exception:
+                continue
+        return {"ok": True, "reconciliados": reconciliados}
     finally:
         if conn:
             conn.close()
@@ -2509,10 +2716,15 @@ def _flow_confirmar_token_y_actualizar(token):
     if not cfg.get("enabled"):
         return {"success": False, "error": "Flow no configurado"}
 
-    status = _flow_post("/payment/getStatus", {"token": token}, cfg)
+    try:
+        status = _flow_post("/payment/getStatus", {"token": token}, cfg)
+    except Exception as e:
+        _set_flow_error(int(row.get("venta_id") or 0), str(e))
+        raise
     venta_id = int(row.get("venta_id") or 0)
     paid = bool(int(status.get("status") or 0) == 2)
-    estado_flow = "pagado" if paid else "pendiente"
+    status_code = int(status.get("status") or 0)
+    estado_flow = "pagado" if paid else ("rechazado" if status_code in {3, 4} else "pendiente")
     _actualizar_flow_pago(venta_id=venta_id, estado=estado_flow, flow_order=status.get("flowOrder"), payment_data=status)
 
     # metodo_pago visible en historial/clientes
@@ -2535,6 +2747,8 @@ def _flow_confirmar_token_y_actualizar(token):
     finally:
         if conn:
             conn.close()
+    if paid:
+        _finalizar_venta_flow_pagada(venta_id, status_payload=status)
     return {"success": True, "venta_id": venta_id, "paid": paid, "status": status}
 
 
@@ -7090,6 +7304,7 @@ def api_tienda_admin_cupones_delete(cupon_id):
 def api_tienda_admin_pedidos_nuevos():
     conn = None
     try:
+        _flow_reconciliar_pendientes(limit=20, horas=72)
         _ensure_ventas_metodo_pago_column()
         _ensure_ventas_flow_admin_alert_column()
         since_id = int(request.args.get("since_id") or 0)
@@ -7375,7 +7590,7 @@ def api_tienda_pedido_estado(venta_id):
                    pedido_estado_actualizado,
                    pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
-            WHERE id = ? AND canal_venta = 'tienda_online'
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
             LIMIT 1
             """,
             (int(venta_id),),
@@ -12768,12 +12983,28 @@ def api_tienda_checkout():
         if metodo_pago_preferido == "flow" and flow_sim_enabled:
             sim_token = f"SIM-{venta_id}-{int(time.time())}"
             sim_order = f"SIM-ORDER-{venta_id}-{int(time.time())}"
+            flow_backup = {
+                "venta_id": int(venta_id),
+                "cliente_nombre": cliente_nombre,
+                "cliente_email": cliente_email,
+                "cliente_telefono": cliente_telefono,
+                "entrega_tipo": entrega_tipo,
+                "hora_retiro": hora_retiro,
+                "direccion_entrega": (direccion_entrega if entrega_tipo == "despacho" else ""),
+                "despacho_monto": float(despacho_monto or 0),
+                "subtotal": float(subtotal or 0),
+                "descuento_monto": float(descuento_monto or 0),
+                "total_monto": float(total_neto or 0),
+                "items": items_notificacion,
+                "created_at": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
+            }
             _guardar_flow_pago(
                 venta_id=venta_id,
                 commerce_order=sim_order,
                 flow_token=sim_token,
                 amount=total_neto,
                 flow_redirect_url=f"{_public_base_url(request.url_root)}/tienda?flow={flow_sim_status}&venta_id={venta_id}",
+                checkout_backup=flow_backup,
             )
             if flow_sim_status == "paid":
                 _actualizar_flow_pago(venta_id=venta_id, estado="pagado", flow_order=f"SIMPAID-{venta_id}", payment_data={"simulated": True, "status": "paid"})
@@ -12836,7 +13067,7 @@ def api_tienda_checkout():
                 "amount": int(round(float(total_neto or 0))),
                 "email": flow_email,
                 "urlConfirmation": f"{base}/api/tienda/flow/confirm",
-                "urlReturn": f"{base}/tienda/flow/retorno",
+                "urlReturn": f"{base}/tienda/flow/retorno?venta_id={int(venta_id)}",
             }
             try:
                 flow_create = _flow_post("/payment/create", flow_params, flow_cfg)
@@ -12850,12 +13081,28 @@ def api_tienda_checkout():
             if not flow_token or not flow_url_base:
                 return jsonify({'success': False, 'error': 'Flow no retorno URL de pago valida'}), 502
             flow_redirect_url = f"{flow_url_base}?token={quote(flow_token)}"
+            flow_backup = {
+                "venta_id": int(venta_id),
+                "cliente_nombre": cliente_nombre,
+                "cliente_email": cliente_email,
+                "cliente_telefono": cliente_telefono,
+                "entrega_tipo": entrega_tipo,
+                "hora_retiro": hora_retiro,
+                "direccion_entrega": (direccion_entrega if entrega_tipo == "despacho" else ""),
+                "despacho_monto": float(despacho_monto or 0),
+                "subtotal": float(subtotal or 0),
+                "descuento_monto": float(descuento_monto or 0),
+                "total_monto": float(total_neto or 0),
+                "items": items_notificacion,
+                "created_at": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
+            }
             _guardar_flow_pago(
                 venta_id=venta_id,
                 commerce_order=commerce_order,
                 flow_token=flow_token,
                 amount=total_neto,
                 flow_redirect_url=flow_redirect_url,
+                checkout_backup=flow_backup,
             )
             respuesta["flow_redirect_url"] = flow_redirect_url
             respuesta["flow_token"] = flow_token
@@ -12927,16 +13174,21 @@ def tienda_flow_retorno():
 
     try:
         token = str(request.values.get("token") or "").strip()
+        venta_hint = int(request.values.get("venta_id") or 0)
+        if not token:
+            base = _public_base_url(request.url_root)
+            return _redirigir_con_cookie(base, "pending", venta_hint)
         result = _flow_confirmar_token_y_actualizar(token)
         base = _public_base_url(request.url_root)
         if not result.get("success"):
-            return _redirigir_con_cookie(base, "error", 0)
+            return _redirigir_con_cookie(base, "pending", venta_hint)
         if bool(result.get("paid")):
             return _redirigir_con_cookie(base, "paid", int(result.get("venta_id") or 0))
         return _redirigir_con_cookie(base, "pending", int(result.get("venta_id") or 0))
     except Exception:
         base = _public_base_url(request.url_root)
-        return _redirigir_con_cookie(base, "error", 0)
+        venta_hint = int(request.values.get("venta_id") or 0)
+        return _redirigir_con_cookie(base, "pending", venta_hint)
 
 
 @app.route('/api/tienda/flow/estado', methods=['GET'])
@@ -12945,6 +13197,7 @@ def api_tienda_flow_estado():
         venta_id = int(request.args.get("venta_id") or 0)
         if venta_id <= 0:
             return jsonify({"success": False, "error": "venta_id invalido"}), 400
+        _flow_reconciliar_pendientes(limit=20, horas=72)
         conn = get_db()
         cur = conn.cursor()
         _ensure_flow_pago_table(cur)
@@ -12964,9 +13217,16 @@ def api_tienda_flow_estado():
                     pass
         conn.close()
         if not row_data:
-            return jsonify({"success": True, "found": False, "estado": "no_registrado"})
+            return jsonify({"success": True, "found": False, "estado": "no_registrado", "checkout_backup": None})
         data = row_data
-        return jsonify({"success": True, "found": True, "estado": str(data.get("estado") or "pendiente"), "data": data})
+        backup = None
+        try:
+            raw_backup = data.get("checkout_backup_json")
+            if raw_backup:
+                backup = json.loads(raw_backup)
+        except Exception:
+            backup = None
+        return jsonify({"success": True, "found": True, "estado": str(data.get("estado") or "pendiente"), "data": data, "checkout_backup": backup})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

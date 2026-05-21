@@ -10029,7 +10029,7 @@
                     const data = await res.json();
                     if (res.ok && data?.success) {
                         const estado = String(data?.estado || "").trim().toLowerCase();
-                        if (estado === "pagado") return { ok: true, estado: "pagado" };
+                        if (estado === "pagado") return { ok: true, estado: "pagado", backup: (data?.checkout_backup || null) };
                     }
                 } catch (_e) {}
                 await new Promise((resolve) => setTimeout(resolve, esperaMs));
@@ -10077,6 +10077,10 @@
                     if (cookieFlow === "paid" || cookieFlow === "pending" || cookieFlow === "error") {
                         const check = await _esperarEstadoFlowFinal(cookieVenta || fallbackVentaId || 0, 8, 1200);
                         if (check.ok || cookieFlow === "paid") {
+                            if (check?.backup && !draft) {
+                                ultimoComprobantePedido = { ...(ultimoComprobantePedido || {}), ...check.backup };
+                                guardarUltimoPedidoLocal();
+                            }
                             msg("Pago confirmado por Flow. Pedido registrado correctamente.");
                             _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: cookieVenta || fallbackVentaId || 0 }), { mode: "success" });
                             _limpiarFlowCheckoutDraft();
@@ -10084,8 +10088,8 @@
                             msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
                             _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: cookieVenta || fallbackVentaId || 0 }), { mode: "pending" });
                         } else {
-                            msg("La compra no se concreto en Flow. Puedes reintentar o usar transferencia.", true);
-                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: cookieVenta || fallbackVentaId || 0 }), { mode: "error" });
+                            msg("No se pudo confirmar el pago inmediatamente. Tu pedido queda en verificacion de pago.", true);
+                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: cookieVenta || fallbackVentaId || 0 }), { mode: "pending" });
                         }
                         _clearCookie("flow_return_status");
                         _clearFlowReturnTracking();
@@ -10105,12 +10109,16 @@
                         }
                         const check = await _esperarEstadoFlowFinal(ventaSeguimiento, 6, 1200);
                         if (check.ok) {
+                            if (check?.backup && !draft) {
+                                ultimoComprobantePedido = { ...(ultimoComprobantePedido || {}), ...check.backup };
+                                guardarUltimoPedidoLocal();
+                            }
                             msg("Pago confirmado por Flow. Pedido registrado correctamente.");
                             _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "success" });
                             _limpiarFlowCheckoutDraft();
                         } else {
-                            msg("La compra fue cancelada o aun no esta pagada en Flow.", true);
-                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "error" });
+                            msg("Pago en verificacion de Flow. Aun no recibimos confirmacion final.", true);
+                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "pending" });
                             _clearFlowReturnTracking();
                         }
                     }
@@ -10133,6 +10141,10 @@
                 } else if (flow === "pending") {
                     const check = await _esperarEstadoFlowFinal(ventaId || fallbackVentaId || 0, 10, 1400);
                     if (check.ok) {
+                        if (check?.backup && !draft) {
+                            ultimoComprobantePedido = { ...(ultimoComprobantePedido || {}), ...check.backup };
+                            guardarUltimoPedidoLocal();
+                        }
                         msg("Pago confirmado por Flow. Pedido registrado correctamente.");
                         _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "success" });
                         _limpiarFlowCheckoutDraft();
@@ -10143,12 +10155,16 @@
                 } else if (flow === "error") {
                     const check = await _esperarEstadoFlowFinal(ventaId || fallbackVentaId || 0, 4, 1200);
                     if (check.ok) {
+                        if (check?.backup && !draft) {
+                            ultimoComprobantePedido = { ...(ultimoComprobantePedido || {}), ...check.backup };
+                            guardarUltimoPedidoLocal();
+                        }
                         msg("Pago confirmado por Flow. Pedido registrado correctamente.");
                         _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "success" });
                         _limpiarFlowCheckoutDraft();
                     } else {
-                        msg("La compra no se concreto en Flow. Puedes reintentar o usar transferencia.", true);
-                        _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "error" });
+                        msg("No se pudo confirmar el pago en este momento. Tu pedido queda en verificacion.", true);
+                        _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "pending" });
                     }
                 }
                 _clearFlowReturnTracking();
