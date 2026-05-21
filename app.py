@@ -2721,9 +2721,60 @@ def _flow_confirmar_token_y_actualizar(token):
     except Exception as e:
         _set_flow_error(int(row.get("venta_id") or 0), str(e))
         raise
+    def _safe_int(v, default=0):
+        try:
+            return int(v)
+        except Exception:
+            return default
+
+    def _txt(v):
+        return str(v or "").strip().lower()
+
+    def _flow_pago_aprobado(payload):
+        data = payload if isinstance(payload, dict) else {}
+        status_code_local = _safe_int(data.get("status"), 0)
+        if status_code_local == 2:
+            return True
+        if status_code_local in {3, 4}:
+            return False
+
+        positivos = {"paid", "approved", "success", "successful", "completed", "authorized", "authorised", "pagado", "aprobado"}
+        negativos = {"pending", "rejected", "cancelled", "canceled", "failed", "error", "declined", "voided", "anulado", "rechazado"}
+
+        candidatos = []
+        for k in ("status_text", "statusText", "paymentStatus", "payment_status", "detailStatus"):
+            vv = _txt(data.get(k))
+            if vv:
+                candidatos.append(vv)
+
+        payment_data = data.get("paymentData")
+        payment_items = []
+        if isinstance(payment_data, dict):
+            payment_items = [payment_data]
+        elif isinstance(payment_data, list):
+            payment_items = [x for x in payment_data if isinstance(x, dict)]
+
+        for it in payment_items:
+            for k in ("status", "paymentStatus", "payment_status", "detailStatus", "type"):
+                vv = _txt(it.get(k))
+                if vv:
+                    candidatos.append(vv)
+
+        # Señal adicional: si hay flowOrder y fecha de pago en paymentData,
+        # tratamos como aprobado aunque status venga transitoriamente distinto.
+        has_flow_order = bool(str(data.get("flowOrder") or "").strip())
+        has_payment_date = any(bool(str((it.get("date") or it.get("paymentDate") or it.get("transferDate") or "")).strip()) for it in payment_items)
+        if has_flow_order and has_payment_date:
+            return True
+
+        if any(any(pos in c for pos in positivos) for c in candidatos):
+            if not any(any(neg in c for neg in negativos) for c in candidatos):
+                return True
+        return False
+
     venta_id = int(row.get("venta_id") or 0)
-    paid = bool(int(status.get("status") or 0) == 2)
-    status_code = int(status.get("status") or 0)
+    status_code = _safe_int(status.get("status"), 0)
+    paid = bool(_flow_pago_aprobado(status))
     estado_flow = "pagado" if paid else ("rechazado" if status_code in {3, 4} else "pendiente")
     _actualizar_flow_pago(venta_id=venta_id, estado=estado_flow, flow_order=status.get("flowOrder"), payment_data=status)
 
