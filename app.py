@@ -9261,6 +9261,144 @@ def api_detalle_producto(id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _ensure_producto_pack_subopciones_table(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS producto_pack_subopciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            producto_pack_id INTEGER NOT NULL,
+            subproducto_id INTEGER NOT NULL,
+            max_cantidad INTEGER NOT NULL DEFAULT 1,
+            orden INTEGER NOT NULL DEFAULT 0,
+            creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(producto_pack_id, subproducto_id)
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pack_subopciones_pack ON producto_pack_subopciones(producto_pack_id, orden, id)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pack_subopciones_sub ON producto_pack_subopciones(subproducto_id)"
+    )
+
+
+@app.route('/api/producto/<int:id>/pack-subopciones', methods=['GET'])
+def api_producto_pack_subopciones_get(id):
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_producto_pack_subopciones_table(cur)
+        cur.execute("SELECT id, nombre, COALESCE(activo_tienda, 1) AS activo_tienda FROM productos WHERE id = ? LIMIT 1", (int(id),))
+        pack = cur.fetchone()
+        if not pack:
+            return jsonify({"success": False, "error": "Producto no encontrado"}), 404
+        cur.execute(
+            """
+            SELECT s.id, s.producto_pack_id, s.subproducto_id, s.max_cantidad, s.orden,
+                   COALESCE(p.nombre, 'Producto #' || s.subproducto_id) AS subproducto_nombre,
+                   COALESCE(p.activo_tienda, 1) AS subproducto_activo_tienda
+            FROM producto_pack_subopciones s
+            LEFT JOIN productos p ON p.id = s.subproducto_id
+            WHERE s.producto_pack_id = ?
+            ORDER BY s.orden ASC, s.id ASC
+            """,
+            (int(id),),
+        )
+        opciones = [dict(r) for r in cur.fetchall()]
+        return jsonify({"success": True, "opciones": opciones})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "opciones": []}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/producto/<int:id>/pack-subopciones', methods=['POST'])
+def api_producto_pack_subopciones_post(id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        raw_items = data.get("items") or []
+        if not isinstance(raw_items, list):
+            return jsonify({"success": False, "error": "items debe ser una lista"}), 400
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_producto_pack_subopciones_table(cur)
+        cur.execute("SELECT id FROM productos WHERE id = ? LIMIT 1", (int(id),))
+        if not cur.fetchone():
+            return jsonify({"success": False, "error": "Producto no encontrado"}), 404
+
+        items_limpios = []
+        usados = set()
+        for idx, item in enumerate(raw_items, start=1):
+            if not isinstance(item, dict):
+                return jsonify({"success": False, "error": f"Subopcion #{idx} invalida"}), 400
+            sub_id = int(item.get("subproducto_id") or 0)
+            if sub_id <= 0:
+                return jsonify({"success": False, "error": f"Subopcion #{idx}: producto invalido"}), 400
+            if sub_id == int(id):
+                return jsonify({"success": False, "error": "No puedes agregar el mismo producto dentro de su pack"}), 400
+            if sub_id in usados:
+                continue
+            usados.add(sub_id)
+            max_cantidad = int(item.get("max_cantidad") or 1)
+            if max_cantidad < 1:
+                max_cantidad = 1
+            if max_cantidad > 100:
+                max_cantidad = 100
+            items_limpios.append({
+                "subproducto_id": sub_id,
+                "max_cantidad": max_cantidad,
+                "orden": len(items_limpios) + 1,
+            })
+
+        if items_limpios:
+            placeholders = ",".join(["?"] * len(items_limpios))
+            cur.execute(
+                f"""
+                SELECT id, nombre, COALESCE(activo_tienda, 1) AS activo_tienda
+                FROM productos
+                WHERE id IN ({placeholders})
+                """,
+                tuple(x["subproducto_id"] for x in items_limpios),
+            )
+            mapa = {int(r["id"]): dict(r) for r in cur.fetchall()}
+            for it in items_limpios:
+                p = mapa.get(int(it["subproducto_id"]))
+                if not p:
+                    return jsonify({"success": False, "error": f"Producto asociado #{it['subproducto_id']} no existe"}), 400
+                if int(p.get("activo_tienda") or 0) != 1:
+                    return jsonify({"success": False, "error": f"Producto asociado '{p.get('nombre')}' esta apagado en tienda"}), 400
+
+        cur.execute("DELETE FROM producto_pack_subopciones WHERE producto_pack_id = ?", (int(id),))
+        for it in items_limpios:
+            cur.execute(
+                """
+                INSERT INTO producto_pack_subopciones (producto_pack_id, subproducto_id, max_cantidad, orden)
+                VALUES (?, ?, ?, ?)
+                """,
+                (int(id), int(it["subproducto_id"]), int(it["max_cantidad"]), int(it["orden"])),
+            )
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "guardadas": len(items_limpios)})
+    except ValueError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/producto/<int:id>/actualizar', methods=['POST'])
 def api_actualizar_producto(id):
     try:

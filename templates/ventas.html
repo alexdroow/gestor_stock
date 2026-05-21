@@ -2284,6 +2284,25 @@
                     <input id="editor-rapido-foto-input" type="file" accept=".jpg,.jpeg,.png,.webp" style="display:none;">
                     <div id="editor-rapido-foto-msg" class="editor-rapido-foto-msg"></div>
                 </div>
+                <div class="editor-rapido-foto-box" style="grid-column:1/-1;">
+                    <div class="editor-rapido-foto-head">
+                        <strong style="font-size:.86rem;color:#334155;">Subopciones de pack (productos disponibles)</strong>
+                        <div class="editor-rapido-foto-preview" id="editor-rapido-pack-preview">Sin subopciones</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 130px auto;gap:8px;align-items:end;">
+                        <div class="editor-rapido-field" style="margin:0;">
+                            <label for="editor-rapido-pack-producto">Producto a incluir</label>
+                            <select id="editor-rapido-pack-producto"></select>
+                        </div>
+                        <div class="editor-rapido-field" style="margin:0;">
+                            <label for="editor-rapido-pack-max">Max por item</label>
+                            <input id="editor-rapido-pack-max" type="number" min="1" max="100" step="1" value="1">
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="agregarSubopcionPackEditorRapido()">+ Agregar</button>
+                    </div>
+                    <div id="editor-rapido-pack-list" style="margin-top:8px;display:grid;gap:6px;"></div>
+                    <div id="editor-rapido-pack-msg" class="editor-rapido-foto-msg"></div>
+                </div>
             </div>
             <div class="editor-rapido-note">
                 Tip: en esta pantalla usa click derecho sobre cualquier tarjeta para abrir este editor al instante.
@@ -3461,6 +3480,7 @@
         }
 
         let _editorRapidoProductoId = 0;
+        let _editorRapidoPackOpciones = [];
         const _editorRapidoCropState = {
             open: false,
             file: null,
@@ -3479,6 +3499,119 @@
             el.className = `editor-rapido-foto-msg ${tipo || ''}`.trim();
             el.textContent = String(texto || '');
         }
+
+        function _setEditorRapidoPackMsg(texto, tipo = "") {
+            const el = document.getElementById('editor-rapido-pack-msg');
+            if (!el) return;
+            el.className = `editor-rapido-foto-msg ${tipo || ''}`.trim();
+            el.textContent = String(texto || '');
+        }
+
+        function _productosDisponiblesParaPack(pid) {
+            return Object.values(productosData || {})
+                .filter((p) => {
+                    const id = Number(p?.id || 0);
+                    if (!id || id === Number(pid || 0)) return false;
+                    return Boolean(p?.activo_tienda !== false);
+                })
+                .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es'));
+        }
+
+        function _renderEditorRapidoPackPreview() {
+            const preview = document.getElementById('editor-rapido-pack-preview');
+            if (!preview) return;
+            const n = Array.isArray(_editorRapidoPackOpciones) ? _editorRapidoPackOpciones.length : 0;
+            preview.textContent = n ? `${n} subopcion(es)` : 'Sin subopciones';
+        }
+
+        function _renderEditorRapidoPackSelector(pid) {
+            const sel = document.getElementById('editor-rapido-pack-producto');
+            if (!sel) return;
+            const rows = _productosDisponiblesParaPack(pid);
+            sel.innerHTML = rows.length
+                ? rows.map((p) => `<option value="${Number(p.id || 0)}">${escapeHtmlLocal(String(p.nombre || 'Producto'))}</option>`).join('')
+                : '<option value="">No hay productos activos disponibles</option>';
+        }
+
+        function _renderEditorRapidoPackList() {
+            const wrap = document.getElementById('editor-rapido-pack-list');
+            if (!wrap) return;
+            const mapa = productosData || {};
+            if (!_editorRapidoPackOpciones.length) {
+                wrap.innerHTML = '<div style="font-size:.82rem;color:#64748b;">Sin subopciones configuradas para este item.</div>';
+                _renderEditorRapidoPackPreview();
+                return;
+            }
+            wrap.innerHTML = _editorRapidoPackOpciones.map((it, idx) => {
+                const info = mapa[Number(it.subproducto_id || 0)] || {};
+                const nombre = String(info.nombre || it.subproducto_nombre || `Producto #${Number(it.subproducto_id || 0)}`);
+                const activo = info.activo_tienda !== false;
+                return `
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid #dbeafe;border-radius:8px;padding:6px 8px;background:${activo ? '#f8fafc' : '#fff1f2'};">
+                        <div style="font-size:.86rem;color:#0f172a;">
+                            <strong>${escapeHtmlLocal(nombre)}</strong>
+                            <span style="color:#475569;"> · max ${Number(it.max_cantidad || 1)}</span>
+                            ${activo ? '' : '<span style="color:#b91c1c;font-weight:700;"> · apagado en tienda</span>'}
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="eliminarSubopcionPackEditorRapido(${idx})">Quitar</button>
+                    </div>
+                `;
+            }).join('');
+            _renderEditorRapidoPackPreview();
+        }
+
+        async function cargarSubopcionesPackEditorRapido(pid) {
+            _editorRapidoPackOpciones = [];
+            _renderEditorRapidoPackSelector(pid);
+            _renderEditorRapidoPackList();
+            _setEditorRapidoPackMsg('Cargando subopciones...', '');
+            try {
+                const res = await fetch(`/api/producto/${Number(pid || 0)}/pack-subopciones`, { headers: { Accept: 'application/json' } });
+                const data = await res.json();
+                if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudieron cargar subopciones');
+                _editorRapidoPackOpciones = (Array.isArray(data.opciones) ? data.opciones : []).map((x) => ({
+                    subproducto_id: Number(x.subproducto_id || 0),
+                    max_cantidad: Math.max(1, Number(x.max_cantidad || 1)),
+                    subproducto_nombre: String(x.subproducto_nombre || ''),
+                })).filter((x) => Number(x.subproducto_id || 0) > 0);
+                _renderEditorRapidoPackList();
+                _setEditorRapidoPackMsg('', '');
+            } catch (err) {
+                _setEditorRapidoPackMsg(err.message || 'No se pudieron cargar subopciones.', 'err');
+            }
+        }
+
+        function agregarSubopcionPackEditorRapido() {
+            const pid = Number(_editorRapidoProductoId || 0);
+            if (!pid) return;
+            const sel = document.getElementById('editor-rapido-pack-producto');
+            const maxEl = document.getElementById('editor-rapido-pack-max');
+            const subId = Number(sel?.value || 0);
+            const max = Math.max(1, Math.min(100, Number(maxEl?.value || 1) || 1));
+            if (!subId) return;
+            if (subId === pid) {
+                _setEditorRapidoPackMsg('No puedes agregar el mismo producto dentro del pack.', 'err');
+                return;
+            }
+            const existente = _editorRapidoPackOpciones.find((x) => Number(x.subproducto_id || 0) === subId);
+            if (existente) {
+                existente.max_cantidad = max;
+            } else {
+                _editorRapidoPackOpciones.push({ subproducto_id: subId, max_cantidad: max });
+            }
+            _setEditorRapidoPackMsg('Subopcion agregada.', 'ok');
+            _renderEditorRapidoPackList();
+        }
+        window.agregarSubopcionPackEditorRapido = agregarSubopcionPackEditorRapido;
+
+        function eliminarSubopcionPackEditorRapido(idx) {
+            const i = Number(idx || 0);
+            if (i < 0 || i >= _editorRapidoPackOpciones.length) return;
+            _editorRapidoPackOpciones.splice(i, 1);
+            _setEditorRapidoPackMsg('Subopcion removida.', '');
+            _renderEditorRapidoPackList();
+        }
+        window.eliminarSubopcionPackEditorRapido = eliminarSubopcionPackEditorRapido;
 
         function _renderEditorRapidoFotoPreview(id) {
             const box = document.getElementById('editor-rapido-foto-preview');
@@ -3673,6 +3806,8 @@
             if (ofertaFinEl) ofertaFinEl.value = String(info.oferta_fin_tienda || '').trim();
             _renderEditorRapidoFotoPreview(pid);
             _setEditorRapidoFotoMsg('', '');
+            _setEditorRapidoPackMsg('', '');
+            cargarSubopcionesPackEditorRapido(pid);
             const modal = document.getElementById('modal-editor-producto-rapido');
             if (modal) modal.classList.add('active');
             window.setTimeout(() => { try { nombreEl?.focus(); nombreEl?.select(); } catch (_) {} }, 50);
@@ -3682,6 +3817,7 @@
             const modal = document.getElementById('modal-editor-producto-rapido');
             if (modal) modal.classList.remove('active');
             _cerrarEditorRapidoCrop();
+            _editorRapidoPackOpciones = [];
             _editorRapidoProductoId = 0;
         }
 
@@ -3921,6 +4057,22 @@
                     productosData[pid].precio,
                     productosData[pid].porciones_disponibles
                 );
+                const packPayload = {
+                    items: (_editorRapidoPackOpciones || []).map((x, idx) => ({
+                        subproducto_id: Number(x.subproducto_id || 0),
+                        max_cantidad: Math.max(1, Math.min(100, Number(x.max_cantidad || 1) || 1)),
+                        orden: idx + 1,
+                    })).filter((x) => Number(x.subproducto_id || 0) > 0),
+                };
+                const resPack = await fetch(`/api/producto/${pid}/pack-subopciones`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify(packPayload),
+                });
+                const dataPack = await resPack.json();
+                if (!resPack.ok || !dataPack?.success) {
+                    throw new Error(dataPack?.error || 'Producto guardado, pero no se pudieron guardar subopciones del pack');
+                }
                 filtrarProductos();
                 cerrarEditorRapidoProducto();
                 if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
