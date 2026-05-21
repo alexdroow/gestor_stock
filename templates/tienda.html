@@ -4482,6 +4482,7 @@
         let productos = [];
         let categoriasDisponibles = [];
         let carrito = [];
+        let packBuilderState = null;
         const CAT_STORAGE_KEY = "tienda_categoria_activa";
         const _agendaUrlParamsInit = new URLSearchParams(window.location.search);
         const _forceAgendaFromServer = {{ 'true' if force_agenda else 'false' }};
@@ -8774,13 +8775,17 @@
             const htmlItems = carrito.map((it) => `
                 <div class="cart-item">
                     <div class="cart-item-row"><strong>${esc(it.nombre)}</strong><span>${money.format(it.precio_unitario)}</span></div>
+                    ${it.pack_resumen ? `<div style="font-size:.78rem;color:#334155;margin:2px 0 6px 0;">${esc(it.pack_resumen)}</div>` : ""}
                     <div class="cart-item-row">
                         <div class="qty-wrap">
                             <button class="qty-btn" type="button" onclick="restar(${it.id})">-</button>
                             <span>${it.cantidad}</span>
                             <button class="qty-btn" type="button" onclick="sumar(${it.id})">+</button>
                         </div>
-                        <span>${money.format(it.cantidad * it.precio_unitario)}</span>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            ${it.pack_resumen ? `<button class="qty-btn" type="button" title="Editar subitems del pack" onclick="editarPackEnCarrito(${it.id})">...</button>` : ""}
+                            <span>${money.format(it.cantidad * it.precio_unitario)}</span>
+                        </div>
                     </div>
                 </div>
             `).join("");
@@ -8847,10 +8852,176 @@
             }
         }
 
+        function _packDisponibleParaProducto(prod) {
+            const opts = Array.isArray(prod?.pack_subopciones) ? prod.pack_subopciones : [];
+            return opts.filter((x) => Number(x?.subproducto_id || 0) > 0 && x?.subproducto_activo_tienda !== false);
+        }
+
+        function _packResumenTexto(packItems = []) {
+            return (Array.isArray(packItems) ? packItems : [])
+                .filter((x) => Number(x?.cantidad || 0) > 0)
+                .map((x) => `${String(x?.nombre || "Item")} x${Number(x?.cantidad || 0)}`)
+                .join(", ");
+        }
+
+        function _cerrarModalPackBuilder() {
+            const old = document.getElementById("modal-pack-builder");
+            if (old && old.parentNode) old.parentNode.removeChild(old);
+            packBuilderState = null;
+        }
+
+        function _renderModalPackBuilder() {
+            const st = packBuilderState;
+            const modal = document.getElementById("modal-pack-builder");
+            if (!st || !modal) return;
+            const total = st.opciones.reduce((acc, it) => acc + Number(st.seleccion[it.subproducto_id] || 0), 0);
+            const totalLabel = modal.querySelector("[data-pack-total]");
+            if (totalLabel) totalLabel.textContent = `${total}/${st.maxTotal}`;
+            const msg = modal.querySelector("[data-pack-msg]");
+            if (msg) {
+                msg.textContent = total > st.maxTotal ? `Maximo total: ${st.maxTotal}` : "";
+            }
+            st.opciones.forEach((opt) => {
+                const sid = Number(opt.subproducto_id || 0);
+                const qty = Number(st.seleccion[sid] || 0);
+                const qtyEl = modal.querySelector(`[data-pack-qty='${sid}']`);
+                if (qtyEl) qtyEl.textContent = String(qty);
+                const inc = modal.querySelector(`[data-pack-inc='${sid}']`);
+                if (inc) inc.disabled = qty >= Number(opt.max_cantidad || 1) || total >= st.maxTotal;
+                const dec = modal.querySelector(`[data-pack-dec='${sid}']`);
+                if (dec) dec.disabled = qty <= 0;
+            });
+            const btn = modal.querySelector("[data-pack-confirm]");
+            if (btn) btn.disabled = total <= 0 || total > st.maxTotal;
+        }
+
+        function _abrirModalPackBuilder(prod, existente = null) {
+            _cerrarModalPackBuilder();
+            const opciones = _packDisponibleParaProducto(prod);
+            if (!opciones.length) return;
+            const maxTotal = Math.max(1, Number(prod?.pack_max_total || 0) || 1);
+            const seleccion = {};
+            if (existente && Array.isArray(existente.pack_items)) {
+                existente.pack_items.forEach((it) => {
+                    const sid = Number(it?.subproducto_id || 0);
+                    const qty = Math.max(0, Number(it?.cantidad || 0));
+                    if (sid > 0 && qty > 0) seleccion[sid] = qty;
+                });
+            }
+            packBuilderState = { producto: prod, opciones, maxTotal, seleccion, existenteId: existente?.id || null };
+            const wrap = document.createElement("div");
+            wrap.id = "modal-pack-builder";
+            wrap.className = "modal active";
+            wrap.innerHTML = `
+                <div class="modal-body" style="width:min(540px,94vw);max-height:90vh;overflow:auto;">
+                    <h3 style="margin:0 0 8px 0;">Configurar pack: ${esc(String(prod?.nombre || "Pack"))}</h3>
+                    <div style="font-size:.85rem;color:#475569;margin-bottom:8px;">Selecciona subitems. Maximo total: <strong data-pack-total>0/${maxTotal}</strong></div>
+                    <div data-pack-msg style="min-height:18px;font-size:.82rem;color:#b45309;margin-bottom:6px;"></div>
+                    <div style="display:grid;gap:8px;">
+                        ${opciones.map((op) => `
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;background:#fff;">
+                                <div>
+                                    <div style="font-weight:700;color:#0f172a;">${esc(String(op.subproducto_nombre || "Item"))}</div>
+                                    <div style="font-size:.78rem;color:#64748b;">Max por item: ${Number(op.max_cantidad || 1)}</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <button type="button" class="qty-btn" data-pack-dec="${Number(op.subproducto_id || 0)}">-</button>
+                                    <strong data-pack-qty="${Number(op.subproducto_id || 0)}">0</strong>
+                                    <button type="button" class="qty-btn" data-pack-inc="${Number(op.subproducto_id || 0)}">+</button>
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                    <div class="modal-actions" style="margin-top:10px;">
+                        <button type="button" class="btn-secondary" data-pack-cancel>Cerrar</button>
+                        <button type="button" class="btn-primary" data-pack-confirm>Agregar pack</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(wrap);
+            wrap.addEventListener("click", (ev) => {
+                if (ev.target === wrap) return;
+                const btn = ev.target.closest("button");
+                if (!btn || !packBuilderState) return;
+                if (btn.hasAttribute("data-pack-cancel")) {
+                    _cerrarModalPackBuilder();
+                    return;
+                }
+                if (btn.hasAttribute("data-pack-confirm")) {
+                    const st = packBuilderState;
+                    const pack_items = st.opciones
+                        .map((op) => {
+                            const sid = Number(op.subproducto_id || 0);
+                            const qty = Number(st.seleccion[sid] || 0);
+                            if (qty <= 0) return null;
+                            return { subproducto_id: sid, cantidad: qty, nombre: String(op.subproducto_nombre || "") };
+                        })
+                        .filter(Boolean);
+                    const resumen = _packResumenTexto(pack_items);
+                    if (!pack_items.length) return;
+                    if (st.existenteId) {
+                        const ex = carrito.find((x) => x.id === st.existenteId);
+                        if (ex) {
+                            ex.pack_items = pack_items;
+                            ex.pack_resumen = resumen;
+                        }
+                    } else {
+                        const precioBase = n(st.producto.precio_final);
+                        const precioFlow = flowPagoHabilitado ? _flowPriceFromBase(precioBase) : precioBase;
+                        carrito.push({
+                            id: st.producto.id,
+                            nombre: st.producto.nombre,
+                            cantidad: 1,
+                            precio_base_unitario: precioBase,
+                            precio_flow_unitario: precioFlow,
+                            precio_unitario: precioFlow,
+                            pack_items,
+                            pack_resumen: resumen,
+                        });
+                    }
+                    limpiarCuponAplicado();
+                    msg("");
+                    renderCart();
+                    _cerrarModalPackBuilder();
+                    return;
+                }
+                const incSid = Number(btn.getAttribute("data-pack-inc") || 0);
+                const decSid = Number(btn.getAttribute("data-pack-dec") || 0);
+                if (incSid > 0) {
+                    const st = packBuilderState;
+                    const op = st.opciones.find((x) => Number(x.subproducto_id || 0) === incSid);
+                    if (!op) return;
+                    const total = st.opciones.reduce((acc, it) => acc + Number(st.seleccion[it.subproducto_id] || 0), 0);
+                    const curr = Number(st.seleccion[incSid] || 0);
+                    if (curr >= Number(op.max_cantidad || 1) || total >= st.maxTotal) return;
+                    st.seleccion[incSid] = curr + 1;
+                    _renderModalPackBuilder();
+                    return;
+                }
+                if (decSid > 0) {
+                    const st = packBuilderState;
+                    const curr = Number(st.seleccion[decSid] || 0);
+                    st.seleccion[decSid] = Math.max(0, curr - 1);
+                    _renderModalPackBuilder();
+                }
+            });
+            _renderModalPackBuilder();
+        }
+
         function agregar(id) {
             if (!tiendaAbierta) return msg("La tienda esta cerrada. No se pueden agregar productos al carrito.", true);
             const p = productos.find((x) => x.id === id);
             if (!p) return;
+            const packOptions = _packDisponibleParaProducto(p);
+            if (packOptions.length) {
+                const existentePack = carrito.find((x) => x.id === id);
+                if (existentePack && !existentePack.pack_items) {
+                    existentePack.pack_items = [];
+                    existentePack.pack_resumen = "";
+                }
+                _abrirModalPackBuilder(p, existentePack || null);
+                return;
+            }
             const max = Math.max(0, Number(p.max_compra || 0));
             if (max <= 0) return msg("Producto sin stock disponible.", true);
             const it = carrito.find((x) => x.id === id);
@@ -8878,6 +9049,16 @@
             if (ev && typeof ev.stopPropagation === "function") ev.stopPropagation();
             if (agotado) return;
             agregar(Number(id || 0));
+        }
+
+        function editarPackEnCarrito(id) {
+            const pid = Number(id || 0);
+            const prod = productos.find((x) => Number(x.id || 0) === pid);
+            const item = carrito.find((x) => Number(x.id || 0) === pid);
+            if (!prod || !item) return;
+            const packOptions = _packDisponibleParaProducto(prod);
+            if (!packOptions.length) return;
+            _abrirModalPackBuilder(prod, item);
         }
 
         function sumar(id) {
@@ -9759,6 +9940,7 @@
                 nombre: String(it.nombre || ""),
                 cantidad: Number(it.cantidad || 0),
                 subtotal: Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPrecio),
+                pack_resumen: String(it.pack_resumen || ""),
             }));
             const subtotal = items.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
             const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
@@ -9772,7 +9954,7 @@
             `;
             const itemsHtml = items.map((it) => `
                 <div class="checkout-ticket-line">
-                    <span>${esc(it.nombre)} x${Number(it.cantidad || 0)}</span>
+                    <span>${esc(it.nombre)} x${Number(it.cantidad || 0)}${it.pack_resumen ? `<br><small style="color:#475569;">${esc(it.pack_resumen)}</small>` : ""}</span>
                     <span>${money.format(Number(it.subtotal || 0))}</span>
                 </div>
             `).join("");
@@ -9848,6 +10030,8 @@
                 cantidad: Number(it.cantidad || 0),
                 precio_unitario: _precioUnitarioItemPorMetodo(it, metodoPagoActual),
                 subtotal: Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPagoActual),
+                pack_items: Array.isArray(it.pack_items) ? it.pack_items : [],
+                pack_resumen: String(it.pack_resumen || ""),
             }));
             const totalsSnapshot = _checkoutCalcularTotales();
             const subtotalSnapshot = Number(totalsSnapshot.subtotal || 0);
@@ -9855,7 +10039,15 @@
             const despachoSnapshot = Number(totalsSnapshot.despacho || 0);
             const totalSnapshot = Number(totalsSnapshot.total || 0);
             const payload = {
-                items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad, precio_unitario: _precioUnitarioItemPorMetodo(it, metodoPagoActual) })),
+                items: carrito.map((it) => ({
+                    id: it.id,
+                    cantidad: it.cantidad,
+                    precio_unitario: _precioUnitarioItemPorMetodo(it, metodoPagoActual),
+                    pack_items: Array.isArray(it.pack_items) ? it.pack_items.map((x) => ({
+                        subproducto_id: Number(x.subproducto_id || 0),
+                        cantidad: Number(x.cantidad || 0),
+                    })) : [],
+                })),
                 codigo_descuento: String((codigoDescuentoEl && codigoDescuentoEl.value) || (mobileCodigoDescuentoEl && mobileCodigoDescuentoEl.value) || "").trim(),
                 cliente_nombre: String(datosCliente?.nombre || "").trim(),
                 cliente_email: normalizarEmailCliente(datosCliente?.email),

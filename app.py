@@ -5423,6 +5423,54 @@ def api_tienda_productos():
             if int(p.get("activo_tienda") if p.get("activo_tienda") is not None else 1) == 1
             and (str(p.get("categoria_tienda") or "General").strip().lower() in categorias_activas_map or not categorias_activas_map)
         ]
+        conn_pack = None
+        try:
+            pack_ids = [int(d.get("id") or 0) for d in disponibles if int(d.get("id") or 0) > 0]
+            if pack_ids:
+                conn_pack = get_db()
+                cur_pack = conn_pack.cursor()
+                _ensure_producto_pack_subopciones_table(cur_pack)
+                placeholders = ",".join(["?"] * len(pack_ids))
+                cur_pack.execute(
+                    f"""
+                    SELECT s.producto_pack_id, s.subproducto_id, s.max_cantidad, s.orden,
+                           COALESCE(p.nombre, 'Producto #' || s.subproducto_id) AS subproducto_nombre,
+                           COALESCE(p.activo_tienda, 1) AS subproducto_activo_tienda
+                    FROM producto_pack_subopciones s
+                    LEFT JOIN productos p ON p.id = s.subproducto_id
+                    WHERE s.producto_pack_id IN ({placeholders})
+                    ORDER BY s.producto_pack_id ASC, s.orden ASC, s.id ASC
+                    """,
+                    tuple(pack_ids),
+                )
+                pack_map = {}
+                for r in cur_pack.fetchall():
+                    pid = int(r["producto_pack_id"] or 0)
+                    pack_map.setdefault(pid, []).append(
+                        {
+                            "subproducto_id": int(r["subproducto_id"] or 0),
+                            "subproducto_nombre": str(r["subproducto_nombre"] or "").strip() or f"Producto #{int(r['subproducto_id'] or 0)}",
+                            "subproducto_activo_tienda": bool(r["subproducto_activo_tienda"]),
+                            "max_cantidad": int(r["max_cantidad"] or 1),
+                            "orden": int(r["orden"] or 0),
+                        }
+                    )
+                cur_pack.execute(
+                    f"""
+                    SELECT producto_pack_id, max_total
+                    FROM producto_pack_subopciones_config
+                    WHERE producto_pack_id IN ({placeholders})
+                    """,
+                    tuple(pack_ids),
+                )
+                cfg_map = {int(r["producto_pack_id"] or 0): int(r["max_total"] or 0) for r in cur_pack.fetchall()}
+                for d in disponibles:
+                    pid = int(d.get("id") or 0)
+                    d["pack_subopciones"] = pack_map.get(pid) or []
+                    d["pack_max_total"] = int(cfg_map.get(pid, 0) or 0)
+        finally:
+            if conn_pack:
+                conn_pack.close()
         categorias_payload = []
         for c in categorias:
             eval_cat = _evaluar_categoria_activa(c, now_local=now_local)
@@ -8870,6 +8918,42 @@ def api_tienda_validar_cupon():
             prod = mapa.get(pid)
             if not prod:
                 return jsonify({'success': False, 'error': f'Producto #{pid} no disponible'}), 400
+            pack_rule = pack_rules_by_product.get(pid) or {"max_total": 0, "items": {}}
+            pack_items_input = raw.get("pack_items")
+            if pack_rule.get("items"):
+                if not isinstance(pack_items_input, list) or not pack_items_input:
+                    return jsonify({'success': False, 'error': f'{prod.get("nombre")}: debes elegir subitems del pack'}), 400
+                resumen_pack = {}
+                for pidx, pick in enumerate(pack_items_input, start=1):
+                    if not isinstance(pick, dict):
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: subitem #{pidx} invalido'}), 400
+                    sid = int(pick.get("subproducto_id") or 0)
+                    sqty = int(pick.get("cantidad") or 0)
+                    if sid <= 0 or sqty <= 0:
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: subitem #{pidx} invalido'}), 400
+                    if sid not in pack_rule["items"]:
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: subitem no permitido en este pack'}), 400
+                    if not bool(pack_rule["items"][sid].get("activo_tienda")):
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: {pack_rule["items"][sid].get("nombre")} esta apagado en tienda'}), 400
+                    resumen_pack[sid] = int(resumen_pack.get(sid, 0)) + sqty
+                total_sel = sum(int(v or 0) for v in resumen_pack.values())
+                if total_sel <= 0:
+                    return jsonify({'success': False, 'error': f'{prod.get("nombre")}: selecciona al menos 1 subitem'}), 400
+                max_total_pack = int(pack_rule.get("max_total") or 0)
+                if max_total_pack > 0 and total_sel > max_total_pack:
+                    return jsonify({'success': False, 'error': f'{prod.get("nombre")}: maximo total {max_total_pack} subitems'}), 400
+                pack_items_final = []
+                partes = []
+                for sid, sqty in resumen_pack.items():
+                    max_item = int(pack_rule["items"][sid].get("max_cantidad") or 1)
+                    if sqty > max_item:
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: {pack_rule["items"][sid].get("nombre")} maximo {max_item}'}), 400
+                    nombre_sub = str(pack_rule["items"][sid].get("nombre") or f"Producto #{sid}")
+                    pack_items_final.append({"subproducto_id": int(sid), "cantidad": int(sqty), "nombre": nombre_sub})
+                    partes.append(f"{nombre_sub} x{int(sqty)}")
+                pack_detalle_por_producto[pid] = "Pack: " + ", ".join(partes)
+            else:
+                pack_items_final = []
             if not bool(prod.get("categoria_activa", True)):
                 return jsonify({'success': False, 'error': f'{prod.get("nombre")}: categoria no disponible en este horario'}), 400
             max_compra = int(prod.get("max_compra") or 0)
@@ -9281,6 +9365,15 @@ def _ensure_producto_pack_subopciones_table(cursor):
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_pack_subopciones_sub ON producto_pack_subopciones(subproducto_id)"
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS producto_pack_subopciones_config (
+            producto_pack_id INTEGER PRIMARY KEY,
+            max_total INTEGER NOT NULL DEFAULT 0,
+            actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
 
 
 @app.route('/api/producto/<int:id>/pack-subopciones', methods=['GET'])
@@ -9307,7 +9400,13 @@ def api_producto_pack_subopciones_get(id):
             (int(id),),
         )
         opciones = [dict(r) for r in cur.fetchall()]
-        return jsonify({"success": True, "opciones": opciones})
+        cur.execute(
+            "SELECT max_total FROM producto_pack_subopciones_config WHERE producto_pack_id = ? LIMIT 1",
+            (int(id),),
+        )
+        row_cfg = cur.fetchone()
+        max_total = int((row_cfg["max_total"] if row_cfg else 0) or 0)
+        return jsonify({"success": True, "opciones": opciones, "max_total": max_total})
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "opciones": []}), 500
     finally:
@@ -9325,6 +9424,11 @@ def api_producto_pack_subopciones_post(id):
         raw_items = data.get("items") or []
         if not isinstance(raw_items, list):
             return jsonify({"success": False, "error": "items debe ser una lista"}), 400
+        max_total = int(data.get("max_total") or 0)
+        if max_total < 1:
+            max_total = 1
+        if max_total > 1000:
+            max_total = 1000
         conn = get_db()
         cur = conn.cursor()
         _ensure_producto_pack_subopciones_table(cur)
@@ -9375,6 +9479,16 @@ def api_producto_pack_subopciones_post(id):
                     return jsonify({"success": False, "error": f"Producto asociado '{p.get('nombre')}' esta apagado en tienda"}), 400
 
         cur.execute("DELETE FROM producto_pack_subopciones WHERE producto_pack_id = ?", (int(id),))
+        cur.execute(
+            """
+            INSERT INTO producto_pack_subopciones_config (producto_pack_id, max_total, actualizado_en)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(producto_pack_id) DO UPDATE SET
+                max_total = excluded.max_total,
+                actualizado_en = CURRENT_TIMESTAMP
+            """,
+            (int(id), int(max_total)),
+        )
         for it in items_limpios:
             cur.execute(
                 """
@@ -13330,10 +13444,56 @@ def api_tienda_checkout():
             int(p.get("id") or 0): _serializar_producto_tienda(p, categorias_map=categorias_map, now_local=now_local)
             for p in _obtener_productos_para_venta()
         }
+        conn_pack = None
+        pack_rules_by_product = {}
+        try:
+            item_ids = sorted({int((x or {}).get("id") or 0) for x in items_req if isinstance(x, dict)})
+            item_ids = [x for x in item_ids if x > 0]
+            if item_ids:
+                conn_pack = get_db()
+                cur_pack = conn_pack.cursor()
+                _ensure_producto_pack_subopciones_table(cur_pack)
+                placeholders = ",".join(["?"] * len(item_ids))
+                cur_pack.execute(
+                    f"""
+                    SELECT s.producto_pack_id, s.subproducto_id, s.max_cantidad,
+                           COALESCE(p.nombre, 'Producto #' || s.subproducto_id) AS subproducto_nombre,
+                           COALESCE(p.activo_tienda, 1) AS subproducto_activo_tienda
+                    FROM producto_pack_subopciones s
+                    LEFT JOIN productos p ON p.id = s.subproducto_id
+                    WHERE s.producto_pack_id IN ({placeholders})
+                    ORDER BY s.orden ASC, s.id ASC
+                    """,
+                    tuple(item_ids),
+                )
+                for rr in cur_pack.fetchall():
+                    pack_id = int(rr["producto_pack_id"] or 0)
+                    pack_rules_by_product.setdefault(pack_id, {"max_total": 0, "items": {}})
+                    pack_rules_by_product[pack_id]["items"][int(rr["subproducto_id"] or 0)] = {
+                        "max_cantidad": int(rr["max_cantidad"] or 1),
+                        "activo_tienda": bool(rr["subproducto_activo_tienda"]),
+                        "nombre": str(rr["subproducto_nombre"] or "").strip() or f"Producto #{int(rr['subproducto_id'] or 0)}",
+                    }
+                cur_pack.execute(
+                    f"""
+                    SELECT producto_pack_id, max_total
+                    FROM producto_pack_subopciones_config
+                    WHERE producto_pack_id IN ({placeholders})
+                    """,
+                    tuple(item_ids),
+                )
+                for rr in cur_pack.fetchall():
+                    pack_id = int(rr["producto_pack_id"] or 0)
+                    pack_rules_by_product.setdefault(pack_id, {"max_total": 0, "items": {}})
+                    pack_rules_by_product[pack_id]["max_total"] = int(rr["max_total"] or 0)
+        finally:
+            if conn_pack:
+                conn_pack.close()
         fee_cfg = _flow_fee_cfg()
         items_limpios = []
         items_serializados = []
         items_notificacion = []
+        pack_detalle_por_producto = {}
         for idx, raw in enumerate(items_req, start=1):
             if not isinstance(raw, dict):
                 return jsonify({'success': False, 'error': f'Item #{idx} invalido'}), 400
@@ -13373,12 +13533,16 @@ def api_tienda_checkout():
                     "precio_unitario": precio_final,
                     "precio_unitario_base": precio_final_base,
                     "descuento_tienda_pct": float(prod.get("descuento_tienda_pct") or 0),
+                    "pack_items": pack_items_final,
                 }
             )
+            nombre_noti = str(prod.get("nombre") or "").strip() or f"Producto #{pid}"
+            if pack_detalle_por_producto.get(pid):
+                nombre_noti = f"{nombre_noti} [{pack_detalle_por_producto[pid]}]"
             items_notificacion.append(
                 {
                     "id": pid,
-                    "nombre": str(prod.get("nombre") or "").strip() or f"Producto #{pid}",
+                    "nombre": nombre_noti,
                     "cantidad": cantidad,
                     "precio_unitario": precio_final,
                 }
@@ -13487,6 +13651,20 @@ def api_tienda_checkout():
                     venta_id,
                 ),
             )
+            for pid_det, det_txt in (pack_detalle_por_producto or {}).items():
+                pid_det = int(pid_det or 0)
+                if pid_det <= 0 or not det_txt:
+                    continue
+                nombre_base = str((mapa.get(pid_det) or {}).get("nombre") or f"Producto #{pid_det}")
+                nombre_final = f"{nombre_base} [{det_txt}]"
+                cursor.execute(
+                    """
+                    UPDATE venta_items
+                    SET producto_nombre = ?
+                    WHERE venta_id = ? AND producto_id = ?
+                    """,
+                    (nombre_final, int(venta_id), int(pid_det)),
+                )
             if cupon_aplicado and descuento_monto > 0:
                 cursor.execute(
                     """

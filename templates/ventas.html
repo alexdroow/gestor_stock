@@ -2315,7 +2315,7 @@
                         <strong style="font-size:.86rem;color:#334155;">Subopciones de pack (productos disponibles)</strong>
                         <div class="editor-rapido-foto-preview" id="editor-rapido-pack-preview">Sin subopciones</div>
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 130px auto;gap:8px;align-items:end;">
+                    <div style="display:grid;grid-template-columns:1fr 120px 130px auto;gap:8px;align-items:end;">
                         <div class="editor-rapido-field" style="margin:0;">
                             <label for="editor-rapido-pack-producto">Producto a incluir</label>
                             <select id="editor-rapido-pack-producto"></select>
@@ -2323,6 +2323,10 @@
                         <div class="editor-rapido-field" style="margin:0;">
                             <label for="editor-rapido-pack-max">Max por item</label>
                             <input id="editor-rapido-pack-max" type="number" min="1" max="100" step="1" value="1">
+                        </div>
+                        <div class="editor-rapido-field" style="margin:0;">
+                            <label for="editor-rapido-pack-max-total">Max total pack</label>
+                            <input id="editor-rapido-pack-max-total" type="number" min="1" max="1000" step="1" value="4">
                         </div>
                         <button type="button" class="btn btn-secondary" onclick="agregarSubopcionPackEditorRapido()">+ Agregar</button>
                     </div>
@@ -3507,6 +3511,7 @@
 
         let _editorRapidoProductoId = 0;
         let _editorRapidoPackOpciones = [];
+        let _editorRapidoPackMaxTotal = 0;
         const _editorRapidoCropState = {
             open: false,
             file: null,
@@ -3547,7 +3552,9 @@
             const preview = document.getElementById('editor-rapido-pack-preview');
             if (!preview) return;
             const n = Array.isArray(_editorRapidoPackOpciones) ? _editorRapidoPackOpciones.length : 0;
-            preview.textContent = n ? `${n} subopcion(es)` : 'Sin subopciones';
+            const t = Number(_editorRapidoPackMaxTotal || 0);
+            const maxTxt = t > 0 ? ` | max total ${t}` : '';
+            preview.textContent = n ? `${n} subopcion(es)${maxTxt}` : `Sin subopciones${maxTxt}`;
         }
 
         function _renderEditorRapidoPackSelector(pid) {
@@ -3595,6 +3602,9 @@
                 const res = await fetch(`/api/producto/${Number(pid || 0)}/pack-subopciones`, { headers: { Accept: 'application/json' } });
                 const data = await res.json();
                 if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudieron cargar subopciones');
+                _editorRapidoPackMaxTotal = Math.max(0, Number(data.max_total || 0));
+                const maxTotalEl = document.getElementById('editor-rapido-pack-max-total');
+                if (maxTotalEl) maxTotalEl.value = String(_editorRapidoPackMaxTotal > 0 ? _editorRapidoPackMaxTotal : 4);
                 _editorRapidoPackOpciones = (Array.isArray(data.opciones) ? data.opciones : []).map((x) => ({
                     subproducto_id: Number(x.subproducto_id || 0),
                     max_cantidad: Math.max(1, Number(x.max_cantidad || 1)),
@@ -3844,6 +3854,7 @@
             if (modal) modal.classList.remove('active');
             _cerrarEditorRapidoCrop();
             _editorRapidoPackOpciones = [];
+            _editorRapidoPackMaxTotal = 0;
             _editorRapidoProductoId = 0;
         }
 
@@ -4084,6 +4095,7 @@
                     productosData[pid].porciones_disponibles
                 );
                 const packPayload = {
+                    max_total: Math.max(1, Math.min(1000, Number(document.getElementById('editor-rapido-pack-max-total')?.value || _editorRapidoPackMaxTotal || 4) || 4)),
                     items: (_editorRapidoPackOpciones || []).map((x, idx) => ({
                         subproducto_id: Number(x.subproducto_id || 0),
                         max_cantidad: Math.max(1, Math.min(100, Number(x.max_cantidad || 1) || 1)),
