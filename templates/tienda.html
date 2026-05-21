@@ -5246,7 +5246,10 @@
 
         function _guardarFlowCheckoutDraft(draft) {
             try {
-                localStorage.setItem(FLOW_CHECKOUT_DRAFT_KEY, JSON.stringify(draft || {}));
+                const payload = (draft && typeof draft === "object") ? { ...draft } : {};
+                if (!Number.isFinite(Number(payload.created_ts || 0))) payload.created_ts = Date.now();
+                payload.updated_ts = Date.now();
+                localStorage.setItem(FLOW_CHECKOUT_DRAFT_KEY, JSON.stringify(payload));
             } catch (_) {}
         }
 
@@ -5283,7 +5286,11 @@
                 const raw = localStorage.getItem(FLOW_CHECKOUT_DRAFT_KEY);
                 if (!raw) return null;
                 const obj = JSON.parse(raw);
-                return (obj && typeof obj === "object") ? obj : null;
+                if (!(obj && typeof obj === "object")) return null;
+                const fixed = { ...obj };
+                if (!Number.isFinite(Number(fixed.created_ts || 0))) fixed.created_ts = Date.now();
+                if (!Number.isFinite(Number(fixed.updated_ts || 0))) fixed.updated_ts = Date.now();
+                return fixed;
             } catch (_) {
                 return null;
             }
@@ -10095,9 +10102,17 @@
                         _clearFlowReturnTracking();
                         return;
                     }
+                    const draftAgeMs = draft ? (Date.now() - Number(draft.created_ts || draft.updated_ts || 0)) : Number.MAX_SAFE_INTEGER;
+                    const draftFlowPendiente = Boolean(
+                        draft
+                        && Number(draft.venta_id || 0) > 0
+                        && ["flow_pendiente", "flow_pending", "flow"].includes(String(draft.metodo_pago || "").toLowerCase())
+                        && draftAgeMs >= 0
+                        && draftAgeMs <= (2 * 60 * 60 * 1000)
+                    );
                     const ageMs = track ? (Date.now() - Number(track.ts || 0)) : Number.MAX_SAFE_INTEGER;
                     const hasRecentTrack = Boolean(track && ageMs >= 0 && ageMs <= 20 * 60 * 1000);
-                    if (hasRecentTrack) {
+                    if (hasRecentTrack || draftFlowPendiente) {
                         const ventaSeguimiento = Number(draft?.venta_id || track?.venta_id || 0);
                         if (draft && Number(draft.venta_id || 0) > 0) {
                             ultimoComprobantePedido = {
@@ -10117,8 +10132,14 @@
                             _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "success" });
                             _limpiarFlowCheckoutDraft();
                         } else {
-                            msg("Pago en verificacion de Flow. Aun no recibimos confirmacion final.", true);
-                            _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "pending" });
+                            const statusTxt = draftFlowPendiente
+                                ? "Pago no completado aun. Puedes reintentar Flow desde 'Tu pedido activo'."
+                                : "Pago en verificacion de Flow. Aun no recibimos confirmacion final.";
+                            msg(statusTxt, true);
+                            _abrirPostCheckoutPopup(
+                                _payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }),
+                                { mode: "pending" }
+                            );
                             _clearFlowReturnTracking();
                         }
                     }

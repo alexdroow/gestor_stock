@@ -4560,7 +4560,15 @@
                 const pendA = Number(data.pendientes_antes || 0);
                 const pendD = Number(data.pendientes_despues || 0);
                 const alertas = Number(data.alertas_nuevas || 0);
-                const texto = `Flow: reconciliados ${reconc} | pendientes ${pendA} -> ${pendD} | alertas nuevas ${alertas}`;
+                const detalle = Array.isArray(data.pendientes_detalle) ? data.pendientes_detalle : [];
+                const top = detalle.slice(0, 3).map((it) => {
+                    const vid = Number(it?.venta_id || 0);
+                    const age = Number(it?.age_min || 0);
+                    const att = Number(it?.confirm_attempts || 0);
+                    const err = String(it?.last_error || '-');
+                    return `#${vid} (${Math.max(0, Math.round(age))}m, intentos ${att}, err: ${err})`;
+                }).join(' | ');
+                const texto = `Flow: reconciliados ${reconc} | pendientes ${pendA} -> ${pendD} | alertas nuevas ${alertas}${top ? ` | top: ${top}` : ''}`;
                 if (estadoEl) estadoEl.textContent = texto;
                 if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
                     window.AppUX.toastSuccess(texto);

@@ -7421,6 +7421,50 @@ def api_tienda_admin_flow_reconciliar():
         cur.execute("SELECT COUNT(*) AS total FROM tienda_flow_pagos WHERE estado = 'pendiente'")
         row_pd = cur.fetchone()
         pendientes_despues = int((row_pd["total"] if row_pd else 0) or 0)
+        cur.execute(
+            """
+            SELECT
+                fp.venta_id,
+                COALESCE(NULLIF(TRIM(fp.flow_order), ''), '-') AS flow_order,
+                COALESCE(NULLIF(TRIM(fp.flow_token), ''), '-') AS flow_token,
+                COALESCE(fp.confirm_attempts, 0) AS confirm_attempts,
+                COALESCE(NULLIF(TRIM(fp.last_error), ''), '-') AS last_error,
+                COALESCE(fp.created_at, '') AS created_at,
+                COALESCE(fp.updated_at, '') AS updated_at,
+                ROUND((julianday('now') - julianday(COALESCE(fp.created_at, fp.updated_at, datetime('now')))) * 24.0 * 60.0, 1) AS age_min,
+                COALESCE(NULLIF(TRIM(v.cliente_nombre), ''), 'Cliente') AS cliente_nombre,
+                COALESCE(v.total_monto, 0) AS total_monto,
+                COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'flow_pendiente') AS metodo_pago
+            FROM tienda_flow_pagos fp
+            LEFT JOIN ventas v ON v.id = fp.venta_id
+            WHERE fp.estado = 'pendiente'
+            ORDER BY COALESCE(fp.updated_at, fp.created_at) DESC
+            LIMIT 20
+            """
+        )
+        pendientes_rows = cur.fetchall() or []
+        pendientes_detalle = []
+        for rr in pendientes_rows:
+            it = dict(rr)
+            token_raw = str(it.get("flow_token") or "").strip()
+            token_mask = "-"
+            if token_raw and token_raw != "-":
+                token_mask = f"{token_raw[:6]}...{token_raw[-4:]}" if len(token_raw) > 14 else token_raw
+            pendientes_detalle.append(
+                {
+                    "venta_id": int(it.get("venta_id") or 0),
+                    "flow_order": str(it.get("flow_order") or "-"),
+                    "flow_token_mask": token_mask,
+                    "confirm_attempts": int(it.get("confirm_attempts") or 0),
+                    "last_error": str(it.get("last_error") or "-"),
+                    "created_at": str(it.get("created_at") or ""),
+                    "updated_at": str(it.get("updated_at") or ""),
+                    "age_min": float(it.get("age_min") or 0.0),
+                    "cliente_nombre": str(it.get("cliente_nombre") or "Cliente"),
+                    "total_monto": int(float(it.get("total_monto") or 0)),
+                    "metodo_pago": str(it.get("metodo_pago") or "flow_pendiente"),
+                }
+            )
 
         cur.execute(
             """
@@ -7444,6 +7488,7 @@ def api_tienda_admin_flow_reconciliar():
                 "alertas_nuevas": alertas_nuevas,
                 "limit": limit,
                 "horas": horas,
+                "pendientes_detalle": pendientes_detalle,
             }
         )
     except Exception as e:
