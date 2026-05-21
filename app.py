@@ -7392,6 +7392,67 @@ def api_tienda_admin_pedidos_nuevos():
             conn.close()
 
 
+@app.route('/api/tienda/admin/flow/reconciliar', methods=['POST'])
+def api_tienda_admin_flow_reconciliar():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        limit = int(data.get("limit") or 40)
+        horas = int(data.get("horas") or 120)
+        limit = max(1, min(200, limit))
+        horas = max(1, min(720, horas))
+
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_flow_pago_table(cur)
+        cur.execute("SELECT COUNT(*) AS total FROM tienda_flow_pagos WHERE estado = 'pendiente'")
+        row_pa = cur.fetchone()
+        pendientes_antes = int((row_pa["total"] if row_pa else 0) or 0)
+        conn.close()
+        conn = None
+
+        resultado = _flow_reconciliar_pendientes(limit=limit, horas=horas)
+
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_flow_pago_table(cur)
+        cur.execute("SELECT COUNT(*) AS total FROM tienda_flow_pagos WHERE estado = 'pendiente'")
+        row_pd = cur.fetchone()
+        pendientes_despues = int((row_pd["total"] if row_pd else 0) or 0)
+
+        cur.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM ventas
+            WHERE LOWER(TRIM(COALESCE(metodo_pago, ''))) = 'flow_pagado'
+              AND COALESCE(flow_admin_alertado, 1) = 0
+            """
+        )
+        row_an = cur.fetchone()
+        alertas_nuevas = int((row_an["total"] if row_an else 0) or 0)
+        conn.close()
+        conn = None
+
+        return jsonify(
+            {
+                "success": True,
+                "reconciliados": int(resultado.get("reconciliados") or 0),
+                "pendientes_antes": pendientes_antes,
+                "pendientes_despues": pendientes_despues,
+                "alertas_nuevas": alertas_nuevas,
+                "limit": limit,
+                "horas": horas,
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/tienda/admin/pedidos-chat-activos', methods=['GET'])
 def api_tienda_admin_pedidos_chat_activos():
     if not session.get(_ADMIN_SESSION_KEY):

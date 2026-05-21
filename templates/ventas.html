@@ -1932,6 +1932,10 @@
                                 <input id="tienda-hora-cierre" type="time" class="alert-tool-select">
                             </label>
                             <button type="button" id="btn-guardar-tienda-config" class="tienda-config-btn">Guardar tienda</button>
+                            <button type="button" id="btn-flow-reconciliar-ahora" class="tienda-config-btn" title="Consultar pagos Flow pendientes y sincronizar estados ahora">
+                                Reconciliar Flow ahora
+                            </button>
+                            <span id="flow-reconciliar-estado" class="form-hint" style="min-width:220px;">Flow: sin sincronizar manual</span>
                         </div>
                     </div>
                 </div>
@@ -4535,6 +4539,50 @@
             }
         }
 
+        async function _reconciliarFlowAhora() {
+            const btn = document.getElementById('btn-flow-reconciliar-ahora');
+            const estadoEl = document.getElementById('flow-reconciliar-estado');
+            const textoOriginal = btn ? btn.textContent : 'Reconciliar Flow ahora';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Sincronizando...';
+                }
+                if (estadoEl) estadoEl.textContent = 'Flow: sincronizando pendientes...';
+                const res = await fetch('/api/tienda/admin/flow/reconciliar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ limit: 80, horas: 168 }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo reconciliar Flow');
+                const reconc = Number(data.reconciliados || 0);
+                const pendA = Number(data.pendientes_antes || 0);
+                const pendD = Number(data.pendientes_despues || 0);
+                const alertas = Number(data.alertas_nuevas || 0);
+                const texto = `Flow: reconciliados ${reconc} | pendientes ${pendA} -> ${pendD} | alertas nuevas ${alertas}`;
+                if (estadoEl) estadoEl.textContent = texto;
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess(texto);
+                }
+                _pollPedidosTiendaNuevos();
+                _pollPedidosChatActivosVentas();
+            } catch (err) {
+                const msgErr = String(err.message || 'Error sincronizando Flow');
+                if (estadoEl) estadoEl.textContent = `Flow: ${msgErr}`;
+                if (window.AppUX && typeof window.AppUX.toastError === 'function') {
+                    window.AppUX.toastError(msgErr);
+                } else {
+                    alert(msgErr);
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal;
+                }
+            }
+        }
+
         function _valorGananciaVolumenAlerta() {
             if (_pedidoAlertVolume === 'maximo') return 1.4;
             if (_pedidoAlertVolume === 'normal') return 0.55;
@@ -5262,6 +5310,7 @@
 
         _initPedidoAlertSettings();
         document.getElementById('btn-guardar-tienda-config')?.addEventListener('click', _guardarConfigTiendaAdmin);
+        document.getElementById('btn-flow-reconciliar-ahora')?.addEventListener('click', _reconciliarFlowAhora);
         _cargarConfigTiendaAdmin();
         _setVentasOnlineIndicator(false, 'Esperando conexión');
         window.addEventListener('offline', () => _setVentasOnlineIndicator(false, 'Sin conexión a internet'));
