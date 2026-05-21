@@ -2742,10 +2742,35 @@ def _flow_confirmar_token_y_actualizar(token):
         negativos = {"pending", "rejected", "cancelled", "canceled", "failed", "error", "declined", "voided", "anulado", "rechazado"}
 
         candidatos = []
+        status_nums = []
+        def _collect_status_like(obj):
+            if not isinstance(obj, dict):
+                return
+            for k in ("status", "statusCode", "paymentStatusCode", "payment_status_code"):
+                vv = obj.get(k)
+                if vv is None:
+                    continue
+                try:
+                    status_nums.append(int(vv))
+                except Exception:
+                    pass
+            for k in ("status_text", "statusText", "paymentStatus", "payment_status", "detailStatus", "message"):
+                vv = _txt(obj.get(k))
+                if vv:
+                    candidatos.append(vv)
+
+        # Formato Flow legacy/directo
+        _collect_status_like(data)
         for k in ("status_text", "statusText", "paymentStatus", "payment_status", "detailStatus"):
             vv = _txt(data.get(k))
             if vv:
                 candidatos.append(vv)
+
+        # Formatos extendidos Flow (API v2/v6)
+        for root_key in ("paymenResult", "paymentResult", "payment_result", "lastPayment", "last_payment", "result"):
+            sub = data.get(root_key)
+            if isinstance(sub, dict):
+                _collect_status_like(sub)
 
         payment_data = data.get("paymentData")
         payment_items = []
@@ -2755,10 +2780,17 @@ def _flow_confirmar_token_y_actualizar(token):
             payment_items = [x for x in payment_data if isinstance(x, dict)]
 
         for it in payment_items:
-            for k in ("status", "paymentStatus", "payment_status", "detailStatus", "type"):
+            _collect_status_like(it)
+            for k in ("type",):
                 vv = _txt(it.get(k))
                 if vv:
                     candidatos.append(vv)
+
+        # Si cualquier status numérico anidado indica pagado, aprobamos.
+        if any(int(x) == 2 for x in status_nums):
+            return True
+        if any(int(x) in {3, 4} for x in status_nums):
+            return False
 
         # Señal adicional: si hay flowOrder y fecha de pago en paymentData,
         # tratamos como aprobado aunque status venga transitoriamente distinto.
