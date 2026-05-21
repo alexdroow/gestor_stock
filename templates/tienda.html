@@ -4517,6 +4517,8 @@
         let paymentPricingCfg = { flow_enabled: false, rate: 0.0319, iva: 0.19, fixed: 0 };
         let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
+        let flowRecheckTsByVenta = {};
+        let flowAutoPopupShownByVenta = {};
         let historialEstadoPollTimer = null;
         let clienteRegistrado = null;
         let historialComprasCliente = [];
@@ -10086,6 +10088,29 @@
             return { ok: false, estado: "pendiente" };
         }
 
+        async function _revalidarFlowPendienteEnSegundoPlano(ventaId) {
+            const id = Number(ventaId || 0);
+            if (!(id > 0)) return null;
+            const now = Date.now();
+            const last = Number(flowRecheckTsByVenta[id] || 0);
+            if (now - last < 8000) return null;
+            flowRecheckTsByVenta[id] = now;
+            try {
+                const res = await fetch(`/api/tienda/flow/estado?venta_id=${id}`, {
+                    headers: { Accept: "application/json" },
+                    cache: "no-store",
+                });
+                const data = await res.json();
+                if (!res.ok || !data?.success || !data?.found) return null;
+                return {
+                    estado: String(data?.estado || "").trim().toLowerCase(),
+                    backup: (data?.checkout_backup || null),
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
         async function _notificarRetornoFlowDesdeUrl() {
             let showVerifyOverlay = false;
             try {
@@ -10530,6 +10555,7 @@
             const p = ultimoComprobantePedido;
             if (!p || !Number(p.venta_id || 0)) return;
             try {
+                const wasFlowPending = _pedidoFlowPendienteCliente(p);
                 const res = await fetch(`/api/tienda/pedido/${Number(p.venta_id || 0)}/estado`, { headers: { Accept: "application/json" } });
                 const data = await res.json();
                 if (!res.ok || !data.success) return;
@@ -10551,6 +10577,32 @@
                 p.timer_label = timerLabel;
                 p.timer_inicio = timerInicio;
                 p.timer_restante_segundos = timerRestante;
+
+                let isFlowPending = _pedidoFlowPendienteCliente(p);
+                if (isFlowPending) {
+                    const flowCheck = await _revalidarFlowPendienteEnSegundoPlano(Number(p.venta_id || 0));
+                    if (flowCheck && flowCheck.estado === "pagado") {
+                        p.metodo_pago = "flow_pagado";
+                        isFlowPending = false;
+                        if (flowCheck.backup && typeof flowCheck.backup === "object") {
+                            ultimoComprobantePedido = {
+                                ...(ultimoComprobantePedido || {}),
+                                ...flowCheck.backup,
+                                ...p,
+                                venta_id: Number(p.venta_id || 0),
+                                metodo_pago: "flow_pagado",
+                            };
+                        }
+                        guardarUltimoPedidoLocal();
+                        _renderPedidoActivoTienda();
+                        const vId = Number(p.venta_id || 0);
+                        if (!flowAutoPopupShownByVenta[vId]) {
+                            flowAutoPopupShownByVenta[vId] = true;
+                            msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                            _abrirPostCheckoutPopup(ultimoComprobantePedido || p, { mode: "success" });
+                        }
+                    }
+                }
                 if (modalExitoEstadoEl) {
                     const timerTxt = _resumenTimerPedido(p);
                     modalExitoEstadoEl.textContent = timerTxt
@@ -10577,6 +10629,14 @@
                 }
                 guardarUltimoPedidoLocal();
                 _renderPedidoActivoTienda();
+                if (wasFlowPending && !isFlowPending) {
+                    const vId = Number(p.venta_id || 0);
+                    if (!flowAutoPopupShownByVenta[vId]) {
+                        flowAutoPopupShownByVenta[vId] = true;
+                        msg("Pago confirmado por Flow. Pedido registrado correctamente.");
+                        _abrirPostCheckoutPopup(p, { mode: "success" });
+                    }
+                }
                 if (_estadoPedidoFinal(estado)) {
                     _stopPedidoEstadoPoll();
                 }
