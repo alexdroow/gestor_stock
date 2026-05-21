@@ -966,11 +966,32 @@
                         <div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
                             <div style="font-size:.82rem;color:#64748b;text-transform:uppercase;font-weight:800;margin-bottom:6px;">Productos solicitados</div>
                             <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;font-size:.9rem;">
-                                ${items.length ? items.map((it) => `
-                                    <div style="color:#0f172a;">${esc(String(it.nombre_producto || '-'))}</div>
-                                    <div style="color:#334155;text-align:center;">x${Math.round(Number(it.cantidad || 0))}</div>
-                                    <div style="color:#0f172a;text-align:right;font-weight:700;">$${Math.round(Number(it.subtotal || 0)).toLocaleString('es-CL')}</div>
-                                `).join('') : '<div style="grid-column:1/-1;color:#64748b;">Sin detalle de items.</div>'}
+                                ${items.length ? items.map((it) => {
+                                    const nombre = String(
+                                        it?.nombre_producto
+                                        || it?.producto_nombre
+                                        || it?.nombre
+                                        || it?.producto
+                                        || 'Item'
+                                    ).trim();
+                                    const cantidad = Number(
+                                        it?.cantidad
+                                        ?? it?.cantidad_unidades
+                                        ?? it?.qty
+                                        ?? 1
+                                    ) || 1;
+                                    const subtotal = Number(
+                                        it?.subtotal
+                                        ?? it?.total_item
+                                        ?? (Number(it?.precio_unitario || it?.precio || 0) * cantidad)
+                                        ?? 0
+                                    ) || 0;
+                                    return `
+                                        <div style="color:#0f172a;">${esc(nombre)}</div>
+                                        <div style="color:#334155;text-align:center;">x${Math.round(cantidad)}</div>
+                                        <div style="color:#0f172a;text-align:right;font-weight:700;">$${Math.round(subtotal).toLocaleString('es-CL')}</div>
+                                    `;
+                                }).join('') : '<div style="grid-column:1/-1;color:#64748b;">Sin detalle de items.</div>'}
                             </div>
                         </div>
                         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">

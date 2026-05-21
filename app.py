@@ -7598,7 +7598,7 @@ def api_tienda_admin_flow_validar_pago():
                 status_payload={
                     "manual_validacion_admin": True,
                     "decision": "confirmado",
-                    "at": _now_chile_iso(),
+                    "at": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
                 },
             )
             # Al confirmar manualmente, mover pedido a preparacion con tiempo base
@@ -7625,7 +7625,7 @@ def api_tienda_admin_flow_validar_pago():
                 payment_data={
                     "manual_validacion_admin": True,
                     "decision": "confirmado",
-                    "at": _now_chile_iso(),
+                    "at": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
                 },
             )
             return jsonify({"success": True, "venta_id": venta_id, "estado_pago": "pagado"})
@@ -7652,7 +7652,7 @@ def api_tienda_admin_flow_validar_pago():
             payment_data={
                 "manual_validacion_admin": True,
                 "decision": "rechazado",
-                "at": _now_chile_iso(),
+                "at": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
             },
         )
         return jsonify({"success": True, "venta_id": venta_id, "estado_pago": "pendiente"})
