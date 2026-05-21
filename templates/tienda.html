@@ -5898,6 +5898,48 @@
             }
         }
 
+        function _setFlowVerificandoOverlay(show, text = "Estamos verificando el estado de tu pago con Flow...") {
+            const ID = "flow-verificando-overlay";
+            try {
+                let el = document.getElementById(ID);
+                if (!show) {
+                    if (el) el.remove();
+                    return;
+                }
+                if (!el) {
+                    el = document.createElement("div");
+                    el.id = ID;
+                    el.style.position = "fixed";
+                    el.style.inset = "0";
+                    el.style.zIndex = "99999";
+                    el.style.background = "rgba(15,23,42,.58)";
+                    el.style.display = "flex";
+                    el.style.alignItems = "center";
+                    el.style.justifyContent = "center";
+                    el.style.padding = "18px";
+                    el.innerHTML = `
+                        <div style="width:min(420px,96vw);background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:14px;display:grid;gap:8px;box-shadow:0 20px 55px rgba(2,6,23,.35);">
+                            <div style="font-weight:800;color:#0f172a;">Verificando transaccion</div>
+                            <div id="flow-verificando-overlay-text" style="font-size:.92rem;color:#334155;line-height:1.45;"></div>
+                            <div style="height:6px;border-radius:999px;background:#e2e8f0;overflow:hidden;">
+                                <span style="display:block;height:100%;width:38%;background:#f97316;animation:flowVerifyPulse 1.2s ease-in-out infinite alternate;"></span>
+                            </div>
+                            <div style="font-size:.82rem;color:#64748b;">No cierres esta ventana. Te mostraremos el resultado en segundos.</div>
+                        </div>
+                    `;
+                    document.body.appendChild(el);
+                    if (!document.getElementById("flow-verificando-overlay-style")) {
+                        const st = document.createElement("style");
+                        st.id = "flow-verificando-overlay-style";
+                        st.textContent = "@keyframes flowVerifyPulse{from{transform:translateX(-22%)}to{transform:translateX(120%)}}";
+                        document.head.appendChild(st);
+                    }
+                }
+                const txt = document.getElementById("flow-verificando-overlay-text");
+                if (txt) txt.textContent = String(text || "Verificando estado de pago...");
+            } catch (_) {}
+        }
+
         function setEstadoTienda(abierta, mensaje) {
             tiendaAbierta = Boolean(abierta);
             tiendaEstadoMensaje = String(mensaje || "").trim();
@@ -10045,6 +10087,7 @@
         }
 
         async function _notificarRetornoFlowDesdeUrl() {
+            let showVerifyOverlay = false;
             try {
                 const p = new URLSearchParams(window.location.search || "");
                 const flow = String(p.get("flow") || "").trim().toLowerCase();
@@ -10079,6 +10122,20 @@
                     const parts = String(cookieFlowRaw).split(":");
                     cookieFlow = String(parts?.[0] || "").trim().toLowerCase();
                     cookieVenta = Number(parts?.[1] || 0) || 0;
+                }
+                const trackAgeForOverlay = track ? (Date.now() - Number(track.ts || 0)) : Number.MAX_SAFE_INTEGER;
+                const hasRecentTrackForOverlay = Boolean(track && trackAgeForOverlay >= 0 && trackAgeForOverlay <= 20 * 60 * 1000);
+                const draftAgeForOverlay = draft ? (Date.now() - Number(draft.created_ts || draft.updated_ts || 0)) : Number.MAX_SAFE_INTEGER;
+                const hasRecentDraftForOverlay = Boolean(
+                    draft
+                    && Number(draft.venta_id || 0) > 0
+                    && ["flow_pendiente", "flow_pending", "flow"].includes(String(draft.metodo_pago || "").toLowerCase())
+                    && draftAgeForOverlay >= 0
+                    && draftAgeForOverlay <= 2 * 60 * 60 * 1000
+                );
+                if (flow || cookieFlowRaw || hasRecentTrackForOverlay || hasRecentDraftForOverlay) {
+                    showVerifyOverlay = true;
+                    _setFlowVerificandoOverlay(true);
                 }
                 if (!flow) {
                     if (cookieFlow === "paid" || cookieFlow === "pending" || cookieFlow === "error") {
@@ -10195,6 +10252,9 @@
                 const next = `${window.location.pathname}${q ? "?" + q : ""}${window.location.hash || ""}`;
                 window.history.replaceState({}, "", next);
             } catch (_e) {}
+            finally {
+                if (showVerifyOverlay) _setFlowVerificandoOverlay(false);
+            }
         }
 
         function cerrarModalCliente() {
