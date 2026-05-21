@@ -2452,6 +2452,20 @@ def _ensure_ventas_flow_return_column():
             conn.close()
 
 
+def _normalizar_metodo_pago_flow_por_canal(cursor):
+    try:
+        cursor.execute(
+            """
+            UPDATE ventas
+            SET metodo_pago = 'flow_pendiente'
+            WHERE canal_venta = 'tienda_online_flow_pendiente'
+              AND LOWER(TRIM(COALESCE(metodo_pago, ''))) NOT IN ('flow_pendiente', 'flow_pending', 'flow_pagado')
+            """
+        )
+    except Exception:
+        pass
+
+
 def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redirect_url=None, checkout_backup=None):
     conn = None
     try:
@@ -7439,6 +7453,7 @@ def api_tienda_admin_pedidos_nuevos():
         since_id = int(request.args.get("since_id") or 0)
         conn = get_db()
         cursor = conn.cursor()
+        _normalizar_metodo_pago_flow_por_canal(cursor)
         cursor.execute(
             """
             SELECT COALESCE(MAX(id), 0) AS max_online_id
@@ -7452,7 +7467,12 @@ def api_tienda_admin_pedidos_nuevos():
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.codigo_pedido,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
-                   COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo') AS metodo_pago,
+                   CASE
+                       WHEN v.canal_venta = 'tienda_online_flow_pendiente' THEN 'flow_pendiente'
+                       WHEN LOWER(TRIM(COALESCE(v.metodo_pago, ''))) IN ('flow', 'flow_pending', 'flow_pendiente', 'flow_pagado')
+                           THEN LOWER(TRIM(COALESCE(v.metodo_pago, '')))
+                       ELSE COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo')
+                   END AS metodo_pago,
                    COALESCE(v.flow_cliente_regreso, 1) AS flow_cliente_regreso,
                    COALESCE(v.flow_admin_alertado, 1) AS flow_admin_alertado,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
@@ -7473,12 +7493,22 @@ def api_tienda_admin_pedidos_nuevos():
                     (
                         v.id > ?
                         AND (
-                            LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
+                            CASE
+                                WHEN v.canal_venta = 'tienda_online_flow_pendiente' THEN 'flow_pendiente'
+                                WHEN LOWER(TRIM(COALESCE(v.metodo_pago, ''))) IN ('flow', 'flow_pending', 'flow_pendiente', 'flow_pagado')
+                                    THEN LOWER(TRIM(COALESCE(v.metodo_pago, '')))
+                                ELSE COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo')
+                            END <> 'flow_pendiente'
                             OR COALESCE(v.flow_cliente_regreso, 1) = 1
                         )
                     )
                     OR (
-                        LOWER(TRIM(COALESCE(v.metodo_pago, ''))) = 'flow_pagado'
+                        CASE
+                            WHEN v.canal_venta = 'tienda_online_flow_pendiente' THEN 'flow_pendiente'
+                            WHEN LOWER(TRIM(COALESCE(v.metodo_pago, ''))) IN ('flow', 'flow_pending', 'flow_pendiente', 'flow_pagado')
+                                THEN LOWER(TRIM(COALESCE(v.metodo_pago, '')))
+                            ELSE COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo')
+                        END = 'flow_pagado'
                         AND COALESCE(v.flow_admin_alertado, 1) = 0
                     )
                   )
@@ -7751,12 +7781,18 @@ def api_tienda_admin_pedidos_chat_activos():
         _ensure_ventas_flow_return_column()
         conn = get_db()
         cursor = conn.cursor()
+        _normalizar_metodo_pago_flow_por_canal(cursor)
         cursor.execute(
             """
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
-                   COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo') AS metodo_pago,
+                   CASE
+                       WHEN v.canal_venta = 'tienda_online_flow_pendiente' THEN 'flow_pendiente'
+                       WHEN LOWER(TRIM(COALESCE(v.metodo_pago, ''))) IN ('flow', 'flow_pending', 'flow_pendiente', 'flow_pagado')
+                           THEN LOWER(TRIM(COALESCE(v.metodo_pago, '')))
+                       ELSE COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo')
+                   END AS metodo_pago,
                    COALESCE(v.flow_cliente_regreso, 1) AS flow_cliente_regreso,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
@@ -7772,7 +7808,12 @@ def api_tienda_admin_pedidos_chat_activos():
             WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
               AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
               AND (
-                   LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
+                   CASE
+                       WHEN v.canal_venta = 'tienda_online_flow_pendiente' THEN 'flow_pendiente'
+                       WHEN LOWER(TRIM(COALESCE(v.metodo_pago, ''))) IN ('flow', 'flow_pending', 'flow_pendiente', 'flow_pagado')
+                           THEN LOWER(TRIM(COALESCE(v.metodo_pago, '')))
+                       ELSE COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo')
+                   END <> 'flow_pendiente'
                    OR COALESCE(v.flow_cliente_regreso, 1) = 1
               )
             ORDER BY v.id DESC
@@ -7950,9 +7991,10 @@ def api_tienda_pedido_estado(venta_id):
         _ensure_ventas_metodo_pago_column()
         conn = get_db()
         cursor = conn.cursor()
+        _normalizar_metodo_pago_flow_por_canal(cursor)
         cursor.execute(
             """
-            SELECT id, fecha_hora, total_monto,
+            SELECT id, fecha_hora, total_monto, canal_venta,
                    COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
                    COALESCE(NULLIF(TRIM(metodo_pago), ''), 'efectivo') AS metodo_pago,
                    pedido_estado_actualizado,
@@ -7969,6 +8011,9 @@ def api_tienda_pedido_estado(venta_id):
         item = dict(row)
         flow_retry_url = ""
         metodo_pago = str(item.get("metodo_pago") or "").strip().lower()
+        canal_venta = str(item.get("canal_venta") or "").strip().lower()
+        if canal_venta == "tienda_online_flow_pendiente" and metodo_pago not in {"flow_pendiente", "flow_pending", "flow_pagado"}:
+            metodo_pago = "flow_pendiente"
         if metodo_pago in {"flow", "flow_pendiente", "flow_pagado"}:
             try:
                 _ensure_flow_pago_table(cursor)
