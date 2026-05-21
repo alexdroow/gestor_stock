@@ -873,6 +873,117 @@
             }
             window._sucreeEliminarPedido = eliminarPedidoActivo;
 
+            function ensureDetallePedidoModal() {
+                let modal = document.getElementById('sucree-detalle-pedido-modal');
+                if (modal) return modal;
+                modal = document.createElement('div');
+                modal.id = 'sucree-detalle-pedido-modal';
+                modal.style.cssText = 'position:fixed;inset:0;z-index:140000;background:rgba(2,6,23,.55);display:none;align-items:center;justify-content:center;padding:12px;';
+                modal.innerHTML = `
+                    <div style="width:min(980px,98vw);max-height:94vh;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:14px;box-shadow:0 20px 46px rgba(2,6,23,.35);">
+                        <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border-bottom:1px solid #e2e8f0;background:#fff;">
+                            <div>
+                                <div style="font-size:1.05rem;font-weight:900;color:#0f172a;">Detalle completo del pedido</div>
+                                <div id="sucree-detalle-pedido-sub" style="font-size:.82rem;color:#475569;"></div>
+                            </div>
+                            <button type="button" id="sucree-detalle-pedido-close" style="border:1px solid #cbd5e1;background:#fff;color:#334155;padding:7px 11px;border-radius:8px;font-weight:800;cursor:pointer;">Cerrar</button>
+                        </div>
+                        <div id="sucree-detalle-pedido-body" style="padding:12px;"></div>
+                    </div>`;
+                document.body.appendChild(modal);
+                const closeBtn = modal.querySelector('#sucree-detalle-pedido-close');
+                closeBtn?.addEventListener('click', () => { modal.style.display = 'none'; });
+                modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.style.display = 'none'; });
+                return modal;
+            }
+
+            async function abrirDetallePedidoActivo(ventaId) {
+                const id = Number(ventaId || 0);
+                if (!id) return;
+                const modal = ensureDetallePedidoModal();
+                const sub = modal.querySelector('#sucree-detalle-pedido-sub');
+                const body = modal.querySelector('#sucree-detalle-pedido-body');
+                if (!body) return;
+                modal.style.display = 'flex';
+                if (sub) sub.textContent = `Pedido #${id}`;
+                body.innerHTML = '<div style="padding:14px;border:1px solid #e2e8f0;border-radius:10px;color:#334155;">Cargando informacion del pedido...</div>';
+                try {
+                    const [rVenta, rEstado] = await Promise.all([
+                        fetch(`/api/venta/${id}`, { headers: { Accept: 'application/json' } }),
+                        fetch(`/api/tienda/pedido/${id}/estado`, { headers: { Accept: 'application/json' } }),
+                    ]);
+                    const dVenta = await rVenta.json();
+                    const dEstado = await rEstado.json();
+                    if (!rVenta.ok || !dVenta?.success) throw new Error(dVenta?.error || 'No se pudo cargar detalle de venta');
+                    if (!rEstado.ok || !dEstado?.success) throw new Error(dEstado?.error || 'No se pudo cargar estado del pedido');
+
+                    const venta = dVenta.venta || {};
+                    const items = Array.isArray(dVenta.items) ? dVenta.items : [];
+                    const pedido = dEstado.pedido || {};
+                    const metodoPago = String(pedido.metodo_pago || venta.metodo_pago || 'efectivo').trim().toUpperCase();
+                    const fechaHora = String(venta.fecha_hora || pedido.fecha_hora || '').trim();
+                    const estadoLabel = String(pedido.estado_label || labelEstado(venta.pedido_estado || 'recibido'));
+                    const hora = String(venta.hora_retiro || '').trim();
+                    const entrega = String(venta.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'Despacho' : 'Retiro';
+                    const total = Math.round(Number(venta.total_monto || pedido.total_monto || 0));
+                    const flowRetryUrl = String(pedido.flow_retry_url || '').trim();
+                    const timerTxt = timerRestanteTexto(pedido.timer_restante_segundos);
+                    const timerBase = timerLabel(pedido.timer_minutos);
+
+                    if (sub) {
+                        sub.textContent = `${fechaHora || 'Sin fecha'} · ${entrega}${hora ? ` · ${hora}` : ''} · Estado: ${estadoLabel}`;
+                    }
+
+                    body.innerHTML = `
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+                            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
+                                <div style="font-size:.78rem;color:#64748b;text-transform:uppercase;font-weight:800;">Metodo de pago</div>
+                                <div style="font-size:1.08rem;font-weight:900;color:${metodoPago.includes('FLOW') ? '#0369a1' : '#166534'};">${esc(metodoPago)}</div>
+                                ${metodoPago.includes('FLOW') ? '<div style="margin-top:4px;display:inline-flex;padding:4px 8px;border-radius:999px;border:2px solid #0284c7;background:#e0f2fe;color:#0c4a6e;font-weight:900;">FLOW</div>' : ''}
+                            </div>
+                            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
+                                <div style="font-size:.78rem;color:#64748b;text-transform:uppercase;font-weight:800;">Entrega</div>
+                                <div style="font-size:1rem;font-weight:800;color:#0f172a;">${entrega}${hora ? ` · ${esc(hora)}` : ''}</div>
+                                <div style="font-size:.82rem;color:#475569;margin-top:4px;">Fecha: ${esc(fechaHora || '-')}</div>
+                            </div>
+                            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
+                                <div style="font-size:.78rem;color:#64748b;text-transform:uppercase;font-weight:800;">Temporizador entrega</div>
+                                <div style="font-size:1rem;font-weight:800;color:#0f172a;">${esc(timerBase || 'Sin tiempo estimado')}</div>
+                                <div style="font-size:.82rem;color:#475569;margin-top:4px;">Restante: ${esc(timerTxt || 'Sin conteo')}</div>
+                            </div>
+                            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
+                                <div style="font-size:.78rem;color:#64748b;text-transform:uppercase;font-weight:800;">Total</div>
+                                <div style="font-size:1.15rem;font-weight:900;color:#0f172a;">$${total.toLocaleString('es-CL')}</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
+                            <div style="font-size:.82rem;color:#64748b;text-transform:uppercase;font-weight:800;">Cliente</div>
+                            <div style="font-size:.92rem;color:#0f172a;"><strong>${esc(String(venta.cliente_nombre || '').trim() || 'Sin nombre')}</strong></div>
+                            <div style="font-size:.86rem;color:#475569;">${esc(String(venta.cliente_email || '-'))} · ${esc(String(venta.cliente_telefono || '-'))}</div>
+                        </div>
+                        <div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
+                            <div style="font-size:.82rem;color:#64748b;text-transform:uppercase;font-weight:800;margin-bottom:6px;">Productos solicitados</div>
+                            <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;font-size:.9rem;">
+                                ${items.length ? items.map((it) => `
+                                    <div style="color:#0f172a;">${esc(String(it.nombre_producto || '-'))}</div>
+                                    <div style="color:#334155;text-align:center;">x${Math.round(Number(it.cantidad || 0))}</div>
+                                    <div style="color:#0f172a;text-align:right;font-weight:700;">$${Math.round(Number(it.subtotal || 0)).toLocaleString('es-CL')}</div>
+                                `).join('') : '<div style="grid-column:1/-1;color:#64748b;">Sin detalle de items.</div>'}
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                            <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, true)" style="border:1px solid #22c55e;background:#16a34a;color:#fff;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Confirmar pago exitoso</button>
+                            <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, false)" style="border:1px solid #f59e0b;background:#fff7ed;color:#9a3412;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Pago no concretado</button>
+                            <button type="button" onclick="window.open('https://dashboard.flow.cl/private/your-sales/paid/', '_blank', 'noopener');" style="border:1px solid #0284c7;background:#e0f2fe;color:#0c4a6e;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Abrir Flow dashboard</button>
+                            ${flowRetryUrl ? `<button type="button" onclick="window.open('${esc(flowRetryUrl)}','_blank','noopener')" style="border:1px solid #0ea5e9;background:#f0f9ff;color:#0c4a6e;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Abrir reintento cliente</button>` : ''}
+                        </div>
+                    `;
+                } catch (err) {
+                    body.innerHTML = `<div style="padding:14px;border:1px solid #fecaca;background:#fff1f2;border-radius:10px;color:#9f1239;">${esc(err.message || 'No se pudo cargar detalle del pedido')}</div>`;
+                }
+            }
+            window._sucreeAbrirDetallePedidoActivo = abrirDetallePedidoActivo;
+
             function toggleQuick(id) {
                 const box = document.getElementById(`sucree-quick-${Number(id || 0)}`);
                 const btn = document.getElementById(`sucree-quick-toggle-${Number(id || 0)}`);
@@ -928,7 +1039,7 @@
                             <button type="button" onclick="_sucreeSetTimerPedido(${id})" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-weight:800;cursor:pointer;">Definir tiempo</button>
                         </div>
                     `;
-                    return `<div class="${pendiente ? 'sucree-pedido-pendiente' : ''}" oncontextmenu="_sucreeEliminarPedido(${id}); return false;" title="Click derecho para eliminar pedido" style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
+                    return `<div class="${pendiente ? 'sucree-pedido-pendiente' : ''}" oncontextmenu="_sucreeEliminarPedido(${id}); return false;" ondblclick="_sucreeAbrirDetallePedidoActivo(${id}); return false;" title="Doble click: ver detalle completo. Click derecho: eliminar pedido." style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;cursor:pointer;">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                             <div style="font-weight:800;color:#0f172a;">Pedido #${id}</div>
                             ${pendiente ? '<span class="sucree-pedido-pendiente-badge">Pendiente confirmar</span>' : ''}
