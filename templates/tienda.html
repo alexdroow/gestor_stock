@@ -10320,6 +10320,7 @@
             const despacho = money.format(Number(p?.despacho_monto || 0));
             const total = money.format(Number(p?.total || 0));
             const wa = _buildWhatsappPedidoLink(p);
+            const retryUrl = String(p?.flow_retry_url || "").trim();
             const items = Array.isArray(p?.items) ? p.items : [];
             const itemsHtml = items.map((it) => `
                 <div style="display:flex;justify-content:space-between;gap:8px;">
@@ -10347,6 +10348,7 @@
                             <div style="display:flex;justify-content:space-between;"><span>Total</span><strong>${total}</strong></div>
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            ${(isPending && retryUrl) ? `<button type="button" id="post-checkout-retry-flow" style="border:1px solid #0284c7;background:#0284c7;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Ir a pagar</button>` : ""}
                             ${isSuccess ? `<button type="button" id="post-checkout-pdf" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Descargar ticket PDF</button>` : ""}
                             <a href="${wa}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;">Enviar WhatsApp pasteleria</a>
                             <button type="button" id="post-checkout-close" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Entendido</button>
@@ -10362,8 +10364,20 @@
             document.body.insertAdjacentHTML("beforeend", _renderPostCheckoutPopup(p, options));
             const overlay = document.getElementById("post-checkout-popup-overlay");
             const btnPdf = document.getElementById("post-checkout-pdf");
+            const btnRetryFlow = document.getElementById("post-checkout-retry-flow");
             const btnClose = document.getElementById("post-checkout-close");
             btnPdf?.addEventListener("click", () => window.descargarComprobanteUltimoPedido && window.descargarComprobanteUltimoPedido());
+            btnRetryFlow?.addEventListener("click", () => {
+                const retryUrl = String(p?.flow_retry_url || "").trim();
+                const ventaId = Number(p?.venta_id || 0);
+                if (!retryUrl) {
+                    msg("No hay enlace de pago disponible para reintentar.", true);
+                    return;
+                }
+                _markFlowReturnTracking(ventaId);
+                _setFlowVerificandoOverlay(true, "Abriendo pasarela Flow para reintentar el pago...");
+                _redirigirAFlow(retryUrl);
+            });
             btnClose?.addEventListener("click", () => overlay?.remove());
             overlay?.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
         }
