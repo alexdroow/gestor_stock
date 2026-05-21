@@ -5304,6 +5304,14 @@
                 cards.forEach((card) => {
                     const idNum = Number(card.getAttribute('data-pedido-card-id') || 0);
                     if (!idNum) return;
+                    if (!card.dataset.ctxDeleteBound) {
+                        card.dataset.ctxDeleteBound = '1';
+                        card.title = 'Click derecho para eliminar pedido';
+                        card.addEventListener('contextmenu', (ev) => {
+                            ev.preventDefault();
+                            _eliminarPedidoActivoAdmin(idNum);
+                        });
+                    }
                     if (card.querySelector(`[data-eliminar-pedido-id="${idNum}"]`)) return;
                     const actions = card.querySelector('div[style*="display:flex"][style*="flex-wrap:wrap"]');
                     if (!actions) return;
