@@ -931,6 +931,24 @@
                     const flowRetryUrl = String(pedido.flow_retry_url || '').trim();
                     const timerTxt = timerRestanteTexto(pedido.timer_restante_segundos);
                     const timerBase = timerLabel(pedido.timer_minutos);
+                    const telefonoClienteRaw = String(venta.cliente_telefono || '').trim();
+                    const nombreClienteRaw = String(venta.cliente_nombre || '').trim();
+                    const resumenWhatsapp = (items || []).map((it) => {
+                        const nombre = String(
+                            it?.nombre_producto
+                            || it?.producto_nombre
+                            || it?.nombre
+                            || it?.producto
+                            || 'Item'
+                        ).trim();
+                        const cantidad = Number(it?.cantidad ?? it?.cantidad_unidades ?? it?.qty ?? 1) || 1;
+                        return `${nombre} x${Math.round(cantidad)}`;
+                    }).filter(Boolean).join(', ');
+                    const telEnc = encodeURIComponent(telefonoClienteRaw);
+                    const nomEnc = encodeURIComponent(nombreClienteRaw);
+                    const timerWaEnc = encodeURIComponent(timerBase || 'sin tiempo definido');
+                    const resumenWaEnc = encodeURIComponent(resumenWhatsapp || '-');
+                    const totalWaEnc = encodeURIComponent(`$${total.toLocaleString('es-CL')}`);
 
                     if (sub) {
                         sub.textContent = `${fechaHora || 'Sin fecha'} · ${entrega}${hora ? ` · ${hora}` : ''} · Estado: ${estadoLabel}`;
@@ -998,7 +1016,7 @@
                             <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, true)" style="border:1px solid #22c55e;background:#16a34a;color:#fff;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Confirmar pago exitoso</button>
                             <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, false)" style="border:1px solid #f59e0b;background:#fff7ed;color:#9a3412;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Pago no concretado</button>
                             <button type="button" onclick="window.open('https://dashboard.flow.cl/private/your-sales/paid/', '_blank', 'noopener');" style="border:1px solid #0284c7;background:#e0f2fe;color:#0c4a6e;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Abrir Flow dashboard</button>
-                            ${flowRetryUrl ? `<button type="button" onclick="window.open('${esc(flowRetryUrl)}','_blank','noopener')" style="border:1px solid #0ea5e9;background:#f0f9ff;color:#0c4a6e;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Abrir reintento cliente</button>` : ''}
+                            <button type="button" onclick="_sucreeAbrirWhatsappPedido(${id}, '${telEnc}', '${nomEnc}', '${timerWaEnc}', '${resumenWaEnc}', '${totalWaEnc}')" style="border:1px solid #16a34a;background:#f0fdf4;color:#166534;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Enviar WhatsApp cliente</button>
                         </div>
                     `;
                 } catch (err) {
