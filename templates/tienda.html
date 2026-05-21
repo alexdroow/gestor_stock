@@ -5303,6 +5303,25 @@
             _clearFlowReturnTracking();
         }
 
+        function _descartarPedidoPendienteLocal(motivo = "") {
+            try {
+                const p = ultimoComprobantePedido || {};
+                const metodo = String(p?.metodo_pago || "").trim().toLowerCase();
+                const esFlowPendiente = ["flow_pendiente", "flow_pending", "flow"].includes(metodo);
+                if (esFlowPendiente) {
+                    ultimoComprobantePedido = null;
+                    try { localStorage.removeItem("tienda_ultimo_pedido"); } catch (_) {}
+                }
+                _limpiarFlowCheckoutDraft();
+                _stopPedidoEstadoPoll();
+                const ov = document.getElementById("post-checkout-popup-overlay");
+                if (ov) ov.remove();
+                _setFlowVerificandoOverlay(false);
+                _renderPedidoActivoTienda();
+                if (motivo) msg(motivo, true);
+            } catch (_) {}
+        }
+
         function _renderPedidoActivoTienda() {
             if (!pedidoActivoBoxEl) return;
             const p = ultimoComprobantePedido;
@@ -10078,6 +10097,12 @@
                 try {
                     const res = await fetch(`/api/tienda/flow/estado?venta_id=${id}`, { headers: { Accept: "application/json" }, cache: "no-store" });
                     const data = await res.json();
+                    if (!res.ok && Number(res.status || 0) === 404) {
+                        return { ok: false, estado: "no_encontrado" };
+                    }
+                    if (res.ok && data?.success && data?.found === false) {
+                        return { ok: false, estado: "no_encontrado" };
+                    }
                     if (res.ok && data?.success) {
                         const estado = String(data?.estado || "").trim().toLowerCase();
                         if (estado === "pagado") return { ok: true, estado: "pagado", backup: (data?.checkout_backup || null) };
@@ -10213,6 +10238,8 @@
                             msg("Pago confirmado por Flow. Pedido registrado correctamente.");
                             _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaSeguimiento || fallbackVentaId || 0 }), { mode: "success" });
                             _limpiarFlowCheckoutDraft();
+                        } else if (check.estado === "no_encontrado") {
+                            _descartarPedidoPendienteLocal("Este pedido ya no esta activo. Si necesitas ayuda, contacta a pasteleria.");
                         } else {
                             const statusTxt = draftFlowPendiente
                                 ? "Pago no completado aun. Puedes reintentar Flow desde 'Tu pedido activo'."
@@ -10251,6 +10278,8 @@
                         msg("Pago confirmado por Flow. Pedido registrado correctamente.");
                         _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "success" });
                         _limpiarFlowCheckoutDraft();
+                    } else if (check.estado === "no_encontrado") {
+                        _descartarPedidoPendienteLocal("Este pedido ya no esta activo. Si necesitas ayuda, contacta a pasteleria.");
                     } else {
                         msg("Pago en Flow pendiente de confirmacion. Te notificaremos cuando sea aprobado.");
                         _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "pending" });
@@ -10265,6 +10294,8 @@
                         msg("Pago confirmado por Flow. Pedido registrado correctamente.");
                         _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "success" });
                         _limpiarFlowCheckoutDraft();
+                    } else if (check.estado === "no_encontrado") {
+                        _descartarPedidoPendienteLocal("Este pedido ya no esta activo. Si necesitas ayuda, contacta a pasteleria.");
                     } else {
                         msg("No se pudo confirmar el pago en este momento. Tu pedido queda en verificacion.", true);
                         _abrirPostCheckoutPopup(_payloadFlowFallback({ venta_id: ventaId || fallbackVentaId || 0 }), { mode: "pending" });
@@ -10583,7 +10614,14 @@
                 const wasFlowPending = _pedidoFlowPendienteCliente(p);
                 const res = await fetch(`/api/tienda/pedido/${Number(p.venta_id || 0)}/estado`, { headers: { Accept: "application/json" } });
                 const data = await res.json();
-                if (!res.ok || !data.success) return;
+                if (!res.ok || !data.success) {
+                    const errTxt = String(data?.error || "").toLowerCase();
+                    if (Number(res.status || 0) === 404 || errTxt.includes("no encontrado")) {
+                        _descartarPedidoPendienteLocal("Este pedido ya no esta activo.");
+                        return;
+                    }
+                    return;
+                }
                 const estado = String(((data.pedido || {}).estado) || "recibido");
                 const estadoActualizado = String(((data.pedido || {}).estado_actualizado) || "");
                 const metodoPago = String(((data.pedido || {}).metodo_pago) || "");
@@ -10663,6 +10701,7 @@
                     }
                 }
                 if (_estadoPedidoFinal(estado)) {
+                    _limpiarFlowCheckoutDraft();
                     _stopPedidoEstadoPoll();
                 }
             } catch (_) {}
