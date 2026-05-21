@@ -1067,13 +1067,60 @@
                         <div style="font-size:.9rem;color:#475569;">Cliente: <strong>${esc(p.cliente_nombre || 'sin nombre')}</strong></div>
                         <div style="font-size:.86rem;color:#64748b;">Correo: ${esc(p.cliente_email || '-')} · Telefono: ${esc(p.cliente_telefono || '-')}</div>
                         <div style="font-size:.9rem;color:#334155;">Entrega: <strong>${esc(String(p.entrega_tipo || 'retiro'))}</strong>${String(p.hora_retiro || '').trim() ? ` · Hora: <strong>${esc(String(p.hora_retiro || ''))}</strong>` : ''}</div>
+                        <div style="font-size:.9rem;color:#0f172a;margin-top:4px;"><strong>Metodo pago:</strong> ${esc(String(p.metodo_pago || 'efectivo').toUpperCase())}</div>
+                        ${(String(p.metodo_pago || '').toLowerCase().includes('flow')) ? `<div style="margin-top:5px;display:inline-flex;align-items:center;gap:6px;border:2px solid #0284c7;background:#e0f2fe;color:#0c4a6e;padding:4px 9px;border-radius:999px;font-weight:900;letter-spacing:.5px;">FLOW</div>` : ''}
                         ${String(p.direccion_entrega || '').trim() ? `<div style="font-size:.84rem;color:#475569;">Direccion: ${esc(String(p.direccion_entrega || ''))}</div>` : ''}
                         <div style="font-size:.88rem;color:#334155;margin-top:4px;"><strong>Productos:</strong> ${esc(String(p.productos || '-'))}</div>
                         <div style="font-size:.9rem;color:#111827;font-weight:700;">Total: $${Math.round(Number(p.total_monto || 0)).toLocaleString('es-CL')}</div>
+                        ${(String(p.metodo_pago || '').toLowerCase().includes('flow')) ? `
+                            <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap;">
+                                <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${Number(p.id || 0)}, true)" style="border:1px solid #22c55e;background:#16a34a;color:#fff;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;">Confirmar pago</button>
+                                <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${Number(p.id || 0)}, false)" style="border:1px solid #f59e0b;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;">Pago no concretado</button>
+                            </div>
+                        ` : ''}
                     </div>
                 `).join('');
                 ov.style.display = 'flex';
             }
+
+            async function confirmarPagoFlowDesdeAlerta(ventaId, confirmado) {
+                const id = Number(ventaId || 0);
+                if (!id) return;
+                const ok = window.confirm(
+                    confirmado
+                        ? `Confirmar que el pago Flow del pedido #${id} fue recibido?`
+                        : `Confirmar que el pago del pedido #${id} NO se concreto?`
+                );
+                if (!ok) return;
+                try {
+                    const decision = confirmado ? 'confirmado' : 'rechazado';
+                    const r1 = await fetch('/api/tienda/admin/flow/validar-pago', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        body: JSON.stringify({ venta_id: id, decision }),
+                    });
+                    const d1 = await r1.json();
+                    if (!r1.ok || !d1?.success) throw new Error(d1?.error || 'No se pudo validar pago');
+
+                    const msgCliente = confirmado
+                        ? 'Pago recibido correctamente. Tu pedido fue confirmado y comenzaremos su preparacion.'
+                        : 'No se pudo confirmar tu pago. Por favor reintenta pagar con Flow o elige transferencia para completar tu pedido.';
+                    const r2 = await fetch(`/api/tienda/chat/venta/${id}/enviar`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        body: JSON.stringify({ role: 'admin', mensaje: msgCliente }),
+                    });
+                    const d2 = await r2.json();
+                    if (!r2.ok || !d2?.success) throw new Error(d2?.error || 'Pago actualizado, pero no se pudo notificar al cliente');
+
+                    nuevosPendientes = nuevosPendientes.filter((x) => Number(x?.id || 0) !== id);
+                    renderAlert();
+                    await pollActivos();
+                } catch (err) {
+                    alert(err.message || 'No se pudo confirmar estado de pago');
+                }
+            }
+            window._sucreeConfirmarPagoFlowDesdeAlerta = confirmarPagoFlowDesdeAlerta;
 
             async function pollNuevos() {
                 try {

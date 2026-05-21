@@ -2433,6 +2433,25 @@ def _ensure_ventas_flow_admin_alert_column():
             conn.close()
 
 
+def _ensure_ventas_flow_return_column():
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(ventas)")
+        cols = {str(r["name"]).strip().lower() for r in (cur.fetchall() or [])}
+        if "flow_cliente_regreso" in cols:
+            return
+        cur.execute("ALTER TABLE ventas ADD COLUMN flow_cliente_regreso INTEGER DEFAULT 1")
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e or "").lower():
+            raise
+    finally:
+        if conn:
+            conn.close()
+
+
 def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redirect_url=None, checkout_backup=None):
     conn = None
     try:
@@ -2833,6 +2852,32 @@ def _flow_confirmar_token_y_actualizar(token):
     if paid:
         _finalizar_venta_flow_pagada(venta_id, status_payload=status)
     return {"success": True, "venta_id": venta_id, "paid": paid, "status": status}
+
+
+def _marcar_flow_cliente_regreso(venta_id):
+    vid = int(venta_id or 0)
+    if vid <= 0:
+        return
+    conn = None
+    try:
+        _ensure_ventas_flow_return_column()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE ventas
+            SET flow_cliente_regreso = 1
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            """,
+            (vid,),
+        )
+        conn.commit()
+    except Exception:
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 
 
 def _rangos_ocupados_evento_agenda(evento, slot_minutes, buffer_minutes=0):
@@ -7390,6 +7435,7 @@ def api_tienda_admin_pedidos_nuevos():
         _flow_reconciliar_pendientes(limit=20, horas=72)
         _ensure_ventas_metodo_pago_column()
         _ensure_ventas_flow_admin_alert_column()
+        _ensure_ventas_flow_return_column()
         since_id = int(request.args.get("since_id") or 0)
         conn = get_db()
         cursor = conn.cursor()
@@ -7407,6 +7453,7 @@ def api_tienda_admin_pedidos_nuevos():
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
                    COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo') AS metodo_pago,
+                   COALESCE(v.flow_cliente_regreso, 1) AS flow_cliente_regreso,
                    COALESCE(v.flow_admin_alertado, 1) AS flow_admin_alertado,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
@@ -7425,6 +7472,10 @@ def api_tienda_admin_pedidos_nuevos():
               AND (
                     (
                         v.id > ?
+                        AND (
+                            LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
+                            OR COALESCE(v.flow_cliente_regreso, 1) = 1
+                        )
                     )
                     OR (
                         LOWER(TRIM(COALESCE(v.metodo_pago, ''))) = 'flow_pagado'
@@ -7679,6 +7730,7 @@ def api_tienda_admin_pedidos_chat_activos():
     conn = None
     try:
         _ensure_ventas_metodo_pago_column()
+        _ensure_ventas_flow_return_column()
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
@@ -7687,6 +7739,7 @@ def api_tienda_admin_pedidos_chat_activos():
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
                    COALESCE(NULLIF(TRIM(v.metodo_pago), ''), 'efectivo') AS metodo_pago,
+                   COALESCE(v.flow_cliente_regreso, 1) AS flow_cliente_regreso,
                    v.pedido_timer_minutos, v.pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(v.entrega_tipo), ''), 'retiro') AS entrega_tipo,
                    v.hora_retiro,
@@ -7700,6 +7753,10 @@ def api_tienda_admin_pedidos_chat_activos():
             ) vp ON vp.venta_id = v.id
             WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
               AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
+              AND (
+                   LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
+                   OR COALESCE(v.flow_cliente_regreso, 1) = 1
+              )
             ORDER BY v.id DESC
             LIMIT 40
             """
@@ -13182,6 +13239,7 @@ def api_tienda_checkout():
         try:
             _ensure_ventas_metodo_pago_column()
             _ensure_ventas_flow_admin_alert_column()
+            _ensure_ventas_flow_return_column()
             conn = get_db()
             cursor = conn.cursor()
             cursor.execute(
@@ -13193,6 +13251,7 @@ def api_tienda_checkout():
                     metodo_pago = ?,
                     canal_venta = ?,
                     flow_admin_alertado = ?,
+                    flow_cliente_regreso = ?,
                     entrega_tipo = ?, hora_retiro = ?, direccion_entrega = ?, entrega_lat = ?, entrega_lng = ?, despacho_monto = ?, entrega_detalle_json = ?
                 WHERE id = ?
                 """,
@@ -13205,6 +13264,7 @@ def api_tienda_checkout():
                     total_neto,
                     ("flow_pendiente" if metodo_pago_preferido == "flow" else "transferencia"),
                     ("tienda_online_flow_pendiente" if metodo_pago_preferido == "flow" else "tienda_online"),
+                    (0 if metodo_pago_preferido == "flow" else 1),
                     (0 if metodo_pago_preferido == "flow" else 1),
                     entrega_tipo,
                     hora_retiro,
@@ -13446,6 +13506,8 @@ def tienda_flow_retorno():
     # Retorno del navegador del cliente luego del checkout Flow
     def _redirigir_con_cookie(base_url, estado, venta_id=0):
         vid = int(venta_id or 0)
+        if vid > 0:
+            _marcar_flow_cliente_regreso(vid)
         if estado == "paid":
             destino = f"{base_url}/tienda?flow=paid&venta_id={vid}"
         elif estado == "pending":
