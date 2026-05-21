@@ -4517,6 +4517,7 @@
         let paymentPricingCfg = { flow_enabled: false, rate: 0.0319, iva: 0.19, fixed: 0 };
         let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
+        let postCheckoutAutoRefreshTimer = null;
         let flowRecheckTsByVenta = {};
         let flowAutoPopupShownByVenta = {};
         let historialEstadoPollTimer = null;
@@ -10360,12 +10361,12 @@
             const resumenTitulo = isSuccess
                 ? "Compra confirmada correctamente."
                 : (isPending
-                    ? "Tu pedido aun NO esta pagado."
+                    ? "Esperando la confirmacion del pago."
                     : "La compra no se concreto en Flow.");
             const resumenDetalle = isSuccess
                 ? `Guarda tu numero de pedido para seguimiento: #${Number(p?.venta_id || 0) || "-"}.`
                 : (isPending
-                    ? "En cuanto Flow confirme el pago, tu pedido se registrara automaticamente en SucréeStock."
+                    ? "Flow esta procesando el pago, te informaremos cuando el pago llegue confirmado que tu pedido se esta preperando (puedes hacer refresh) para actualizar el estado de tu pedido."
                     : "Puedes reintentar el pago o elegir transferencia para completar tu pedido.");
             const ventaId = Number(p?.venta_id || 0);
             const entrega = String(p?.entrega_tipo || "").toLowerCase() === "despacho" ? "Despacho" : "Retiro en tienda";
@@ -10418,12 +10419,26 @@
         function _abrirPostCheckoutPopup(p, options = {}) {
             const old = document.getElementById("post-checkout-popup-overlay");
             if (old) old.remove();
+            if (postCheckoutAutoRefreshTimer) {
+                clearInterval(postCheckoutAutoRefreshTimer);
+                postCheckoutAutoRefreshTimer = null;
+            }
             document.body.insertAdjacentHTML("beforeend", _renderPostCheckoutPopup(p, options));
             const overlay = document.getElementById("post-checkout-popup-overlay");
             const btnPdf = document.getElementById("post-checkout-pdf");
             const btnRetryFlow = document.getElementById("post-checkout-retry-flow");
             const btnRefresh = document.getElementById("post-checkout-refresh");
             const btnClose = document.getElementById("post-checkout-close");
+            const runRefreshNow = async () => {
+                const pedidoRef = ultimoComprobantePedido || p || {};
+                const ventaId = Number(pedidoRef?.venta_id || 0);
+                if (!ventaId) return;
+                flowRecheckTsByVenta[ventaId] = 0;
+                await _pollEstadoPedidoCliente();
+                const refreshed = ultimoComprobantePedido || pedidoRef || {};
+                const mode = _popupModeByPedido(refreshed);
+                _abrirPostCheckoutPopup(refreshed, { mode });
+            };
             btnPdf?.addEventListener("click", () => window.descargarComprobanteUltimoPedido && window.descargarComprobanteUltimoPedido());
             btnRetryFlow?.addEventListener("click", () => {
                 const retryUrl = String(p?.flow_retry_url || "").trim();
@@ -10441,18 +10456,28 @@
                 const old = btnRefresh.textContent;
                 btnRefresh.textContent = "Verificando...";
                 try {
-                    await _pollEstadoPedidoCliente();
-                    const pedidoRef = ultimoComprobantePedido || p || {};
-                    const mode = _popupModeByPedido(pedidoRef);
-                    _abrirPostCheckoutPopup(pedidoRef, { mode });
+                    await runRefreshNow();
                 } catch (_) {
                 } finally {
                     btnRefresh.disabled = false;
                     btnRefresh.textContent = old || "Refresh";
                 }
             });
-            btnClose?.addEventListener("click", () => overlay?.remove());
-            overlay?.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+            const initialMode = _popupModeByPedido(ultimoComprobantePedido || p || {});
+            if (initialMode === "pending") {
+                postCheckoutAutoRefreshTimer = setInterval(async () => {
+                    try { await runRefreshNow(); } catch (_) {}
+                }, 30000);
+            }
+            const closePopup = () => {
+                if (postCheckoutAutoRefreshTimer) {
+                    clearInterval(postCheckoutAutoRefreshTimer);
+                    postCheckoutAutoRefreshTimer = null;
+                }
+                overlay?.remove();
+            };
+            btnClose?.addEventListener("click", closePopup);
+            overlay?.addEventListener("click", (ev) => { if (ev.target === overlay) closePopup(); });
         }
 
         function _popupModeByPedido(pedidoLike) {
