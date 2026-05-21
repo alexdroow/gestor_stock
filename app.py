@@ -7397,7 +7397,7 @@ def api_tienda_admin_pedidos_nuevos():
             """
             SELECT COALESCE(MAX(id), 0) AS max_online_id
             FROM ventas
-            WHERE canal_venta = 'tienda_online'
+            WHERE canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
             """
         )
         max_online_id = int(cursor.fetchone()["max_online_id"] or 0)
@@ -7421,11 +7421,10 @@ def api_tienda_admin_pedidos_nuevos():
                 FROM venta_items
                 GROUP BY venta_id
             ) vp ON vp.venta_id = v.id
-            WHERE v.canal_venta = 'tienda_online'
+            WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
               AND (
                     (
                         v.id > ?
-                        AND LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
                     )
                     OR (
                         LOWER(TRIM(COALESCE(v.metodo_pago, ''))) = 'flow_pagado'
@@ -7470,6 +7469,98 @@ def api_tienda_admin_pedidos_nuevos():
         return jsonify({"success": True, "pedidos": rows, "max_id": max_id})
     except Exception as e:
         return jsonify({"success": False, "pedidos": [], "max_id": 0, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/flow/validar-pago', methods=['POST'])
+def api_tienda_admin_flow_validar_pago():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        payload = request.get_json(silent=True) or {}
+        venta_id = int(payload.get("venta_id") or 0)
+        decision = str(payload.get("decision") or "").strip().lower()
+        if venta_id <= 0:
+            return jsonify({"success": False, "error": "venta_id invalido"}), 400
+        if decision not in {"confirmado", "rechazado"}:
+            return jsonify({"success": False, "error": "Decision invalida"}), 400
+
+        _ensure_ventas_metodo_pago_column()
+        _ensure_ventas_flow_admin_alert_column()
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, COALESCE(NULLIF(TRIM(metodo_pago), ''), '') AS metodo_pago
+            FROM ventas
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            LIMIT 1
+            """,
+            (venta_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+        metodo = str((dict(row).get("metodo_pago")) or "").strip().lower()
+        if metodo not in {"flow", "flow_pendiente", "flow_pending", "flow_pagado"}:
+            return jsonify({"success": False, "error": "Pedido no corresponde a Flow"}), 400
+        conn.close()
+        conn = None
+
+        if decision == "confirmado":
+            _finalizar_venta_flow_pagada(
+                venta_id,
+                status_payload={
+                    "manual_validacion_admin": True,
+                    "decision": "confirmado",
+                    "at": _now_chile_iso(),
+                },
+            )
+            _actualizar_flow_pago(
+                venta_id=venta_id,
+                estado="pagado",
+                payment_data={
+                    "manual_validacion_admin": True,
+                    "decision": "confirmado",
+                    "at": _now_chile_iso(),
+                },
+            )
+            return jsonify({"success": True, "venta_id": venta_id, "estado_pago": "pagado"})
+
+        # Rechazado manual: mantenemos pendiente para reintento de pago.
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE ventas
+            SET metodo_pago = 'flow_pendiente',
+                canal_venta = 'tienda_online_flow_pendiente',
+                flow_admin_alertado = 1
+            WHERE id = ?
+            """,
+            (venta_id,),
+        )
+        conn.commit()
+        conn.close()
+        conn = None
+        _actualizar_flow_pago(
+            venta_id=venta_id,
+            estado="pendiente",
+            payment_data={
+                "manual_validacion_admin": True,
+                "decision": "rechazado",
+                "at": _now_chile_iso(),
+            },
+        )
+        return jsonify({"success": True, "venta_id": venta_id, "estado_pago": "pendiente"})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
@@ -7607,9 +7698,8 @@ def api_tienda_admin_pedidos_chat_activos():
                 FROM venta_items
                 GROUP BY venta_id
             ) vp ON vp.venta_id = v.id
-            WHERE v.canal_venta = 'tienda_online'
+            WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
               AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
-              AND LOWER(TRIM(COALESCE(v.metodo_pago, 'efectivo'))) <> 'flow_pendiente'
             ORDER BY v.id DESC
             LIMIT 40
             """
@@ -7666,7 +7756,7 @@ def api_tienda_admin_pedido_estado(venta_id):
             SELECT id, pedido_timer_minutos, pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(metodo_pago), ''), 'efectivo') AS metodo_pago
             FROM ventas
-            WHERE id = ? AND canal_venta = 'tienda_online'
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
             LIMIT 1
             """,
             (int(venta_id),),
