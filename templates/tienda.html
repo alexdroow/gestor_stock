@@ -10433,6 +10433,9 @@
                 const pedidoRef = ultimoComprobantePedido || p || {};
                 const ventaId = Number(pedidoRef?.venta_id || 0);
                 if (!ventaId) return;
+                if (!ultimoComprobantePedido) {
+                    ultimoComprobantePedido = { ...pedidoRef };
+                }
                 flowRecheckTsByVenta[ventaId] = 0;
                 await _pollEstadoPedidoCliente();
                 const refreshed = ultimoComprobantePedido || pedidoRef || {};
@@ -10665,6 +10668,12 @@
                 p.timer_label = timerLabel;
                 p.timer_inicio = timerInicio;
                 p.timer_restante_segundos = timerRestante;
+
+                const estadoNorm = String(estado || "").trim().toLowerCase();
+                if (["confirmado", "preparando", "listo", "entregado"].includes(estadoNorm)) {
+                    p.metodo_pago = "flow_pagado";
+                    p.flow_retry_url = "";
+                }
 
                 let isFlowPending = _pedidoFlowPendienteCliente(p);
                 if (isFlowPending) {
