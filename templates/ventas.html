@@ -4756,7 +4756,7 @@
                     </div>
                 ` : '';
                 return `
-                    <div data-pedido-card-id="${Number(p.id || 0)}" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
+                    <div data-pedido-card-id="${Number(p.id || 0)}" oncontextmenu="_eliminarPedidoActivoAdmin(${Number(p.id || 0)}); return false;" title="Click derecho para eliminar pedido" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
                         <div style="font-weight:800;color:#1f2937;">Pedido #${p.id || '?'} ${idx === total - 1 ? '(nuevo)' : ''}</div>
                         <div style="font-size:.9rem;color:#475569;">Cliente: <strong>${nombre}</strong></div>
                         <div style="font-size:.9rem;color:#475569;">Correo: <strong>${email}</strong></div>
@@ -5140,7 +5140,7 @@
                     const productosWaEnc = encodeURIComponent(productosWa);
                     const totalWaEnc = encodeURIComponent(`$${Math.round(Number(p.total_monto || 0)).toLocaleString('es-CL')}`);
                     const waBtnHub = `<button type="button" onclick="_abrirWhatsappPedidoCliente(${id}, '${telEnc}', '${nomEnc}', '${timerWaEnc}', '${productosWaEnc}', '${totalWaEnc}')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">WhatsApp</button>`;
-                    return `<div data-pedido-card-id="${id}" style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
+                    return `<div data-pedido-card-id="${id}" oncontextmenu="_eliminarPedidoActivoAdmin(${id}); return false;" title="Click derecho para eliminar pedido" style="border:1px solid #e2e8f0;border-radius:10px;padding:8px;">
                         <div style="font-weight:800;color:#0f172a;">Pedido #${id}${pendingBadge}</div>
                         <div style="font-size:.85rem;color:#475569;">${nom}</div>
                         <div style="font-size:.8rem;color:#64748b;">${em} · ${tel}</div>
