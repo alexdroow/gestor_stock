@@ -1874,7 +1874,7 @@ def _chat_info_origen_cursor(cursor, origen_tipo, origen_id):
                pedido_estado_actualizado,
                cliente_email, cliente_telefono, cliente_nombre
         FROM ventas
-        WHERE id = ? AND canal_venta = 'tienda_online'
+        WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
         LIMIT 1
         """,
         (oid,),
@@ -2624,9 +2624,13 @@ def _finalizar_venta_flow_pagada(venta_id, status_payload=None):
             row_v = cur.fetchone()
             if row_v:
                 venta = dict(row_v)
+                cur.execute("PRAGMA table_info(venta_items)")
+                vi_cols = {str(r["name"]).strip().lower() for r in (cur.fetchall() or [])}
+                select_precio = "precio_unitario" if "precio_unitario" in vi_cols else "0 AS precio_unitario"
+                select_subtotal = "subtotal" if "subtotal" in vi_cols else "0 AS subtotal"
                 cur.execute(
-                    """
-                    SELECT producto_id, producto_nombre, cantidad, precio_unitario
+                    f"""
+                    SELECT producto_id, producto_nombre, cantidad, {select_precio}, {select_subtotal}
                     FROM venta_items
                     WHERE venta_id = ?
                     ORDER BY id ASC
@@ -2639,13 +2643,19 @@ def _finalizar_venta_flow_pagada(venta_id, status_payload=None):
                     d = dict(rr)
                     qty = int(d.get("cantidad") or 0)
                     pu = float(d.get("precio_unitario") or 0)
-                    subtotal += pu * qty
+                    sub = float(d.get("subtotal") or 0)
+                    if sub <= 0 and qty > 0:
+                        sub = pu * qty
+                    if pu <= 0 and qty > 0 and sub > 0:
+                        pu = sub / qty
+                    subtotal += sub
                     items.append(
                         {
                             "id": int(d.get("producto_id") or 0),
                             "nombre": str(d.get("producto_nombre") or "").strip() or "Producto",
                             "cantidad": qty,
                             "precio_unitario": pu,
+                            "subtotal": sub,
                         }
                     )
                 notify_payload = {
