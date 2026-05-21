@@ -7805,7 +7805,7 @@ def api_tienda_admin_pedido_estado(venta_id):
                 UPDATE ventas
                 SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP,
                     pedido_timer_minutos = ?, pedido_timer_inicio = CURRENT_TIMESTAMP
-                WHERE id = ? AND canal_venta = 'tienda_online'
+                WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
                 """,
                 (nuevo_estado, guardar_timer, int(venta_id)),
             )
@@ -7815,7 +7815,7 @@ def api_tienda_admin_pedido_estado(venta_id):
                 UPDATE ventas
                 SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP,
                     pedido_timer_minutos = ?, pedido_timer_inicio = ?
-                WHERE id = ? AND canal_venta = 'tienda_online'
+                WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
                 """,
                 (nuevo_estado, guardar_timer, guardar_inicio, int(venta_id)),
             )
@@ -7825,7 +7825,7 @@ def api_tienda_admin_pedido_estado(venta_id):
             SELECT COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
                    pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
-            WHERE id = ? AND canal_venta = 'tienda_online'
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
             LIMIT 1
             """,
             (int(venta_id),),
@@ -7852,6 +7852,20 @@ def api_tienda_admin_pedido_estado(venta_id):
     finally:
         if conn:
             conn.close()
+
+
+@app.route('/api/tienda/admin/pedido/<int:venta_id>/eliminar', methods=['POST'])
+def api_tienda_admin_pedido_eliminar(venta_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        eliminar_venta(int(venta_id))
+        crear_backup()
+        return jsonify({"success": True, "venta_id": int(venta_id), "mensaje": "Pedido eliminado y stock restablecido"})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/tienda/pedido/<int:venta_id>/estado', methods=['GET'])

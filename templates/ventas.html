@@ -4777,6 +4777,7 @@
                             <button type="button" ${pagoFlowPendiente ? 'disabled title="Pago Flow pendiente"' : `onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'preparando')"`} style="border:1px solid ${pagoFlowPendiente ? '#cbd5e1' : '#fdba74'};background:${pagoFlowPendiente ? '#e5e7eb' : '#fff7ed'};color:${pagoFlowPendiente ? '#94a3b8' : '#9a3412'};padding:6px 10px;border-radius:8px;font-weight:700;cursor:${pagoFlowPendiente ? 'not-allowed' : 'pointer'};">Preparando</button>
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo</button>
                             <button type="button" onclick="_actualizarEstadoPedidoOnline(${Number(p.id || 0)}, 'entregado')" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">${btnEntregadoTxt}</button>
+                            <button type="button" onclick="_eliminarPedidoActivoAdmin(${Number(p.id || 0)})" style="border:1px solid #ef4444;background:#fef2f2;color:#b91c1c;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;">Eliminar pedido</button>
                             <button type="button" onclick="_abrirChatPedidoOnline(${Number(p.id || 0)}, '${emailEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Chat cliente</button>
                             ${waBtn}
                         </div>
@@ -5149,6 +5150,7 @@
                         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
                             <button type="button" onclick="_abrirChatPedidoOnline(${id}, '${emEnc}', '${telEnc}')" style="border:1px solid #c7d2fe;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Abrir chat</button>
                             ${waBtnHub}
+                            <button type="button" onclick="_eliminarPedidoActivoAdmin(${id})" style="border:1px solid #ef4444;background:#fef2f2;color:#b91c1c;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;">Eliminar pedido</button>
                             <button type="button" id="pedido-quick-toggle-${id}" onclick="_toggleMensajesRapidos(${id})" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Mostrar mensajes</button>
                         </div>
                         <div id="pedido-quick-${id}" style="display:none;grid-template-columns:1fr;gap:6px;margin-top:6px;">
@@ -5265,6 +5267,34 @@
             }
         }
         window._validarPagoFlowManual = _validarPagoFlowManual;
+
+        async function _eliminarPedidoActivoAdmin(ventaId) {
+            const idNum = Number(ventaId || 0);
+            if (!idNum) return;
+            const ok = window.confirm(`Eliminar pedido #${idNum}? Esta accion restablece stock y lo quita del panel activo.`);
+            if (!ok) return;
+            try {
+                const response = await fetch(`/api/tienda/admin/pedido/${idNum}/eliminar`, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' },
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo eliminar el pedido');
+                _pedidosPendientesAtencion = _pedidosPendientesAtencion.filter((p) => Number(p.id || 0) !== idNum);
+                _renderPedidoAlert();
+                await _pollPedidosChatActivosVentas();
+                if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
+                    window.AppUX.toastSuccess(`Pedido #${idNum} eliminado y stock restablecido.`);
+                }
+            } catch (err) {
+                if (window.AppUX && typeof window.AppUX.toastError === 'function') {
+                    window.AppUX.toastError(err.message || 'No se pudo eliminar el pedido');
+                } else {
+                    alert(err.message || 'No se pudo eliminar el pedido');
+                }
+            }
+        }
+        window._eliminarPedidoActivoAdmin = _eliminarPedidoActivoAdmin;
 
         function _aceptarPedidoConTimer(ventaId, minutos) {
             const mins = Number(minutos || 0);
