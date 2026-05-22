@@ -898,6 +898,25 @@
                 return modal;
             }
 
+            function extraerComprobanteDesdeMensajes(mensajes) {
+                const arr = Array.isArray(mensajes) ? mensajes : [];
+                const re = /\/static\/tienda_comprobantes_transferencia\/([A-Za-z0-9._-]+)/i;
+                for (let i = arr.length - 1; i >= 0; i--) {
+                    const raw = String(arr[i]?.mensaje || '');
+                    const m = raw.match(re);
+                    if (!m) continue;
+                    const filename = String(m[1] || '').trim();
+                    if (!filename) continue;
+                    return {
+                        filename,
+                        view_url: `/api/tienda/admin/comprobante-transferencia/${encodeURIComponent(filename)}`,
+                        download_url: `/api/tienda/admin/comprobante-transferencia/${encodeURIComponent(filename)}?download=1`,
+                        creado_en: String(arr[i]?.creado_en || '').replace('T', ' ').slice(0, 19),
+                    };
+                }
+                return null;
+            }
+
             async function abrirDetallePedidoActivo(ventaId) {
                 const id = Number(ventaId || 0);
                 if (!id) return;
@@ -910,14 +929,17 @@
                 if (sub) sub.textContent = `Pedido #${id}`;
                 body.innerHTML = '<div style="padding:14px;border:1px solid #e2e8f0;border-radius:10px;color:#334155;">Cargando informacion del pedido...</div>';
                 try {
-                    const [rVenta, rEstado] = await Promise.all([
+                    const [rVenta, rEstado, rChat] = await Promise.all([
                         fetch(`/api/venta/${id}`, { headers: { Accept: 'application/json' } }),
                         fetch(`/api/tienda/pedido/${id}/estado`, { headers: { Accept: 'application/json' } }),
+                        fetch(`/api/tienda/chat/venta/${id}?role=admin`, { headers: { Accept: 'application/json' } }),
                     ]);
                     const dVenta = await rVenta.json();
                     const dEstado = await rEstado.json();
+                    const dChat = await rChat.json();
                     if (!rVenta.ok || !dVenta?.success) throw new Error(dVenta?.error || 'No se pudo cargar detalle de venta');
                     if (!rEstado.ok || !dEstado?.success) throw new Error(dEstado?.error || 'No se pudo cargar estado del pedido');
+                    if (!rChat.ok || !dChat?.success) throw new Error(dChat?.error || 'No se pudo cargar chat del pedido');
 
                     const venta = dVenta.venta || {};
                     const items = Array.isArray(dVenta.items) ? dVenta.items : [];
@@ -931,6 +953,7 @@
                     const flowRetryUrl = String(pedido.flow_retry_url || '').trim();
                     const timerTxt = timerRestanteTexto(pedido.timer_restante_segundos);
                     const timerBase = timerLabel(pedido.timer_minutos);
+                    const comp = extraerComprobanteDesdeMensajes(dChat.mensajes || []);
                     const telefonoClienteRaw = String(venta.cliente_telefono || '').trim();
                     const nombreClienteRaw = String(venta.cliente_nombre || '').trim();
                     const resumenWhatsapp = (items || []).map((it) => {
@@ -1013,11 +1036,14 @@
                             </div>
                         </div>
                         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                            <button type="button" onclick="_sucreeAbrirDetallePedidoActivo(${id})" style="border:1px solid #0ea5e9;background:#e0f2fe;color:#0c4a6e;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Refresh pedido</button>
+                            <button type="button" onclick="${comp ? `window.open('${comp.download_url}', '_blank', 'noopener')` : `alert('Aun no hay comprobante subido por el cliente para este pedido.')`}" style="border:1px solid ${comp ? '#16a34a' : '#cbd5e1'};background:${comp ? '#16a34a' : '#f8fafc'};color:${comp ? '#fff' : '#64748b'};padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Descargar comprobante</button>
                             <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, true)" style="border:1px solid #22c55e;background:#16a34a;color:#fff;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Confirmar pago exitoso</button>
                             <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, false)" style="border:1px solid #f59e0b;background:#fff7ed;color:#9a3412;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Pago no concretado</button>
                             <button type="button" onclick="window.open('https://dashboard.flow.cl/private/your-sales/paid/', '_blank', 'noopener');" style="border:1px solid #0284c7;background:#e0f2fe;color:#0c4a6e;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Abrir Flow dashboard</button>
                             <button type="button" onclick="_sucreeAbrirWhatsappPedido(${id}, '${telEnc}', '${nomEnc}', '${timerWaEnc}', '${resumenWaEnc}', '${totalWaEnc}')" style="border:1px solid #16a34a;background:#f0fdf4;color:#166534;padding:8px 12px;border-radius:9px;font-weight:900;cursor:pointer;">Enviar WhatsApp cliente</button>
                         </div>
+                        ${comp ? `<div style="margin-top:8px;font-size:.82rem;color:#166534;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;padding:7px 9px;">Comprobante detectado: ${esc(comp.filename)}${comp.creado_en ? ` · ${esc(comp.creado_en)}` : ''}</div>` : `<div style="margin-top:8px;font-size:.82rem;color:#64748b;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;padding:7px 9px;">Sin comprobante cargado aun. Usa "Refresh pedido" para revisar de nuevo.</div>`}
                     `;
                 } catch (err) {
                     body.innerHTML = `<div style="padding:14px;border:1px solid #fecaca;background:#fff1f2;border-radius:10px;color:#9f1239;">${esc(err.message || 'No se pudo cargar detalle del pedido')}</div>`;
