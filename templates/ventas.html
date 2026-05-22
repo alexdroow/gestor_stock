@@ -5050,6 +5050,13 @@
         function _renderChatPedidoOnlineAdminMensajes(mensajes) {
             const list = document.getElementById('pedido-chat-admin-list');
             if (!list) return;
+            const linkify = (raw) => {
+                const safe = String(raw || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
+                return safe.replace(/(https?:\/\/[^\s<]+)/gi, (url) => {
+                    const clean = String(url || '').replace(/&amp;/g, '&');
+                    return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">${url}</a>`;
+                });
+            };
             const arr = Array.isArray(mensajes) ? mensajes : [];
             if (!arr.length) {
                 list.innerHTML = '<div style="font-size:.82rem;color:#64748b;">Sin mensajes aun.</div>';
@@ -5058,7 +5065,7 @@
             list.innerHTML = arr.map((m) => {
                 const tipo = String(m.remitente_tipo || '').toLowerCase();
                 const admin = tipo === 'pasteleria';
-                const txt = String(m.mensaje || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
+                const txt = linkify(String(m.mensaje || ''));
                 const fecha = String(m.creado_en || '').replace('T',' ').slice(0,16);
                 return `<div style="display:flex;flex-direction:column;gap:2px;align-items:${admin ? 'flex-end' : 'flex-start'};min-width:0;">
                     <div style="display:inline-block;width:fit-content;max-width:92%;padding:7px 8px;border-radius:9px;border:1px solid ${admin ? '#93c5fd' : '#bbf7d0'};background:${admin ? '#eff6ff' : '#f0fdf4'};font-size:.85rem;color:#0f172a;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;">${txt}</div>

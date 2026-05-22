@@ -5587,6 +5587,13 @@
 
         function _renderPedidoChatMensajes(mensajes) {
             if (!pedidoChatListEl) return;
+            const linkify = (raw) => {
+                const safe = esc(String(raw || ""));
+                return safe.replace(/(https?:\/\/[^\s<]+)/gi, (url) => {
+                    const clean = String(url || "").replace(/&amp;/g, "&");
+                    return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">${url}</a>`;
+                });
+            };
             const arr = Array.isArray(mensajes) ? mensajes : [];
             let shouldStickToBottom = true;
             try {
@@ -5602,7 +5609,7 @@
             pedidoChatListEl.innerHTML = arr.map((m) => {
                 const tipo = String(m.remitente_tipo || "cliente").trim().toLowerCase();
                 const isCli = tipo === "cliente";
-                const texto = esc(String(m.mensaje || ""));
+                const texto = linkify(String(m.mensaje || ""));
                 const fecha = esc(String(m.creado_en || "").replace("T", " ").slice(0, 16));
                 return `<div style="display:flex;flex-direction:column;gap:2px;align-items:${isCli ? "flex-end" : "flex-start"};">
                     <div style="display:inline-block;width:fit-content;max-width:92%;padding:7px 9px;border-radius:10px;border:1px solid ${isCli ? "#fdba74" : "#93c5fd"};background:${isCli ? "#fff7ed" : "#eff6ff"};font-size:.83rem;line-height:1.35;color:#0f172a;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;">${texto}</div>
@@ -10613,6 +10620,14 @@
             }
         }
 
+        function _transferChatAuthFromPedido(pedidoLike) {
+            const p = pedidoLike || ultimoComprobantePedido || {};
+            return {
+                email: String(p?.cliente_email || "").trim().toLowerCase(),
+                telefono: String(p?.cliente_telefono || "").trim(),
+            };
+        }
+
         function _abrirModalDatosTransferencia() {
             const old = document.getElementById("transfer-data-overlay");
             if (old) old.remove();
@@ -10664,6 +10679,78 @@
                 if (!field) return;
                 const ok = await _copyToClipboardSmart(field.value);
                 showMsg(ok ? `${field.label} copiado.` : `No se pudo copiar ${field.label}.`, !ok);
+            });
+        }
+
+        function _abrirModalSubirComprobanteTransferencia(pedidoLike) {
+            const old = document.getElementById("transfer-proof-overlay");
+            if (old) old.remove();
+            const p = pedidoLike || ultimoComprobantePedido || {};
+            const ventaId = Number(p?.venta_id || 0);
+            const auth = _transferChatAuthFromPedido(p);
+            if (!ventaId || !auth.email || !auth.telefono) {
+                msg("No se pudo identificar el pedido para subir comprobante.", true);
+                return;
+            }
+            const html = `
+                <div id="transfer-proof-overlay" style="position:fixed;inset:0;z-index:100510;background:rgba(2,6,23,.58);display:flex;align-items:center;justify-content:center;padding:14px;">
+                    <div style="width:min(520px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;box-shadow:0 20px 60px rgba(2,6,23,.28);padding:14px;display:grid;gap:10px;">
+                        <h3 style="margin:0;color:#0f172a;">Enviar comprobante</h3>
+                        <div style="font-size:.9rem;color:#334155;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px;">
+                            Sube una imagen o PDF del comprobante de transferencia para que Pasteleria Sucree lo reciba en el chat del pedido.
+                        </div>
+                        <input id="transfer-proof-file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" style="border:1px solid #cbd5e1;border-radius:9px;padding:10px;">
+                        <div id="transfer-proof-msg" style="display:none;font-size:.86rem;padding:8px 10px;border-radius:9px;"></div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            <button type="button" id="transfer-proof-close" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Cerrar</button>
+                            <button type="button" id="transfer-proof-send" style="border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Subir comprobante</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML("beforeend", html);
+            const ov = document.getElementById("transfer-proof-overlay");
+            const fileEl = document.getElementById("transfer-proof-file");
+            const msgEl = document.getElementById("transfer-proof-msg");
+            const btnSend = document.getElementById("transfer-proof-send");
+            const showMsg = (txt, isErr = false) => {
+                if (!msgEl) return;
+                msgEl.style.display = "block";
+                msgEl.textContent = String(txt || "");
+                msgEl.style.border = `1px solid ${isErr ? "#fecaca" : "#bbf7d0"}`;
+                msgEl.style.background = isErr ? "#fff1f2" : "#f0fdf4";
+                msgEl.style.color = isErr ? "#991b1b" : "#166534";
+            };
+            ov?.querySelector("#transfer-proof-close")?.addEventListener("click", () => ov.remove());
+            btnSend?.addEventListener("click", async () => {
+                const originalText = btnSend.textContent || "Subir comprobante";
+                try {
+                    const f = fileEl?.files?.[0];
+                    if (!f) {
+                        showMsg("Debes seleccionar un archivo primero.", true);
+                        return;
+                    }
+                    btnSend.disabled = true;
+                    btnSend.textContent = "Subiendo...";
+                    const fd = new FormData();
+                    fd.append("comprobante", f);
+                    fd.append("email", auth.email);
+                    fd.append("telefono", auth.telefono);
+                    const res = await fetch(`/api/tienda/chat/venta/${ventaId}/subir-comprobante`, {
+                        method: "POST",
+                        body: fd,
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.success) throw new Error(data?.error || "No se pudo subir comprobante");
+                    showMsg("Comprobante enviado correctamente. Ya esta disponible para pasteleria.");
+                    try { await _pollPedidoChat(); } catch (_) {}
+                    setTimeout(() => { try { ov?.remove(); } catch (_) {} }, 900);
+                } catch (e) {
+                    showMsg(String(e?.message || "No se pudo subir comprobante"), true);
+                } finally {
+                    btnSend.disabled = false;
+                    btnSend.textContent = originalText;
+                }
             });
         }
 
@@ -10727,6 +10814,7 @@
                             <button type="button" id="post-checkout-refresh" style="border:1px solid #0ea5e9;background:#e0f2fe;color:#0c4a6e;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Refresh</button>
                             ${(isPending && retryUrl) ? `<button type="button" id="post-checkout-retry-flow" style="border:1px solid #0284c7;background:#0284c7;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Ir a pagar</button>` : ""}
                             ${(esTransferencia && isSuccess) ? `<button type="button" id="post-checkout-transfer-data" style="border:1px solid #f59e0b;background:#f59e0b;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Mostrar datos de transferencia</button>` : ""}
+                            ${(esTransferencia && isSuccess) ? `<button type="button" id="post-checkout-transfer-proof" style="border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Enviar comprobante</button>` : ""}
                             ${isSuccess ? `<button type="button" id="post-checkout-pdf" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Descargar ticket PDF</button>` : ""}
                             <a href="${wa}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;">Enviar WhatsApp pasteleria</a>
                             <button type="button" id="post-checkout-close" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Entendido</button>
@@ -10750,6 +10838,7 @@
             const btnRefresh = document.getElementById("post-checkout-refresh");
             const btnClose = document.getElementById("post-checkout-close");
             const btnTransferData = document.getElementById("post-checkout-transfer-data");
+            const btnTransferProof = document.getElementById("post-checkout-transfer-proof");
             const runRefreshNow = async () => {
                 const pedidoRef = ultimoComprobantePedido || p || {};
                 const ventaId = Number(pedidoRef?.venta_id || 0);
@@ -10765,6 +10854,7 @@
             };
             btnPdf?.addEventListener("click", () => window.descargarComprobanteUltimoPedido && window.descargarComprobanteUltimoPedido());
             btnTransferData?.addEventListener("click", () => _abrirModalDatosTransferencia());
+            btnTransferProof?.addEventListener("click", () => _abrirModalSubirComprobanteTransferencia(ultimoComprobantePedido || p || {}));
             btnRetryFlow?.addEventListener("click", () => {
                 const retryUrl = String(p?.flow_retry_url || "").trim();
                 const ventaId = Number(p?.venta_id || 0);

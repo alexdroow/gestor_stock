@@ -8227,6 +8227,97 @@ def api_tienda_chat_enviar(origen_tipo, origen_id):
             conn.close()
 
 
+@app.route('/api/tienda/chat/venta/<int:origen_id>/subir-comprobante', methods=['POST'])
+def api_tienda_chat_subir_comprobante_transferencia(origen_id):
+    conn = None
+    try:
+        archivo = request.files.get("comprobante")
+        if not archivo or not getattr(archivo, "filename", ""):
+            return jsonify({"success": False, "error": "Debes seleccionar un comprobante"}), 400
+
+        nombre_original = os.path.basename(str(archivo.filename or "").strip())
+        nombre_seguro = secure_filename(nombre_original)
+        ext = os.path.splitext(nombre_seguro)[1].lower()
+        permitidas = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+        if ext not in permitidas:
+            return jsonify({"success": False, "error": "Formato no permitido. Usa JPG, PNG, WEBP o PDF"}), 400
+
+        email = str(request.form.get("email") or "").strip().lower()
+        telefono = str(request.form.get("telefono") or "").strip()
+        telefono_norm = _normalizar_telefono_cl(telefono)
+        if not email or not telefono_norm:
+            return jsonify({"success": False, "error": "Falta validar email/telefono del pedido"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        info = _chat_info_origen_cursor(cursor, "venta", int(origen_id))
+        if not info:
+            return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+        if not _chat_cliente_autorizado(info, email, telefono_norm):
+            return jsonify({"success": False, "error": "Cliente no autorizado para este pedido"}), 403
+        if not bool(info.get("chat_activo")):
+            return jsonify({"success": False, "error": "Este pedido ya no acepta nuevos comprobantes"}), 409
+
+        base_dir = os.path.join(static_dir, "tienda_comprobantes_transferencia")
+        os.makedirs(base_dir, exist_ok=True)
+        unique_name = f"comp_{int(origen_id)}_{int(time.time())}_{uuid.uuid4().hex[:8]}{ext}"
+        abs_path = os.path.join(base_dir, unique_name)
+        archivo.save(abs_path)
+        try:
+            size_bytes = os.path.getsize(abs_path)
+        except Exception:
+            size_bytes = 0
+        if size_bytes <= 0:
+            try:
+                os.remove(abs_path)
+            except Exception:
+                pass
+            return jsonify({"success": False, "error": "No se pudo guardar el comprobante"}), 400
+        if size_bytes > (8 * 1024 * 1024):
+            try:
+                os.remove(abs_path)
+            except Exception:
+                pass
+            return jsonify({"success": False, "error": "El comprobante supera 8MB"}), 400
+
+        url_archivo = f"/static/tienda_comprobantes_transferencia/{unique_name}"
+        etiqueta = "PDF" if ext == ".pdf" else "Imagen"
+        mensaje = (
+            f"Comprobante de transferencia adjunto ({etiqueta})\n"
+            f"Archivo: {nombre_original or unique_name}\n"
+            f"Ver/descargar: {url_archivo}"
+        )
+        cursor.execute(
+            """
+            INSERT INTO tienda_pedido_chat (
+                origen_tipo, origen_id, cliente_email, cliente_telefono, remitente_tipo, mensaje
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("venta", int(origen_id), email, telefono_norm, "cliente", mensaje),
+        )
+        msg_id = int(cursor.lastrowid or 0)
+        conn.commit()
+        return jsonify(
+            {
+                "success": True,
+                "archivo_url": url_archivo,
+                "archivo_nombre": (nombre_original or unique_name),
+                "mensaje": {
+                    "id": msg_id,
+                    "remitente_tipo": "cliente",
+                    "mensaje": mensaje,
+                },
+            }
+        )
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/tienda/agenda/disponibilidad', methods=['GET'])
 def api_tienda_agenda_disponibilidad():
     conn = None
