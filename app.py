@@ -13507,6 +13507,40 @@ def api_tienda_checkout():
             prod = mapa.get(pid)
             if not prod:
                 return jsonify({'success': False, 'error': f'Producto #{pid} no disponible'}), 400
+            pack_items_final = []
+            pack_rule = pack_rules_by_product.get(pid) or {"max_total": 0, "items": {}}
+            pack_items_input = raw.get("pack_items")
+            if pack_rule.get("items"):
+                if not isinstance(pack_items_input, list) or not pack_items_input:
+                    return jsonify({'success': False, 'error': f'{prod.get("nombre")}: debes elegir subitems del pack'}), 400
+                resumen_pack = {}
+                for pidx, pick in enumerate(pack_items_input, start=1):
+                    if not isinstance(pick, dict):
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: subitem #{pidx} invalido'}), 400
+                    sid = int(pick.get("subproducto_id") or 0)
+                    sqty = int(pick.get("cantidad") or 0)
+                    if sid <= 0 or sqty <= 0:
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: subitem #{pidx} invalido'}), 400
+                    if sid not in pack_rule["items"]:
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: subitem no permitido en este pack'}), 400
+                    if not bool(pack_rule["items"][sid].get("activo_tienda")):
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: {pack_rule["items"][sid].get("nombre")} esta apagado en tienda'}), 400
+                    resumen_pack[sid] = int(resumen_pack.get(sid, 0)) + sqty
+                total_sel = sum(int(v or 0) for v in resumen_pack.values())
+                if total_sel <= 0:
+                    return jsonify({'success': False, 'error': f'{prod.get("nombre")}: selecciona al menos 1 subitem'}), 400
+                max_total_pack = int(pack_rule.get("max_total") or 0)
+                if max_total_pack > 0 and total_sel > max_total_pack:
+                    return jsonify({'success': False, 'error': f'{prod.get("nombre")}: maximo total {max_total_pack} subitems'}), 400
+                partes = []
+                for sid, sqty in resumen_pack.items():
+                    max_item = int(pack_rule["items"][sid].get("max_cantidad") or 1)
+                    if sqty > max_item:
+                        return jsonify({'success': False, 'error': f'{prod.get("nombre")}: {pack_rule["items"][sid].get("nombre")} maximo {max_item}'}), 400
+                    nombre_sub = str(pack_rule["items"][sid].get("nombre") or f"Producto #{sid}")
+                    pack_items_final.append({"subproducto_id": int(sid), "cantidad": int(sqty), "nombre": nombre_sub})
+                    partes.append(f"{nombre_sub} x{int(sqty)}")
+                pack_detalle_por_producto[pid] = "Pack: " + ", ".join(partes)
             if not bool(prod.get("categoria_activa", True)):
                 return jsonify({'success': False, 'error': f'{prod.get("nombre")}: categoria no disponible en este horario'}), 400
             max_compra = int(prod.get("max_compra") or 0)
