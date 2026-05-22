@@ -9012,9 +9012,19 @@
             if (!tiendaAbierta) return msg("La tienda esta cerrada. No se pueden agregar productos al carrito.", true);
             const p = productos.find((x) => x.id === id);
             if (!p) return;
+            const max = Math.max(0, Number(p.max_compra || 0));
+            if (max <= 0) return msg("Producto sin stock disponible.", true);
             const packOptions = _packDisponibleParaProducto(p);
             if (packOptions.length) {
                 const existentePack = carrito.find((x) => x.id === id);
+                if (existentePack && Array.isArray(existentePack.pack_items) && existentePack.pack_items.length) {
+                    if (Number(existentePack.cantidad || 0) >= max) return msg(`Maximo ${max} unidad(es) para ${p.nombre}.`, true);
+                    existentePack.cantidad = Number(existentePack.cantidad || 0) + 1;
+                    limpiarCuponAplicado();
+                    msg("");
+                    renderCart();
+                    return;
+                }
                 if (existentePack && !existentePack.pack_items) {
                     existentePack.pack_items = [];
                     existentePack.pack_resumen = "";
@@ -9022,8 +9032,6 @@
                 _abrirModalPackBuilder(p, existentePack || null);
                 return;
             }
-            const max = Math.max(0, Number(p.max_compra || 0));
-            if (max <= 0) return msg("Producto sin stock disponible.", true);
             const it = carrito.find((x) => x.id === id);
             if (it) {
                 if (it.cantidad >= max) return msg(`Maximo ${max} unidad(es) para ${p.nombre}.`, true);
