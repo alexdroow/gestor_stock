@@ -1854,6 +1854,26 @@
             padding: 14px;
         }
         .modal-overlay.active { display: flex; }
+        #modal-pack-builder.modal-overlay {
+            z-index: 150000;
+            align-items: center;
+            justify-content: center;
+        }
+        #modal-pack-builder .modal {
+            width: min(560px, 96vw);
+            max-height: 88vh;
+            overflow: auto;
+        }
+        body.pack-builder-open {
+            overflow: hidden;
+        }
+        body.pack-builder-open #mobile-cart-fab,
+        body.pack-builder-open #mobile-order-fab,
+        body.pack-builder-open #mobile-menu-fab,
+        body.pack-builder-open #mobile-agenda-summary-fab,
+        body.pack-builder-open #wa-fab {
+            display: none !important;
+        }
         .agenda-cake-modal .modal {
             width: min(960px, 96vw);
             max-height: 88vh;
@@ -8867,6 +8887,7 @@
         function _cerrarModalPackBuilder() {
             const old = document.getElementById("modal-pack-builder");
             if (old && old.parentNode) old.parentNode.removeChild(old);
+            document.body.classList.remove("pack-builder-open");
             packBuilderState = null;
         }
 
@@ -8911,9 +8932,9 @@
             packBuilderState = { producto: prod, opciones, maxTotal, seleccion, existenteId: existente?.id || null };
             const wrap = document.createElement("div");
             wrap.id = "modal-pack-builder";
-            wrap.className = "modal active";
+            wrap.className = "modal-overlay active";
             wrap.innerHTML = `
-                <div class="modal-body" style="width:min(540px,94vw);max-height:90vh;overflow:auto;">
+                <div class="modal" style="width:min(540px,94vw);max-height:90vh;overflow:auto;">
                     <h3 style="margin:0 0 8px 0;">Configurar pack: ${esc(String(prod?.nombre || "Pack"))}</h3>
                     <div style="font-size:.85rem;color:#475569;margin-bottom:8px;">Selecciona subitems. Maximo total: <strong data-pack-total>0/${maxTotal}</strong></div>
                     <div data-pack-msg style="min-height:18px;font-size:.82rem;color:#b45309;margin-bottom:6px;"></div>
@@ -8939,8 +8960,9 @@
                 </div>
             `;
             document.body.appendChild(wrap);
+            document.body.classList.add("pack-builder-open");
             wrap.addEventListener("click", (ev) => {
-                if (ev.target === wrap) return;
+                if (ev.target === wrap) { _cerrarModalPackBuilder(); return; }
                 const btn = ev.target.closest("button");
                 if (!btn || !packBuilderState) return;
                 if (btn.hasAttribute("data-pack-cancel")) {
