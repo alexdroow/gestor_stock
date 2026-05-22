@@ -1992,9 +1992,12 @@
 
                     <div class="stock-filtros">
                         <button type="button" class="stock-filtro-btn active" data-filtro="todos" onclick="aplicarFiltroStock('todos')">Todos</button>
+                        <button type="button" class="stock-filtro-btn" data-filtro="mas_vendidos" onclick="aplicarFiltroStock('mas_vendidos')">M&aacute;s vendidos</button>
+                        <button type="button" class="stock-filtro-btn" data-filtro="en_oferta" onclick="aplicarFiltroStock('en_oferta')">En oferta</button>
                         <button type="button" class="stock-filtro-btn" data-filtro="bajo_minimo" onclick="aplicarFiltroStock('bajo_minimo')">Bajo m&iacute;nimo</button>
                         <button type="button" class="stock-filtro-btn" data-filtro="baja_porcion" onclick="aplicarFiltroStock('baja_porcion')">Baja porci&oacute;n</button>
                         <button type="button" class="stock-filtro-btn" data-filtro="agotados" onclick="aplicarFiltroStock('agotados')">Agotados</button>
+                        <button type="button" class="stock-filtro-btn" data-filtro="apagados" onclick="aplicarFiltroStock('apagados')">Apagados</button>
                     </div>
 
                     <div class="ofertas-resumen-box" id="ofertas-resumen-box">
@@ -2012,6 +2015,8 @@
                              data-cerca-minimo="{{ 1 if p.cerca_minimo else 0 }}"
                              data-baja-porcion="{{ 1 if p.baja_porcion else 0 }}"
                              data-agotado="{{ 1 if ((p.stock_visual if p.stock_visual is defined else p.stock)|float <= 0) else 0 }}"
+                             data-apagado-tienda="{{ 1 if (((p.stock_visual if p.stock_visual is defined else p.stock)|float <= 0) or (p.activo_tienda is defined and (not p.activo_tienda))) else 0 }}"
+                             data-ventas-totales="{{ (p.ventas_totales or 0)|int }}"
                              data-requiere-desactivacion="{{ 1 if p.desactivacion_manual_requiere_confirmacion else 0 }}"
                              data-desactivacion-confirmada="{{ 1 if p.desactivacion_manual_confirmada else 0 }}"
                              data-porciones="{{ p.porciones_disponibles }}"
@@ -2939,7 +2944,15 @@
                     buscadorInput.value = state.q;
                 }
 
-                if (state.filtro === 'bajo_minimo' || state.filtro === 'baja_porcion' || state.filtro === 'agotados' || state.filtro === 'todos') {
+                if (
+                    state.filtro === 'bajo_minimo'
+                    || state.filtro === 'baja_porcion'
+                    || state.filtro === 'agotados'
+                    || state.filtro === 'mas_vendidos'
+                    || state.filtro === 'en_oferta'
+                    || state.filtro === 'apagados'
+                    || state.filtro === 'todos'
+                ) {
                     aplicarFiltroStock(state.filtro);
                 } else {
                     filtrarProductos();
@@ -2959,7 +2972,15 @@
             if (raw) return;
             const params = new URLSearchParams(window.location.search || '');
             const filtro = (params.get('filtro') || '').trim().toLowerCase();
-            if (filtro === 'baja_porcion' || filtro === 'bajo_minimo' || filtro === 'agotados' || filtro === 'todos') {
+            if (
+                filtro === 'baja_porcion'
+                || filtro === 'bajo_minimo'
+                || filtro === 'agotados'
+                || filtro === 'mas_vendidos'
+                || filtro === 'en_oferta'
+                || filtro === 'apagados'
+                || filtro === 'todos'
+            ) {
                 aplicarFiltroStock(filtro);
             }
         }
@@ -3098,6 +3119,7 @@
             card.setAttribute('data-cerca-minimo', esCercaMinimo ? '1' : '0');
             card.setAttribute('data-baja-porcion', info.baja_porcion ? '1' : '0');
             card.setAttribute('data-agotado', agotadoStockReal ? '1' : '0');
+            card.setAttribute('data-apagado-tienda', apagadoEnTienda ? '1' : '0');
             card.setAttribute('data-requiere-desactivacion', requiereConfirmacion ? '1' : '0');
             card.setAttribute('data-desactivacion-confirmada', desactivacionConfirmada ? '1' : '0');
             card.setAttribute('data-porciones', String(porciones));
@@ -3414,6 +3436,7 @@
         function filtrarProductos() {
             const texto = document.getElementById('buscador').value.toLowerCase();
             const cards = document.querySelectorAll('.producto-card');
+            const ordenarVendidos = (filtroStockActivo === 'mas_vendidos');
 
             cards.forEach(card => {
                 const nombre = card.getAttribute('data-nombre').toLowerCase();
@@ -3421,11 +3444,22 @@
                 const esBajoMinimo = card.getAttribute('data-bajo-minimo') === '1';
                 const esBajaPorcion = card.getAttribute('data-baja-porcion') === '1';
                 const esAgotado = card.getAttribute('data-agotado') === '1';
+                const esApagado = card.getAttribute('data-apagado-tienda') === '1';
+                const esOferta = card.getAttribute('data-oferta-activa') === '1';
+                const ventasTotales = Number(card.getAttribute('data-ventas-totales') || 0);
                 let matchFiltro = true;
                 if (filtroStockActivo === 'bajo_minimo') matchFiltro = esBajoMinimo;
                 if (filtroStockActivo === 'baja_porcion') matchFiltro = esBajaPorcion;
                 if (filtroStockActivo === 'agotados') matchFiltro = esAgotado;
+                if (filtroStockActivo === 'apagados') matchFiltro = esApagado;
+                if (filtroStockActivo === 'en_oferta') matchFiltro = esOferta;
+                if (filtroStockActivo === 'mas_vendidos') matchFiltro = ventasTotales > 0;
                 card.style.display = (matchTexto && matchFiltro) ? '' : 'none';
+                if (ordenarVendidos) {
+                    card.style.order = String(100000 - Math.max(0, Math.floor(ventasTotales)));
+                } else {
+                    card.style.order = '';
+                }
             });
         }
 
