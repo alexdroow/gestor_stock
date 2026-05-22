@@ -10572,6 +10572,101 @@
             return `https://wa.me/${telefonoDestino}?text=${encodeURIComponent(mensaje)}`;
         }
 
+        const TRANSFER_DATA_FIELDS = [
+            { key: "titular", label: "Titular", value: "ALEXIS JAVIER GUTIERREZ SALGADO" },
+            { key: "rut", label: "RUT", value: "18.121.947-5" },
+            { key: "banco", label: "Banco", value: "Bci / Banco Credito e Inversiones / Mach" },
+            { key: "tipo_cuenta", label: "Tipo de cuenta", value: "Cuenta Vista" },
+            { key: "numero_cuenta", label: "Numero de cuenta", value: "777018121947" },
+            { key: "correo", label: "Correo", value: "pasteleria.sucree@outlook.com" },
+        ];
+
+        function _transferDataAsBlockText() {
+            return TRANSFER_DATA_FIELDS.map((f) => `${f.label}: ${f.value}`).join("\n");
+        }
+
+        async function _copyToClipboardSmart(texto) {
+            const val = String(texto || "").trim();
+            if (!val) return false;
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(val);
+                    return true;
+                }
+            } catch (_) {}
+            try {
+                const ta = document.createElement("textarea");
+                ta.value = val;
+                ta.setAttribute("readonly", "readonly");
+                ta.style.position = "fixed";
+                ta.style.opacity = "0";
+                ta.style.pointerEvents = "none";
+                ta.style.left = "-9999px";
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                const ok = document.execCommand("copy");
+                ta.remove();
+                return Boolean(ok);
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function _abrirModalDatosTransferencia() {
+            const old = document.getElementById("transfer-data-overlay");
+            if (old) old.remove();
+            const html = `
+                <div id="transfer-data-overlay" style="position:fixed;inset:0;z-index:100500;background:rgba(2,6,23,.58);display:flex;align-items:center;justify-content:center;padding:14px;">
+                    <div style="width:min(620px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:14px;display:grid;gap:10px;box-shadow:0 20px 60px rgba(2,6,23,.28);">
+                        <h3 style="margin:0;color:#0f172a;">Datos de transferencia</h3>
+                        <div style="font-size:.9rem;color:#475569;">Copia campo por campo o usa "Copiar todos los datos".</div>
+                        <div style="display:grid;gap:8px;">
+                            ${TRANSFER_DATA_FIELDS.map((f) => `
+                                <div style="display:grid;grid-template-columns:minmax(100px,140px) 1fr auto;gap:8px;align-items:center;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;background:#f8fafc;">
+                                    <strong style="font-size:.86rem;color:#334155;">${f.label}</strong>
+                                    <span style="font-size:.9rem;color:#0f172a;word-break:break-word;">${esc(f.value)}</span>
+                                    <button type="button" data-copy-transfer="${esc(f.key)}" style="border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;border-radius:9px;padding:8px 10px;font-weight:800;cursor:pointer;">Copiar</button>
+                                </div>
+                            `).join("")}
+                        </div>
+                        <div id="transfer-copy-msg" style="min-height:18px;font-size:.84rem;color:#166534;"></div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            <button type="button" id="transfer-copy-all" style="border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Copiar todos los datos</button>
+                            <button type="button" id="transfer-close" style="border:1px solid #334155;background:#334155;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML("beforeend", html);
+            const ov = document.getElementById("transfer-data-overlay");
+            const msg = document.getElementById("transfer-copy-msg");
+            const showMsg = (t, err = false) => {
+                if (!msg) return;
+                msg.textContent = String(t || "");
+                msg.style.color = err ? "#b91c1c" : "#166534";
+            };
+            ov?.addEventListener("click", async (ev) => {
+                const btn = ev.target.closest("button");
+                if (!btn) return;
+                if (btn.id === "transfer-close") {
+                    ov.remove();
+                    return;
+                }
+                if (btn.id === "transfer-copy-all") {
+                    const ok = await _copyToClipboardSmart(_transferDataAsBlockText());
+                    showMsg(ok ? "Datos completos copiados." : "No se pudo copiar. Copia manualmente.", !ok);
+                    return;
+                }
+                const key = btn.getAttribute("data-copy-transfer");
+                if (!key) return;
+                const field = TRANSFER_DATA_FIELDS.find((x) => String(x.key) === String(key));
+                if (!field) return;
+                const ok = await _copyToClipboardSmart(field.value);
+                showMsg(ok ? `${field.label} copiado.` : `No se pudo copiar ${field.label}.`, !ok);
+            });
+        }
+
         function _renderPostCheckoutPopup(p, options = {}) {
             const mode = String(options?.mode || "success").toLowerCase();
             const isSuccess = mode === "success";
@@ -10601,6 +10696,8 @@
             const wa = _buildWhatsappPedidoLink(p);
             const retryUrl = String(p?.flow_retry_url || "").trim();
             const items = Array.isArray(p?.items) ? p.items : [];
+            const metodoPago = String(p?.metodo_pago || "").trim().toLowerCase();
+            const esTransferencia = ["transferencia", "efectivo"].includes(metodoPago);
             const itemsHtml = items.map((it) => `
                 <div style="display:flex;justify-content:space-between;gap:8px;">
                     <span>${esc(String(it.nombre || ""))} x${Number(it.cantidad || 0)}</span>
@@ -10629,6 +10726,7 @@
                         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                             <button type="button" id="post-checkout-refresh" style="border:1px solid #0ea5e9;background:#e0f2fe;color:#0c4a6e;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Refresh</button>
                             ${(isPending && retryUrl) ? `<button type="button" id="post-checkout-retry-flow" style="border:1px solid #0284c7;background:#0284c7;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Ir a pagar</button>` : ""}
+                            ${(esTransferencia && isSuccess) ? `<button type="button" id="post-checkout-transfer-data" style="border:1px solid #f59e0b;background:#f59e0b;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Mostrar datos de transferencia</button>` : ""}
                             ${isSuccess ? `<button type="button" id="post-checkout-pdf" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Descargar ticket PDF</button>` : ""}
                             <a href="${wa}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;">Enviar WhatsApp pasteleria</a>
                             <button type="button" id="post-checkout-close" style="border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;">Entendido</button>
@@ -10651,6 +10749,7 @@
             const btnRetryFlow = document.getElementById("post-checkout-retry-flow");
             const btnRefresh = document.getElementById("post-checkout-refresh");
             const btnClose = document.getElementById("post-checkout-close");
+            const btnTransferData = document.getElementById("post-checkout-transfer-data");
             const runRefreshNow = async () => {
                 const pedidoRef = ultimoComprobantePedido || p || {};
                 const ventaId = Number(pedidoRef?.venta_id || 0);
@@ -10665,6 +10764,7 @@
                 _abrirPostCheckoutPopup(refreshed, { mode });
             };
             btnPdf?.addEventListener("click", () => window.descargarComprobanteUltimoPedido && window.descargarComprobanteUltimoPedido());
+            btnTransferData?.addEventListener("click", () => _abrirModalDatosTransferencia());
             btnRetryFlow?.addEventListener("click", () => {
                 const retryUrl = String(p?.flow_retry_url || "").trim();
                 const ventaId = Number(p?.venta_id || 0);
