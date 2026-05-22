@@ -1009,6 +1009,7 @@
 
         restoreHistorialVentasUiStateIfNeeded();
         let detalleVentaActual = null;
+        let detalleComprobanteActual = null;
 
         function escapeHtml(value) {
             return String(value === null || value === undefined ? '' : value)
@@ -1206,12 +1207,34 @@
             `;
         }
 
+        function _extraerComprobanteTransferencia(mensajes) {
+            const arr = Array.isArray(mensajes) ? mensajes : [];
+            const re = /\/static\/tienda_comprobantes_transferencia\/([A-Za-z0-9._-]+)/i;
+            for (let i = arr.length - 1; i >= 0; i--) {
+                const m = arr[i] || {};
+                const txt = String(m.mensaje || "");
+                const match = txt.match(re);
+                if (!match) continue;
+                const filename = String(match[1] || "").trim();
+                if (!filename) continue;
+                return {
+                    filename,
+                    url_relativa: `/static/tienda_comprobantes_transferencia/${filename}`,
+                    view_url: `/api/tienda/admin/comprobante-transferencia/${encodeURIComponent(filename)}`,
+                    download_url: `/api/tienda/admin/comprobante-transferencia/${encodeURIComponent(filename)}?download=1`,
+                    creado_en: String(m.creado_en || "").replace("T", " ").slice(0, 19),
+                };
+            }
+            return null;
+        }
+
         function verDetalle(ventaId) {
             fetch(`/api/venta/${ventaId}`)
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) return;
 
+                    const compPrevio = detalleComprobanteActual ? String(detalleComprobanteActual.filename || "") : "";
                     detalleVentaActual = data;
                     document.getElementById('detalle-venta-id').textContent = ventaId;
                     const canal = String(data.venta?.canal_venta || 'presencial').trim().toLowerCase();
@@ -1224,6 +1247,24 @@
                     const direccionEntrega = String(data.venta?.direccion_entrega || '').trim();
                     const despachoMonto = Number(data.venta?.despacho_monto || 0);
                     const chatHistorial = renderChatHistorial(data.chat_mensajes || []);
+                    const comp = _extraerComprobanteTransferencia(data.chat_mensajes || []);
+                    detalleComprobanteActual = comp;
+                    const compActual = comp ? String(comp.filename || "") : "";
+                    const compDetectadoAhora = Boolean(compActual && compActual !== compPrevio);
+                    const compHtml = comp ? `
+                        <div style="margin:8px 0 12px;padding:10px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:10px;color:#14532d;">
+                            <div style="font-weight:800;">Comprobante de transferencia detectado</div>
+                            <div style="font-size:.85rem;">Archivo: <strong>${escapeHtml(comp.filename)}</strong>${comp.creado_en ? ` · ${escapeHtml(comp.creado_en)}` : ''}</div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.open('${comp.view_url}', '_blank')">Ver comprobante</button>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="descargarComprobanteDetalleActual()">Descargar comprobante</button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="margin:8px 0 12px;padding:10px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;color:#475569;">
+                            Aun no hay comprobante de transferencia subido por el cliente.
+                        </div>
+                    `;
 
                     document.getElementById('detalle-contenido').innerHTML = `
                         <div style="margin-bottom: 16px; color: #64748b;">
@@ -1245,14 +1286,39 @@
                             Codigo operación: <strong>${escapeHtml(data.venta?.codigo_operacion || '-')}</strong>
                             ${mostrarPrecios ? `<div class="detalle-total">Total: ${formatearMonedaCLP(totalMonto)}</div>` : ''}
                         </div>
-                        ${mostrarPrecios ? `<button class="btn btn-secondary btn-sm" onclick="generarTicketPdf()">Descargar ticket PDF</button>` : ''}
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                            <button class="btn btn-secondary btn-sm" onclick="refrescarDetallePedidoActual()">Refresh pedido</button>
+                            ${mostrarPrecios ? `<button class="btn btn-secondary btn-sm" onclick="generarTicketPdf()">Descargar ticket PDF</button>` : ''}
+                            <button class="btn btn-primary btn-sm" onclick="descargarComprobanteDetalleActual()" ${comp ? '' : 'disabled title="Sin comprobante disponible aun"'}>Descargar comprobante</button>
+                        </div>
+                        ${compHtml}
                         <h4 style="margin-bottom: 12px; font-size: 14px; color: #64748b;">PRODUCTOS Y TRAZABILIDAD:</h4>
                         ${items || '<div class="detalle-item"><span>Sin productos</span></div>'}
                         <h4 style="margin:16px 0 12px; font-size: 14px; color: #64748b;">CHAT DEL PEDIDO:</h4>
                         ${chatHistorial}
                     `;
                     document.getElementById('modal-detalle').classList.add('active');
+                    if (compDetectadoAhora) {
+                        alert('Comprobante detectado y disponible para descargar.');
+                    }
                 });
+        }
+
+        function refrescarDetallePedidoActual() {
+            const idNum = Number(detalleVentaActual?.venta?.id || detalleVentaActual?.venta_id || 0);
+            if (!idNum) {
+                alert('No hay pedido activo para refrescar.');
+                return;
+            }
+            verDetalle(idNum);
+        }
+
+        function descargarComprobanteDetalleActual() {
+            if (!detalleComprobanteActual || !detalleComprobanteActual.download_url) {
+                alert('Aun no hay comprobante disponible para este pedido.');
+                return;
+            }
+            window.open(String(detalleComprobanteActual.download_url), '_blank');
         }
 
         function anularVenta(ventaId) {
