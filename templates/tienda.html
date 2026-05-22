@@ -10622,9 +10622,12 @@
 
         function _transferChatAuthFromPedido(pedidoLike) {
             const p = pedidoLike || ultimoComprobantePedido || {};
+            const cli = cargarClienteLocal() || {};
+            const telFromPedido = String(p?.cliente_telefono || "").trim();
+            const telFromCli = String(cli?.telefono || "").trim();
             return {
-                email: String(p?.cliente_email || "").trim().toLowerCase(),
-                telefono: String(p?.cliente_telefono || "").trim(),
+                email: String(p?.cliente_email || cli?.email || "").trim().toLowerCase(),
+                telefono: telFromPedido || telFromCli,
             };
         }
 
@@ -10688,7 +10691,7 @@
             const p = pedidoLike || ultimoComprobantePedido || {};
             const ventaId = Number(p?.venta_id || 0);
             const auth = _transferChatAuthFromPedido(p);
-            if (!ventaId || !auth.email || !auth.telefono) {
+            if (!ventaId) {
                 msg("No se pudo identificar el pedido para subir comprobante.", true);
                 return;
             }
@@ -10698,6 +10701,14 @@
                         <h3 style="margin:0;color:#0f172a;">Enviar comprobante</h3>
                         <div style="font-size:.9rem;color:#334155;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px;">
                             Sube una imagen o PDF del comprobante de transferencia para que Pasteleria Sucree lo reciba en el chat del pedido.
+                        </div>
+                        <div style="display:grid;gap:6px;">
+                            <label style="font-size:.8rem;color:#475569;">Correo del pedido</label>
+                            <input id="transfer-proof-email" type="email" value="${esc(auth.email || "")}" placeholder="correo@ejemplo.com" style="border:1px solid #cbd5e1;border-radius:9px;padding:9px 10px;">
+                        </div>
+                        <div style="display:grid;gap:6px;">
+                            <label style="font-size:.8rem;color:#475569;">Telefono del pedido</label>
+                            <input id="transfer-proof-phone" type="tel" value="${esc(auth.telefono || "")}" placeholder="+569XXXXXXXX" style="border:1px solid #cbd5e1;border-radius:9px;padding:9px 10px;">
                         </div>
                         <input id="transfer-proof-file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" style="border:1px solid #cbd5e1;border-radius:9px;padding:10px;">
                         <div id="transfer-proof-msg" style="display:none;font-size:.86rem;padding:8px 10px;border-radius:9px;"></div>
@@ -10711,6 +10722,8 @@
             document.body.insertAdjacentHTML("beforeend", html);
             const ov = document.getElementById("transfer-proof-overlay");
             const fileEl = document.getElementById("transfer-proof-file");
+            const emailEl = document.getElementById("transfer-proof-email");
+            const phoneEl = document.getElementById("transfer-proof-phone");
             const msgEl = document.getElementById("transfer-proof-msg");
             const btnSend = document.getElementById("transfer-proof-send");
             const showMsg = (txt, isErr = false) => {
@@ -10732,10 +10745,15 @@
                     }
                     btnSend.disabled = true;
                     btnSend.textContent = "Subiendo...";
+                    const email = String(emailEl?.value || "").trim().toLowerCase();
+                    const telefono = String(phoneEl?.value || "").trim();
+                    if (!email || !telefono) {
+                        throw new Error("Completa correo y telefono del pedido para validar el envio.");
+                    }
                     const fd = new FormData();
                     fd.append("comprobante", f);
-                    fd.append("email", auth.email);
-                    fd.append("telefono", auth.telefono);
+                    fd.append("email", email);
+                    fd.append("telefono", telefono);
                     const res = await fetch(`/api/tienda/chat/venta/${ventaId}/subir-comprobante`, {
                         method: "POST",
                         body: fd,
