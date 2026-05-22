@@ -5051,7 +5051,16 @@
             const list = document.getElementById('pedido-chat-admin-list');
             if (!list) return;
             const linkify = (raw) => {
-                const safe = String(raw || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
+                let safe = String(raw || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
+                safe = safe.replace(/(\/static\/tienda_comprobantes_transferencia\/([A-Za-z0-9._-]+))/gi, (_all, relPath, filename) => {
+                    const file = encodeURIComponent(String(filename || ''));
+                    const viewHref = `/api/tienda/admin/comprobante-transferencia/${file}`;
+                    const dlHref = `/api/tienda/admin/comprobante-transferencia/${file}?download=1`;
+                    return `<span style="display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                        <a href="${viewHref}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:4px 8px;font-size:.78rem;font-weight:700;">Ver comprobante</a>
+                        <a href="${dlHref}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:8px;padding:4px 8px;font-size:.78rem;font-weight:700;">Descargar comprobante</a>
+                    </span>`;
+                });
                 return safe.replace(/(https?:\/\/[^\s<]+)/gi, (url) => {
                     const clean = String(url || '').replace(/&amp;/g, '&');
                     const m = clean.match(/\/static\/tienda_comprobantes_transferencia\/([A-Za-z0-9._-]+)$/i);
