@@ -1904,6 +1904,58 @@ def _chat_cliente_autorizado(info_origen, email, telefono):
     return bool(email_in) and bool(tel_in) and email_in == str(info_origen.get("cliente_email") or "").strip().lower() and tel_in == _normalizar_telefono_cl(info_origen.get("cliente_telefono"))
 
 
+_TRANSFER_PROOF_PREFIX = "/static/tienda_comprobantes_transferencia/"
+_RE_TRANSFER_PROOF_URL = re.compile(r"/static/tienda_comprobantes_transferencia/([A-Za-z0-9._-]+)")
+
+
+def _transfer_proof_abs_path(filename):
+    safe = secure_filename(os.path.basename(str(filename or "").strip()))
+    if not safe:
+        return ""
+    return os.path.join(static_dir, "tienda_comprobantes_transferencia", safe)
+
+
+def _purge_transfer_proofs_for_venta_cursor(cursor, venta_id):
+    try:
+        oid = int(venta_id or 0)
+    except (TypeError, ValueError):
+        return 0
+    if oid <= 0:
+        return 0
+    cursor.execute(
+        """
+        SELECT id, mensaje
+        FROM tienda_pedido_chat
+        WHERE origen_tipo = 'venta' AND origen_id = ?
+        ORDER BY id ASC
+        """,
+        (oid,),
+    )
+    rows = cursor.fetchall() or []
+    deleted = 0
+    for row in rows:
+        msg_id = int(row["id"] or 0)
+        raw = str(row["mensaje"] or "")
+        found = _RE_TRANSFER_PROOF_URL.findall(raw)
+        if not found:
+            continue
+        for fname in found:
+            abs_path = _transfer_proof_abs_path(fname)
+            if abs_path and os.path.isfile(abs_path):
+                try:
+                    os.remove(abs_path)
+                    deleted += 1
+                except Exception:
+                    pass
+        cleaned = _RE_TRANSFER_PROOF_URL.sub("[Comprobante eliminado]", raw)
+        if cleaned != raw and msg_id > 0:
+            cursor.execute(
+                "UPDATE tienda_pedido_chat SET mensaje = ? WHERE id = ?",
+                (cleaned, msg_id),
+            )
+    return deleted
+
+
 def _clamp_int(value, default=0, min_value=0, max_value=9999):
     try:
         out = int(value)
@@ -7993,6 +8045,8 @@ def api_tienda_admin_pedido_estado(venta_id):
                 """,
                 (nuevo_estado, guardar_timer, guardar_inicio, int(venta_id)),
             )
+        if nuevo_estado == "entregado":
+            _purge_transfer_proofs_for_venta_cursor(cursor, int(venta_id))
         conn.commit()
         cursor.execute(
             """
@@ -8033,6 +8087,15 @@ def api_tienda_admin_pedido_eliminar(venta_id):
     if not session.get(_ADMIN_SESSION_KEY):
         return jsonify({"success": False, "error": "No autorizado"}), 401
     try:
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            _purge_transfer_proofs_for_venta_cursor(cur, int(venta_id))
+            conn.commit()
+        finally:
+            if conn:
+                conn.close()
         eliminar_venta(int(venta_id))
         crear_backup()
         return jsonify({"success": True, "venta_id": int(venta_id), "mensaje": "Pedido eliminado y stock restablecido"})
@@ -8309,6 +8372,65 @@ def api_tienda_chat_subir_comprobante_transferencia(origen_id):
                 },
             }
         )
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/comprobante-transferencia/<path:filename>', methods=['GET'])
+def api_tienda_admin_comprobante_transferencia(filename):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        safe_name = secure_filename(os.path.basename(str(filename or "").strip()))
+        if not safe_name:
+            return jsonify({"success": False, "error": "Archivo invalido"}), 400
+        abs_path = _transfer_proof_abs_path(safe_name)
+        if not abs_path or not os.path.isfile(abs_path):
+            return jsonify({"success": False, "error": "Comprobante no encontrado"}), 404
+
+        with open(abs_path, "rb") as fh:
+            payload = fh.read()
+        if not payload:
+            return jsonify({"success": False, "error": "Comprobante vacio"}), 404
+
+        conn = get_db()
+        cur = conn.cursor()
+        needle = f"{_TRANSFER_PROOF_PREFIX}{safe_name}"
+        cur.execute(
+            """
+            UPDATE tienda_pedido_chat
+            SET mensaje = REPLACE(mensaje, ?, '[Comprobante eliminado por revision admin]')
+            WHERE mensaje LIKE ?
+            """,
+            (needle, f"%{needle}%"),
+        )
+        conn.commit()
+        try:
+            os.remove(abs_path)
+        except Exception:
+            pass
+
+        ext = os.path.splitext(safe_name)[1].lower()
+        mime = {
+            ".pdf": "application/pdf",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+        }.get(ext, "application/octet-stream")
+        force_download = str(request.args.get("download") or "").strip().lower() in {"1", "true", "yes", "on"}
+        disp = "attachment" if force_download else "inline"
+        resp = make_response(payload)
+        resp.headers["Content-Type"] = mime
+        resp.headers["Content-Length"] = str(len(payload))
+        resp.headers["Content-Disposition"] = f'{disp}; filename="{safe_name}"'
+        return resp
     except Exception as e:
         if conn:
             conn.rollback()

@@ -5054,7 +5054,11 @@
                 const safe = String(raw || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
                 return safe.replace(/(https?:\/\/[^\s<]+)/gi, (url) => {
                     const clean = String(url || '').replace(/&amp;/g, '&');
-                    return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">${url}</a>`;
+                    const m = clean.match(/\/static\/tienda_comprobantes_transferencia\/([A-Za-z0-9._-]+)$/i);
+                    const href = m
+                        ? `/api/tienda/admin/comprobante-transferencia/${encodeURIComponent(String(m[1] || ''))}`
+                        : clean;
+                    return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">${url}</a>`;
                 });
             };
             const arr = Array.isArray(mensajes) ? mensajes : [];
