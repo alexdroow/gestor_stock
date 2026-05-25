@@ -2057,6 +2057,15 @@
 
             <div class="form-group" style="margin-bottom: 0;">
                 <label>Ingredientes y componentes</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 10px 0;">
+                    <span style="font-size:.82rem;color:#64748b;">Multiplicar receta:</span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="setFactorRecetaVista(1)">x1</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="setFactorRecetaVista(2)">x2</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="setFactorRecetaVista(3)">x3</button>
+                    <input type="number" id="ver-receta-factor" min="0.1" step="0.1" value="1" style="width:90px;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;">
+                    <button type="button" class="btn btn-warning btn-sm" onclick="aplicarFactorRecetaVista()">Aplicar</button>
+                    <span id="ver-receta-factor-label" style="font-size:.82rem;color:#1d4ed8;font-weight:700;">Factor actual: x1</span>
+                </div>
                 <div class="ver-receta-list">
                     <div class="ver-receta-head">
                         <span>Ingrediente</span>
@@ -3395,6 +3404,59 @@
             agregarComponenteEn('insumos-container', item);
         }
 
+        let recetaVistaBase = null;
+        let recetaVistaFactor = 1;
+
+        function renderItemsRecetaVista() {
+            const itemsContainer = document.getElementById('ver-receta-items');
+            const label = document.getElementById('ver-receta-factor-label');
+            if (!itemsContainer) return;
+            const items = Array.isArray(recetaVistaBase?.items) ? recetaVistaBase.items : [];
+            const factor = Number(recetaVistaFactor || 1);
+            if (label) {
+                label.textContent = `Factor actual: x${formatoNumeroLocal(factor)}`;
+            }
+            if (items.length === 0) {
+                itemsContainer.innerHTML = '<div class="ver-receta-vacio">Esta receta no tiene componentes cargados.</div>';
+                return;
+            }
+            itemsContainer.innerHTML = items.map(item => {
+                const nombre = item.nombre || 'Sin nombre';
+                const qtyBase = Number(item.cantidad || 0);
+                const qtyCalc = qtyBase * factor;
+                const unidad = item.unidad || 'unidad';
+                const cantidadConUnidad = `${formatoNumeroLocal(qtyCalc)} ${unidad}`;
+                return `
+                    <div class="ver-receta-row">
+                        <span class="ver-receta-nombre">${escapeHtml(nombre)}</span>
+                        <span class="ver-receta-cantidad">${escapeHtml(cantidadConUnidad)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setFactorRecetaVista(factor) {
+            const n = Number(factor || 1);
+            if (!Number.isFinite(n) || n <= 0) return;
+            recetaVistaFactor = n;
+            const inp = document.getElementById('ver-receta-factor');
+            if (inp) inp.value = String(n);
+            renderItemsRecetaVista();
+        }
+        window.setFactorRecetaVista = setFactorRecetaVista;
+
+        function aplicarFactorRecetaVista() {
+            const inp = document.getElementById('ver-receta-factor');
+            const n = Number(inp?.value || 1);
+            if (!Number.isFinite(n) || n <= 0) {
+                alert('Ingresa un factor valido mayor a 0.');
+                return;
+            }
+            recetaVistaFactor = n;
+            renderItemsRecetaVista();
+        }
+        window.aplicarFactorRecetaVista = aplicarFactorRecetaVista;
+
         function abrirModalVerReceta(recetaId) {
             if (!recetaId) return;
 
@@ -3407,27 +3469,13 @@
                     }
 
                     const receta = data.receta || {};
-                    const items = Array.isArray(receta.items) ? receta.items : [];
+                    recetaVistaBase = receta;
+                    recetaVistaFactor = 1;
 
                     document.getElementById('ver-receta-nombre').value = receta.nombre || '';
-
-                    const itemsContainer = document.getElementById('ver-receta-items');
-                    if (items.length === 0) {
-                        itemsContainer.innerHTML = '<div class="ver-receta-vacio">Esta receta no tiene componentes cargados.</div>';
-                    } else {
-                        itemsContainer.innerHTML = items.map(item => {
-                            const nombre = item.nombre || 'Sin nombre';
-                            const cantidad = formatoNumeroLocal(item.cantidad || 0);
-                            const unidad = item.unidad || 'unidad';
-                            const cantidadConUnidad = `${cantidad} ${unidad}`;
-                            return `
-                                <div class="ver-receta-row">
-                                    <span class="ver-receta-nombre">${escapeHtml(nombre)}</span>
-                                    <span class="ver-receta-cantidad">${escapeHtml(cantidadConUnidad)}</span>
-                                </div>
-                            `;
-                        }).join('');
-                    }
+                    const factorInput = document.getElementById('ver-receta-factor');
+                    if (factorInput) factorInput.value = '1';
+                    renderItemsRecetaVista();
 
                     renderNutricionReceta(receta.nutricion || null);
 
@@ -3442,6 +3490,8 @@
             const modal = document.getElementById('modal-ver-receta');
             if (!modal) return;
             modal.classList.remove('active');
+            recetaVistaBase = null;
+            recetaVistaFactor = 1;
             const nutri = document.getElementById('ver-receta-nutricion');
             if (nutri) {
                 nutri.innerHTML = '';
