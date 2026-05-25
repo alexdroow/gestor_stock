@@ -2888,6 +2888,7 @@
 
         let insumoAEliminar = null;
         let insumoAEditar = null;
+        let editarInsumoModoSimple = false;
         let descuentoRapidoItems = [];
         const INSUMOS_SCROLL_KEY = 'insumos_scroll_y';
         const INSUMOS_SCROLL_RESTORE_KEY = 'insumos_restore_scroll';
@@ -3612,7 +3613,44 @@
             `;
         }
 
-        function abrirModalEditarInsumo(id) {
+        function aplicarModoSimpleEditarInsumo(simpleMode) {
+            const simple = Boolean(simpleMode);
+            const ocultarIds = [
+                'editar-insumo-codigo',
+                'editar-insumo-stock',
+                'editar-insumo-stock-minimo',
+                'editar-insumo-lote-codigo',
+                'editar-insumo-fecha-elaboracion',
+                'editar-insumo-fecha-vencimiento',
+                'editar-insumo-lotes-resumen',
+                'editar-insumo-cantidad-scan',
+                'editar-insumo-unidad-scan',
+                'editar-insumo-nutri-ref-cantidad',
+                'editar-insumo-nutri-ref-unidad',
+                'editar-insumo-nutri-kcal',
+                'editar-insumo-nutri-proteinas',
+                'editar-insumo-nutri-carbohidratos',
+                'editar-insumo-nutri-grasas',
+                'editar-insumo-nutri-azucares',
+                'editar-insumo-nutri-sodio'
+            ];
+            ocultarIds.forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const group = el.closest('.form-group');
+                if (group) group.style.display = simple ? 'none' : '';
+            });
+            document.querySelectorAll('#form-editar-insumo .edit-section-title').forEach((titleEl) => {
+                const txt = String(titleEl.textContent || '').toLowerCase();
+                if (txt.includes('tabla nutricional')) {
+                    titleEl.style.display = simple ? 'none' : '';
+                }
+            });
+        }
+
+        function abrirModalEditarInsumo(id, simpleMode = false) {
+            editarInsumoModoSimple = Boolean(simpleMode);
+            aplicarModoSimpleEditarInsumo(editarInsumoModoSimple);
             fetch(`/api/insumo/${id}/detalle`)
                 .then(r => r.json())
                 .then(data => {
@@ -3661,6 +3699,8 @@
             document.getElementById('modal-editar-insumo').classList.remove('active');
             renderLotesInsumoResumen([], '');
             insumoAEditar = null;
+            editarInsumoModoSimple = false;
+            aplicarModoSimpleEditarInsumo(false);
         }
 
         function actualizarPreviewPrecioInsumo() {
@@ -3982,7 +4022,7 @@
                     alert('Este item no tiene insumo maestro asociado. Selecciona un insumo existente y vuelve a intentar.');
                     return;
                 }
-                abrirModalEditarInsumo(insumoId);
+                abrirModalEditarInsumo(insumoId, true);
             });
         }
         const listaCalculoEl = document.getElementById('lista-calculo');
