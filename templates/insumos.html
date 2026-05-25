@@ -5551,22 +5551,9 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
 
 function calcularTotales() {
     const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null);
-    
-    let totalSinIva = 0;
-    let totalConIva = 0;
-    
-    activas.forEach(f => {
-        if (f.precio_incluye_iva) {
-            // Precio ya tiene IVA incluido, extraer base
-            const base = f.total / 1.19;
-            totalSinIva += base;
-            totalConIva += f.total;
-        } else {
-            // Precio sin IVA, agregarlo
-            totalSinIva += f.total;
-            totalConIva += f.total * 1.19;
-        }
-    });
+    // Regla visual: el total de filas mostrado en pantalla es la base (sin IVA).
+    const totalSinIva = activas.reduce((acc, f) => acc + Number(f.total || 0), 0);
+    const totalConIva = totalSinIva * 1.19;
     
     document.getElementById('total-items').textContent = activas.length;
     document.getElementById('total-sin-iva').textContent = '$' + Math.round(totalSinIva).toLocaleString();
@@ -5639,18 +5626,8 @@ function calcularTotales() {
         const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null);
         
         // Calcular totales
-        let totalSinIva = 0;
-        let totalConIva = 0;
-        
-        activas.forEach(f => {
-            if (f.precio_incluye_iva) {
-                totalSinIva += f.total / 1.19;
-                totalConIva += f.total;
-            } else {
-                totalSinIva += f.total;
-                totalConIva += f.total * 1.19;
-            }
-        });
+        const totalSinIva = activas.reduce((acc, f) => acc + Number(f.total || 0), 0);
+        const totalConIva = totalSinIva * 1.19;
         
         // Crear contenido HTML para imprimir
         const contenido = `
@@ -5814,18 +5791,8 @@ function calcularTotales() {
             csv += `"${f.nombre}",${f.cantidad},"${f.unidad || ''}",${f.precio},${f.total}\n`;
         });
         
-        let totalSinIva = 0;
-        let totalConIva = 0;
-
-        activas.forEach(f => {
-            if (f.precio_incluye_iva) {
-                totalSinIva += f.total / 1.19;
-                totalConIva += f.total;
-            } else {
-                totalSinIva += f.total;
-                totalConIva += f.total * 1.19;
-            }
-        });
+        const totalSinIva = activas.reduce((acc, f) => acc + Number(f.total || 0), 0);
+        const totalConIva = totalSinIva * 1.19;
         
         csv += `\n,,,Subtotal,${totalSinIva}\n`;
         csv += `,,,IVA (19%),${totalConIva - totalSinIva}\n`;
