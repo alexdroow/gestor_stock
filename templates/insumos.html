@@ -3921,9 +3921,8 @@
             if (e.target === this) cerrarModal();
         });
 
-        document.getElementById('modal-editar-insumo').addEventListener('click', function(e) {
-            if (e.target === this) cerrarModalEditarInsumo();
-        });
+        // Este modal solo se cierra con X o boton "Cerrar" (no por click fuera).
+        document.getElementById('modal-editar-insumo').addEventListener('click', function(_e) {});
 
         const tablaInsumosEl = document.getElementById('tabla-insumos');
         if (tablaInsumosEl) {
@@ -3954,6 +3953,20 @@
                     stockActual: Number(fila.getAttribute('data-stock-anterior') || 0),
                     unidadStock: fila.getAttribute('data-unidad-stock') || 'unidad'
                 });
+            });
+        }
+        const pendientesBodyEl = document.getElementById('pendientes-body');
+        if (pendientesBodyEl) {
+            pendientesBodyEl.addEventListener('dblclick', function(e) {
+                if (e.target.closest('button, input, select, textarea, a, label')) return;
+                const fila = e.target.closest('tr[data-insumo-id]');
+                if (!fila) return;
+                const insumoId = Number(fila.getAttribute('data-insumo-id') || 0);
+                if (!insumoId) {
+                    alert('Este item no tiene insumo maestro asociado. Selecciona un insumo existente y vuelve a intentar.');
+                    return;
+                }
+                abrirModalEditarInsumo(insumoId);
             });
         }
 
@@ -4655,7 +4668,7 @@ let insumosData = [
                 body.innerHTML = `<tr><td colspan="9" class="pendiente-empty">No hay insumos pendientes.</td></tr>`;
             } else {
                 body.innerHTML = comprasPendientesCache.map(item => `
-                    <tr>
+                    <tr data-compra-id="${Number(item.id || 0)}" data-insumo-id="${Number(item.insumo_id || 0)}">
                         <td><input type="text" value="${escapeHtml(item.nombre || '')}" onchange="actualizarCompraPendiente(${item.id}, 'nombre', this.value)"></td>
                         <td><input type="number" min="0" step="0.01" value="${Number(item.cantidad || 0)}" onchange="actualizarCompraPendiente(${item.id}, 'cantidad', this.value)"></td>
                         <td><input type="text" value="${escapeHtml(item.unidad || 'unidad')}" onchange="actualizarCompraPendiente(${item.id}, 'unidad', this.value)"></td>
