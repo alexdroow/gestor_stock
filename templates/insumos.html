@@ -5443,7 +5443,7 @@ fila.innerHTML = `
     </div>
 
 <div style="display: flex; flex-direction: column; justify-content: center; height: 44px;">
-    <input type="number" class="insumo-calc-input" id="cantidad-${index}" placeholder="Cant" min="0.01" step="0.01" onchange="calcularTotalFila(${index})">
+    <input type="number" class="insumo-calc-input" id="cantidad-${index}" placeholder="Cant" min="0.01" step="0.01" onchange="calcularTotalFila(${index})" oninput="calcularTotalFila(${index})">
     <div style="margin-top: 2px; font-size: 11px; line-height: 1.2; visibility: hidden;">.</div>
 </div>
 
@@ -5526,9 +5526,16 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
             guardarEstadoCalculadora();
         }
 
+        function _leerCantidadFila(index) {
+            const el = document.getElementById('cantidad-' + index);
+            const raw = String((el && el.value) || '').trim().replace(',', '.');
+            const cantidad = Number(raw);
+            return Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 0;
+        }
+
         function calcularTotalFila(index) {
-            const cantidad = parseFloat(document.getElementById('cantidad-' + index).value) || 0;
-            const precio = filasCalculo[index].precio || 0;
+            const cantidad = _leerCantidadFila(index);
+            const precio = Number((filasCalculo[index] && filasCalculo[index].precio) || 0);
             const total = cantidad * precio;
             
             filasCalculo[index].cantidad = cantidad;
@@ -5551,6 +5558,17 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
 
 function calcularTotales() {
     const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null);
+    // Recalcular totales por fila con la cantidad actual escrita por el usuario.
+    for (let i = 0; i < filasCalculo.length; i += 1) {
+        const f = filasCalculo[i];
+        if (!f || !f.insumoId) continue;
+        const cantidad = _leerCantidadFila(i);
+        const precio = Number(f.precio || 0);
+        f.cantidad = cantidad;
+        f.total = cantidad * precio;
+        const totalEl = document.getElementById('total-' + i);
+        if (totalEl) totalEl.textContent = '$' + Number(f.total || 0).toLocaleString('es-CL');
+    }
     // Regla visual: el total de filas mostrado en pantalla es la base (sin IVA).
     const totalSinIva = activas.reduce((acc, f) => acc + Number(f.total || 0), 0);
     const totalConIva = totalSinIva * 1.19;
