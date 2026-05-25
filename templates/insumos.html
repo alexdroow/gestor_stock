@@ -2861,6 +2861,8 @@
 
     <script>
         let filasCalculo = [];
+        const INSUMOS_CALCULADORA_STATE_KEY = 'insumos_calculadora_state_v1';
+        let calculadoraStateIntentado = false;
 
         // Modo Oscuro
 
@@ -3750,6 +3752,19 @@
             }
         }
 
+        function refrescarFilasCalculadoraPorInsumo(insumoIdObjetivo) {
+            const objetivo = Number(insumoIdObjetivo || 0);
+            if (!objetivo) return;
+            for (let i = 0; i < filasCalculo.length; i += 1) {
+                const fila = filasCalculo[i];
+                if (!fila) continue;
+                const actual = Number(fila.insumoId || 0);
+                if (actual !== objetivo) continue;
+                actualizarFilaCalculo(i);
+                calcularTotalFila(i);
+            }
+        }
+
         function guardarEdicionInsumo(event) {
             event.preventDefault();
 
@@ -3870,6 +3885,7 @@
                         insumosLookup[lookupKey].unidad_compra = payload.unidad_compra || insumosLookup[lookupKey].unidad_compra || insumosLookup[lookupKey].unidad || 'unidad';
                     }
                     actualizarFilaInsumoEnTabla(insumoAEditar, payload);
+                    refrescarFilasCalculadoraPorInsumo(insumoAEditar);
                     alert('\u2705 Insumo actualizado correctamente');
                     cerrarModalEditarInsumo();
                     buscarInsumos();
@@ -3964,6 +3980,23 @@
                 const insumoId = Number(fila.getAttribute('data-insumo-id') || 0);
                 if (!insumoId) {
                     alert('Este item no tiene insumo maestro asociado. Selecciona un insumo existente y vuelve a intentar.');
+                    return;
+                }
+                abrirModalEditarInsumo(insumoId);
+            });
+        }
+        const listaCalculoEl = document.getElementById('lista-calculo');
+        if (listaCalculoEl) {
+            listaCalculoEl.addEventListener('dblclick', function(e) {
+                if (e.target.closest('button, input, select, textarea, a, label')) return;
+                const fila = e.target.closest('.insumo-calc-row[id^="fila-calc-"]');
+                if (!fila) return;
+                const idx = Number(String(fila.id || '').replace('fila-calc-', '') || -1);
+                if (idx < 0) return;
+                const hidden = document.getElementById('insumo-id-' + idx);
+                const insumoId = Number((hidden && hidden.value) || 0);
+                if (!insumoId) {
+                    alert('Selecciona un insumo en la fila para poder editar su ficha maestra.');
                     return;
                 }
                 abrirModalEditarInsumo(insumoId);
@@ -5201,10 +5234,78 @@ let insumosData = [
             // Si es la calculadora, inicializar primera fila si está vacía
             if (tabName === 'calculadora') {
                 const container = document.getElementById('lista-calculo');
+                if (!calculadoraStateIntentado) {
+                    calculadoraStateIntentado = true;
+                    restaurarEstadoCalculadora();
+                }
                 if (!container || container.children.length === 0) {
                     agregarFilaCalculo();
                 }
                 cargarComprasPendientes();
+            }
+        }
+
+        function serializarEstadoCalculadora() {
+            const items = [];
+            for (let i = 0; i < filasCalculo.length; i += 1) {
+                const fila = filasCalculo[i];
+                if (!fila) continue;
+                const hidden = document.getElementById('insumo-id-' + i);
+                const cantidadEl = document.getElementById('cantidad-' + i);
+                const insumoId = Number((hidden && hidden.value) || fila.insumoId || 0);
+                const cantidad = Number((cantidadEl && cantidadEl.value) || fila.cantidad || 0);
+                if (!insumoId && !cantidad) continue;
+                items.push({
+                    insumoId: insumoId || null,
+                    cantidad: Number.isFinite(cantidad) ? cantidad : 0,
+                    precio: Number(fila.precio || 0),
+                    unidad: String(fila.unidad || ''),
+                    nombre: String(fila.nombre || ''),
+                    precio_incluye_iva: Boolean(fila.precio_incluye_iva)
+                });
+            }
+            return { items };
+        }
+
+        function guardarEstadoCalculadora() {
+            try {
+                localStorage.setItem(INSUMOS_CALCULADORA_STATE_KEY, JSON.stringify(serializarEstadoCalculadora()));
+            } catch (_) {}
+        }
+
+        function limpiarEstadoCalculadora() {
+            try {
+                localStorage.removeItem(INSUMOS_CALCULADORA_STATE_KEY);
+            } catch (_) {}
+        }
+
+        function restaurarEstadoCalculadora() {
+            try {
+                const raw = localStorage.getItem(INSUMOS_CALCULADORA_STATE_KEY);
+                if (!raw) return false;
+                const parsed = JSON.parse(raw || '{}');
+                const items = Array.isArray(parsed.items) ? parsed.items : [];
+                if (!items.length) return false;
+
+                const container = document.getElementById('lista-calculo');
+                if (!container) return false;
+                container.innerHTML = '';
+                filasCalculo = [];
+
+                items.forEach((it) => {
+                    const idx = agregarFilaCalculo();
+                    const hidden = document.getElementById('insumo-id-' + idx);
+                    const input = document.getElementById('insumo-buscar-' + idx);
+                    const cantidadEl = document.getElementById('cantidad-' + idx);
+                    if (hidden) hidden.value = String(Number(it.insumoId || 0) || '');
+                    if (input) input.value = String(it.nombre || '');
+                    actualizarFilaCalculo(idx);
+                    if (cantidadEl) cantidadEl.value = String(Number(it.cantidad || 0) || '');
+                    calcularTotalFila(idx);
+                });
+                return true;
+            } catch (_) {
+                return false;
             }
         }
 
@@ -5319,6 +5420,7 @@ fila.innerHTML = `
             
             container.appendChild(fila);
             filasCalculo.push({ id: index, insumoId: null, precio: 0, cantidad: 0, total: 0 });
+            guardarEstadoCalculadora();
             return index;
         }
 
@@ -5385,6 +5487,7 @@ filasCalculo[index] = {
             }
             
 document.getElementById('unidad-' + index).textContent = unidadCompra;
+            guardarEstadoCalculadora();
         }
 
         function calcularTotalFila(index) {
@@ -5398,6 +5501,7 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
             document.getElementById('total-' + index).textContent = '$' + total.toLocaleString();
             
             calcularTotales();
+            guardarEstadoCalculadora();
         }
 
         function eliminarFilaCalculo(index) {
@@ -5406,6 +5510,7 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
             
             filasCalculo[index] = null; // Marcar como eliminada
             calcularTotales();
+            guardarEstadoCalculadora();
         }
 
 function calcularTotales() {
@@ -5430,6 +5535,7 @@ function calcularTotales() {
     document.getElementById('total-items').textContent = activas.length;
     document.getElementById('total-sin-iva').textContent = '$' + Math.round(totalSinIva).toLocaleString();
     document.getElementById('total-con-iva').textContent = '$' + Math.round(totalConIva).toLocaleString();
+    guardarEstadoCalculadora();
 }
 
     function imprimirLista() {
@@ -5654,6 +5760,7 @@ function calcularTotales() {
             container.innerHTML = '';
         }
         calcularTotales();
+        limpiarEstadoCalculadora();
         agregarFilaCalculo();
     }
 
