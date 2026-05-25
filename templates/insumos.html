@@ -4039,7 +4039,7 @@
                     alert('Selecciona un insumo en la fila para poder editar su ficha maestra.');
                     return;
                 }
-                abrirModalEditarInsumo(insumoId);
+                abrirModalEditarInsumo(insumoId, true);
             });
         }
 
@@ -5496,20 +5496,16 @@ filasCalculo[index] = {
             const cantidadCompra = Number(insumo ? insumo.cantidad_comprada : 1);
             const divisor = (Number.isFinite(cantidadCompra) && cantidadCompra > 0) ? cantidadCompra : 1;
             const precioEfectivo = (precioCompra > 0) ? (precioCompra / divisor) : 0;
-            const cantidadFmt = (Math.round(divisor * 100) / 100).toString().replace('.', ',');
-            const detalleCompra = (precioCompra > 0)
-                ? `Compra registrada: $${Math.round(precioCompra).toLocaleString('es-CL')} por ${cantidadFmt} ${unidadCompra || 'unidad'}`
-                : '';
             const warning = diagnosticoCosteoInsumo(insumo);
 
             if (precio > 0) {
                 if (infoEl) {
-                    infoEl.textContent = `Costo calculo: $${Math.round(precioEfectivo || precio).toLocaleString('es-CL')} / ${unidadCompra}${detalleCompra ? ' | ' + detalleCompra : ''}`;
+                    infoEl.textContent = `Valor: $${Math.round(precioEfectivo || precio).toLocaleString('es-CL')} / ${unidadCompra || 'unidad'}`;
                     infoEl.classList.toggle('warn', Boolean(warning));
                 }
             } else {
                 if (infoEl) {
-                    infoEl.textContent = 'Sin precio unitario registrado - Ingresa manual';
+                    infoEl.textContent = 'Valor: sin precio configurado';
                     infoEl.classList.add('warn');
                 }
                 // Permitir ingresar precio manual por unidad de compra
@@ -5517,7 +5513,7 @@ filasCalculo[index] = {
                 if (precioManual && !isNaN(precioManual)) {
                     filasCalculo[index].precio = parseFloat(precioManual);
                     if (infoEl) {
-                        infoEl.textContent = `Costo calculo: $${Math.round(filasCalculo[index].precio).toLocaleString('es-CL')} / ${unidadCompra}`;
+                        infoEl.textContent = `Valor: $${Math.round(filasCalculo[index].precio).toLocaleString('es-CL')} / ${unidadCompra || 'unidad'}`;
                         infoEl.classList.remove('warn');
                     }
                 }
