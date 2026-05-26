@@ -702,6 +702,17 @@ def init_db():
                 estado TEXT DEFAULT 'completada'
             )
         ''')
+
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS calculadora_compras_draft (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                payload_json TEXT DEFAULT '',
+                actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
+        cursor.execute("INSERT OR IGNORE INTO calculadora_compras_draft (id, payload_json) VALUES (1, '')")
         # Migracion compatible: instalaciones antiguas pueden no tener metodo_pago.
         _ensure_column(conn, "ventas", "metodo_pago", "TEXT DEFAULT 'efectivo'")
 
@@ -8837,6 +8848,16 @@ def migrar_db():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS calculadora_compras_draft (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                payload_json TEXT DEFAULT '',
+                actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute("INSERT OR IGNORE INTO calculadora_compras_draft (id, payload_json) VALUES (1, '')")
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS insumo_precio_historial (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 insumo_id INTEGER NOT NULL,
@@ -12851,6 +12872,77 @@ def obtener_compras_pendientes(incluir_comprados=True):
             resumen[clave] = round(resumen[clave], 2)
 
         return {"items": items, "resumen": resumen}
+    finally:
+        conn.close()
+
+
+def obtener_calculadora_compras_draft():
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT payload_json, actualizado FROM calculadora_compras_draft WHERE id = 1")
+        row = cursor.fetchone()
+        if not row:
+            return {"success": True, "items": [], "actualizado": None}
+        raw = str(row["payload_json"] or "").strip()
+        data = []
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, dict):
+                    parsed = parsed.get("items", [])
+                data = parsed if isinstance(parsed, list) else []
+            except Exception:
+                data = []
+        return {"success": True, "items": data, "actualizado": row["actualizado"]}
+    finally:
+        conn.close()
+
+
+def guardar_calculadora_compras_draft(items):
+    if not isinstance(items, list):
+        return {"success": False, "error": "Formato invalido para items"}
+    payload = json.dumps(items, ensure_ascii=False)
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO calculadora_compras_draft (id, payload_json, actualizado)
+            VALUES (1, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                payload_json = excluded.payload_json,
+                actualizado = CURRENT_TIMESTAMP
+            """,
+            (payload,),
+        )
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+
+def limpiar_calculadora_compras_draft():
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO calculadora_compras_draft (id, payload_json, actualizado)
+            VALUES (1, '', CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                payload_json = '',
+                actualizado = CURRENT_TIMESTAMP
+            """
+        )
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
     finally:
         conn.close()
 

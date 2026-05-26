@@ -330,6 +330,7 @@ from database import (
     actualizar_compra_pendiente, eliminar_compra_pendiente, limpiar_compras_pendientes,
     marcar_compras_pendientes_completadas, previsualizar_finalizacion_compras_pendientes,
     finalizar_compras_pendientes_con_stock,
+    obtener_calculadora_compras_draft, guardar_calculadora_compras_draft, limpiar_calculadora_compras_draft,
     registrar_historial_cambio, listar_historial_cambios, eliminar_historial_cambio,
     descartar_insumos_masivo,
     obtener_evento_agenda_por_id, actualizar_estado_evento_agenda,
@@ -10427,6 +10428,43 @@ def api_compras_pendientes_limpiar():
             resumen = obtener_compras_pendientes()
             resultado['items'] = resumen['items']
             resultado['resumen'] = resumen['resumen']
+            return jsonify(resultado)
+        return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/calculadora-insumos/estado', methods=['GET'])
+def api_calculadora_insumos_estado_get():
+    try:
+        resultado = obtener_calculadora_compras_draft()
+        if resultado.get('success'):
+            return jsonify(resultado)
+        return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'items': []}), 500
+
+
+@app.route('/api/calculadora-insumos/estado', methods=['POST'])
+def api_calculadora_insumos_estado_save():
+    try:
+        data = request.get_json(silent=True) or {}
+        items = data.get('items') if isinstance(data.get('items'), list) else []
+        resultado = guardar_calculadora_compras_draft(items)
+        if resultado.get('success'):
+            crear_backup()
+            return jsonify(resultado)
+        return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/calculadora-insumos/estado', methods=['DELETE'])
+def api_calculadora_insumos_estado_clear():
+    try:
+        resultado = limpiar_calculadora_compras_draft()
+        if resultado.get('success'):
+            crear_backup()
             return jsonify(resultado)
         return jsonify(resultado), 400
     except Exception as e:

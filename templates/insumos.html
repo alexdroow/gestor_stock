@@ -2863,6 +2863,8 @@
         let filasCalculo = [];
         const INSUMOS_CALCULADORA_STATE_KEY = 'insumos_calculadora_state_v1';
         let calculadoraStateIntentado = false;
+        let calculadoraStateSyncTimer = null;
+        let calculadoraStateEnRestauracion = false;
 
         // Modo Oscuro
 
@@ -5276,7 +5278,7 @@ let insumosData = [
                 const container = document.getElementById('lista-calculo');
                 if (!calculadoraStateIntentado) {
                     calculadoraStateIntentado = true;
-                    restaurarEstadoCalculadora();
+                    restaurarEstadoCalculadoraMultiOrigen();
                 }
                 if (!container || container.children.length === 0) {
                     agregarFilaCalculo();
@@ -5308,27 +5310,37 @@ let insumosData = [
         }
 
         function guardarEstadoCalculadora() {
+            if (calculadoraStateEnRestauracion) return;
+            const state = serializarEstadoCalculadora();
             try {
-                localStorage.setItem(INSUMOS_CALCULADORA_STATE_KEY, JSON.stringify(serializarEstadoCalculadora()));
+                localStorage.setItem(INSUMOS_CALCULADORA_STATE_KEY, JSON.stringify(state));
             } catch (_) {}
+            if (calculadoraStateSyncTimer) {
+                clearTimeout(calculadoraStateSyncTimer);
+            }
+            calculadoraStateSyncTimer = setTimeout(() => {
+                fetch('/api/calculadora-insumos/estado', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(state)
+                }).catch(() => {});
+            }, 450);
         }
 
         function limpiarEstadoCalculadora() {
             try {
                 localStorage.removeItem(INSUMOS_CALCULADORA_STATE_KEY);
             } catch (_) {}
+            fetch('/api/calculadora-insumos/estado', { method: 'DELETE' }).catch(() => {});
         }
 
-        function restaurarEstadoCalculadora() {
+        function _restaurarEstadoCalculadoraDesdeItems(items) {
             try {
-                const raw = localStorage.getItem(INSUMOS_CALCULADORA_STATE_KEY);
-                if (!raw) return false;
-                const parsed = JSON.parse(raw || '{}');
-                const items = Array.isArray(parsed.items) ? parsed.items : [];
                 if (!items.length) return false;
 
                 const container = document.getElementById('lista-calculo');
                 if (!container) return false;
+                calculadoraStateEnRestauracion = true;
                 container.innerHTML = '';
                 filasCalculo = [];
 
@@ -5343,10 +5355,39 @@ let insumosData = [
                     if (cantidadEl) cantidadEl.value = String(Number(it.cantidad || 0) || '');
                     calcularTotalFila(idx);
                 });
+                calculadoraStateEnRestauracion = false;
                 return true;
+            } catch (_) {
+                calculadoraStateEnRestauracion = false;
+                return false;
+            }
+        }
+
+        function restaurarEstadoCalculadora() {
+            try {
+                const raw = localStorage.getItem(INSUMOS_CALCULADORA_STATE_KEY);
+                if (!raw) return false;
+                const parsed = JSON.parse(raw || '{}');
+                const items = Array.isArray(parsed.items) ? parsed.items : [];
+                return _restaurarEstadoCalculadoraDesdeItems(items);
             } catch (_) {
                 return false;
             }
+        }
+
+        async function restaurarEstadoCalculadoraMultiOrigen() {
+            try {
+                const resp = await fetch('/api/calculadora-insumos/estado');
+                const data = await resp.json();
+                const remotos = Array.isArray(data.items) ? data.items : [];
+                if (_restaurarEstadoCalculadoraDesdeItems(remotos)) {
+                    try {
+                        localStorage.setItem(INSUMOS_CALCULADORA_STATE_KEY, JSON.stringify({ items: remotos }));
+                    } catch (_) {}
+                    return true;
+                }
+            } catch (_) {}
+            return restaurarEstadoCalculadora();
         }
 
         function tabInicialDesdeQuery() {
