@@ -10452,7 +10452,6 @@ def api_calculadora_insumos_estado_save():
         items = data.get('items') if isinstance(data.get('items'), list) else []
         resultado = guardar_calculadora_compras_draft(items)
         if resultado.get('success'):
-            crear_backup()
             return jsonify(resultado)
         return jsonify(resultado), 400
     except Exception as e:
@@ -10464,7 +10463,6 @@ def api_calculadora_insumos_estado_clear():
     try:
         resultado = limpiar_calculadora_compras_draft()
         if resultado.get('success'):
-            crear_backup()
             return jsonify(resultado)
         return jsonify(resultado), 400
     except Exception as e:

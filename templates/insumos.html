@@ -2865,6 +2865,7 @@
         let calculadoraStateIntentado = false;
         let calculadoraStateSyncTimer = null;
         let calculadoraStateEnRestauracion = false;
+        let calculadoraStatePendienteSync = null;
 
         // Modo Oscuro
 
@@ -5312,6 +5313,7 @@ let insumosData = [
         function guardarEstadoCalculadora() {
             if (calculadoraStateEnRestauracion) return;
             const state = serializarEstadoCalculadora();
+            calculadoraStatePendienteSync = state;
             try {
                 localStorage.setItem(INSUMOS_CALCULADORA_STATE_KEY, JSON.stringify(state));
             } catch (_) {}
@@ -5319,19 +5321,31 @@ let insumosData = [
                 clearTimeout(calculadoraStateSyncTimer);
             }
             calculadoraStateSyncTimer = setTimeout(() => {
-                fetch('/api/calculadora-insumos/estado', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(state)
-                }).catch(() => {});
-            }, 450);
+                sincronizarEstadoCalculadoraServidor(false);
+            }, 150);
         }
 
         function limpiarEstadoCalculadora() {
             try {
                 localStorage.removeItem(INSUMOS_CALCULADORA_STATE_KEY);
             } catch (_) {}
-            fetch('/api/calculadora-insumos/estado', { method: 'DELETE' }).catch(() => {});
+            calculadoraStatePendienteSync = null;
+            fetch('/api/calculadora-insumos/estado', { method: 'DELETE', keepalive: true }).catch(() => {});
+        }
+
+        function sincronizarEstadoCalculadoraServidor(force) {
+            const payload = calculadoraStatePendienteSync;
+            if (!payload) return;
+            fetch('/api/calculadora-insumos/estado', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload),
+                keepalive: Boolean(force)
+            })
+            .then(() => {
+                calculadoraStatePendienteSync = null;
+            })
+            .catch(() => {});
         }
 
         function _restaurarEstadoCalculadoraDesdeItems(items) {
@@ -5389,6 +5403,18 @@ let insumosData = [
             } catch (_) {}
             return restaurarEstadoCalculadora();
         }
+
+        window.addEventListener('beforeunload', function() {
+            if (calculadoraStateSyncTimer) clearTimeout(calculadoraStateSyncTimer);
+            sincronizarEstadoCalculadoraServidor(true);
+        });
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') {
+                if (calculadoraStateSyncTimer) clearTimeout(calculadoraStateSyncTimer);
+                sincronizarEstadoCalculadoraServidor(true);
+            }
+        });
 
         function tabInicialDesdeQuery() {
             try {
