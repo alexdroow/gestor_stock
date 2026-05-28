@@ -2867,6 +2867,8 @@
         let calculadoraStateEnRestauracion = false;
         let calculadoraStatePendienteSync = null;
         let calculadoraStateCargando = false;
+        let calculadoraStateSyncInFlight = false;
+        let calculadoraStateRetryTimer = null;
 
         // Modo Oscuro
 
@@ -5337,12 +5339,9 @@ let insumosData = [
                 return;
             }
             calculadoraStatePendienteSync = state;
-            if (calculadoraStateSyncTimer) {
-                clearTimeout(calculadoraStateSyncTimer);
-            }
-            calculadoraStateSyncTimer = setTimeout(() => {
-                sincronizarEstadoCalculadoraServidor(false);
-            }, 150);
+            sincronizarEstadoCalculadoraServidor(false);
+            if (calculadoraStateSyncTimer) clearTimeout(calculadoraStateSyncTimer);
+            calculadoraStateSyncTimer = setTimeout(() => sincronizarEstadoCalculadoraServidor(false), 500);
         }
 
         function limpiarEstadoCalculadora() {
@@ -5356,6 +5355,8 @@ let insumosData = [
         function sincronizarEstadoCalculadoraServidor(force) {
             const payload = calculadoraStatePendienteSync;
             if (!payload) return;
+            if (calculadoraStateSyncInFlight && !force) return;
+            calculadoraStateSyncInFlight = true;
             fetch('/api/calculadora-insumos/estado', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -5364,8 +5365,21 @@ let insumosData = [
             })
             .then(() => {
                 calculadoraStatePendienteSync = null;
+                calculadoraStateSyncInFlight = false;
+                if (calculadoraStateRetryTimer) {
+                    clearTimeout(calculadoraStateRetryTimer);
+                    calculadoraStateRetryTimer = null;
+                }
             })
-            .catch(() => {});
+            .catch(() => {
+                calculadoraStateSyncInFlight = false;
+                if (!calculadoraStateRetryTimer) {
+                    calculadoraStateRetryTimer = setTimeout(() => {
+                        calculadoraStateRetryTimer = null;
+                        sincronizarEstadoCalculadoraServidor(false);
+                    }, 1500);
+                }
+            });
         }
 
         function _restaurarEstadoCalculadoraDesdeItems(items) {
@@ -5435,6 +5449,12 @@ let insumosData = [
                 sincronizarEstadoCalculadoraServidor(true);
             }
         });
+
+        setInterval(() => {
+            if (document.visibilityState === 'visible' && calculadoraStatePendienteSync) {
+                sincronizarEstadoCalculadoraServidor(false);
+            }
+        }, 5000);
 
         function tabInicialDesdeQuery() {
             try {
