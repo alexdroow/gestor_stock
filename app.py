@@ -5554,6 +5554,7 @@ def api_tienda_productos():
                 "personalizacion": _obtener_tienda_personalizacion(),
                 "flow_enabled": bool(_flow_cfg().get("enabled")),
                 "admin_flow_sim_enabled": bool(session.get(_ADMIN_SESSION_KEY)),
+                "admin_mode": bool(session.get(_ADMIN_SESSION_KEY)),
                 "payment_pricing": {
                     "flow_enabled": bool(_flow_cfg().get("enabled")),
                     **_flow_fee_cfg(),
@@ -7409,6 +7410,53 @@ def api_tienda_admin_productos():
         return jsonify({"success": True, "productos": productos, "categorias": categorias_payload})
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/admin/producto/<int:producto_id>/quick-update', methods=['POST'])
+def api_tienda_admin_producto_quick_update(producto_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        precio = float(data.get("precio") or 0)
+        stock = float(data.get("stock") or 0)
+        oculto = 1 if bool(data.get("oculto", False)) else 0
+        if precio < 0:
+            return jsonify({"success": False, "error": "El precio no puede ser negativo"}), 400
+        if stock < 0:
+            return jsonify({"success": False, "error": "El stock no puede ser negativo"}), 400
+        activo_tienda = 0 if oculto else 1
+        if stock <= 0:
+            activo_tienda = 0
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM productos WHERE id = ? AND COALESCE(eliminado, 0) = 0 LIMIT 1",
+            (int(producto_id),),
+        )
+        if not cur.fetchone():
+            return jsonify({"success": False, "error": "Producto no encontrado"}), 404
+
+        cur.execute(
+            """
+            UPDATE productos
+            SET precio = ?, stock = ?, activo_tienda = ?, actualizado_en = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (float(precio), float(stock), int(activo_tienda), int(producto_id)),
+        )
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "message": "Producto actualizado"})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
             conn.close()

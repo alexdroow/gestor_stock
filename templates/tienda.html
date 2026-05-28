@@ -2102,6 +2102,25 @@
             border-radius: 4px;
             flex: 0 0 auto;
         }
+        .admin-mode-pill {
+            position: fixed;
+            right: 12px;
+            top: 12px;
+            z-index: 1200;
+            background: #111827;
+            color: #fff;
+            border: 1px solid #374151;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            display: none;
+        }
+        .item-card.admin-editable {
+            outline: 1px dashed rgba(245, 158, 11, 0.55);
+            outline-offset: 2px;
+        }
         .checkout-pago-option-text {
             display: inline-flex;
             align-items: center;
@@ -3641,6 +3660,7 @@
     <style id="tienda-custom-css"></style>
 </head>
 <body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
+    <div id="tienda-admin-pill" class="admin-mode-pill">MODO ADMIN ACTIVO</div>
     <header class="topbar">
         <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()">Menu</button>
         <div class="brand brand-with-logo">
@@ -4077,6 +4097,32 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-admin-producto">
+        <div class="modal" style="width:min(460px,95vw);">
+            <h3>Editar producto (modo admin)</h3>
+            <div id="admin-producto-titulo" style="font-size:.9rem;color:#334155;font-weight:700;"></div>
+            <div class="two" style="margin-top:8px;">
+                <label style="display:grid;gap:4px;">
+                    <span style="font-size:.82rem;color:#475569;">Precio</span>
+                    <input id="admin-producto-precio" type="number" min="0" step="1">
+                </label>
+                <label style="display:grid;gap:4px;">
+                    <span style="font-size:.82rem;color:#475569;">Stock</span>
+                    <input id="admin-producto-stock" type="number" min="0" step="0.01">
+                </label>
+            </div>
+            <label style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+                <input id="admin-producto-oculto" type="checkbox">
+                <span>Ocultar de tienda</span>
+            </label>
+            <div id="admin-producto-msg" style="min-height:18px;margin-top:6px;font-size:.85rem;color:#64748b;"></div>
+            <div class="modal-actions">
+                <button class="btn-muted" type="button" id="admin-producto-cerrar">Cerrar</button>
+                <button class="btn-primary" type="button" id="admin-producto-guardar">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-exito-pedido">
         <div class="modal">
             <h3>Pedido recibido</h3>
@@ -4263,6 +4309,7 @@
         const topbarNavEl = document.getElementById("topbar-nav");
         const searchInputEl = document.getElementById("search-input");
         const menuTitleEl = document.getElementById("menu-title");
+        const tiendaAdminPillEl = document.getElementById("tienda-admin-pill");
         const secOfertasTitleEl = document.getElementById("sec-ofertas-title");
         const secDestacadosTitleEl = document.getElementById("sec-destacados-title");
         const agendaQuickBtnEl = document.getElementById("agenda-quick-btn");
@@ -4289,6 +4336,14 @@
         const clienteEmailEl = document.getElementById("cliente-email");
         const clienteTelefonoEl = document.getElementById("cliente-telefono");
         const modalCheckoutResumenEl = document.getElementById("modal-checkout-resumen");
+        const modalAdminProductoEl = document.getElementById("modal-admin-producto");
+        const adminProductoTituloEl = document.getElementById("admin-producto-titulo");
+        const adminProductoPrecioEl = document.getElementById("admin-producto-precio");
+        const adminProductoStockEl = document.getElementById("admin-producto-stock");
+        const adminProductoOcultoEl = document.getElementById("admin-producto-oculto");
+        const adminProductoMsgEl = document.getElementById("admin-producto-msg");
+        const adminProductoCerrarEl = document.getElementById("admin-producto-cerrar");
+        const adminProductoGuardarEl = document.getElementById("admin-producto-guardar");
         const modalCheckoutClienteEl = document.getElementById("modal-checkout-cliente");
         const modalCheckoutDetalleEl = document.getElementById("modal-checkout-detalle");
         const checkoutEntregaRetiroEl = document.getElementById("checkout-entrega-retiro");
@@ -4541,6 +4596,11 @@
         let checkoutShippingError = "";
         let flowPagoHabilitado = false;
         let flowSimAdminEnabled = false;
+        let tiendaAdminMode = false;
+        let adminBindingsReady = false;
+        let adminLongPressTimer = null;
+        let adminLongPressTriggered = false;
+        let adminProductoEditando = null;
         let paymentPricingCfg = { flow_enabled: false, rate: 0.0319, iva: 0.19, fixed: 0 };
         let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
@@ -6172,7 +6232,7 @@
             const floatImg = String(tiendaUiCfg.offer_float_image_url || "").trim();
             const floatIcon = String(tiendaUiCfg.offer_float_icon || "").trim();
             return `
-                <article class="item-card ${esOferta ? "oferta" : ""} ${agotado ? "agotado" : ""}" onclick="agregarDesdeTarjeta(event, ${p.id}, ${agotado ? "true" : "false"})" ${agotado ? "" : "title=\"Agregar al carrito\""}>
+                <article class="item-card ${esOferta ? "oferta" : ""} ${agotado ? "agotado" : ""} ${tiendaAdminMode ? "admin-editable" : ""}" data-product-id="${Number(p.id || 0)}" onclick="agregarDesdeTarjeta(event, ${p.id}, ${agotado ? "true" : "false"})" ${agotado ? "" : "title=\"Agregar al carrito\""}>
                     ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
                     ${badgeOn ? `<span class="offer-custom-badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
                     ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
@@ -6194,6 +6254,100 @@
                     </div>
                 </article>
             `;
+        }
+
+        function _adminSetPillVisible() {
+            if (!tiendaAdminPillEl) return;
+            tiendaAdminPillEl.style.display = tiendaAdminMode ? "inline-flex" : "none";
+        }
+
+        function _adminFindProductById(productoId) {
+            const pid = Number(productoId || 0);
+            if (!pid) return null;
+            return (Array.isArray(productos) ? productos : []).find((p) => Number(p.id || 0) === pid) || null;
+        }
+
+        function _adminOpenQuickEdit(productoId) {
+            if (!tiendaAdminMode || !modalAdminProductoEl) return;
+            const p = _adminFindProductById(productoId);
+            if (!p) return;
+            adminProductoEditando = Number(p.id || 0);
+            if (adminProductoTituloEl) adminProductoTituloEl.textContent = String(p.nombre || `Producto #${adminProductoEditando}`);
+            if (adminProductoPrecioEl) adminProductoPrecioEl.value = String(Math.round(Number(p.precio_base || p.precio || 0)));
+            if (adminProductoStockEl) adminProductoStockEl.value = String(Number(p.stock || 0));
+            if (adminProductoOcultoEl) adminProductoOcultoEl.checked = !Boolean(p.activo_tienda);
+            if (adminProductoMsgEl) adminProductoMsgEl.textContent = "";
+            modalAdminProductoEl.classList.add("active");
+        }
+
+        function _adminCloseQuickEdit() {
+            if (!modalAdminProductoEl) return;
+            modalAdminProductoEl.classList.remove("active");
+            adminProductoEditando = null;
+        }
+
+        async function _adminSaveQuickEdit() {
+            if (!tiendaAdminMode || !adminProductoEditando) return;
+            const precio = Number(adminProductoPrecioEl?.value || 0);
+            const stock = Number(adminProductoStockEl?.value || 0);
+            const oculto = Boolean(adminProductoOcultoEl?.checked);
+            if (!Number.isFinite(precio) || precio < 0) {
+                if (adminProductoMsgEl) adminProductoMsgEl.textContent = "Precio invalido.";
+                return;
+            }
+            if (!Number.isFinite(stock) || stock < 0) {
+                if (adminProductoMsgEl) adminProductoMsgEl.textContent = "Stock invalido.";
+                return;
+            }
+            if (adminProductoMsgEl) adminProductoMsgEl.textContent = "Guardando cambios...";
+            try {
+                const res = await fetch(`/api/tienda/admin/producto/${adminProductoEditando}/quick-update`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ precio, stock, oculto }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || "No se pudo guardar");
+                if (adminProductoMsgEl) adminProductoMsgEl.textContent = "Cambios guardados. Actualizando...";
+                setTimeout(() => window.location.reload(), 250);
+            } catch (e) {
+                if (adminProductoMsgEl) adminProductoMsgEl.textContent = String(e.message || "Error al guardar");
+            }
+        }
+
+        function _adminBindProductGestures() {
+            if (adminBindingsReady) return;
+            adminBindingsReady = true;
+            document.addEventListener("contextmenu", (ev) => {
+                if (!tiendaAdminMode) return;
+                const card = ev.target?.closest?.(".item-card[data-product-id]");
+                if (!card) return;
+                ev.preventDefault();
+                const pid = Number(card.getAttribute("data-product-id") || 0);
+                if (pid > 0) _adminOpenQuickEdit(pid);
+            });
+
+            const startLongPress = (ev) => {
+                if (!tiendaAdminMode) return;
+                const card = ev.target?.closest?.(".item-card[data-product-id]");
+                if (!card) return;
+                if (!document.body.classList.contains("mobile-ui")) return;
+                adminLongPressTriggered = false;
+                clearTimeout(adminLongPressTimer);
+                const pid = Number(card.getAttribute("data-product-id") || 0);
+                if (!pid) return;
+                adminLongPressTimer = setTimeout(() => {
+                    adminLongPressTriggered = true;
+                    _adminOpenQuickEdit(pid);
+                }, 550);
+            };
+            const endLongPress = () => {
+                clearTimeout(adminLongPressTimer);
+            };
+            document.addEventListener("touchstart", startLongPress, { passive: true });
+            document.addEventListener("touchend", endLongPress, { passive: true });
+            document.addEventListener("touchcancel", endLongPress, { passive: true });
+            document.addEventListener("touchmove", endLongPress, { passive: true });
         }
 
         function renderCategoriasMenu() {
@@ -9090,6 +9244,10 @@
 
         function agregarDesdeTarjeta(ev, id, agotado) {
             if (ev && typeof ev.stopPropagation === "function") ev.stopPropagation();
+            if (adminLongPressTriggered) {
+                adminLongPressTriggered = false;
+                return;
+            }
             if (agotado) return;
             agregar(Number(id || 0));
         }
@@ -9179,6 +9337,9 @@
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                 flowPagoHabilitado = Boolean(data.flow_enabled);
                 flowSimAdminEnabled = Boolean(data.admin_flow_sim_enabled);
+                tiendaAdminMode = Boolean(data.admin_mode);
+                _adminSetPillVisible();
+                _adminBindProductGestures();
                 paymentPricingCfg = {
                     flow_enabled: flowPagoHabilitado,
                     rate: Math.max(0, Number(data?.payment_pricing?.rate ?? 0.0319)),
@@ -11451,6 +11612,11 @@
         });
         checkoutBtnProgramarHoraEl?.addEventListener("click", () => {
             _setModoHoraCheckout(true);
+        });
+        adminProductoCerrarEl?.addEventListener("click", _adminCloseQuickEdit);
+        adminProductoGuardarEl?.addEventListener("click", _adminSaveQuickEdit);
+        modalAdminProductoEl?.addEventListener("click", (ev) => {
+            if (ev.target === modalAdminProductoEl) _adminCloseQuickEdit();
         });
         checkoutBuscarMapaEl?.addEventListener("click", _buscarDireccionCheckoutEnMapa);
         checkoutConfirmarPinEl?.addEventListener("click", _confirmarPinCheckout);
