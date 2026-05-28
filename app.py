@@ -276,7 +276,8 @@ def _proteger_area_admin():
         return redirect(url_for("tienda_publica"))
     if path.startswith("/api/"):
         return jsonify({"success": False, "error": "Acceso no autorizado."}), 401
-    return redirect(url_for("tienda_publica"))
+    destino = request.full_path if request.query_string else path
+    return redirect(url_for("admin_login", next=_normalizar_next_admin(destino)))
 
 _GO2RTC_PROCESS = None
 
