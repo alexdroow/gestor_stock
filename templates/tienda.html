@@ -4022,6 +4022,9 @@
                 </div>
                 <div class="checkout-delivery-time" id="checkout-delivery-time-wrap">
                     <label for="checkout-hora-retiro">Hora de retiro/entrega</label>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+                        <button type="button" class="btn-muted" id="checkout-btn-programar-hora">Programar retiro / despacho</button>
+                    </div>
                     <select id="checkout-hora-retiro"></select>
                     <div id="checkout-hora-help"></div>
                 </div>
@@ -4292,6 +4295,7 @@
         const checkoutEntregaDespachoEl = document.getElementById("checkout-entrega-despacho");
         const checkoutDeliveryTimeWrapEl = document.getElementById("checkout-delivery-time-wrap");
         const checkoutHoraRetiroEl = document.getElementById("checkout-hora-retiro");
+        const checkoutBtnProgramarHoraEl = document.getElementById("checkout-btn-programar-hora");
         const checkoutHoraHelpEl = document.getElementById("checkout-hora-help");
         const checkoutDespachoWrapEl = document.getElementById("checkout-despacho-wrap");
         const checkoutDireccionBuscarEl = document.getElementById("checkout-direccion-buscar");
@@ -4527,6 +4531,8 @@
         let ultimoComprobantePedido = null;
         let checkoutClientePendiente = null;
         let checkoutEntregaTipo = "retiro";
+        let checkoutHoraResumenOpenedAt = null;
+        let checkoutHoraManualActiva = false;
         let checkoutMap = null;
         let checkoutMarker = null;
         let checkoutDireccionConfirmada = false;
@@ -9656,10 +9662,10 @@
             msg(`Repeticion aplicada: ${agregados} unidad(es) agregadas${omitidos > 0 ? `, ${omitidos} omitidas por stock` : ""}.`, omitidos > 0 && agregados === 0);
         }
 
-        function _checkoutMinDateObj() {
-            const d = new Date();
+        function _checkoutMinDateObj(baseDate = null, plusMinutes = 30) {
+            const d = baseDate instanceof Date ? new Date(baseDate.getTime()) : new Date();
             d.setSeconds(0, 0);
-            d.setMinutes(d.getMinutes() + 30);
+            d.setMinutes(d.getMinutes() + Number(plusMinutes || 0));
             // El input usa step=300 (5 min): redondeamos hacia arriba para evitar horas "invalidas".
             const rem = d.getMinutes() % 5;
             if (rem !== 0) {
@@ -9668,8 +9674,8 @@
             return d;
         }
 
-        function _horaMinimaCheckoutHHMM() {
-            const d = _checkoutMinDateObj();
+        function _horaMinimaCheckoutHHMM(baseDate = null, plusMinutes = 30) {
+            const d = _checkoutMinDateObj(baseDate, plusMinutes);
             const hh = String(d.getHours()).padStart(2, "0");
             const mm = String(d.getMinutes()).padStart(2, "0");
             return `${hh}:${mm}`;
@@ -9686,6 +9692,13 @@
             const sel = new Date(now);
             sel.setHours(hh, mm, 0, 0);
             return sel.getTime() >= min.getTime();
+        }
+
+        function _esHoraMayorIgual(hora, minimo) {
+            const h = String(hora || "").trim();
+            const m = String(minimo || "").trim();
+            if (!/^\d{2}:\d{2}$/.test(h) || !/^\d{2}:\d{2}$/.test(m)) return false;
+            return h >= m;
         }
 
         function _construirOpcionesHoraCheckout(minHora, preferida) {
@@ -9710,9 +9723,9 @@
             checkoutHoraRetiroEl.value = seleccion;
         }
 
-        function _aplicarMinimoHoraCheckout(forceDefault = false) {
+        function _aplicarMinimoHoraCheckout(forceDefault = false, minHoraOverride = "") {
             if (!checkoutHoraRetiroEl) return "";
-            const minHora = _horaMinimaCheckoutHHMM();
+            const minHora = String(minHoraOverride || "").trim() || _horaMinimaCheckoutHHMM();
             const actual = String(checkoutHoraRetiroEl.value || "").trim();
             _construirOpcionesHoraCheckout(minHora, forceDefault ? "" : actual);
             return minHora;
@@ -9720,10 +9733,15 @@
 
         function _actualizarAyudaHoraCheckout() {
             if (!checkoutHoraHelpEl) return;
-            const minHora = _aplicarMinimoHoraCheckout(false) || _horaMinimaCheckoutHHMM();
+            const minHoraBase = checkoutHoraManualActiva
+                ? _horaMinimaCheckoutHHMM(checkoutHoraResumenOpenedAt, 60)
+                : _horaMinimaCheckoutHHMM(null, 30);
+            const minHora = _aplicarMinimoHoraCheckout(false, minHoraBase) || minHoraBase;
             const horaSel = String(checkoutHoraRetiroEl?.value || "").trim();
             if (!horaSel) {
-                checkoutHoraHelpEl.textContent = `La hora minima disponible es ${minHora} (30 min desde ahora).`;
+                checkoutHoraHelpEl.textContent = checkoutHoraManualActiva
+                    ? `Programacion manual activa. Hora minima: ${minHora} (1 hora desde que abriste el resumen).`
+                    : `Hora automatica asignada: ${minHora} (30 min desde ahora).`;
                 checkoutHoraHelpEl.style.color = "#64748b";
                 return;
             }
@@ -9734,6 +9752,24 @@
             }
             checkoutHoraHelpEl.textContent = `Hora seleccionada: ${horaSel}`;
             checkoutHoraHelpEl.style.color = "#166534";
+        }
+
+        function _setModoHoraCheckout(manualActiva) {
+            checkoutHoraManualActiva = Boolean(manualActiva);
+            if (checkoutHoraRetiroEl) {
+                checkoutHoraRetiroEl.style.display = checkoutHoraManualActiva ? "" : "none";
+            }
+            if (checkoutBtnProgramarHoraEl) {
+                checkoutBtnProgramarHoraEl.style.display = checkoutHoraManualActiva ? "none" : "";
+            }
+            const minHora = checkoutHoraManualActiva
+                ? _horaMinimaCheckoutHHMM(checkoutHoraResumenOpenedAt, 60)
+                : _horaMinimaCheckoutHHMM(null, 30);
+            _aplicarMinimoHoraCheckout(true, minHora);
+            _actualizarAyudaHoraCheckout();
+            if (checkoutEntregaTipo === "despacho" && checkoutHoraManualActiva) {
+                _cotizarDespachoCheckoutDesdePin();
+            }
         }
 
         function _checkoutShippingVisible() {
@@ -9954,6 +9990,8 @@
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             checkoutClientePendiente = norm.value;
             checkoutEntregaTipo = "retiro";
+            checkoutHoraResumenOpenedAt = new Date();
+            checkoutHoraManualActiva = false;
             checkoutShippingQuote = null;
             checkoutShippingError = "";
             checkoutDireccionConfirmada = false;
@@ -10007,9 +10045,9 @@
                 </div>
             `;
             if (checkoutHoraRetiroEl) {
-                _aplicarMinimoHoraCheckout(true);
+                _aplicarMinimoHoraCheckout(true, _horaMinimaCheckoutHHMM(null, 30));
             }
-            _actualizarAyudaHoraCheckout();
+            _setModoHoraCheckout(false);
             _setCheckoutEntregaTipo("retiro");
             _renderCheckoutShippingQuote();
             _renderTotalesResumenCheckout();
@@ -10029,9 +10067,14 @@
             setCheckoutStatusMsg("");
             const horaRetiro = String(checkoutHoraRetiroEl?.value || "").trim();
             if (!MODO_PRESENCIAL) {
-                if (!_esHoraCheckoutValida(horaRetiro)) {
+                const minHora = checkoutHoraManualActiva
+                    ? _horaMinimaCheckoutHHMM(checkoutHoraResumenOpenedAt, 60)
+                    : _horaMinimaCheckoutHHMM(null, 30);
+                if (!_esHoraCheckoutValida(horaRetiro) || !_esHoraMayorIgual(horaRetiro, minHora)) {
                     _actualizarAyudaHoraCheckout();
-                    return msg("Debes seleccionar una hora valida (minimo 30 min desde ahora).", true);
+                    return msg(checkoutHoraManualActiva
+                        ? "Debes elegir una hora valida (minimo 1 hora desde que abriste el resumen)."
+                        : "Debes seleccionar una hora valida (minimo 30 min desde ahora).", true);
                 }
             }
             if (!MODO_PRESENCIAL && checkoutEntregaTipo === "despacho") {
@@ -11405,6 +11448,9 @@
             } else {
                 _renderTotalesResumenCheckout();
             }
+        });
+        checkoutBtnProgramarHoraEl?.addEventListener("click", () => {
+            _setModoHoraCheckout(true);
         });
         checkoutBuscarMapaEl?.addEventListener("click", _buscarDireccionCheckoutEnMapa);
         checkoutConfirmarPinEl?.addEventListener("click", _confirmarPinCheckout);
