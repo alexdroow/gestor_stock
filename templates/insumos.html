@@ -2866,6 +2866,7 @@
         let calculadoraStateSyncTimer = null;
         let calculadoraStateEnRestauracion = false;
         let calculadoraStatePendienteSync = null;
+        let calculadoraStateCargando = false;
 
         // Modo Oscuro
 
@@ -5276,16 +5277,29 @@ let insumosData = [
             
             // Si es la calculadora, inicializar primera fila si está vacía
             if (tabName === 'calculadora') {
-                const container = document.getElementById('lista-calculo');
                 if (!calculadoraStateIntentado) {
                     calculadoraStateIntentado = true;
-                    restaurarEstadoCalculadoraMultiOrigen();
-                }
-                if (!container || container.children.length === 0) {
-                    agregarFilaCalculo();
+                    inicializarEstadoCalculadora();
+                } else if (!calculadoraStateCargando) {
+                    const container = document.getElementById('lista-calculo');
+                    if (!container || container.children.length === 0) {
+                        agregarFilaCalculo();
+                    }
                 }
                 cargarComprasPendientes();
             }
+        }
+
+        function inicializarEstadoCalculadora() {
+            calculadoraStateCargando = true;
+            restaurarEstadoCalculadoraMultiOrigen()
+                .finally(() => {
+                    const container = document.getElementById('lista-calculo');
+                    if (!container || container.children.length === 0) {
+                        agregarFilaCalculo();
+                    }
+                    calculadoraStateCargando = false;
+                });
         }
 
         function serializarEstadoCalculadora() {
@@ -5391,7 +5405,7 @@ let insumosData = [
 
         async function restaurarEstadoCalculadoraMultiOrigen() {
             try {
-                const resp = await fetch('/api/calculadora-insumos/estado');
+                const resp = await fetch('/api/calculadora-insumos/estado', { cache: 'no-store' });
                 const data = await resp.json();
                 const remotos = Array.isArray(data.items) ? data.items : [];
                 if (_restaurarEstadoCalculadoraDesdeItems(remotos)) {

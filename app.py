@@ -10439,7 +10439,10 @@ def api_calculadora_insumos_estado_get():
     try:
         resultado = obtener_calculadora_compras_draft()
         if resultado.get('success'):
-            return jsonify(resultado)
+            resp = jsonify(resultado)
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            return resp
         return jsonify(resultado), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'items': []}), 500
