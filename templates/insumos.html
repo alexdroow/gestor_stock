@@ -5327,10 +5327,15 @@ let insumosData = [
         function guardarEstadoCalculadora() {
             if (calculadoraStateEnRestauracion) return;
             const state = serializarEstadoCalculadora();
-            calculadoraStatePendienteSync = state;
             try {
                 localStorage.setItem(INSUMOS_CALCULADORA_STATE_KEY, JSON.stringify(state));
             } catch (_) {}
+            if (!Array.isArray(state.items) || state.items.length === 0) {
+                // Evita sobreescribir en servidor con estado vacio por cargas incompletas.
+                calculadoraStatePendienteSync = null;
+                return;
+            }
+            calculadoraStatePendienteSync = state;
             if (calculadoraStateSyncTimer) {
                 clearTimeout(calculadoraStateSyncTimer);
             }
