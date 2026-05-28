@@ -12876,10 +12876,24 @@ def obtener_compras_pendientes(incluir_comprados=True):
         conn.close()
 
 
+def _ensure_calculadora_compras_draft_table(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS calculadora_compras_draft (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            payload_json TEXT DEFAULT '',
+            actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute("INSERT OR IGNORE INTO calculadora_compras_draft (id, payload_json) VALUES (1, '')")
+
+
 def obtener_calculadora_compras_draft():
     conn = get_db()
     cursor = conn.cursor()
     try:
+        _ensure_calculadora_compras_draft_table(conn)
         cursor.execute("SELECT payload_json, actualizado FROM calculadora_compras_draft WHERE id = 1")
         row = cursor.fetchone()
         if not row:
@@ -12906,6 +12920,7 @@ def guardar_calculadora_compras_draft(items):
     conn = get_db()
     cursor = conn.cursor()
     try:
+        _ensure_calculadora_compras_draft_table(conn)
         cursor.execute(
             """
             INSERT INTO calculadora_compras_draft (id, payload_json, actualizado)
@@ -12929,6 +12944,7 @@ def limpiar_calculadora_compras_draft():
     conn = get_db()
     cursor = conn.cursor()
     try:
+        _ensure_calculadora_compras_draft_table(conn)
         cursor.execute(
             """
             INSERT INTO calculadora_compras_draft (id, payload_json, actualizado)
