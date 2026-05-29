@@ -7442,14 +7442,26 @@ def api_tienda_admin_producto_quick_update(producto_id):
         if not cur.fetchone():
             return jsonify({"success": False, "error": "Producto no encontrado"}), 404
 
-        cur.execute(
-            """
-            UPDATE productos
-            SET precio = ?, stock = ?, activo_tienda = ?, actualizado_en = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (float(precio), float(stock), int(activo_tienda), int(producto_id)),
-        )
+        cur.execute("PRAGMA table_info(productos)")
+        cols = {str(r["name"]).strip().lower() for r in (cur.fetchall() or []) if r and r["name"]}
+        if "actualizado_en" in cols:
+            cur.execute(
+                """
+                UPDATE productos
+                SET precio = ?, stock = ?, activo_tienda = ?, actualizado_en = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (float(precio), float(stock), int(activo_tienda), int(producto_id)),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE productos
+                SET precio = ?, stock = ?, activo_tienda = ?
+                WHERE id = ?
+                """,
+                (float(precio), float(stock), int(activo_tienda), int(producto_id)),
+            )
         conn.commit()
         crear_backup()
         return jsonify({"success": True, "message": "Producto actualizado"})
