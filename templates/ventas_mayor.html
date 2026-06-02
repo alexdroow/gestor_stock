@@ -368,6 +368,9 @@
             align-items: end;
             margin-bottom: 10px;
         }
+        .history-filters.unified-filter {
+            grid-template-columns: minmax(220px, 1fr) 160px 160px 120px 160px;
+        }
         .history-list {
             display: grid;
             gap: 8px;
@@ -419,11 +422,11 @@
             .layout { grid-template-columns: 1fr; }
             .products-grid { max-height: none; }
             .summary-band { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .history-filters { grid-template-columns: 1fr 1fr; }
+            .history-filters, .history-filters.unified-filter { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 620px) {
             .page-header { flex-direction: column; }
-            .form-grid, .tools-row, .cart-grid, .history-filters, .seller-actions { grid-template-columns: 1fr; }
+            .form-grid, .tools-row, .cart-grid, .history-filters, .history-filters.unified-filter, .seller-actions { grid-template-columns: 1fr; }
             .summary-band { grid-template-columns: 1fr; }
         }
     </style>
@@ -529,9 +532,11 @@
                     <span>Historial y vendedores</span>
                     <button type="button" class="btn btn-outline" onclick="cargarHistorialMayor()">Actualizar</button>
                 </div>
-                <div class="history-filters">
-                    <label>Buscar vendedor
-                        <input id="filtro-vendedor" type="search" placeholder="Buscar vendedor...">
+                <div class="history-filters unified-filter">
+                    <label>Vendedor activo
+                        <select id="filtro-vendedor-id">
+                            <option value="">Todos los vendedores</option>
+                        </select>
                     </label>
                     <label>Desde
                         <input id="filtro-desde" type="date">
@@ -540,17 +545,7 @@
                         <input id="filtro-hasta" type="date">
                     </label>
                     <button type="button" class="btn btn-primary" onclick="cargarHistorialMayor()">Filtrar</button>
-                </div>
-                <div class="history-filters" style="grid-template-columns:minmax(0,1fr) 160px 180px;">
-                    <label>Reporte semanal vendedor
-                        <select id="pdf-vendedor-id">
-                            <option value="">Selecciona vendedor...</option>
-                        </select>
-                    </label>
-                    <label>Semana
-                        <input id="pdf-semana" type="date">
-                    </label>
-                    <button type="button" class="btn btn-success" onclick="descargarReporteSemanalMayorista()">PDF semanal</button>
+                    <button type="button" class="btn btn-success" onclick="descargarReporteSemanalMayorista()">PDF del filtro</button>
                 </div>
                 <div class="layout" style="grid-template-columns:minmax(0,1fr) minmax(320px,.55fr);">
                     <div class="history-list" id="history-list"></div>
@@ -608,7 +603,7 @@
         }
         function renderVendedoresMayoristas(selectedId = '') {
             const select = document.getElementById('vendedor-id');
-            const pdfSelect = document.getElementById('pdf-vendedor-id');
+            const filterSelect = document.getElementById('filtro-vendedor-id');
             const actual = String(selectedId || select.value || '');
             const options = '<option value="">Selecciona vendedor...</option>' + vendedoresMayoristas.map((v) => (
                 `<option value="${Number(v.id || 0)}">${esc(v.nombre)}${v.contacto ? ' - ' + esc(v.contacto) : ''}</option>`
@@ -617,10 +612,12 @@
                 select.innerHTML = options;
                 if (actual) select.value = actual;
             }
-            if (pdfSelect) {
-                const pdfActual = String(pdfSelect.value || actual || '');
-                pdfSelect.innerHTML = options;
-                if (pdfActual) pdfSelect.value = pdfActual;
+            if (filterSelect) {
+                const filterActual = String(filterSelect.value || '');
+                filterSelect.innerHTML = '<option value="">Todos los vendedores</option>' + vendedoresMayoristas.map((v) => (
+                    `<option value="${Number(v.id || 0)}">${esc(v.nombre)}${v.contacto ? ' - ' + esc(v.contacto) : ''}</option>`
+                )).join('');
+                if (filterActual) filterSelect.value = filterActual;
             }
             renderVendedoresActivos();
             actualizarVendedorSeleccionado();
@@ -940,10 +937,10 @@
         }
         async function cargarHistorialMayor() {
             const qs = new URLSearchParams();
-            const vendedor = document.getElementById('filtro-vendedor')?.value || '';
+            const vendedorId = Number(document.getElementById('filtro-vendedor-id')?.value || 0);
             const desde = document.getElementById('filtro-desde')?.value || '';
             const hasta = document.getElementById('filtro-hasta')?.value || '';
-            if (vendedor.trim()) qs.set('vendedor', vendedor.trim());
+            if (vendedorId > 0) qs.set('vendedor_id', String(vendedorId));
             if (desde) qs.set('desde', desde);
             if (hasta) qs.set('hasta', hasta);
             const res = await fetch(`/api/ventas/mayoristas?${qs.toString()}`, { headers: { Accept: 'application/json' } });
@@ -952,10 +949,12 @@
             renderHistorial(data);
         }
         function descargarReporteSemanalMayorista() {
-            const vendedorId = Number(document.getElementById('pdf-vendedor-id')?.value || document.getElementById('vendedor-id')?.value || 0);
-            const semana = document.getElementById('pdf-semana')?.value || todayIso();
-            if (!vendedorId) return status('Selecciona un vendedor para generar el PDF semanal.', true);
-            const qs = new URLSearchParams({ vendedor_id: String(vendedorId), semana });
+            const vendedorId = Number(document.getElementById('filtro-vendedor-id')?.value || 0);
+            const desde = document.getElementById('filtro-desde')?.value || '';
+            const hasta = document.getElementById('filtro-hasta')?.value || '';
+            if (!vendedorId) return status('Selecciona un vendedor para generar el PDF del filtro.', true);
+            if (!desde || !hasta) return status('Selecciona fecha desde y hasta para generar el PDF.', true);
+            const qs = new URLSearchParams({ vendedor_id: String(vendedorId), desde, hasta });
             window.open(`/api/ventas/mayoristas/reporte-semanal.pdf?${qs.toString()}`, '_blank', 'noopener');
         }
         document.getElementById('product-search')?.addEventListener('input', renderProductos);
@@ -965,17 +964,13 @@
             if (!btn) return;
             guardarPerfilVendedorMayorista(Number(btn.dataset.sellerSave || 0));
         });
-        document.getElementById('filtro-vendedor')?.addEventListener('input', () => {
-            clearTimeout(window.__mayorFilterTimer);
-            window.__mayorFilterTimer = setTimeout(() => cargarHistorialMayor().catch(console.error), 280);
-        });
+        document.getElementById('filtro-vendedor-id')?.addEventListener('change', () => cargarHistorialMayor().catch(console.error));
         document.getElementById('filtro-desde')?.addEventListener('change', () => cargarHistorialMayor().catch(console.error));
         document.getElementById('filtro-hasta')?.addEventListener('change', () => cargarHistorialMayor().catch(console.error));
         document.getElementById('venta-fecha').value = todayIso();
         const defaultRange = monthRangeIso();
         document.getElementById('filtro-desde').value = defaultRange.desde;
         document.getElementById('filtro-hasta').value = defaultRange.hasta;
-        document.getElementById('pdf-semana').value = todayIso();
         renderVendedoresMayoristas();
         renderProductos();
         renderCarrito();

@@ -12120,6 +12120,13 @@ def _parse_pct_mayor(value):
     return max(0.0, min(100.0, pct))
 
 
+def _parse_int_mayor(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_hasta):
     if canvas is None:
         raise RuntimeError("ReportLab no esta instalado en el entorno.")
@@ -12168,7 +12175,7 @@ def _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_ha
     c.setFont("Helvetica-Bold", 16)
     c.drawString(50, height - 62, "Sucree Pasteleria")
     c.setFont("Helvetica", 9)
-    c.drawString(50, height - 78, "Reporte semanal de ventas por mayor")
+    c.drawString(50, height - 78, "Reporte de ventas por mayor")
     c.drawRightString(width - 50, height - 62, f"{fecha_desde} al {fecha_hasta}")
     c.setFillColorRGB(0, 0, 0)
     y = height - 122
@@ -12194,9 +12201,9 @@ def _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_ha
     c.setFillColorRGB(0, 0, 0)
     y -= 88
 
-    line("Detalle semanal", bold=True, size=11, dy=18)
+    line("Detalle del periodo", bold=True, size=11, dy=18)
     if not ventas:
-        line("No hay ventas registradas para este vendedor en la semana seleccionada.")
+        line("No hay ventas registradas para este vendedor en el rango seleccionado.")
     for venta in ventas:
         line(f"{venta.get('fecha')} - {venta.get('codigo_operacion') or '#' + str(venta.get('id'))}", bold=True, size=10)
         line(f"Cliente final: {venta.get('cliente_nombre') or '-'} | Total: {_fmt_clp_mayor(venta.get('total_bruto'))} | Comision venta: {_fmt_clp_mayor(venta.get('total_comision'))} | A transferir: {_fmt_clp_mayor(venta.get('total_neto'))}", size=8)
@@ -12322,8 +12329,11 @@ def api_ventas_mayoristas_listar():
         fecha_desde = str(request.args.get("desde") or "").strip()[:10]
         fecha_hasta = str(request.args.get("hasta") or "").strip()[:10]
         vendedor = str(request.args.get("vendedor") or "").strip()
+        vendedor_id = _parse_int_mayor(request.args.get("vendedor_id"), 0)
         if not fecha_desde and not fecha_hasta:
             fecha_desde, fecha_hasta = _ventas_mayor_mes_actual()
+        if fecha_desde and fecha_hasta and fecha_desde > fecha_hasta:
+            fecha_desde, fecha_hasta = fecha_hasta, fecha_desde
         conn = get_db()
         cur = conn.cursor()
         _ensure_ventas_mayoristas_tables(cur)
@@ -12335,7 +12345,10 @@ def api_ventas_mayoristas_listar():
         if fecha_hasta:
             where.append("fecha <= ?")
             params.append(fecha_hasta)
-        if vendedor:
+        if vendedor_id > 0:
+            where.append("vendedor_id = ?")
+            params.append(vendedor_id)
+        elif vendedor:
             where.append("LOWER(vendedor_nombre) LIKE ?")
             params.append(f"%{vendedor.lower()}%")
         where_sql = ("WHERE " + " AND ".join(where)) if where else ""
@@ -12404,10 +12417,19 @@ def api_ventas_mayoristas_listar():
 def api_ventas_mayoristas_reporte_semanal_pdf():
     conn = None
     try:
-        vendedor_id = int(request.args.get("vendedor_id") or 0)
+        vendedor_id = _parse_int_mayor(request.args.get("vendedor_id"), 0)
         if vendedor_id <= 0:
             return jsonify({"success": False, "error": "Selecciona un vendedor"}), 400
-        fecha_desde, fecha_hasta = _ventas_mayor_semana_por_fecha(request.args.get("semana") or request.args.get("fecha"))
+        fecha_desde = str(request.args.get("desde") or "").strip()[:10]
+        fecha_hasta = str(request.args.get("hasta") or "").strip()[:10]
+        if not fecha_desde and not fecha_hasta:
+            fecha_desde, fecha_hasta = _ventas_mayor_semana_por_fecha(request.args.get("semana") or request.args.get("fecha"))
+        elif not fecha_desde:
+            fecha_desde = fecha_hasta
+        elif not fecha_hasta:
+            fecha_hasta = fecha_desde
+        if fecha_desde and fecha_hasta and fecha_desde > fecha_hasta:
+            fecha_desde, fecha_hasta = fecha_hasta, fecha_desde
         conn = get_db()
         cur = conn.cursor()
         _ensure_ventas_mayoristas_tables(cur)
