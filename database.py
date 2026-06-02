@@ -8205,6 +8205,22 @@ def migrar_db():
         _ensure_column(conn, "tienda_visitas", "ip_address", "TEXT")
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_ip_geo_cache (
+                ip_address TEXT PRIMARY KEY,
+                label TEXT,
+                city TEXT,
+                region TEXT,
+                country TEXT,
+                latitude REAL,
+                longitude REAL,
+                provider TEXT,
+                status TEXT DEFAULT 'ok',
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS tienda_descuento_campanas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT NOT NULL DEFAULT '',

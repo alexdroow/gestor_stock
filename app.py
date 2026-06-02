@@ -14,6 +14,7 @@ import csv
 import shutil
 import hashlib
 import hmac
+import ipaddress
 import subprocess
 import threading
 import sqlite3
@@ -7617,6 +7618,22 @@ def api_tienda_admin_cupones_delete(cupon_id):
 def _ensure_adm_pagina_tables(cursor):
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS tienda_ip_geo_cache (
+            ip_address TEXT PRIMARY KEY,
+            label TEXT,
+            city TEXT,
+            region TEXT,
+            country TEXT,
+            latitude REAL,
+            longitude REAL,
+            provider TEXT,
+            status TEXT DEFAULT 'ok',
+            actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS tienda_descuento_campanas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL DEFAULT '',
@@ -7655,6 +7672,7 @@ def api_adm_pagina_realtime():
     try:
         conn = get_db()
         cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
         cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-30 seconds')")
         visitantes = int(cursor.fetchone()["total"] or 0)
         cursor.execute(
@@ -7716,17 +7734,40 @@ def api_adm_pagina_realtime():
         compras_recientes = int(cursor.fetchone()["total"] or 0)
         cursor.execute(
             """
-            SELECT COALESCE(NULLIF(TRIM(ip_address), ''), 'Chile / ubicacion no detectada') AS ubicacion,
+            SELECT COALESCE(NULLIF(TRIM(ip_address), ''), 'sin-ip') AS ip_address,
                    COUNT(*) AS sesiones,
+                   COALESCE(SUM(COALESCE(carrito_items, 0)), 0) AS carrito_items,
+                   SUM(CASE
+                        WHEN checkouts > 0
+                         AND datetime(COALESCE(ultimo_checkout, ultima_actividad)) >= datetime('now', '-15 minutes')
+                        THEN 1 ELSE 0 END) AS en_pago,
                    MAX(ultima_actividad) AS ultima
             FROM tienda_visitas
             WHERE datetime(ultima_actividad) >= datetime('now', '-30 minutes')
-            GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'Chile / ubicacion no detectada')
+            GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'sin-ip')
             ORDER BY sesiones DESC, datetime(ultima) DESC
-            LIMIT 8
+            LIMIT 12
             """
         )
-        ubicaciones = [dict(r) for r in cursor.fetchall()]
+        ubicaciones = []
+        for r in cursor.fetchall():
+            item = dict(r)
+            geo = _adm_geo_for_ip(cursor, item.get("ip_address"))
+            ubicaciones.append(
+                {
+                    "ubicacion": geo.get("label") or "Chile / ubicacion no detectada",
+                    "ip_mask": geo.get("ip_mask") or "",
+                    "lat": geo.get("latitude"),
+                    "lng": geo.get("longitude"),
+                    "geo_status": geo.get("status") or "",
+                    "provider": geo.get("provider") or "",
+                    "sesiones": int(item.get("sesiones") or 0),
+                    "carrito_items": int(item.get("carrito_items") or 0),
+                    "en_pago": int(item.get("en_pago") or 0),
+                    "ultima": item.get("ultima"),
+                }
+            )
+        conn.commit()
         cursor.execute(
             """
             SELECT evento, pagina, creado_en
@@ -7778,6 +7819,152 @@ def _adm_parse_fecha(raw):
         return None
     datetime.strptime(txt, "%Y-%m-%d")
     return txt
+
+
+def _adm_ip_publica_valida(ip_raw):
+    txt = str(ip_raw or "").strip()
+    if not txt:
+        return False
+    try:
+        ip_obj = ipaddress.ip_address(txt)
+        return not (
+            ip_obj.is_private
+            or ip_obj.is_loopback
+            or ip_obj.is_link_local
+            or ip_obj.is_multicast
+            or ip_obj.is_reserved
+            or ip_obj.is_unspecified
+        )
+    except ValueError:
+        return False
+
+
+def _adm_mask_ip(ip_raw):
+    txt = str(ip_raw or "").strip()
+    if not txt:
+        return ""
+    if ":" in txt:
+        return txt[:14] + "..." if len(txt) > 14 else txt
+    parts = txt.split(".")
+    if len(parts) == 4:
+        return ".".join(parts[:2] + ["x", "x"])
+    return txt[:10] + "..." if len(txt) > 10 else txt
+
+
+def _adm_geo_fallback(ip_raw, status="fallback"):
+    return {
+        "ip_address": str(ip_raw or "").strip(),
+        "ip_mask": _adm_mask_ip(ip_raw),
+        "label": "Chile / ubicacion no detectada",
+        "city": "",
+        "region": "",
+        "country": "Chile",
+        "latitude": -33.4489,
+        "longitude": -70.6693,
+        "provider": "fallback",
+        "status": status,
+    }
+
+
+def _adm_lookup_ip_geo(ip_raw):
+    ip_txt = str(ip_raw or "").strip()
+    if not _adm_ip_publica_valida(ip_txt):
+        return _adm_geo_fallback(ip_txt, status="private")
+    if not _bool_env("GESTIONSTOCK_GEOIP_ENABLED", True):
+        return _adm_geo_fallback(ip_txt, status="disabled")
+    try:
+        url = f"https://ipapi.co/{quote(ip_txt)}/json/"
+        req = UrlRequest(url, headers={"User-Agent": "SucreeStock-Realtime/1.0"})
+        with urlopen(req, timeout=2.5) as resp:
+            payload = json.loads(resp.read().decode("utf-8", errors="ignore") or "{}")
+        if payload.get("error"):
+            return _adm_geo_fallback(ip_txt, status="error")
+        lat = payload.get("latitude")
+        lng = payload.get("longitude")
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
+            return _adm_geo_fallback(ip_txt, status="no_coords")
+        city = str(payload.get("city") or "").strip()
+        region = str(payload.get("region") or "").strip()
+        country = str(payload.get("country_name") or payload.get("country") or "").strip()
+        label = " - ".join([x for x in [country, region, city] if x]) or "Ubicacion detectada"
+        return {
+            "ip_address": ip_txt,
+            "ip_mask": _adm_mask_ip(ip_txt),
+            "label": label[:180],
+            "city": city[:80],
+            "region": region[:100],
+            "country": country[:80],
+            "latitude": lat,
+            "longitude": lng,
+            "provider": "ipapi.co",
+            "status": "ok",
+        }
+    except Exception:
+        return _adm_geo_fallback(ip_txt, status="error")
+
+
+def _adm_geo_for_ip(cursor, ip_raw):
+    ip_txt = str(ip_raw or "").strip()
+    if not ip_txt:
+        return _adm_geo_fallback("", status="empty")
+    cursor.execute(
+        """
+        SELECT *
+        FROM tienda_ip_geo_cache
+        WHERE ip_address = ?
+          AND datetime(COALESCE(actualizado_en, '1970-01-01')) >= datetime('now', '-30 days')
+        LIMIT 1
+        """,
+        (ip_txt,),
+    )
+    row = cursor.fetchone()
+    if row:
+        data = dict(row)
+        return {
+            "ip_address": ip_txt,
+            "ip_mask": _adm_mask_ip(ip_txt),
+            "label": str(data.get("label") or "").strip() or "Chile / ubicacion no detectada",
+            "city": str(data.get("city") or ""),
+            "region": str(data.get("region") or ""),
+            "country": str(data.get("country") or ""),
+            "latitude": float(data.get("latitude") or -33.4489),
+            "longitude": float(data.get("longitude") or -70.6693),
+            "provider": str(data.get("provider") or "cache"),
+            "status": str(data.get("status") or "ok"),
+        }
+    geo = _adm_lookup_ip_geo(ip_txt)
+    cursor.execute(
+        """
+        INSERT INTO tienda_ip_geo_cache (
+            ip_address, label, city, region, country, latitude, longitude, provider, status, actualizado_en
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(ip_address) DO UPDATE SET
+            label = excluded.label,
+            city = excluded.city,
+            region = excluded.region,
+            country = excluded.country,
+            latitude = excluded.latitude,
+            longitude = excluded.longitude,
+            provider = excluded.provider,
+            status = excluded.status,
+            actualizado_en = CURRENT_TIMESTAMP
+        """,
+        (
+            ip_txt,
+            geo.get("label"),
+            geo.get("city"),
+            geo.get("region"),
+            geo.get("country"),
+            geo.get("latitude"),
+            geo.get("longitude"),
+            geo.get("provider"),
+            geo.get("status"),
+        ),
+    )
+    return geo
 
 
 @app.route('/api/adm-pagina/descuentos', methods=['GET'])

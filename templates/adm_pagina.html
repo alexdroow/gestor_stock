@@ -78,6 +78,8 @@
         .map-points { position: absolute; inset: 0; z-index: 3; border-radius: 50%; overflow: hidden; }
         .map-point { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: #22d3ee; transform: translate(-50%, -50%); box-shadow: 0 0 0 5px rgba(34,211,238,.22), 0 0 18px rgba(14,165,233,.7); }
         .map-point.order { background: #8b5cf6; box-shadow: 0 0 0 5px rgba(139,92,246,.2), 0 0 18px rgba(139,92,246,.7); }
+        .map-point.checkout { background: #f59e0b; box-shadow: 0 0 0 6px rgba(245,158,11,.22), 0 0 20px rgba(245,158,11,.75); }
+        .map-point:hover:after { content: attr(data-label); position: absolute; left: 14px; top: -10px; min-width: 170px; max-width: 230px; background: rgba(15,23,42,.92); color: white; border-radius: 10px; padding: 8px 10px; font-size: 11px; line-height: 1.35; z-index: 8; pointer-events: none; }
         .map-tools { position: absolute; top: 18px; right: 18px; display: flex; gap: 8px; z-index: 2; }
         .map-search { min-width: 300px; border: 1px solid #94a3b8; border-radius: 10px; padding: 10px 12px; background: white; box-shadow: 0 8px 22px rgba(15,23,42,.07); }
         .legend { position: absolute; bottom: 18px; right: 18px; background: rgba(255,255,255,.88); border: 1px solid var(--line); border-radius: 999px; padding: 10px 14px; display: flex; gap: 14px; font-weight: 700; color: #475569; }
@@ -89,6 +91,7 @@
         .location-row { display: grid; gap: 7px; padding: 11px 0; border-bottom: 1px solid #eef2f7; }
         .location-row:last-child { border-bottom: none; }
         .location-meta { display: flex; justify-content: space-between; gap: 10px; color: #475569; font-size: 12px; font-weight: 700; }
+        .location-extra { color: #64748b; font-size: 11px; display: flex; gap: 8px; flex-wrap: wrap; }
         .location-bar { height: 64px; border-radius: 3px; background: linear-gradient(90deg, #0ea5e9, #22d3ee); box-shadow: inset 0 -18px 22px rgba(2,132,199,.12); min-width: 4px; }
         .rt-refresh-chip { position: absolute; left: 18px; bottom: 18px; z-index: 2; background: rgba(15,23,42,.82); color: white; border-radius: 999px; padding: 10px 13px; font-size: 12px; font-weight: 800; }
         .muted { color: var(--muted); }
@@ -175,7 +178,7 @@
                     </div>
                     <div class="globe" aria-hidden="true"><div class="map-points" id="rt-map-points"></div></div>
                     <div class="rt-refresh-chip">Actualiza cada 1 segundo</div>
-                    <div class="legend"><span><i class="dot order"></i>Pedidos</span><span><i class="dot"></i>Visitantes ahora</span></div>
+                    <div class="legend"><span><i class="dot order"></i>Pedidos</span><span><i class="dot"></i>Visitantes</span><span><i class="dot" style="background:#f59e0b;"></i>En pago</span></div>
                 </div>
             </section>
 
@@ -235,7 +238,7 @@
 
     <script>
         const money = (v) => '$' + Math.round(Number(v || 0)).toLocaleString('es-CL');
-        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], selected: new Set() };
+        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], selected: new Set(), realtime: null };
         const $ = (id) => document.getElementById(id);
         const pointSeed = (txt) => {
             let h = 0;
@@ -259,6 +262,7 @@
                 const res = await fetch('/api/adm-pagina/realtime', { headers: { Accept: 'application/json' }, cache: 'no-store' });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo cargar realtime');
+                state.realtime = data;
                 const m = data.metrics || {};
                 $('rt-visitantes').textContent = m.visitantes || 0;
                 $('rt-ventas').textContent = money(m.ventas_total || 0);
@@ -270,8 +274,9 @@
                 $('rt-server-time').textContent = data.server_time
                     ? `Ultima lectura ${new Date(data.server_time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
                     : 'Ahora mismo';
-                $('rt-ubicaciones').innerHTML = (data.ubicaciones || []).length
-                    ? renderUbicaciones(data.ubicaciones || [])
+                const ubicacionesFiltradas = filtrarUbicaciones(data.ubicaciones || []);
+                $('rt-ubicaciones').innerHTML = ubicacionesFiltradas.length
+                    ? renderUbicaciones(ubicacionesFiltradas)
                     : '<div class="muted">Sin actividad aun.</div>';
                 const eventos = [
                     ...(data.pedidos_recientes || []).map((p) => ({ etiqueta: `Pedido #${p.id}`, meta: `${money(p.total_monto)} - ${p.pedido_estado || 'recibido'}` })),
@@ -280,7 +285,7 @@
                 $('rt-eventos').innerHTML = eventos.length
                     ? eventos.map((e) => `<div class="list-item"><span>${escapeHtml(e.etiqueta)}</span><small class="muted">${escapeHtml(e.meta)}</small></div>`).join('')
                     : '<div class="muted">Esperando actividad.</div>';
-                renderMapPoints(data);
+                renderMapPoints({ ...data, ubicaciones: ubicacionesFiltradas });
             } catch (err) {
                 $('rt-eventos').innerHTML = `<div class="muted">${escapeHtml(err.message || 'Error realtime')}</div>`;
             }
@@ -295,22 +300,57 @@
             return 'Visita tienda';
         }
 
+        function filtrarUbicaciones(items) {
+            const q = String($('rt-search')?.value || '').trim().toLowerCase();
+            if (!q) return items;
+            return items.filter((u) => `${u.ubicacion || ''} ${u.ip_mask || ''} ${u.provider || ''}`.toLowerCase().includes(q));
+        }
+
         function renderUbicaciones(items) {
             const max = Math.max(1, ...items.map((u) => Number(u.sesiones || 0)));
             return items.map((u) => {
                 const val = Number(u.sesiones || 0);
                 const pct = Math.max(8, Math.min(100, Math.round((val / max) * 100)));
+                const buying = Number(u.en_pago || 0);
+                const cartItems = Number(u.carrito_items || 0);
                 return `<div class="location-row">
                     <div class="location-meta"><span>${escapeHtml(u.ubicacion || 'Chile - ubicacion no detectada')}</span><span>${val}</span></div>
+                    <div class="location-extra"><span>IP ${escapeHtml(u.ip_mask || '-')}</span><span>Carrito ${cartItems}</span><span>En pago ${buying}</span></div>
                     <div class="location-bar" style="width:${pct}%"></div>
                 </div>`;
             }).join('');
         }
 
+        function projectGeoPoint(lat, lng, fallbackKey) {
+            const latNum = Number(lat);
+            const lngNum = Number(lng);
+            if (Number.isFinite(latNum) && Number.isFinite(lngNum)) {
+                const x = ((lngNum + 180) / 360) * 100;
+                const y = ((90 - latNum) / 180) * 100;
+                return {
+                    x: Math.max(10, Math.min(90, x)),
+                    y: Math.max(10, Math.min(90, y)),
+                };
+            }
+            const seed = pointSeed(fallbackKey || 'fallback');
+            const angle = (seed % 360) * Math.PI / 180;
+            const radius = 18 + (seed % 46);
+            return {
+                x: Math.max(14, Math.min(86, 50 + Math.cos(angle) * radius)),
+                y: Math.max(14, Math.min(86, 50 + Math.sin(angle) * radius * .82)),
+            };
+        }
+
         function renderMapPoints(data) {
             const box = $('rt-map-points');
             if (!box) return;
-            const visitors = (data.ubicaciones || []).slice(0, 12).map((u) => ({ key: u.ubicacion, type: 'visitor' }));
+            const visitors = (data.ubicaciones || []).slice(0, 12).map((u) => ({
+                key: `${u.ubicacion}-${u.ip_mask}`,
+                type: Number(u.en_pago || 0) > 0 ? 'checkout' : 'visitor',
+                lat: u.lat,
+                lng: u.lng,
+                label: `${u.ubicacion || 'Ubicacion no detectada'} | Sesiones: ${u.sesiones || 0} | En pago: ${u.en_pago || 0}`,
+            }));
             const orders = (data.pedidos_recientes || []).slice(0, 6).map((p) => ({ key: `pedido-${p.id}`, type: 'order' }));
             const points = [...visitors, ...orders];
             if (!points.length) {
@@ -318,14 +358,10 @@
                 return;
             }
             box.innerHTML = points.map((p, idx) => {
-                const seed = pointSeed(`${p.key}-${idx}`);
-                const angle = (seed % 360) * Math.PI / 180;
-                const radius = 18 + (seed % 46);
-                const x = 50 + Math.cos(angle) * radius;
-                const y = 50 + Math.sin(angle) * radius * .82;
-                const safeX = Math.max(14, Math.min(86, x));
-                const safeY = Math.max(14, Math.min(86, y));
-                return `<span class="map-point ${p.type === 'order' ? 'order' : ''}" style="left:${safeX}%;top:${safeY}%;"></span>`;
+                const pos = projectGeoPoint(p.lat, p.lng, `${p.key}-${idx}`);
+                const klass = p.type === 'order' ? 'order' : (p.type === 'checkout' ? 'checkout' : '');
+                const label = p.label || (p.type === 'order' ? 'Pedido reciente' : 'Visitante en tienda');
+                return `<span class="map-point ${klass}" data-label="${escapeHtml(label)}" style="left:${pos.x}%;top:${pos.y}%;"></span>`;
             }).join('');
         }
         function escapeHtml(v) {
@@ -375,7 +411,7 @@
                 return `<label class="check-row" style="text-transform:none;letter-spacing:0;color:var(--ink);font-size:13px;">
                     <input type="checkbox" data-producto-id="${Number(p.id)}" ${checked ? 'checked' : ''}>
                     <span><strong>${escapeHtml(p.nombre)}</strong><br><span class="muted">${escapeHtml(p.categoria_tienda || 'General')} - ${money(p.precio || 0)}</span></span>
-                    <span class="badge ${active ? 'green' : 'orange'}">${active ? 'Activo' : 'Oculto'}${pct ? ` - -${pct}%` : ''}</span>
+                    <span class="badge ${active ? 'green' : 'orange'}">${active ? 'Activo' : 'Oculto'}${pct ? ` -${pct}%` : ''}</span>
                 </label>`;
             }).join('') : '<div class="muted">Sin productos.</div>';
         }
@@ -474,6 +510,12 @@
         $('btn-limpiar-descuento').addEventListener('click', () => limpiarForm(true));
         $('btn-refrescar-descuentos').addEventListener('click', loadDescuentos);
         $('btn-crear-descuento').addEventListener('click', () => document.getElementById('discount-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        $('rt-search').addEventListener('input', () => {
+            if (!state.realtime) return;
+            const ubicacionesFiltradas = filtrarUbicaciones(state.realtime.ubicaciones || []);
+            $('rt-ubicaciones').innerHTML = ubicacionesFiltradas.length ? renderUbicaciones(ubicacionesFiltradas) : '<div class="muted">Sin ubicaciones con ese filtro.</div>';
+            renderMapPoints({ ...state.realtime, ubicaciones: ubicacionesFiltradas });
+        });
 
         setTipo('productos');
         setTab(new URLSearchParams(window.location.search).get('tab') || 'realtime');
