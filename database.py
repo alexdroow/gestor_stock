@@ -8205,6 +8205,31 @@ def migrar_db():
         _ensure_column(conn, "tienda_visitas", "ip_address", "TEXT")
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_descuento_campanas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL DEFAULT '',
+                tipo TEXT NOT NULL DEFAULT 'productos',
+                descuento_tipo TEXT NOT NULL DEFAULT 'porcentaje',
+                valor REAL NOT NULL DEFAULT 0,
+                fecha_inicio TEXT,
+                fecha_fin TEXT,
+                target_json TEXT,
+                cupon_id INTEGER,
+                activo INTEGER NOT NULL DEFAULT 1,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(cupon_id) REFERENCES tienda_cupones(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_descuento_campanas_estado
+            ON tienda_descuento_campanas(activo, fecha_inicio, fecha_fin)
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS tienda_clientes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT DEFAULT '',

@@ -341,6 +341,19 @@
                 <a href="/historial-ventas" class="nav-subitem">Historial de ventas</a>
             </div>
         </details>
+        <details class="nav-group" id="nav-group-adm-pagina">
+            <summary class="nav-item">
+                <span class="nav-item-main">
+                    <span class="icon">&#128200;</span>
+                    <span>Adm. p&aacute;gina</span>
+                </span>
+                <span class="nav-caret">&#9662;</span>
+            </summary>
+            <div class="nav-submenu">
+                <a href="/adm-pagina?tab=realtime" class="nav-subitem">Vista en tiempo real</a>
+                <a href="/adm-pagina?tab=descuentos" class="nav-subitem">Descuentos</a>
+            </div>
+        </details>
         <a href="/reportes" class="nav-item sucree-hide-reportes">
             <span class="icon">&#128202;</span>
             <span>Reportes</span>
@@ -411,6 +424,15 @@
                 currentPath === '/ventas/mayor' ||
                 currentPath === '/historial-ventas'
             ) {
+                details.open = true;
+            }
+        })();
+
+        (function () {
+            const details = document.getElementById('nav-group-adm-pagina');
+            if (!details) return;
+            const currentPath = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+            if (currentPath === '/adm-pagina') {
                 details.open = true;
             }
         })();

@@ -7614,6 +7614,396 @@ def api_tienda_admin_cupones_delete(cupon_id):
             conn.close()
 
 
+def _ensure_adm_pagina_tables(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tienda_descuento_campanas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL DEFAULT '',
+            tipo TEXT NOT NULL DEFAULT 'productos',
+            descuento_tipo TEXT NOT NULL DEFAULT 'porcentaje',
+            valor REAL NOT NULL DEFAULT 0,
+            fecha_inicio TEXT,
+            fecha_fin TEXT,
+            target_json TEXT,
+            cupon_id INTEGER,
+            activo INTEGER NOT NULL DEFAULT 1,
+            creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+            actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(cupon_id) REFERENCES tienda_cupones(id)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_tienda_descuento_campanas_estado
+        ON tienda_descuento_campanas(activo, fecha_inicio, fecha_fin)
+        """
+    )
+
+
+@app.route('/adm-pagina')
+def adm_pagina():
+    return render_template('adm_pagina.html')
+
+
+@app.route('/api/adm-pagina/realtime', methods=['GET'])
+def api_adm_pagina_realtime():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-30 seconds')")
+        visitantes = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tienda_visitas_eventos
+            WHERE evento IN ('view', 'enter')
+              AND datetime(creado_en) >= datetime('now', '-30 minutes')
+            """
+        )
+        sesiones = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(COALESCE(total_monto, 0)), 0) AS total
+            FROM ventas
+            WHERE canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+              AND date(fecha_hora, 'localtime') = date('now', 'localtime')
+              AND LOWER(COALESCE(pedido_estado, '')) NOT IN ('anulado', 'cancelado')
+            """
+        )
+        ventas_total = float(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM ventas
+            WHERE canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+              AND date(fecha_hora, 'localtime') = date('now', 'localtime')
+              AND LOWER(COALESCE(pedido_estado, '')) NOT IN ('anulado', 'cancelado')
+            """
+        )
+        pedidos = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tienda_visitas
+            WHERE carrito_items > 0
+              AND datetime(ultima_actividad) >= datetime('now', '-10 minutes')
+            """
+        )
+        carritos = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tienda_visitas
+            WHERE checkouts > 0
+              AND datetime(COALESCE(ultimo_checkout, ultima_actividad)) >= datetime('now', '-15 minutes')
+            """
+        )
+        en_pago = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM ventas
+            WHERE canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+              AND datetime(fecha_hora) >= datetime('now', '-30 minutes')
+              AND LOWER(COALESCE(pedido_estado, '')) NOT IN ('anulado', 'cancelado')
+            """
+        )
+        compras_recientes = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT COALESCE(NULLIF(TRIM(ip_address), ''), 'Chile / ubicacion no detectada') AS ubicacion,
+                   COUNT(*) AS sesiones,
+                   MAX(ultima_actividad) AS ultima
+            FROM tienda_visitas
+            WHERE datetime(ultima_actividad) >= datetime('now', '-30 minutes')
+            GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'Chile / ubicacion no detectada')
+            ORDER BY sesiones DESC, datetime(ultima) DESC
+            LIMIT 8
+            """
+        )
+        ubicaciones = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT evento, pagina, creado_en
+            FROM tienda_visitas_eventos
+            ORDER BY datetime(creado_en) DESC
+            LIMIT 12
+            """
+        )
+        eventos = [dict(r) for r in cursor.fetchall()]
+        cursor.execute("PRAGMA table_info(ventas)")
+        ventas_cols = {str(r["name"]).strip().lower() for r in cursor.fetchall()}
+        metodo_expr = "metodo_pago" if "metodo_pago" in ventas_cols else "'' AS metodo_pago"
+        cursor.execute(
+            f"""
+            SELECT id, fecha_hora, cliente_nombre, total_monto, pedido_estado, {metodo_expr}
+            FROM ventas
+            WHERE canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            ORDER BY datetime(fecha_hora) DESC, id DESC
+            LIMIT 8
+            """
+        )
+        pedidos_recientes = [dict(r) for r in cursor.fetchall()]
+        return jsonify({
+            "success": True,
+            "metrics": {
+                "visitantes": visitantes,
+                "ventas_total": ventas_total,
+                "sesiones": sesiones,
+                "pedidos": pedidos,
+                "carritos": carritos,
+                "en_pago": en_pago,
+                "compras_recientes": compras_recientes,
+            },
+            "ubicaciones": ubicaciones,
+            "eventos": eventos,
+            "pedidos_recientes": pedidos_recientes,
+            "server_time": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+def _adm_parse_fecha(raw):
+    txt = str(raw or "").strip()
+    if not txt:
+        return None
+    datetime.strptime(txt, "%Y-%m-%d")
+    return txt
+
+
+@app.route('/api/adm-pagina/descuentos', methods=['GET'])
+def api_adm_pagina_descuentos_get():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        cursor.execute(
+            """
+            SELECT id, nombre, precio, stock, categoria_tienda, COALESCE(activo_tienda, 1) AS activo_tienda,
+                   COALESCE(descuento_tienda_pct, 0) AS descuento_tienda_pct,
+                   oferta_inicio_tienda, oferta_fin_tienda
+            FROM productos
+            WHERE COALESCE(eliminado, 0) = 0
+            ORDER BY nombre COLLATE NOCASE ASC
+            """
+        )
+        productos = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT id, nombre, activo, orden, COALESCE(descuento_pct, 0) AS descuento_pct
+            FROM tienda_categorias
+            ORDER BY orden ASC, nombre COLLATE NOCASE ASC
+            """
+        )
+        categorias = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT c.*, tc.codigo AS cupon_codigo
+            FROM tienda_descuento_campanas c
+            LEFT JOIN tienda_cupones tc ON tc.id = c.cupon_id
+            ORDER BY COALESCE(c.activo, 1) DESC, datetime(COALESCE(c.fecha_fin, c.actualizado_en, c.creado_en)) DESC, c.id DESC
+            LIMIT 100
+            """
+        )
+        campanas = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tienda_descuento_campanas
+            WHERE activo = 1
+              AND (fecha_inicio IS NULL OR date(fecha_inicio) <= date('now', 'localtime'))
+              AND (fecha_fin IS NULL OR date(fecha_fin) >= date('now', 'localtime'))
+            """
+        )
+        activas = int(cursor.fetchone()["total"] or 0)
+        return jsonify({"success": True, "productos": productos, "categorias": categorias, "campanas": campanas, "activas": activas})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/descuentos', methods=['POST'])
+def api_adm_pagina_descuentos_post():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        tipo = str(data.get("tipo") or "productos").strip().lower()
+        if tipo not in {"productos", "pedido"}:
+            return jsonify({"success": False, "error": "Por ahora solo estan activos: productos y descuento en pedido."}), 400
+        nombre = str(data.get("nombre") or "").strip()[:140] or ("Campana productos" if tipo == "productos" else "Cupon pedido")
+        descuento_tipo = str(data.get("descuento_tipo") or "porcentaje").strip().lower()
+        if descuento_tipo not in {"porcentaje", "monto_fijo"}:
+            descuento_tipo = "porcentaje"
+        valor = float(data.get("valor") or 0)
+        if valor <= 0:
+            return jsonify({"success": False, "error": "El descuento debe ser mayor a 0."}), 400
+        if descuento_tipo == "porcentaje" and valor > 100:
+            return jsonify({"success": False, "error": "El porcentaje no puede superar 100."}), 400
+        fecha_inicio = _adm_parse_fecha(data.get("fecha_inicio"))
+        fecha_fin = _adm_parse_fecha(data.get("fecha_fin"))
+        if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
+            return jsonify({"success": False, "error": "La fecha de termino no puede ser anterior al inicio."}), 400
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        target = {}
+        cupon_id = None
+        if tipo == "productos":
+            if descuento_tipo != "porcentaje":
+                return jsonify({"success": False, "error": "En productos se usa porcentaje para mantener precios consistentes."}), 400
+            producto_ids = []
+            for raw in data.get("producto_ids") or []:
+                try:
+                    pid = int(raw)
+                except (TypeError, ValueError):
+                    continue
+                if pid > 0:
+                    producto_ids.append(pid)
+            producto_ids = sorted(set(producto_ids))
+            if not producto_ids:
+                return jsonify({"success": False, "error": "Selecciona al menos un producto."}), 400
+            placeholders = ",".join(["?"] * len(producto_ids))
+            cursor.execute(f"SELECT id FROM productos WHERE id IN ({placeholders}) AND COALESCE(eliminado, 0) = 0", tuple(producto_ids))
+            validos = [int(r["id"]) for r in cursor.fetchall()]
+            if not validos:
+                return jsonify({"success": False, "error": "No se encontraron productos validos."}), 400
+            placeholders = ",".join(["?"] * len(validos))
+            cursor.execute(
+                f"""
+                UPDATE productos
+                SET descuento_tienda_pct = ?, oferta_inicio_tienda = ?, oferta_fin_tienda = ?
+                WHERE id IN ({placeholders})
+                """,
+                tuple([valor, fecha_inicio, fecha_fin] + validos),
+            )
+            target = {"producto_ids": validos}
+        else:
+            codigo = _normalizar_cupon_codigo(data.get("codigo") or nombre)
+            if not codigo:
+                return jsonify({"success": False, "error": "Codigo de cupon invalido."}), 400
+            cursor.execute(
+                """
+                INSERT INTO tienda_cupones (
+                    codigo, nombre, tipo_descuento, valor_descuento, activo,
+                    fecha_inicio, fecha_fin, usos_max_total, usos_max_por_cliente, monto_minimo, solo_sin_oferta
+                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, 0)
+                """,
+                (
+                    codigo,
+                    nombre,
+                    descuento_tipo,
+                    valor,
+                    fecha_inicio,
+                    fecha_fin,
+                    int(data.get("usos_max_total") or 0) or None,
+                    int(data.get("usos_max_por_cliente") or 0) or None,
+                    float(data.get("monto_minimo") or 0),
+                ),
+            )
+            cupon_id = int(cursor.lastrowid)
+            target = {"codigo": codigo}
+        cursor.execute(
+            """
+            INSERT INTO tienda_descuento_campanas (
+                nombre, tipo, descuento_tipo, valor, fecha_inicio, fecha_fin, target_json, cupon_id, activo
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            (nombre, tipo, descuento_tipo, valor, fecha_inicio, fecha_fin, json.dumps(target, ensure_ascii=False), cupon_id),
+        )
+        campana_id = int(cursor.lastrowid)
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "id": campana_id, "cupon_id": cupon_id})
+    except sqlite3.IntegrityError:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": "El codigo de cupon ya existe."}), 400
+    except ValueError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/descuentos/<int:campana_id>/desactivar', methods=['POST'])
+def api_adm_pagina_descuentos_desactivar(campana_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        cursor.execute("SELECT * FROM tienda_descuento_campanas WHERE id = ? LIMIT 1", (campana_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Campana no encontrada."}), 404
+        campana = dict(row)
+        target = {}
+        try:
+            target = json.loads(campana.get("target_json") or "{}")
+        except Exception:
+            target = {}
+        if str(campana.get("tipo") or "") == "productos":
+            ids = []
+            for raw in target.get("producto_ids") or []:
+                try:
+                    val = int(raw)
+                except (TypeError, ValueError):
+                    continue
+                if val > 0:
+                    ids.append(val)
+            if ids:
+                placeholders = ",".join(["?"] * len(ids))
+                cursor.execute(
+                    f"""
+                    UPDATE productos
+                    SET descuento_tienda_pct = 0, oferta_inicio_tienda = NULL, oferta_fin_tienda = NULL
+                    WHERE id IN ({placeholders})
+                    """,
+                    tuple(ids),
+                )
+        cupon_id = int(campana.get("cupon_id") or 0)
+        if cupon_id > 0:
+            cursor.execute("UPDATE tienda_cupones SET activo = 0, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?", (cupon_id,))
+        cursor.execute(
+            "UPDATE tienda_descuento_campanas SET activo = 0, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+            (campana_id,),
+        )
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/tienda/admin/pedidos-nuevos', methods=['GET'])
 def api_tienda_admin_pedidos_nuevos():
     conn = None
