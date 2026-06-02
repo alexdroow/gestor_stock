@@ -743,6 +743,7 @@ def init_db():
                 nombre TEXT NOT NULL,
                 contacto TEXT,
                 notas TEXT,
+                comision_pct REAL DEFAULT 0,
                 activo INTEGER DEFAULT 1,
                 creado TEXT DEFAULT CURRENT_TIMESTAMP,
                 actualizado TEXT DEFAULT CURRENT_TIMESTAMP
@@ -750,6 +751,7 @@ def init_db():
             '''
         )
         _ensure_column(conn, "ventas_mayoristas", "vendedor_id", "INTEGER")
+        _ensure_column(conn, "ventas_mayoristas_vendedores", "comision_pct", "REAL DEFAULT 0")
         cursor.execute(
             '''
             CREATE TABLE IF NOT EXISTS ventas_mayoristas_items (

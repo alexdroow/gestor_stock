@@ -12024,6 +12024,7 @@ def _ensure_ventas_mayoristas_tables(cursor):
             nombre TEXT NOT NULL,
             contacto TEXT,
             notas TEXT,
+            comision_pct REAL DEFAULT 0,
             activo INTEGER DEFAULT 1,
             creado TEXT DEFAULT CURRENT_TIMESTAMP,
             actualizado TEXT DEFAULT CURRENT_TIMESTAMP
@@ -12034,6 +12035,10 @@ def _ensure_ventas_mayoristas_tables(cursor):
     columnas_ventas_mayoristas = {str(r["name"] if hasattr(r, "keys") and "name" in r.keys() else r[1]) for r in cursor.fetchall()}
     if "vendedor_id" not in columnas_ventas_mayoristas:
         cursor.execute("ALTER TABLE ventas_mayoristas ADD COLUMN vendedor_id INTEGER")
+    cursor.execute("PRAGMA table_info(ventas_mayoristas_vendedores)")
+    columnas_vendedores_mayoristas = {str(r["name"] if hasattr(r, "keys") and "name" in r.keys() else r[1]) for r in cursor.fetchall()}
+    if "comision_pct" not in columnas_vendedores_mayoristas:
+        cursor.execute("ALTER TABLE ventas_mayoristas_vendedores ADD COLUMN comision_pct REAL DEFAULT 0")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS ventas_mayoristas_items (
@@ -12064,13 +12069,149 @@ def _listar_vendedores_mayoristas(cursor, solo_activos=False):
     where = "WHERE COALESCE(activo, 1) = 1" if solo_activos else ""
     cursor.execute(
         f"""
-        SELECT id, nombre, contacto, notas, COALESCE(activo, 1) AS activo, creado, actualizado
+        SELECT id, nombre, contacto, notas, COALESCE(comision_pct, 0) AS comision_pct,
+               COALESCE(activo, 1) AS activo, creado, actualizado
         FROM ventas_mayoristas_vendedores
         {where}
         ORDER BY COALESCE(activo, 1) DESC, nombre COLLATE NOCASE ASC
         """
     )
     return [dict(r) for r in cursor.fetchall()]
+
+
+def _ventas_mayor_semana_por_fecha(fecha_raw):
+    raw = str(fecha_raw or "").strip()[:10]
+    if not raw:
+        base = datetime.now(ZoneInfo("America/Santiago")).date()
+    else:
+        try:
+            base = datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Fecha de semana invalida")
+    inicio = base - timedelta(days=base.weekday())
+    fin = inicio + timedelta(days=6)
+    return inicio.strftime("%Y-%m-%d"), fin.strftime("%Y-%m-%d")
+
+
+def _fmt_clp_mayor(value):
+    try:
+        num = float(value or 0)
+    except (TypeError, ValueError):
+        num = 0
+    return f"${num:,.0f}".replace(",", ".")
+
+
+def _parse_pct_mayor(value):
+    try:
+        pct = float(str(value or "0").replace(",", "."))
+    except (TypeError, ValueError):
+        pct = 0.0
+    return max(0.0, min(100.0, pct))
+
+
+def _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_hasta):
+    if canvas is None:
+        raise RuntimeError("ReportLab no esta instalado en el entorno.")
+
+    buff = BytesIO()
+    c = canvas.Canvas(buff, pagesize=A4)
+    width, height = A4
+    y = height - 44
+
+    def new_page():
+        nonlocal y
+        c.showPage()
+        y = height - 44
+
+    def line(text, x=42, size=9, bold=False, dy=14):
+        nonlocal y
+        if y < 60:
+            new_page()
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.drawString(x, y, str(text or "")[:115])
+        y -= dy
+
+    def wrap_text(text, max_len=92):
+        raw = str(text or "").strip()
+        if not raw:
+            return ["-"]
+        out = []
+        while len(raw) > max_len:
+            cut = raw.rfind(" ", 0, max_len + 1)
+            if cut <= 0:
+                cut = max_len
+            out.append(raw[:cut].strip())
+            raw = raw[cut:].strip()
+        if raw:
+            out.append(raw)
+        return out or ["-"]
+
+    total_bruto = sum(float(v.get("total_bruto") or 0) for v in ventas)
+    total_comision = sum(float(v.get("total_comision") or 0) for v in ventas)
+    total_neto = sum(float(v.get("total_neto") or 0) for v in ventas)
+    comision_base = float(vendedor.get("comision_pct") or 0)
+
+    c.setFillColorRGB(0.96, 0.52, 0.05)
+    c.rect(36, height - 96, width - 72, 58, stroke=0, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 62, "Sucree Pasteleria")
+    c.setFont("Helvetica", 9)
+    c.drawString(50, height - 78, "Reporte semanal de ventas por mayor")
+    c.drawRightString(width - 50, height - 62, f"{fecha_desde} al {fecha_hasta}")
+    c.setFillColorRGB(0, 0, 0)
+    y = height - 122
+
+    line("Vendedor", bold=True, size=11, dy=16)
+    line(f"Nombre: {vendedor.get('nombre') or '-'}")
+    line(f"Contacto: {vendedor.get('contacto') or '-'}")
+    line(f"Comision base perfil: {comision_base:.2f}%")
+    y -= 8
+
+    c.setFillColorRGB(0.92, 0.99, 0.95)
+    c.rect(42, y - 62, width - 84, 64, stroke=1, fill=1)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(56, y - 18, "Total vendido")
+    c.drawString(220, y - 18, "Comision vendedor")
+    c.drawString(410, y - 18, "Neto Sucree")
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(56, y - 42, _fmt_clp_mayor(total_bruto))
+    c.drawString(220, y - 42, _fmt_clp_mayor(total_comision))
+    c.drawString(410, y - 42, _fmt_clp_mayor(total_neto))
+    y -= 88
+
+    line("Detalle semanal", bold=True, size=11, dy=18)
+    if not ventas:
+        line("No hay ventas registradas para este vendedor en la semana seleccionada.")
+    for venta in ventas:
+        line(f"{venta.get('fecha')} - {venta.get('codigo_operacion') or '#' + str(venta.get('id'))}", bold=True, size=10)
+        line(f"Cliente final: {venta.get('cliente_nombre') or '-'} | Total: {_fmt_clp_mayor(venta.get('total_bruto'))} | Comision: {_fmt_clp_mayor(venta.get('total_comision'))} | Neto: {_fmt_clp_mayor(venta.get('total_neto'))}", size=8)
+        for it in venta.get("items") or []:
+            item_line = (
+                f"- {it.get('producto_nombre') or '-'} x{float(it.get('cantidad') or 0):g} | "
+                f"Precio: {_fmt_clp_mayor(it.get('precio_unitario'))} | "
+                f"Subtotal: {_fmt_clp_mayor(it.get('subtotal'))} | "
+                f"Comision {float(it.get('comision_pct') or 0):g}%: {_fmt_clp_mayor(it.get('comision_monto'))}"
+            )
+            for part in wrap_text(item_line, 104):
+                line(part, x=54, size=8, dy=11)
+        if venta.get("notas"):
+            for part in wrap_text(f"Notas: {venta.get('notas')}", 104):
+                line(part, x=54, size=8, dy=11)
+        y -= 8
+
+    line("Resumen para vendedor", bold=True, size=11, dy=18)
+    line(f"Ventas registradas: {len(ventas)}")
+    line(f"Total vendido: {_fmt_clp_mayor(total_bruto)}")
+    line(f"Comision a pagar: {_fmt_clp_mayor(total_comision)}")
+    line(f"Neto para Sucree: {_fmt_clp_mayor(total_neto)}")
+    y -= 8
+    line("Documento informativo generado desde SucreeStock.", size=8)
+
+    c.save()
+    buff.seek(0)
+    return buff
 
 
 @app.route('/ventas/mayor')
@@ -12105,19 +12246,55 @@ def api_ventas_mayoristas_vendedores():
         nombre = str(data.get("nombre") or "").strip()[:120]
         contacto = str(data.get("contacto") or "").strip()[:120]
         notas = str(data.get("notas") or "").strip()[:500]
+        comision_pct = _parse_pct_mayor(data.get("comision_pct"))
         activo = 1 if bool(data.get("activo", True)) else 0
         if len(nombre) < 2:
             return jsonify({"success": False, "error": "Ingresa el nombre del vendedor"}), 400
         cur.execute(
             """
-            INSERT INTO ventas_mayoristas_vendedores (nombre, contacto, notas, activo, actualizado)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO ventas_mayoristas_vendedores (nombre, contacto, notas, comision_pct, activo, actualizado)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
-            (nombre, contacto, notas, activo),
+            (nombre, contacto, notas, comision_pct, activo),
         )
         conn.commit()
         crear_backup()
         return jsonify({"success": True, "vendedor_id": int(cur.lastrowid), "vendedores": _listar_vendedores_mayoristas(cur, solo_activos=True)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/ventas/mayoristas/vendedores/<int:vendedor_id>', methods=['POST'])
+def api_ventas_mayoristas_vendedor_actualizar(vendedor_id):
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        nombre = str(data.get("nombre") or "").strip()[:120]
+        contacto = str(data.get("contacto") or "").strip()[:120]
+        notas = str(data.get("notas") or "").strip()[:500]
+        comision_pct = _parse_pct_mayor(data.get("comision_pct"))
+        activo = 1 if bool(data.get("activo", True)) else 0
+        if len(nombre) < 2:
+            return jsonify({"success": False, "error": "Ingresa el nombre del vendedor"}), 400
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_ventas_mayoristas_tables(cur)
+        cur.execute(
+            """
+            UPDATE ventas_mayoristas_vendedores
+            SET nombre = ?, contacto = ?, notas = ?, comision_pct = ?, activo = ?, actualizado = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (nombre, contacto, notas, comision_pct, activo, int(vendedor_id)),
+        )
+        if cur.rowcount <= 0:
+            return jsonify({"success": False, "error": "Vendedor no encontrado"}), 404
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "vendedores": _listar_vendedores_mayoristas(cur, solo_activos=False)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
@@ -12201,6 +12378,75 @@ def api_ventas_mayoristas_listar():
         return jsonify({"success": True, "ventas": ventas, "resumen": resumen, "vendedores": vendedores})
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "ventas": []}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/ventas/mayoristas/reporte-semanal.pdf', methods=['GET'])
+def api_ventas_mayoristas_reporte_semanal_pdf():
+    conn = None
+    try:
+        vendedor_id = int(request.args.get("vendedor_id") or 0)
+        if vendedor_id <= 0:
+            return jsonify({"success": False, "error": "Selecciona un vendedor"}), 400
+        fecha_desde, fecha_hasta = _ventas_mayor_semana_por_fecha(request.args.get("semana") or request.args.get("fecha"))
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_ventas_mayoristas_tables(cur)
+        cur.execute(
+            """
+            SELECT id, nombre, contacto, notas, COALESCE(comision_pct, 0) AS comision_pct, COALESCE(activo, 1) AS activo
+            FROM ventas_mayoristas_vendedores
+            WHERE id = ?
+            """,
+            (vendedor_id,),
+        )
+        vendedor = cur.fetchone()
+        if not vendedor:
+            return jsonify({"success": False, "error": "Vendedor no encontrado"}), 404
+        vendedor = dict(vendedor)
+        cur.execute(
+            """
+            SELECT *
+            FROM ventas_mayoristas
+            WHERE vendedor_id = ? AND fecha >= ? AND fecha <= ?
+            ORDER BY fecha ASC, id ASC
+            """,
+            (vendedor_id, fecha_desde, fecha_hasta),
+        )
+        ventas = [dict(r) for r in cur.fetchall()]
+        ids = [int(v["id"]) for v in ventas]
+        items_map = {}
+        if ids:
+            placeholders = ",".join(["?"] * len(ids))
+            cur.execute(
+                f"""
+                SELECT *
+                FROM ventas_mayoristas_items
+                WHERE venta_mayorista_id IN ({placeholders})
+                ORDER BY id ASC
+                """,
+                tuple(ids),
+            )
+            for row in cur.fetchall():
+                item = dict(row)
+                items_map.setdefault(int(item["venta_mayorista_id"]), []).append(item)
+        for venta in ventas:
+            venta["items"] = items_map.get(int(venta["id"]), [])
+
+        pdf_buff = _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_hasta)
+        filename = f"reporte_mayorista_{vendedor_id}_{fecha_desde}_al_{fecha_hasta}.pdf"
+        return send_file(
+            pdf_buff,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/pdf",
+        )
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if conn:
             conn.close()

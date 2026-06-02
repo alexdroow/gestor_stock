@@ -277,9 +277,30 @@
         }
         .seller-actions {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 120px auto;
             gap: 8px;
             align-items: end;
+        }
+        .seller-active-list {
+            display: grid;
+            gap: 8px;
+            margin-top: 10px;
+            max-height: 230px;
+            overflow: auto;
+        }
+        .seller-active-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 110px auto;
+            gap: 8px;
+            align-items: end;
+            border: 1px solid #fed7aa;
+            background: #fff;
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .seller-active-name {
+            font-weight: 900;
+            color: #0f172a;
         }
         .cart-item {
             border: 1px solid var(--line);
@@ -468,8 +489,13 @@
                             <label>Contacto
                                 <input id="nuevo-vendedor-contacto" type="text" maxlength="120" placeholder="Telefono o correo">
                             </label>
+                            <label>% comision
+                                <input id="nuevo-vendedor-comision" type="number" min="0" max="100" step="0.01" value="0">
+                            </label>
                             <button type="button" class="btn btn-primary" onclick="registrarVendedorMayorista()">Guardar vendedor</button>
                         </div>
+                        <div class="seller-box-title" style="margin-top:12px;">Vendedores activos</div>
+                        <div id="vendedores-activos-list" class="seller-active-list"></div>
                     </div>
                     <label style="margin-top:10px;">Notas
                         <textarea id="venta-notas" maxlength="1000" placeholder="Observaciones, condiciones de entrega o pago..."></textarea>
@@ -495,7 +521,7 @@
                     <button type="button" class="btn btn-outline" onclick="cargarHistorialMayor()">Actualizar</button>
                 </div>
                 <div class="history-filters">
-                    <label>Vendedor
+                    <label>Buscar vendedor
                         <input id="filtro-vendedor" type="search" placeholder="Buscar vendedor...">
                     </label>
                     <label>Desde
@@ -505,6 +531,17 @@
                         <input id="filtro-hasta" type="date">
                     </label>
                     <button type="button" class="btn btn-primary" onclick="cargarHistorialMayor()">Filtrar</button>
+                </div>
+                <div class="history-filters" style="grid-template-columns:minmax(0,1fr) 160px 180px;">
+                    <label>Reporte semanal vendedor
+                        <select id="pdf-vendedor-id">
+                            <option value="">Selecciona vendedor...</option>
+                        </select>
+                    </label>
+                    <label>Semana
+                        <input id="pdf-semana" type="date">
+                    </label>
+                    <button type="button" class="btn btn-success" onclick="descargarReporteSemanalMayorista()">PDF semanal</button>
                 </div>
                 <div class="layout" style="grid-template-columns:minmax(0,1fr) minmax(320px,.55fr);">
                     <div class="history-list" id="history-list"></div>
@@ -550,14 +587,27 @@
         function productoOcultoTienda(p) {
             return p.activo_tienda === false || p.activo_tienda === 0 || p.activo_tienda === '0';
         }
+        function comisionVendedorActual() {
+            const v = vendedorSeleccionado();
+            return Math.max(0, Math.min(100, n(v?.comision_pct)));
+        }
         function renderVendedoresMayoristas(selectedId = '') {
             const select = document.getElementById('vendedor-id');
-            if (!select) return;
+            const pdfSelect = document.getElementById('pdf-vendedor-id');
             const actual = String(selectedId || select.value || '');
-            select.innerHTML = '<option value="">Selecciona vendedor...</option>' + vendedoresMayoristas.map((v) => (
+            const options = '<option value="">Selecciona vendedor...</option>' + vendedoresMayoristas.map((v) => (
                 `<option value="${Number(v.id || 0)}">${esc(v.nombre)}${v.contacto ? ' - ' + esc(v.contacto) : ''}</option>`
             )).join('');
-            if (actual) select.value = actual;
+            if (select) {
+                select.innerHTML = options;
+                if (actual) select.value = actual;
+            }
+            if (pdfSelect) {
+                const pdfActual = String(pdfSelect.value || actual || '');
+                pdfSelect.innerHTML = options;
+                if (pdfActual) pdfSelect.value = pdfActual;
+            }
+            renderVendedoresActivos();
             actualizarVendedorSeleccionado();
         }
         function vendedorSeleccionado() {
@@ -568,25 +618,78 @@
             const v = vendedorSeleccionado();
             const contact = document.getElementById('vendedor-contacto');
             if (contact) contact.value = v ? String(v.contacto || '') : '';
+            if (v && carritoMayor.length) {
+                const pct = comisionVendedorActual();
+                carritoMayor = carritoMayor.map((it) => ({ ...it, comision_pct: pct }));
+                renderCarrito();
+            }
+        }
+        function renderVendedoresActivos() {
+            const root = document.getElementById('vendedores-activos-list');
+            if (!root) return;
+            const activos = vendedoresMayoristas.filter((v) => Number(v.activo ?? 1) === 1);
+            root.innerHTML = activos.map((v) => `
+                <div class="seller-active-card">
+                    <div>
+                        <div class="seller-active-name">${esc(v.nombre)}</div>
+                        <input id="seller-contact-${Number(v.id)}" type="text" value="${esc(v.contacto || '')}" placeholder="Contacto">
+                    </div>
+                    <label>% comision
+                        <input id="seller-comision-${Number(v.id)}" type="number" min="0" max="100" step="0.01" value="${n(v.comision_pct)}">
+                    </label>
+                    <button type="button" class="btn btn-outline" onclick="guardarPerfilVendedorMayorista(${Number(v.id)})">Guardar</button>
+                </div>
+            `).join('') || '<div style="color:#64748b;">No hay vendedores activos registrados.</div>';
+        }
+        async function guardarPerfilVendedorMayorista(id) {
+            const v = vendedoresMayoristas.find((x) => Number(x.id || 0) === Number(id));
+            if (!v) return;
+            const contacto = document.getElementById(`seller-contact-${Number(id)}`)?.value || '';
+            const comision = n(document.getElementById(`seller-comision-${Number(id)}`)?.value || 0);
+            try {
+                status('Actualizando vendedor...');
+                const res = await fetch(`/api/ventas/mayoristas/vendedores/${Number(id)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({
+                        nombre: v.nombre,
+                        contacto,
+                        notas: v.notas || '',
+                        comision_pct: comision,
+                        activo: true,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar vendedor');
+                vendedoresMayoristas = (Array.isArray(data.vendedores) ? data.vendedores : vendedoresMayoristas)
+                    .filter((seller) => Number(seller.activo ?? 1) === 1);
+                renderVendedoresMayoristas(String(document.getElementById('vendedor-id')?.value || ''));
+                status('Perfil de vendedor actualizado.');
+            } catch (err) {
+                status(err.message || 'Error al actualizar vendedor.', true);
+            }
         }
         async function registrarVendedorMayorista() {
             const nombreEl = document.getElementById('nuevo-vendedor-nombre');
             const contactoEl = document.getElementById('nuevo-vendedor-contacto');
+            const comisionEl = document.getElementById('nuevo-vendedor-comision');
             const nombre = String(nombreEl?.value || '').trim();
             const contacto = String(contactoEl?.value || '').trim();
+            const comision = n(comisionEl?.value || 0);
             if (nombre.length < 2) return status('Ingresa el nombre del vendedor.', true);
             try {
                 status('Registrando vendedor...');
                 const res = await fetch('/api/ventas/mayoristas/vendedores', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ nombre, contacto, activo: true }),
+                    body: JSON.stringify({ nombre, contacto, comision_pct: comision, activo: true }),
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo registrar vendedor');
                 vendedoresMayoristas = Array.isArray(data.vendedores) ? data.vendedores : vendedoresMayoristas;
                 if (nombreEl) nombreEl.value = '';
                 if (contactoEl) contactoEl.value = '';
+                if (comisionEl) comisionEl.value = '0';
                 renderVendedoresMayoristas(String(data.vendedor_id || ''));
                 status('Vendedor registrado y seleccionado.');
             } catch (err) {
@@ -635,7 +738,7 @@
                     nombre: String(p.nombre || ''),
                     cantidad: 1,
                     precio_unitario: Math.round(n(p.precio)),
-                    comision_pct: 0,
+                    comision_pct: comisionVendedorActual(),
                 };
                 carritoMayor.push(item);
             }
@@ -803,6 +906,13 @@
             if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo cargar historial');
             renderHistorial(data);
         }
+        function descargarReporteSemanalMayorista() {
+            const vendedorId = Number(document.getElementById('pdf-vendedor-id')?.value || document.getElementById('vendedor-id')?.value || 0);
+            const semana = document.getElementById('pdf-semana')?.value || todayIso();
+            if (!vendedorId) return status('Selecciona un vendedor para generar el PDF semanal.', true);
+            const qs = new URLSearchParams({ vendedor_id: String(vendedorId), semana });
+            window.open(`/api/ventas/mayoristas/reporte-semanal.pdf?${qs.toString()}`, '_blank', 'noopener');
+        }
         document.getElementById('product-search')?.addEventListener('input', renderProductos);
         document.getElementById('product-filter')?.addEventListener('change', renderProductos);
         document.getElementById('filtro-vendedor')?.addEventListener('input', () => {
@@ -810,6 +920,7 @@
             window.__mayorFilterTimer = setTimeout(() => cargarHistorialMayor().catch(console.error), 280);
         });
         document.getElementById('venta-fecha').value = todayIso();
+        document.getElementById('pdf-semana').value = todayIso();
         renderVendedoresMayoristas();
         renderProductos();
         renderCarrito();
