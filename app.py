@@ -11996,6 +11996,258 @@ def ventas():
         return f"Error: {str(e)}", 500
 
 
+def _ensure_ventas_mayoristas_tables(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ventas_mayoristas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT NOT NULL,
+            vendedor_nombre TEXT NOT NULL,
+            vendedor_contacto TEXT,
+            cliente_nombre TEXT,
+            notas TEXT,
+            total_bruto REAL DEFAULT 0,
+            total_comision REAL DEFAULT 0,
+            total_neto REAL DEFAULT 0,
+            descontar_stock INTEGER DEFAULT 1,
+            codigo_operacion TEXT,
+            creado TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ventas_mayoristas_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            venta_mayorista_id INTEGER NOT NULL,
+            producto_id INTEGER NOT NULL,
+            producto_nombre TEXT NOT NULL,
+            cantidad REAL NOT NULL DEFAULT 0,
+            precio_unitario REAL NOT NULL DEFAULT 0,
+            subtotal REAL NOT NULL DEFAULT 0,
+            comision_pct REAL NOT NULL DEFAULT 0,
+            comision_monto REAL NOT NULL DEFAULT 0,
+            neto_negocio REAL NOT NULL DEFAULT 0,
+            FOREIGN KEY (venta_mayorista_id) REFERENCES ventas_mayoristas(id) ON DELETE CASCADE,
+            FOREIGN KEY (producto_id) REFERENCES productos(id)
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_fecha ON ventas_mayoristas(fecha)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedor ON ventas_mayoristas(vendedor_nombre)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_items_venta ON ventas_mayoristas_items(venta_mayorista_id)")
+
+
+@app.route('/ventas/mayor')
+def ventas_mayor():
+    try:
+        productos = _obtener_productos_para_venta(include_zero_stock=True)
+        return render_template('ventas_mayor.html', productos=productos)
+    except Exception as e:
+        print(f"Error en ventas por mayor: {e}")
+        return f"Error: {str(e)}", 500
+
+
+@app.route('/api/ventas/mayoristas', methods=['GET'])
+def api_ventas_mayoristas_listar():
+    conn = None
+    try:
+        fecha_desde = str(request.args.get("desde") or "").strip()[:10]
+        fecha_hasta = str(request.args.get("hasta") or "").strip()[:10]
+        vendedor = str(request.args.get("vendedor") or "").strip()
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_ventas_mayoristas_tables(cur)
+        where = []
+        params = []
+        if fecha_desde:
+            where.append("fecha >= ?")
+            params.append(fecha_desde)
+        if fecha_hasta:
+            where.append("fecha <= ?")
+            params.append(fecha_hasta)
+        if vendedor:
+            where.append("LOWER(vendedor_nombre) LIKE ?")
+            params.append(f"%{vendedor.lower()}%")
+        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+        cur.execute(
+            f"""
+            SELECT *
+            FROM ventas_mayoristas
+            {where_sql}
+            ORDER BY fecha DESC, id DESC
+            LIMIT 250
+            """,
+            tuple(params),
+        )
+        ventas = [dict(r) for r in cur.fetchall()]
+        ids = [int(v["id"]) for v in ventas]
+        items_map = {}
+        if ids:
+            placeholders = ",".join(["?"] * len(ids))
+            cur.execute(
+                f"""
+                SELECT *
+                FROM ventas_mayoristas_items
+                WHERE venta_mayorista_id IN ({placeholders})
+                ORDER BY id ASC
+                """,
+                tuple(ids),
+            )
+            for row in cur.fetchall():
+                item = dict(row)
+                items_map.setdefault(int(item["venta_mayorista_id"]), []).append(item)
+        for venta in ventas:
+            venta["items"] = items_map.get(int(venta["id"]), [])
+        resumen = {
+            "ventas": len(ventas),
+            "total_bruto": round(sum(float(v.get("total_bruto") or 0) for v in ventas), 2),
+            "total_comision": round(sum(float(v.get("total_comision") or 0) for v in ventas), 2),
+            "total_neto": round(sum(float(v.get("total_neto") or 0) for v in ventas), 2),
+        }
+        cur.execute(
+            f"""
+            SELECT vendedor_nombre,
+                   COUNT(*) AS ventas,
+                   COALESCE(SUM(total_bruto), 0) AS total_bruto,
+                   COALESCE(SUM(total_comision), 0) AS total_comision,
+                   COALESCE(SUM(total_neto), 0) AS total_neto
+            FROM ventas_mayoristas
+            {where_sql}
+            GROUP BY vendedor_nombre
+            ORDER BY total_bruto DESC, vendedor_nombre COLLATE NOCASE ASC
+            LIMIT 80
+            """,
+            tuple(params),
+        )
+        vendedores = [dict(r) for r in cur.fetchall()]
+        return jsonify({"success": True, "ventas": ventas, "resumen": resumen, "vendedores": vendedores})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "ventas": []}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/ventas/mayoristas', methods=['POST'])
+def api_ventas_mayoristas_guardar():
+    conn = None
+    stock_updates = []
+    try:
+        data = request.get_json(silent=True) or {}
+        vendedor_nombre = str(data.get("vendedor_nombre") or "").strip()[:120]
+        if len(vendedor_nombre) < 2:
+            return jsonify({"success": False, "error": "Ingresa el vendedor o cliente mayorista"}), 400
+        vendedor_contacto = str(data.get("vendedor_contacto") or "").strip()[:120]
+        cliente_nombre = str(data.get("cliente_nombre") or "").strip()[:120]
+        notas = str(data.get("notas") or "").strip()[:1000]
+        fecha = str(data.get("fecha") or "").strip()[:10] or datetime.now(ZoneInfo("America/Santiago")).strftime("%Y-%m-%d")
+        try:
+            datetime.strptime(fecha, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"success": False, "error": "Fecha invalida"}), 400
+        descontar_stock = 1 if bool(data.get("descontar_stock", True)) else 0
+        raw_items = data.get("items") or []
+        if not isinstance(raw_items, list) or not raw_items:
+            return jsonify({"success": False, "error": "Agrega productos a la venta"}), 400
+
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_ventas_mayoristas_tables(cur)
+        producto_ids = []
+        items_in = []
+        for idx, item in enumerate(raw_items, start=1):
+            if not isinstance(item, dict):
+                return jsonify({"success": False, "error": f"Item #{idx} invalido"}), 400
+            pid = int(item.get("producto_id") or 0)
+            cantidad = float(item.get("cantidad") or 0)
+            precio_unitario = float(item.get("precio_unitario") or 0)
+            comision_pct = float(item.get("comision_pct") or 0)
+            if pid <= 0 or cantidad <= 0 or precio_unitario < 0:
+                return jsonify({"success": False, "error": f"Item #{idx}: datos invalidos"}), 400
+            comision_pct = max(0.0, min(100.0, comision_pct))
+            producto_ids.append(pid)
+            items_in.append({"producto_id": pid, "cantidad": cantidad, "precio_unitario": precio_unitario, "comision_pct": comision_pct})
+
+        placeholders = ",".join(["?"] * len(set(producto_ids)))
+        cur.execute(
+            f"SELECT id, nombre, COALESCE(stock, 0) AS stock FROM productos WHERE id IN ({placeholders}) AND COALESCE(eliminado, 0) = 0",
+            tuple(sorted(set(producto_ids))),
+        )
+        productos_map = {int(r["id"]): dict(r) for r in cur.fetchall()}
+        for item in items_in:
+            prod = productos_map.get(int(item["producto_id"]))
+            if not prod:
+                return jsonify({"success": False, "error": f"Producto #{item['producto_id']} no existe"}), 400
+            if descontar_stock and float(prod.get("stock") or 0) + 1e-9 < float(item["cantidad"] or 0):
+                return jsonify({"success": False, "error": f"Stock insuficiente para {prod.get('nombre')}"}), 400
+
+        total_bruto = 0.0
+        total_comision = 0.0
+        rows = []
+        for item in items_in:
+            prod = productos_map[int(item["producto_id"])]
+            subtotal = round(float(item["cantidad"]) * float(item["precio_unitario"]), 2)
+            comision = round(subtotal * (float(item["comision_pct"]) / 100.0), 2)
+            neto = round(subtotal - comision, 2)
+            total_bruto += subtotal
+            total_comision += comision
+            rows.append({**item, "producto_nombre": str(prod.get("nombre") or ""), "subtotal": subtotal, "comision_monto": comision, "neto_negocio": neto})
+        total_bruto = round(total_bruto, 2)
+        total_comision = round(total_comision, 2)
+        total_neto = round(total_bruto - total_comision, 2)
+        codigo = f"VPM-{datetime.now(ZoneInfo('America/Santiago')).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+
+        cur.execute(
+            """
+            INSERT INTO ventas_mayoristas (
+                fecha, vendedor_nombre, vendedor_contacto, cliente_nombre, notas,
+                total_bruto, total_comision, total_neto, descontar_stock, codigo_operacion
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (fecha, vendedor_nombre, vendedor_contacto, cliente_nombre, notas, total_bruto, total_comision, total_neto, int(descontar_stock), codigo),
+        )
+        venta_id = int(cur.lastrowid)
+        for row in rows:
+            cur.execute(
+                """
+                INSERT INTO ventas_mayoristas_items (
+                    venta_mayorista_id, producto_id, producto_nombre, cantidad, precio_unitario,
+                    subtotal, comision_pct, comision_monto, neto_negocio
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    venta_id, int(row["producto_id"]), row["producto_nombre"], float(row["cantidad"]),
+                    float(row["precio_unitario"]), float(row["subtotal"]), float(row["comision_pct"]),
+                    float(row["comision_monto"]), float(row["neto_negocio"]),
+                ),
+            )
+            if descontar_stock:
+                stock_updates.append(row)
+        conn.commit()
+
+        for row in stock_updates:
+            actualizar_stock_producto(
+                int(row["producto_id"]),
+                -float(row["cantidad"]),
+                referencia_tipo="venta_mayorista",
+                referencia_id=venta_id,
+                detalle=f"Venta por mayor {codigo} - {vendedor_nombre}",
+                codigo_operacion=codigo,
+                origen_modulo="ventas_mayor",
+            )
+
+        crear_backup()
+        return jsonify({"success": True, "venta_id": venta_id, "codigo_operacion": codigo})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 def _armar_producto_base_para_venta(data):
     item = dict(data or {})
     porcion_info = _calcular_info_porciones_producto(item)

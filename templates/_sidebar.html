@@ -327,10 +327,22 @@
             <span class="icon">&#128197;</span>
             <span>Agenda</span>
         </a>
-        <a href="/ventas" class="nav-item">
-            <span class="icon">&#128722;</span>
-            <span>Ventas</span>
-        </a>
+        <details class="nav-group" id="nav-group-ventas">
+            <summary class="nav-item">
+                <span class="nav-item-main">
+                    <span class="icon">&#128722;</span>
+                    <span>Ventas</span>
+                </span>
+                <span class="nav-caret">&#9662;</span>
+            </summary>
+            <div class="nav-submenu">
+                <a href="/ventas" class="nav-subitem">Punto de venta</a>
+                <a href="/ventas/mayor" class="nav-subitem">Ventas por mayor</a>
+                <a href="/historial-ventas" class="nav-subitem">Historial de ventas</a>
+                <a href="/ventas/admin-catalogo" class="nav-subitem">Admin catalogo</a>
+                <a href="/ventas/admin-personalizacion" class="nav-subitem">Personalizacion tienda</a>
+            </div>
+        </details>
         <a href="/reportes" class="nav-item sucree-hide-reportes">
             <span class="icon">&#128202;</span>
             <span>Reportes</span>
@@ -388,6 +400,21 @@
             if (!details) return;
             const currentPath = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
             if (currentPath === '/settings' || currentPath === '/settings/clientes') {
+                details.open = true;
+            }
+        })();
+
+        (function () {
+            const details = document.getElementById('nav-group-ventas');
+            if (!details) return;
+            const currentPath = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+            if (
+                currentPath === '/ventas' ||
+                currentPath === '/ventas/mayor' ||
+                currentPath === '/historial-ventas' ||
+                currentPath === '/ventas/admin-catalogo' ||
+                currentPath === '/ventas/admin-personalizacion'
+            ) {
                 details.open = true;
             }
         })();

@@ -716,6 +716,47 @@ def init_db():
         # Migracion compatible: instalaciones antiguas pueden no tener metodo_pago.
         _ensure_column(conn, "ventas", "metodo_pago", "TEXT DEFAULT 'efectivo'")
 
+        # Ventas por mayor: registro separado para vendedores/revendedores internos.
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS ventas_mayoristas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha TEXT NOT NULL,
+                vendedor_nombre TEXT NOT NULL,
+                vendedor_contacto TEXT,
+                cliente_nombre TEXT,
+                notas TEXT,
+                total_bruto REAL DEFAULT 0,
+                total_comision REAL DEFAULT 0,
+                total_neto REAL DEFAULT 0,
+                descontar_stock INTEGER DEFAULT 1,
+                codigo_operacion TEXT,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS ventas_mayoristas_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                venta_mayorista_id INTEGER NOT NULL,
+                producto_id INTEGER NOT NULL,
+                producto_nombre TEXT NOT NULL,
+                cantidad REAL NOT NULL DEFAULT 0,
+                precio_unitario REAL NOT NULL DEFAULT 0,
+                subtotal REAL NOT NULL DEFAULT 0,
+                comision_pct REAL NOT NULL DEFAULT 0,
+                comision_monto REAL NOT NULL DEFAULT 0,
+                neto_negocio REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY (venta_mayorista_id) REFERENCES ventas_mayoristas(id) ON DELETE CASCADE,
+                FOREIGN KEY (producto_id) REFERENCES productos(id)
+            )
+            '''
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_fecha ON ventas_mayoristas(fecha)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedor ON ventas_mayoristas(vendedor_nombre)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_items_venta ON ventas_mayoristas_items(venta_mayorista_id)")
+
         # Ventas semanales manuales para comparativo con compras facturadas
         cursor.execute(
             '''

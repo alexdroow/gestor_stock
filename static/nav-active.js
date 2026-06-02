@@ -22,25 +22,22 @@
   });
 
   var subLinks = document.querySelectorAll(".nav-menu .nav-subitem");
-  var foundSubActive = false;
   subLinks.forEach(function (link) {
     var href = norm(link.getAttribute("href"));
     var active = href === current;
     link.classList.toggle("active", active);
     if (active) {
-      foundSubActive = true;
       link.setAttribute("aria-current", "page");
       var group = link.closest(".nav-group");
-      if (group) group.open = true;
+      if (group) {
+        group.open = true;
+        var summary = group.querySelector("summary.nav-item");
+        if (summary) summary.classList.add("active");
+      }
     } else {
       link.removeAttribute("aria-current");
     }
   });
-
-  if (foundSubActive) {
-    var insumosTop = document.querySelector(".nav-menu .nav-group > .nav-item");
-    if (insumosTop) insumosTop.classList.add("active");
-  }
 
   function updateAlertBadge() {
     var badge = document.getElementById("nav-alertas");

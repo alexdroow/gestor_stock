@@ -1,0 +1,658 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventas por mayor - Sucree Pasteleria</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #f59e0b;
+            --secondary: #f97316;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --panel: #fff;
+            --soft: #f8fafc;
+            --green: #059669;
+            --blue: #2563eb;
+            --red: #dc2626;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--soft);
+            min-height: 100vh;
+            color: var(--ink);
+        }
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid var(--line);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        .main-content {
+            margin-left: 260px;
+            padding: 28px;
+            max-width: 1600px;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .page-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--ink);
+            line-height: 1.1;
+        }
+        .page-subtitle {
+            color: #475569;
+            font-size: .95rem;
+            margin-top: 4px;
+        }
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: .88rem;
+        }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-secondary { background: #e2e8f0; color: #0f172a; }
+        .btn-outline { background: #fff; color: #334155; border: 1px solid #cbd5e1; }
+        .btn-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .btn:disabled { opacity: .55; cursor: not-allowed; }
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(380px, .85fr);
+            gap: 16px;
+            align-items: start;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 14px;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+        }
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .tools-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 140px;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        input, select, textarea {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: .9rem;
+            background: #fff;
+        }
+        textarea { min-height: 74px; resize: vertical; }
+        label {
+            display: grid;
+            gap: 5px;
+            color: #475569;
+            font-size: .78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .02em;
+        }
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 10px;
+            max-height: 64vh;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        .product-card {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            padding: 10px;
+            cursor: pointer;
+            min-height: 132px;
+            display: grid;
+            align-content: space-between;
+            gap: 8px;
+        }
+        .product-card:hover { border-color: #f59e0b; background: #fffbeb; }
+        .product-card.off { opacity: .56; }
+        .product-name {
+            font-size: .92rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.25;
+        }
+        .product-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            color: #475569;
+            font-size: .78rem;
+        }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 3px 8px;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            font-weight: 800;
+        }
+        .chip.ok { color: #166534; background: #ecfdf5; border-color: #bbf7d0; }
+        .chip.warn { color: #9a3412; background: #fff7ed; border-color: #fed7aa; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .cart-list {
+            display: grid;
+            gap: 8px;
+            max-height: 340px;
+            overflow: auto;
+            margin-top: 10px;
+        }
+        .cart-item {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 10px;
+            display: grid;
+            gap: 8px;
+        }
+        .cart-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .cart-name { font-weight: 800; color: #0f172a; }
+        .cart-grid {
+            display: grid;
+            grid-template-columns: 90px 1fr 90px;
+            gap: 8px;
+            align-items: end;
+        }
+        .totals {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: .94rem;
+        }
+        .total-row strong { font-size: 1.1rem; }
+        .summary-band {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .metric {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .metric-label { color: #64748b; font-size: .78rem; font-weight: 800; text-transform: uppercase; }
+        .metric-value { font-size: 1.35rem; font-weight: 900; margin-top: 4px; color: #0f172a; }
+        .history-filters {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 150px 150px 120px;
+            gap: 8px;
+            align-items: end;
+            margin-bottom: 10px;
+        }
+        .history-list {
+            display: grid;
+            gap: 8px;
+            max-height: 440px;
+            overflow: auto;
+        }
+        .history-item {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 10px;
+            background: #fff;
+        }
+        .history-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .history-title { font-weight: 900; color: #0f172a; }
+        .history-meta { color: #64748b; font-size: .82rem; margin-top: 2px; }
+        .history-items {
+            margin-top: 8px;
+            font-size: .84rem;
+            color: #334155;
+            display: grid;
+            gap: 3px;
+        }
+        .seller-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .86rem;
+        }
+        .seller-table th, .seller-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px 6px;
+            text-align: left;
+        }
+        .seller-table th { color: #64748b; font-size: .75rem; text-transform: uppercase; }
+        .status-msg {
+            min-height: 20px;
+            margin-top: 8px;
+            color: #475569;
+            font-size: .86rem;
+            font-weight: 700;
+        }
+        @media (max-width: 980px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; padding: 16px; }
+            .layout { grid-template-columns: 1fr; }
+            .products-grid { max-height: none; }
+            .summary-band { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .history-filters { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 620px) {
+            .page-header { flex-direction: column; }
+            .form-grid, .tools-row, .cart-grid, .history-filters { grid-template-columns: 1fr; }
+            .summary-band { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
+</head>
+<body>
+    <div style="display:flex;min-height:100vh;">
+        {% include "_sidebar.html" %}
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Ventas por mayor</h1>
+                    <p class="page-subtitle">Registra productos entregados a vendedores, comisiones y utilidad neta.</p>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <a href="/ventas" class="btn btn-outline">Punto de venta</a>
+                    <a href="/historial-ventas" class="btn btn-secondary">Historial ventas</a>
+                </div>
+            </div>
+
+            <section class="summary-band">
+                <div class="metric"><div class="metric-label">Ventas</div><div class="metric-value" id="metric-ventas">0</div></div>
+                <div class="metric"><div class="metric-label">Venta bruta</div><div class="metric-value" id="metric-bruto">$0</div></div>
+                <div class="metric"><div class="metric-label">Comision vendedor</div><div class="metric-value" id="metric-comision">$0</div></div>
+                <div class="metric"><div class="metric-label">Neto negocio</div><div class="metric-value" id="metric-neto">$0</div></div>
+            </section>
+
+            <div class="layout">
+                <section class="panel">
+                    <div class="panel-title">
+                        <span>Productos</span>
+                        <span class="chip" id="product-count">0 items</span>
+                    </div>
+                    <div class="tools-row">
+                        <input id="product-search" type="search" placeholder="Buscar producto...">
+                        <select id="product-filter">
+                            <option value="todos">Todos</option>
+                            <option value="stock">Con stock</option>
+                            <option value="agotados">Agotados</option>
+                        </select>
+                    </div>
+                    <div class="products-grid" id="products-grid"></div>
+                </section>
+
+                <aside class="panel">
+                    <div class="panel-title">
+                        <span>Nueva venta mayorista</span>
+                        <button type="button" class="btn btn-secondary" onclick="limpiarVentaMayor()">Limpiar</button>
+                    </div>
+                    <div class="form-grid">
+                        <label>Fecha
+                            <input id="venta-fecha" type="date">
+                        </label>
+                        <label>Vendedor / cliente mayorista
+                            <input id="vendedor-nombre" type="text" maxlength="120" placeholder="Ej: Juan Perez">
+                        </label>
+                        <label>Contacto
+                            <input id="vendedor-contacto" type="text" maxlength="120" placeholder="Telefono o correo">
+                        </label>
+                        <label>Cliente final (opcional)
+                            <input id="cliente-nombre" type="text" maxlength="120" placeholder="Si aplica">
+                        </label>
+                    </div>
+                    <label style="margin-top:10px;">Notas
+                        <textarea id="venta-notas" maxlength="1000" placeholder="Observaciones, condiciones de entrega o pago..."></textarea>
+                    </label>
+                    <label style="display:flex;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-top:10px;text-transform:none;letter-spacing:0;color:#334155;">
+                        <input id="descontar-stock" type="checkbox" checked style="width:auto;">
+                        Descontar stock al guardar
+                    </label>
+                    <div class="cart-list" id="cart-list"></div>
+                    <div class="totals">
+                        <div class="total-row"><span>Total bruto</span><strong id="total-bruto">$0</strong></div>
+                        <div class="total-row"><span>Comision vendedor</span><strong id="total-comision">$0</strong></div>
+                        <div class="total-row"><span>Neto para Sucree</span><strong id="total-neto">$0</strong></div>
+                    </div>
+                    <button type="button" class="btn btn-success" id="btn-guardar" onclick="guardarVentaMayor()" style="width:100%;margin-top:10px;">Guardar venta por mayor</button>
+                    <div class="status-msg" id="status-msg"></div>
+                </aside>
+            </div>
+
+            <section class="panel" style="margin-top:16px;">
+                <div class="panel-title">
+                    <span>Historial y vendedores</span>
+                    <button type="button" class="btn btn-outline" onclick="cargarHistorialMayor()">Actualizar</button>
+                </div>
+                <div class="history-filters">
+                    <label>Vendedor
+                        <input id="filtro-vendedor" type="search" placeholder="Buscar vendedor...">
+                    </label>
+                    <label>Desde
+                        <input id="filtro-desde" type="date">
+                    </label>
+                    <label>Hasta
+                        <input id="filtro-hasta" type="date">
+                    </label>
+                    <button type="button" class="btn btn-primary" onclick="cargarHistorialMayor()">Filtrar</button>
+                </div>
+                <div class="layout" style="grid-template-columns:minmax(0,1fr) minmax(320px,.55fr);">
+                    <div class="history-list" id="history-list"></div>
+                    <div style="overflow:auto;">
+                        <table class="seller-table">
+                            <thead>
+                                <tr><th>Vendedor</th><th>Ventas</th><th>Bruto</th><th>Comision</th><th>Neto</th></tr>
+                            </thead>
+                            <tbody id="seller-summary"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const productos = {{ productos|tojson }};
+        const money = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+        let carritoMayor = [];
+
+        function n(v) {
+            const num = Number(v || 0);
+            return Number.isFinite(num) ? num : 0;
+        }
+        function esc(v) {
+            return String(v || '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[ch]));
+        }
+        function todayIso() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function status(text, error = false) {
+            const el = document.getElementById('status-msg');
+            if (!el) return;
+            el.textContent = text || '';
+            el.style.color = error ? '#b91c1c' : '#475569';
+        }
+        function productoStock(p) {
+            return n(p.stock_visual ?? p.stock ?? 0);
+        }
+        function renderProductos() {
+            const q = String(document.getElementById('product-search')?.value || '').trim().toLowerCase();
+            const filtro = String(document.getElementById('product-filter')?.value || 'todos');
+            const rows = productos.filter((p) => {
+                const nombre = String(p.nombre || '').toLowerCase();
+                const stock = productoStock(p);
+                if (q && !nombre.includes(q)) return false;
+                if (filtro === 'stock' && stock <= 0) return false;
+                if (filtro === 'agotados' && stock > 0) return false;
+                return true;
+            });
+            const grid = document.getElementById('products-grid');
+            const count = document.getElementById('product-count');
+            if (count) count.textContent = `${rows.length} items`;
+            if (!grid) return;
+            grid.innerHTML = rows.map((p) => {
+                const stock = productoStock(p);
+                return `
+                    <article class="product-card ${stock <= 0 ? 'off' : ''}" onclick="agregarProductoMayor(${Number(p.id || 0)})">
+                        <div class="product-name">${esc(p.nombre)}</div>
+                        <div class="product-meta">
+                            <span class="chip">${money.format(n(p.precio))}</span>
+                            <span class="chip ${stock > 0 ? 'ok' : 'warn'}">Stock ${esc(String(p.stock_visual_label || p.stock_label || stock))} ${esc(p.stock_visual_unidad || p.unidad || 'unidad')}</span>
+                        </div>
+                        <button type="button" class="btn btn-outline" style="width:100%;">Agregar</button>
+                    </article>
+                `;
+            }).join('') || '<div style="color:#64748b;">Sin productos para mostrar.</div>';
+        }
+        function agregarProductoMayor(id) {
+            const p = productos.find((x) => Number(x.id || 0) === Number(id || 0));
+            if (!p) return;
+            let item = carritoMayor.find((x) => Number(x.producto_id) === Number(id));
+            if (item) item.cantidad += 1;
+            else {
+                item = {
+                    producto_id: Number(p.id),
+                    nombre: String(p.nombre || ''),
+                    cantidad: 1,
+                    precio_unitario: Math.round(n(p.precio)),
+                    comision_pct: 0,
+                };
+                carritoMayor.push(item);
+            }
+            renderCarrito();
+        }
+        function quitarItemMayor(id) {
+            carritoMayor = carritoMayor.filter((x) => Number(x.producto_id) !== Number(id));
+            renderCarrito();
+        }
+        function actualizarItemMayor(id, campo, valor) {
+            const item = carritoMayor.find((x) => Number(x.producto_id) === Number(id));
+            if (!item) return;
+            let num = Number(valor || 0);
+            if (!Number.isFinite(num)) num = 0;
+            if (campo === 'cantidad') item.cantidad = Math.max(0.01, num);
+            if (campo === 'precio_unitario') item.precio_unitario = Math.max(0, Math.round(num));
+            if (campo === 'comision_pct') item.comision_pct = Math.max(0, Math.min(100, num));
+            renderCarrito();
+        }
+        function totalesMayor() {
+            let bruto = 0;
+            let comision = 0;
+            carritoMayor.forEach((it) => {
+                const subtotal = n(it.cantidad) * n(it.precio_unitario);
+                bruto += subtotal;
+                comision += subtotal * (n(it.comision_pct) / 100);
+            });
+            return { bruto, comision, neto: bruto - comision };
+        }
+        function renderCarrito() {
+            const root = document.getElementById('cart-list');
+            if (!root) return;
+            root.innerHTML = carritoMayor.map((it) => {
+                const subtotal = n(it.cantidad) * n(it.precio_unitario);
+                const com = subtotal * (n(it.comision_pct) / 100);
+                return `
+                    <div class="cart-item">
+                        <div class="cart-head">
+                            <div class="cart-name">${esc(it.nombre)}</div>
+                            <button type="button" class="btn btn-danger" onclick="quitarItemMayor(${Number(it.producto_id)})">Quitar</button>
+                        </div>
+                        <div class="cart-grid">
+                            <label>Cant
+                                <input type="number" min="0.01" step="0.01" value="${n(it.cantidad)}" onchange="actualizarItemMayor(${Number(it.producto_id)}, 'cantidad', this.value)">
+                            </label>
+                            <label>Precio x mayor
+                                <input type="number" min="0" step="1" value="${Math.round(n(it.precio_unitario))}" onchange="actualizarItemMayor(${Number(it.producto_id)}, 'precio_unitario', this.value)">
+                            </label>
+                            <label>% comision
+                                <input type="number" min="0" max="100" step="0.01" value="${n(it.comision_pct)}" onchange="actualizarItemMayor(${Number(it.producto_id)}, 'comision_pct', this.value)">
+                            </label>
+                        </div>
+                        <div class="product-meta">
+                            <span class="chip">Subtotal ${money.format(subtotal)}</span>
+                            <span class="chip warn">Comision ${money.format(com)}</span>
+                            <span class="chip ok">Sucree ${money.format(subtotal - com)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('') || '<div style="color:#64748b;">Agrega productos para crear una venta por mayor.</div>';
+            const t = totalesMayor();
+            document.getElementById('total-bruto').textContent = money.format(t.bruto);
+            document.getElementById('total-comision').textContent = money.format(t.comision);
+            document.getElementById('total-neto').textContent = money.format(t.neto);
+        }
+        function limpiarVentaMayor() {
+            carritoMayor = [];
+            document.getElementById('vendedor-nombre').value = '';
+            document.getElementById('vendedor-contacto').value = '';
+            document.getElementById('cliente-nombre').value = '';
+            document.getElementById('venta-notas').value = '';
+            document.getElementById('descontar-stock').checked = true;
+            status('');
+            renderCarrito();
+        }
+        async function guardarVentaMayor() {
+            const btn = document.getElementById('btn-guardar');
+            const payload = {
+                fecha: document.getElementById('venta-fecha')?.value || todayIso(),
+                vendedor_nombre: document.getElementById('vendedor-nombre')?.value || '',
+                vendedor_contacto: document.getElementById('vendedor-contacto')?.value || '',
+                cliente_nombre: document.getElementById('cliente-nombre')?.value || '',
+                notas: document.getElementById('venta-notas')?.value || '',
+                descontar_stock: Boolean(document.getElementById('descontar-stock')?.checked),
+                items: carritoMayor.map((x) => ({
+                    producto_id: Number(x.producto_id),
+                    cantidad: n(x.cantidad),
+                    precio_unitario: n(x.precio_unitario),
+                    comision_pct: n(x.comision_pct),
+                })),
+            };
+            if (!payload.vendedor_nombre.trim()) return status('Ingresa vendedor / cliente mayorista.', true);
+            if (!payload.items.length) return status('Agrega productos a la venta.', true);
+            try {
+                if (btn) btn.disabled = true;
+                status('Guardando venta por mayor...');
+                const res = await fetch('/api/ventas/mayoristas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo guardar');
+                status(`Venta guardada: ${data.codigo_operacion || '#' + data.venta_id}`);
+                limpiarVentaMayor();
+                await cargarHistorialMayor();
+            } catch (err) {
+                status(err.message || 'Error al guardar venta por mayor.', true);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+        function renderHistorial(data) {
+            const resumen = data.resumen || {};
+            document.getElementById('metric-ventas').textContent = String(Math.round(n(resumen.ventas)));
+            document.getElementById('metric-bruto').textContent = money.format(n(resumen.total_bruto));
+            document.getElementById('metric-comision').textContent = money.format(n(resumen.total_comision));
+            document.getElementById('metric-neto').textContent = money.format(n(resumen.total_neto));
+            const list = document.getElementById('history-list');
+            const ventas = Array.isArray(data.ventas) ? data.ventas : [];
+            list.innerHTML = ventas.map((v) => `
+                <article class="history-item">
+                    <div class="history-top">
+                        <div>
+                            <div class="history-title">${esc(v.vendedor_nombre)} - ${esc(v.codigo_operacion || '#' + v.id)}</div>
+                            <div class="history-meta">${esc(v.fecha)} - Contacto: ${esc(v.vendedor_contacto || '-')} - Cliente final: ${esc(v.cliente_nombre || '-')}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div><strong>${money.format(n(v.total_bruto))}</strong></div>
+                            <div class="history-meta">Comision ${money.format(n(v.total_comision))}</div>
+                            <div class="history-meta">Neto ${money.format(n(v.total_neto))}</div>
+                        </div>
+                    </div>
+                    <div class="history-items">
+                        ${(Array.isArray(v.items) ? v.items : []).map((it) => `
+                            <div>${esc(it.producto_nombre)} x${n(it.cantidad)} - ${money.format(n(it.subtotal))} - ${n(it.comision_pct)}% comision</div>
+                        `).join('')}
+                    </div>
+                    ${v.notas ? `<div class="history-meta" style="margin-top:8px;">Notas: ${esc(v.notas)}</div>` : ''}
+                </article>
+            `).join('') || '<div style="color:#64748b;">Sin ventas mayoristas registradas.</div>';
+            const sellers = Array.isArray(data.vendedores) ? data.vendedores : [];
+            document.getElementById('seller-summary').innerHTML = sellers.map((s) => `
+                <tr>
+                    <td><strong>${esc(s.vendedor_nombre)}</strong></td>
+                    <td>${Math.round(n(s.ventas))}</td>
+                    <td>${money.format(n(s.total_bruto))}</td>
+                    <td>${money.format(n(s.total_comision))}</td>
+                    <td>${money.format(n(s.total_neto))}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" style="color:#64748b;">Sin resumen.</td></tr>';
+        }
+        async function cargarHistorialMayor() {
+            const qs = new URLSearchParams();
+            const vendedor = document.getElementById('filtro-vendedor')?.value || '';
+            const desde = document.getElementById('filtro-desde')?.value || '';
+            const hasta = document.getElementById('filtro-hasta')?.value || '';
+            if (vendedor.trim()) qs.set('vendedor', vendedor.trim());
+            if (desde) qs.set('desde', desde);
+            if (hasta) qs.set('hasta', hasta);
+            const res = await fetch(`/api/ventas/mayoristas?${qs.toString()}`, { headers: { Accept: 'application/json' } });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo cargar historial');
+            renderHistorial(data);
+        }
+        document.getElementById('product-search')?.addEventListener('input', renderProductos);
+        document.getElementById('product-filter')?.addEventListener('change', renderProductos);
+        document.getElementById('filtro-vendedor')?.addEventListener('input', () => {
+            clearTimeout(window.__mayorFilterTimer);
+            window.__mayorFilterTimer = setTimeout(() => cargarHistorialMayor().catch(console.error), 280);
+        });
+        document.getElementById('venta-fecha').value = todayIso();
+        renderProductos();
+        renderCarrito();
+        cargarHistorialMayor().catch((err) => status(err.message || 'No se pudo cargar historial', true));
+    </script>
+    <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
+    <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
+</body>
+</html>
+
+
