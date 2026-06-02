@@ -263,6 +263,24 @@
             overflow: auto;
             margin-top: 10px;
         }
+        .seller-box {
+            margin-top: 12px;
+            border: 1px dashed #fdba74;
+            background: #fff7ed;
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .seller-box-title {
+            font-weight: 900;
+            color: #9a3412;
+            margin-bottom: 8px;
+        }
+        .seller-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: end;
+        }
         .cart-item {
             border: 1px solid var(--line);
             border-radius: 8px;
@@ -375,7 +393,7 @@
         }
         @media (max-width: 620px) {
             .page-header { flex-direction: column; }
-            .form-grid, .tools-row, .cart-grid, .history-filters { grid-template-columns: 1fr; }
+            .form-grid, .tools-row, .cart-grid, .history-filters, .seller-actions { grid-template-columns: 1fr; }
             .summary-band { grid-template-columns: 1fr; }
         }
     </style>
@@ -429,15 +447,29 @@
                         <label>Fecha
                             <input id="venta-fecha" type="date">
                         </label>
-                        <label>Vendedor / cliente mayorista
-                            <input id="vendedor-nombre" type="text" maxlength="120" placeholder="Ej: Juan Perez">
+                        <label>Vendedor activo
+                            <select id="vendedor-id" onchange="actualizarVendedorSeleccionado()">
+                                <option value="">Selecciona vendedor...</option>
+                            </select>
                         </label>
                         <label>Contacto
-                            <input id="vendedor-contacto" type="text" maxlength="120" placeholder="Telefono o correo">
+                            <input id="vendedor-contacto" type="text" maxlength="120" placeholder="Telefono o correo" readonly>
                         </label>
                         <label>Cliente final (opcional)
                             <input id="cliente-nombre" type="text" maxlength="120" placeholder="Si aplica">
                         </label>
+                    </div>
+                    <div class="seller-box">
+                        <div class="seller-box-title">Registrar vendedor mayorista</div>
+                        <div class="seller-actions">
+                            <label>Nombre
+                                <input id="nuevo-vendedor-nombre" type="text" maxlength="120" placeholder="Ej: Vendedor feria">
+                            </label>
+                            <label>Contacto
+                                <input id="nuevo-vendedor-contacto" type="text" maxlength="120" placeholder="Telefono o correo">
+                            </label>
+                            <button type="button" class="btn btn-primary" onclick="registrarVendedorMayorista()">Guardar vendedor</button>
+                        </div>
                     </div>
                     <label style="margin-top:10px;">Notas
                         <textarea id="venta-notas" maxlength="1000" placeholder="Observaciones, condiciones de entrega o pago..."></textarea>
@@ -491,6 +523,7 @@
 
     <script>
         const productos = {{ productos|tojson }};
+        let vendedoresMayoristas = {{ vendedores|tojson }};
         const money = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
         let carritoMayor = [];
 
@@ -514,6 +547,52 @@
         function productoStock(p) {
             return n(p.stock_visual ?? p.stock ?? 0);
         }
+        function productoOcultoTienda(p) {
+            return p.activo_tienda === false || p.activo_tienda === 0 || p.activo_tienda === '0';
+        }
+        function renderVendedoresMayoristas(selectedId = '') {
+            const select = document.getElementById('vendedor-id');
+            if (!select) return;
+            const actual = String(selectedId || select.value || '');
+            select.innerHTML = '<option value="">Selecciona vendedor...</option>' + vendedoresMayoristas.map((v) => (
+                `<option value="${Number(v.id || 0)}">${esc(v.nombre)}${v.contacto ? ' - ' + esc(v.contacto) : ''}</option>`
+            )).join('');
+            if (actual) select.value = actual;
+            actualizarVendedorSeleccionado();
+        }
+        function vendedorSeleccionado() {
+            const id = Number(document.getElementById('vendedor-id')?.value || 0);
+            return vendedoresMayoristas.find((v) => Number(v.id || 0) === id) || null;
+        }
+        function actualizarVendedorSeleccionado() {
+            const v = vendedorSeleccionado();
+            const contact = document.getElementById('vendedor-contacto');
+            if (contact) contact.value = v ? String(v.contacto || '') : '';
+        }
+        async function registrarVendedorMayorista() {
+            const nombreEl = document.getElementById('nuevo-vendedor-nombre');
+            const contactoEl = document.getElementById('nuevo-vendedor-contacto');
+            const nombre = String(nombreEl?.value || '').trim();
+            const contacto = String(contactoEl?.value || '').trim();
+            if (nombre.length < 2) return status('Ingresa el nombre del vendedor.', true);
+            try {
+                status('Registrando vendedor...');
+                const res = await fetch('/api/ventas/mayoristas/vendedores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ nombre, contacto, activo: true }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo registrar vendedor');
+                vendedoresMayoristas = Array.isArray(data.vendedores) ? data.vendedores : vendedoresMayoristas;
+                if (nombreEl) nombreEl.value = '';
+                if (contactoEl) contactoEl.value = '';
+                renderVendedoresMayoristas(String(data.vendedor_id || ''));
+                status('Vendedor registrado y seleccionado.');
+            } catch (err) {
+                status(err.message || 'Error al registrar vendedor.', true);
+            }
+        }
         function renderProductos() {
             const q = String(document.getElementById('product-search')?.value || '').trim().toLowerCase();
             const filtro = String(document.getElementById('product-filter')?.value || 'todos');
@@ -531,12 +610,14 @@
             if (!grid) return;
             grid.innerHTML = rows.map((p) => {
                 const stock = productoStock(p);
+                const oculto = productoOcultoTienda(p);
                 return `
                     <article class="product-card ${stock <= 0 ? 'off' : ''}" onclick="agregarProductoMayor(${Number(p.id || 0)})">
                         <div class="product-name">${esc(p.nombre)}</div>
                         <div class="product-meta">
                             <span class="chip">${money.format(n(p.precio))}</span>
                             <span class="chip ${stock > 0 ? 'ok' : 'warn'}">Stock ${esc(String(p.stock_visual_label || p.stock_label || stock))} ${esc(p.stock_visual_unidad || p.unidad || 'unidad')}</span>
+                            ${oculto ? '<span class="chip warn">Oculto tienda</span>' : ''}
                         </div>
                         <button type="button" class="btn btn-outline" style="width:100%;">Agregar</button>
                     </article>
@@ -622,7 +703,7 @@
         }
         function limpiarVentaMayor() {
             carritoMayor = [];
-            document.getElementById('vendedor-nombre').value = '';
+            document.getElementById('vendedor-id').value = '';
             document.getElementById('vendedor-contacto').value = '';
             document.getElementById('cliente-nombre').value = '';
             document.getElementById('venta-notas').value = '';
@@ -632,10 +713,12 @@
         }
         async function guardarVentaMayor() {
             const btn = document.getElementById('btn-guardar');
+            const vendedor = vendedorSeleccionado();
             const payload = {
                 fecha: document.getElementById('venta-fecha')?.value || todayIso(),
-                vendedor_nombre: document.getElementById('vendedor-nombre')?.value || '',
-                vendedor_contacto: document.getElementById('vendedor-contacto')?.value || '',
+                vendedor_id: Number(vendedor?.id || 0),
+                vendedor_nombre: vendedor?.nombre || '',
+                vendedor_contacto: vendedor?.contacto || '',
                 cliente_nombre: document.getElementById('cliente-nombre')?.value || '',
                 notas: document.getElementById('venta-notas')?.value || '',
                 descontar_stock: Boolean(document.getElementById('descontar-stock')?.checked),
@@ -646,7 +729,7 @@
                     comision_pct: n(x.comision_pct),
                 })),
             };
-            if (!payload.vendedor_nombre.trim()) return status('Ingresa vendedor / cliente mayorista.', true);
+            if (!payload.vendedor_id) return status('Selecciona un vendedor activo.', true);
             if (!payload.items.length) return status('Agrega productos a la venta.', true);
             try {
                 if (btn) btn.disabled = true;
@@ -727,6 +810,7 @@
             window.__mayorFilterTimer = setTimeout(() => cargarHistorialMayor().catch(console.error), 280);
         });
         document.getElementById('venta-fecha').value = todayIso();
+        renderVendedoresMayoristas();
         renderProductos();
         renderCarrito();
         cargarHistorialMayor().catch((err) => status(err.message || 'No se pudo cargar historial', true));

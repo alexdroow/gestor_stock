@@ -722,6 +722,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS ventas_mayoristas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 fecha TEXT NOT NULL,
+                vendedor_id INTEGER,
                 vendedor_nombre TEXT NOT NULL,
                 vendedor_contacto TEXT,
                 cliente_nombre TEXT,
@@ -735,6 +736,20 @@ def init_db():
             )
             '''
         )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS ventas_mayoristas_vendedores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                contacto TEXT,
+                notas TEXT,
+                activo INTEGER DEFAULT 1,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
+        _ensure_column(conn, "ventas_mayoristas", "vendedor_id", "INTEGER")
         cursor.execute(
             '''
             CREATE TABLE IF NOT EXISTS ventas_mayoristas_items (
@@ -753,9 +768,11 @@ def init_db():
             )
             '''
         )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedor_id ON ventas_mayoristas(vendedor_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_fecha ON ventas_mayoristas(fecha)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedor ON ventas_mayoristas(vendedor_nombre)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_items_venta ON ventas_mayoristas_items(venta_mayorista_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedores_activo ON ventas_mayoristas_vendedores(activo, nombre)")
 
         # Ventas semanales manuales para comparativo con compras facturadas
         cursor.execute(

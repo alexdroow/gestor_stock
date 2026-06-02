@@ -11997,11 +11997,13 @@ def ventas():
 
 
 def _ensure_ventas_mayoristas_tables(cursor):
+    conn = getattr(cursor, "connection", None)
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS ventas_mayoristas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha TEXT NOT NULL,
+            vendedor_id INTEGER,
             vendedor_nombre TEXT NOT NULL,
             vendedor_contacto TEXT,
             cliente_nombre TEXT,
@@ -12015,6 +12017,23 @@ def _ensure_ventas_mayoristas_tables(cursor):
         )
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ventas_mayoristas_vendedores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            contacto TEXT,
+            notas TEXT,
+            activo INTEGER DEFAULT 1,
+            creado TEXT DEFAULT CURRENT_TIMESTAMP,
+            actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute("PRAGMA table_info(ventas_mayoristas)")
+    columnas_ventas_mayoristas = {str(r["name"] if hasattr(r, "keys") and "name" in r.keys() else r[1]) for r in cursor.fetchall()}
+    if "vendedor_id" not in columnas_ventas_mayoristas:
+        cursor.execute("ALTER TABLE ventas_mayoristas ADD COLUMN vendedor_id INTEGER")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS ventas_mayoristas_items (
@@ -12033,19 +12052,77 @@ def _ensure_ventas_mayoristas_tables(cursor):
         )
         """
     )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedor_id ON ventas_mayoristas(vendedor_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_fecha ON ventas_mayoristas(fecha)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedor ON ventas_mayoristas(vendedor_nombre)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_items_venta ON ventas_mayoristas_items(venta_mayorista_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_mayoristas_vendedores_activo ON ventas_mayoristas_vendedores(activo, nombre)")
+
+
+def _listar_vendedores_mayoristas(cursor, solo_activos=False):
+    _ensure_ventas_mayoristas_tables(cursor)
+    where = "WHERE COALESCE(activo, 1) = 1" if solo_activos else ""
+    cursor.execute(
+        f"""
+        SELECT id, nombre, contacto, notas, COALESCE(activo, 1) AS activo, creado, actualizado
+        FROM ventas_mayoristas_vendedores
+        {where}
+        ORDER BY COALESCE(activo, 1) DESC, nombre COLLATE NOCASE ASC
+        """
+    )
+    return [dict(r) for r in cursor.fetchall()]
 
 
 @app.route('/ventas/mayor')
 def ventas_mayor():
+    conn = None
     try:
         productos = _obtener_productos_para_venta(include_zero_stock=True)
-        return render_template('ventas_mayor.html', productos=productos)
+        conn = get_db()
+        cur = conn.cursor()
+        vendedores = _listar_vendedores_mayoristas(cur, solo_activos=True)
+        return render_template('ventas_mayor.html', productos=productos, vendedores=vendedores)
     except Exception as e:
         print(f"Error en ventas por mayor: {e}")
         return f"Error: {str(e)}", 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/ventas/mayoristas/vendedores', methods=['GET', 'POST'])
+def api_ventas_mayoristas_vendedores():
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_ventas_mayoristas_tables(cur)
+        if request.method == 'GET':
+            solo_activos = str(request.args.get("activos") or "").strip().lower() in {"1", "true", "si", "yes"}
+            return jsonify({"success": True, "vendedores": _listar_vendedores_mayoristas(cur, solo_activos=solo_activos)})
+
+        data = request.get_json(silent=True) or {}
+        nombre = str(data.get("nombre") or "").strip()[:120]
+        contacto = str(data.get("contacto") or "").strip()[:120]
+        notas = str(data.get("notas") or "").strip()[:500]
+        activo = 1 if bool(data.get("activo", True)) else 0
+        if len(nombre) < 2:
+            return jsonify({"success": False, "error": "Ingresa el nombre del vendedor"}), 400
+        cur.execute(
+            """
+            INSERT INTO ventas_mayoristas_vendedores (nombre, contacto, notas, activo, actualizado)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (nombre, contacto, notas, activo),
+        )
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "vendedor_id": int(cur.lastrowid), "vendedores": _listar_vendedores_mayoristas(cur, solo_activos=True)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/ventas/mayoristas', methods=['GET'])
@@ -12135,9 +12212,8 @@ def api_ventas_mayoristas_guardar():
     stock_updates = []
     try:
         data = request.get_json(silent=True) or {}
+        vendedor_id = int(data.get("vendedor_id") or 0)
         vendedor_nombre = str(data.get("vendedor_nombre") or "").strip()[:120]
-        if len(vendedor_nombre) < 2:
-            return jsonify({"success": False, "error": "Ingresa el vendedor o cliente mayorista"}), 400
         vendedor_contacto = str(data.get("vendedor_contacto") or "").strip()[:120]
         cliente_nombre = str(data.get("cliente_nombre") or "").strip()[:120]
         notas = str(data.get("notas") or "").strip()[:1000]
@@ -12154,6 +12230,21 @@ def api_ventas_mayoristas_guardar():
         conn = get_db()
         cur = conn.cursor()
         _ensure_ventas_mayoristas_tables(cur)
+        if vendedor_id <= 0:
+            return jsonify({"success": False, "error": "Selecciona un vendedor activo"}), 400
+        cur.execute(
+            """
+            SELECT id, nombre, contacto, COALESCE(activo, 1) AS activo
+            FROM ventas_mayoristas_vendedores
+            WHERE id = ?
+            """,
+            (vendedor_id,),
+        )
+        vendedor_row = cur.fetchone()
+        if not vendedor_row or int(vendedor_row["activo"] or 0) != 1:
+            return jsonify({"success": False, "error": "El vendedor seleccionado no esta activo"}), 400
+        vendedor_nombre = str(vendedor_row["nombre"] or vendedor_nombre).strip()[:120]
+        vendedor_contacto = str(vendedor_row["contacto"] or vendedor_contacto).strip()[:120]
         producto_ids = []
         items_in = []
         for idx, item in enumerate(raw_items, start=1):
@@ -12201,12 +12292,12 @@ def api_ventas_mayoristas_guardar():
         cur.execute(
             """
             INSERT INTO ventas_mayoristas (
-                fecha, vendedor_nombre, vendedor_contacto, cliente_nombre, notas,
+                fecha, vendedor_id, vendedor_nombre, vendedor_contacto, cliente_nombre, notas,
                 total_bruto, total_comision, total_neto, descontar_stock, codigo_operacion
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (fecha, vendedor_nombre, vendedor_contacto, cliente_nombre, notas, total_bruto, total_comision, total_neto, int(descontar_stock), codigo),
+            (fecha, vendedor_id, vendedor_nombre, vendedor_contacto, cliente_nombre, notas, total_bruto, total_comision, total_neto, int(descontar_stock), codigo),
         )
         venta_id = int(cur.lastrowid)
         for row in rows:
