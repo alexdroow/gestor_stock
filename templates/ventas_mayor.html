@@ -447,8 +447,8 @@
             <section class="summary-band">
                 <div class="metric"><div class="metric-label">Ventas</div><div class="metric-value" id="metric-ventas">0</div></div>
                 <div class="metric"><div class="metric-label">Venta bruta</div><div class="metric-value" id="metric-bruto">$0</div></div>
-                <div class="metric"><div class="metric-label">Comision vendedor</div><div class="metric-value" id="metric-comision">$0</div></div>
-                <div class="metric"><div class="metric-label">Neto negocio</div><div class="metric-value" id="metric-neto">$0</div></div>
+                <div class="metric"><div class="metric-label">Comision venta</div><div class="metric-value" id="metric-comision">$0</div></div>
+                <div class="metric"><div class="metric-label">A transferir</div><div class="metric-value" id="metric-neto">$0</div></div>
             </section>
 
             <div class="layout">
@@ -516,8 +516,8 @@
                     <div class="cart-list" id="cart-list"></div>
                     <div class="totals">
                         <div class="total-row"><span>Total bruto</span><strong id="total-bruto">$0</strong></div>
-                        <div class="total-row"><span>Comision vendedor</span><strong id="total-comision">$0</strong></div>
-                        <div class="total-row"><span>Neto para Sucree</span><strong id="total-neto">$0</strong></div>
+                        <div class="total-row"><span>Comision venta</span><strong id="total-comision">$0</strong></div>
+                        <div class="total-row"><span>A transferir</span><strong id="total-neto">$0</strong></div>
                     </div>
                     <button type="button" class="btn btn-success" id="btn-guardar" onclick="guardarVentaMayor()" style="width:100%;margin-top:10px;">Guardar venta por mayor</button>
                     <div class="status-msg" id="status-msg"></div>
@@ -557,7 +557,7 @@
                     <div style="overflow:auto;">
                         <table class="seller-table">
                             <thead>
-                                <tr><th>Vendedor</th><th>Ventas</th><th>Bruto</th><th>Comision</th><th>Neto</th></tr>
+                                <tr><th>Vendedor</th><th>Ventas</th><th>Bruto</th><th>Comision venta</th><th>A transferir</th></tr>
                             </thead>
                             <tbody id="seller-summary"></tbody>
                         </table>
@@ -583,6 +583,12 @@
         function todayIso() {
             const d = new Date();
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function monthRangeIso(date = new Date()) {
+            const first = new Date(date.getFullYear(), date.getMonth(), 1);
+            const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+            const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            return { desde: fmt(first), hasta: fmt(last) };
         }
         function status(text, error = false) {
             const el = document.getElementById('status-msg');
@@ -909,8 +915,8 @@
                         </div>
                         <div style="text-align:right;">
                             <div><strong>${money.format(n(v.total_bruto))}</strong></div>
-                            <div class="history-meta">Comision ${money.format(n(v.total_comision))}</div>
-                            <div class="history-meta">Neto ${money.format(n(v.total_neto))}</div>
+                            <div class="history-meta">Comision venta ${money.format(n(v.total_comision))}</div>
+                            <div class="history-meta">A transferir ${money.format(n(v.total_neto))}</div>
                         </div>
                     </div>
                     <div class="history-items">
@@ -963,7 +969,12 @@
             clearTimeout(window.__mayorFilterTimer);
             window.__mayorFilterTimer = setTimeout(() => cargarHistorialMayor().catch(console.error), 280);
         });
+        document.getElementById('filtro-desde')?.addEventListener('change', () => cargarHistorialMayor().catch(console.error));
+        document.getElementById('filtro-hasta')?.addEventListener('change', () => cargarHistorialMayor().catch(console.error));
         document.getElementById('venta-fecha').value = todayIso();
+        const defaultRange = monthRangeIso();
+        document.getElementById('filtro-desde').value = defaultRange.desde;
+        document.getElementById('filtro-hasta').value = defaultRange.hasta;
         document.getElementById('pdf-semana').value = todayIso();
         renderVendedoresMayoristas();
         renderProductos();

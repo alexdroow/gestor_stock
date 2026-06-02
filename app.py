@@ -12093,6 +12093,17 @@ def _ventas_mayor_semana_por_fecha(fecha_raw):
     return inicio.strftime("%Y-%m-%d"), fin.strftime("%Y-%m-%d")
 
 
+def _ventas_mayor_mes_actual():
+    hoy = datetime.now(ZoneInfo("America/Santiago")).date()
+    inicio = hoy.replace(day=1)
+    if hoy.month == 12:
+        siguiente = hoy.replace(year=hoy.year + 1, month=1, day=1)
+    else:
+        siguiente = hoy.replace(month=hoy.month + 1, day=1)
+    fin = siguiente - timedelta(days=1)
+    return inicio.strftime("%Y-%m-%d"), fin.strftime("%Y-%m-%d")
+
+
 def _fmt_clp_mayor(value):
     try:
         num = float(value or 0)
@@ -12173,12 +12184,14 @@ def _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_ha
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica-Bold", 10)
     c.drawString(56, y - 18, "Total vendido")
-    c.drawString(220, y - 18, "Comision vendedor")
-    c.drawString(410, y - 18, "Neto Sucree")
+    c.drawString(220, y - 18, "Comision venta")
+    c.drawString(410, y - 18, "A transferir")
     c.setFont("Helvetica-Bold", 13)
     c.drawString(56, y - 42, _fmt_clp_mayor(total_bruto))
     c.drawString(220, y - 42, _fmt_clp_mayor(total_comision))
+    c.setFillColorRGB(0.0, 0.45, 0.26)
     c.drawString(410, y - 42, _fmt_clp_mayor(total_neto))
+    c.setFillColorRGB(0, 0, 0)
     y -= 88
 
     line("Detalle semanal", bold=True, size=11, dy=18)
@@ -12186,7 +12199,7 @@ def _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_ha
         line("No hay ventas registradas para este vendedor en la semana seleccionada.")
     for venta in ventas:
         line(f"{venta.get('fecha')} - {venta.get('codigo_operacion') or '#' + str(venta.get('id'))}", bold=True, size=10)
-        line(f"Cliente final: {venta.get('cliente_nombre') or '-'} | Total: {_fmt_clp_mayor(venta.get('total_bruto'))} | Comision: {_fmt_clp_mayor(venta.get('total_comision'))} | Neto: {_fmt_clp_mayor(venta.get('total_neto'))}", size=8)
+        line(f"Cliente final: {venta.get('cliente_nombre') or '-'} | Total: {_fmt_clp_mayor(venta.get('total_bruto'))} | Comision venta: {_fmt_clp_mayor(venta.get('total_comision'))} | A transferir: {_fmt_clp_mayor(venta.get('total_neto'))}", size=8)
         for it in venta.get("items") or []:
             item_line = (
                 f"- {it.get('producto_nombre') or '-'} x{float(it.get('cantidad') or 0):g} | "
@@ -12204,8 +12217,8 @@ def _crear_pdf_ventas_mayoristas_semanal(vendedor, ventas, fecha_desde, fecha_ha
     line("Resumen para vendedor", bold=True, size=11, dy=18)
     line(f"Ventas registradas: {len(ventas)}")
     line(f"Total vendido: {_fmt_clp_mayor(total_bruto)}")
-    line(f"Comision a pagar: {_fmt_clp_mayor(total_comision)}")
-    line(f"Neto para Sucree: {_fmt_clp_mayor(total_neto)}")
+    line(f"Comision venta: {_fmt_clp_mayor(total_comision)}")
+    line(f"A transferir: {_fmt_clp_mayor(total_neto)}")
     y -= 8
     line("Documento informativo generado desde SucreeStock.", size=8)
 
@@ -12309,6 +12322,8 @@ def api_ventas_mayoristas_listar():
         fecha_desde = str(request.args.get("desde") or "").strip()[:10]
         fecha_hasta = str(request.args.get("hasta") or "").strip()[:10]
         vendedor = str(request.args.get("vendedor") or "").strip()
+        if not fecha_desde and not fecha_hasta:
+            fecha_desde, fecha_hasta = _ventas_mayor_mes_actual()
         conn = get_db()
         cur = conn.cursor()
         _ensure_ventas_mayoristas_tables(cur)
@@ -12358,6 +12373,8 @@ def api_ventas_mayoristas_listar():
             "total_bruto": round(sum(float(v.get("total_bruto") or 0) for v in ventas), 2),
             "total_comision": round(sum(float(v.get("total_comision") or 0) for v in ventas), 2),
             "total_neto": round(sum(float(v.get("total_neto") or 0) for v in ventas), 2),
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
         }
         cur.execute(
             f"""
