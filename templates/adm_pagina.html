@@ -63,22 +63,32 @@
         .client-steps span { display: block; color: #475569; font-size: 12px; font-weight: 700; }
         .client-steps strong { display: block; margin-top: 8px; font-size: 28px; }
         .map-card { min-height: calc(100vh - 184px); position: relative; overflow: hidden; background:
-            radial-gradient(circle at 56% 43%, rgba(204,251,241,.78), rgba(219,234,254,.4) 40%, rgba(248,250,252,.95) 73%),
-            linear-gradient(135deg, #f8fafc, #eef6ff);
+            radial-gradient(circle at 48% 44%, rgba(204,251,241,.72), rgba(219,234,254,.38) 42%, rgba(248,250,252,.96) 74%),
+            linear-gradient(135deg, #f8fafc, #edf7ff);
         }
         .map-card:before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(148,163,184,.14) 0 1px, transparent 1.5px); background-size: 28px 28px; opacity: .45; }
-        .globe { position: absolute; width: min(78vh, 64vw); aspect-ratio: 1; border-radius: 50%; right: 8%; top: 9%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.92), rgba(186,230,253,.58) 36%, rgba(96,165,250,.22) 72%); box-shadow: 0 0 86px rgba(14,165,233,.22), inset 0 0 42px rgba(255,255,255,.65); overflow: hidden; }
-        .globe:before { content: ""; position: absolute; inset: 6%; border-radius: 50%; background-image: radial-gradient(circle, rgba(45,212,191,.9) 0 1.65px, transparent 2px); background-size: 7px 7px; mask-image: radial-gradient(circle, #000 0 70%, transparent 71%); transform: rotate(-11deg) scale(1.08); opacity: .88; }
-        .globe:after { content: ""; position: absolute; inset: 0; border-radius: 50%; background:
-            radial-gradient(ellipse at 25% 20%, transparent 0 17%, rgba(219,234,254,.68) 17.5% 22%, transparent 23%),
-            radial-gradient(ellipse at 31% 68%, transparent 0 16%, rgba(219,234,254,.72) 16.5% 23%, transparent 24%),
-            radial-gradient(ellipse at 70% 42%, transparent 0 22%, rgba(219,234,254,.7) 22.5% 29%, transparent 30%);
-            mix-blend-mode: screen;
+        .chile-map { position: absolute; inset: 72px 74px 74px 74px; z-index: 1; display: grid; grid-template-columns: minmax(180px, 34%) 1fr; gap: 26px; align-items: center; }
+        .chile-stage { position: relative; height: min(66vh, 650px); min-height: 460px; border-radius: 34px; background:
+            linear-gradient(180deg, rgba(255,255,255,.82), rgba(255,255,255,.36)),
+            radial-gradient(circle at 48% 22%, rgba(34,211,238,.16), transparent 42%);
+            border: 1px solid rgba(203,213,225,.75);
+            box-shadow: 0 24px 80px rgba(14,165,233,.12);
+            overflow: hidden;
         }
-        .map-points { position: absolute; inset: 0; z-index: 3; border-radius: 50%; overflow: hidden; }
+        .chile-stage:before { content: ""; position: absolute; inset: 18px; background-image: linear-gradient(rgba(148,163,184,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.12) 1px, transparent 1px); background-size: 44px 44px; border-radius: 26px; opacity: .65; }
+        .chile-svg { position: absolute; inset: 6% 18% 6% 18%; width: 64%; height: 88%; filter: drop-shadow(0 18px 28px rgba(14, 116, 144, .18)); opacity: .94; }
+        .chile-shape { fill: url(#chileGradient); stroke: rgba(14, 116, 144, .22); stroke-width: 2.2; }
+        .chile-capital { position: absolute; left: 48%; top: 39%; transform: translate(-50%, -50%); font-size: 11px; color: #0369a1; font-weight: 900; background: rgba(255,255,255,.82); border: 1px solid rgba(14,165,233,.25); border-radius: 999px; padding: 4px 8px; z-index: 2; }
+        .chile-map-copy { align-self: end; display: grid; gap: 12px; color: #334155; max-width: 320px; }
+        .chile-map-copy h3 { font-size: 24px; letter-spacing: -.04em; }
+        .chile-map-copy p { color: #64748b; line-height: 1.45; }
+        .chile-stat { border: 1px solid rgba(203,213,225,.85); background: rgba(255,255,255,.82); border-radius: 16px; padding: 12px; }
+        .chile-stat strong { display: block; font-size: 24px; margin-top: 4px; }
+        .map-points { position: absolute; inset: 0; z-index: 3; overflow: visible; }
         .map-point { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: #22d3ee; transform: translate(-50%, -50%); box-shadow: 0 0 0 5px rgba(34,211,238,.22), 0 0 18px rgba(14,165,233,.7); }
         .map-point.order { background: #8b5cf6; box-shadow: 0 0 0 5px rgba(139,92,246,.2), 0 0 18px rgba(139,92,246,.7); }
         .map-point.checkout { background: #f59e0b; box-shadow: 0 0 0 6px rgba(245,158,11,.22), 0 0 20px rgba(245,158,11,.75); }
+        .map-point.outside { background: #94a3b8; box-shadow: 0 0 0 5px rgba(148,163,184,.2), 0 0 18px rgba(100,116,139,.5); }
         .map-point:hover:after { content: attr(data-label); position: absolute; left: 14px; top: -10px; min-width: 170px; max-width: 230px; background: rgba(15,23,42,.92); color: white; border-radius: 10px; padding: 8px 10px; font-size: 11px; line-height: 1.35; z-index: 8; pointer-events: none; }
         .map-tools { position: absolute; top: 18px; right: 18px; display: flex; gap: 8px; z-index: 2; }
         .map-search { min-width: 300px; border: 1px solid #94a3b8; border-radius: 10px; padding: 10px 12px; background: white; box-shadow: 0 8px 22px rgba(15,23,42,.07); }
@@ -119,7 +129,9 @@
             .main-content { margin-left: 0; width: 100%; padding: 18px; }
             .realtime-layout, .discount-layout { grid-template-columns: 1fr; }
             .map-card { min-height: 420px; }
-            .globe { width: 88vw; right: -18vw; }
+            .chile-map { inset: 72px 16px 62px; grid-template-columns: 1fr; }
+            .chile-map-copy { display: none; }
+            .chile-stage { min-height: 360px; height: 52vh; }
             .form-grid { grid-template-columns: 1fr; }
         }
     </style>
@@ -176,7 +188,36 @@
                         <button class="btn" type="button">&#128506;</button>
                         <button class="btn" type="button">&#8599;</button>
                     </div>
-                    <div class="globe" aria-hidden="true"><div class="map-points" id="rt-map-points"></div></div>
+                    <div class="chile-map" aria-label="Mapa de Chile con visitas en tiempo real">
+                        <div class="chile-map-copy">
+                            <div>
+                                <h3>Mapa de Chile</h3>
+                                <p>Los puntos se calculan por IP y muestran una ubicacion aproximada de visitas, carritos y compras en proceso.</p>
+                            </div>
+                            <div class="chile-stat">
+                                Visitantes en Chile
+                                <strong id="rt-chile-visitors">0</strong>
+                            </div>
+                            <div class="chile-stat">
+                                En proceso de pago
+                                <strong id="rt-chile-checkout">0</strong>
+                            </div>
+                        </div>
+                        <div class="chile-stage">
+                            <svg class="chile-svg" viewBox="0 0 220 760" role="img" aria-label="Silueta de Chile">
+                                <defs>
+                                    <linearGradient id="chileGradient" x1="0" y1="0" x2="1" y2="1">
+                                        <stop offset="0%" stop-color="#67e8f9"/>
+                                        <stop offset="45%" stop-color="#38bdf8"/>
+                                        <stop offset="100%" stop-color="#2563eb"/>
+                                    </linearGradient>
+                                </defs>
+                                <path class="chile-shape" d="M118 18 C142 34 137 60 130 82 C123 105 133 124 145 145 C157 167 150 192 135 213 C119 235 126 259 142 282 C161 310 153 338 133 360 C111 384 116 408 139 432 C165 460 154 492 128 514 C104 535 103 559 125 586 C148 615 141 650 111 673 C86 693 78 722 94 750 L56 750 C42 723 50 693 70 670 C91 646 93 620 75 596 C56 570 55 542 77 518 C100 492 101 468 81 444 C59 417 60 386 83 361 C105 337 106 312 87 287 C68 262 67 233 87 208 C107 184 109 162 92 139 C75 117 74 90 92 68 C106 51 106 34 100 20 Z"/>
+                            </svg>
+                            <span class="chile-capital">Santiago</span>
+                            <div class="map-points" id="rt-map-points"></div>
+                        </div>
+                    </div>
                     <div class="rt-refresh-chip">Actualiza cada 1 segundo</div>
                     <div class="legend"><span><i class="dot order"></i>Pedidos</span><span><i class="dot"></i>Visitantes</span><span><i class="dot" style="background:#f59e0b;"></i>En pago</span></div>
                 </div>
@@ -275,6 +316,7 @@
                     ? `Ultima lectura ${new Date(data.server_time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
                     : 'Ahora mismo';
                 const ubicacionesFiltradas = filtrarUbicaciones(data.ubicaciones || []);
+                actualizarResumenChile(ubicacionesFiltradas);
                 $('rt-ubicaciones').innerHTML = ubicacionesFiltradas.length
                     ? renderUbicaciones(ubicacionesFiltradas)
                     : '<div class="muted">Sin actividad aun.</div>';
@@ -306,6 +348,21 @@
             return items.filter((u) => `${u.ubicacion || ''} ${u.ip_mask || ''} ${u.provider || ''}`.toLowerCase().includes(q));
         }
 
+        function ubicacionEnChile(u) {
+            const lat = Number(u?.lat);
+            const lng = Number(u?.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+            return lat <= -17 && lat >= -56.5 && lng >= -76.5 && lng <= -65.0;
+        }
+
+        function actualizarResumenChile(items) {
+            const chileItems = items.filter(ubicacionEnChile);
+            const visitantesChile = chileItems.reduce((acc, u) => acc + Number(u.sesiones || 0), 0);
+            const checkoutChile = chileItems.reduce((acc, u) => acc + Number(u.en_pago || 0), 0);
+            if ($('rt-chile-visitors')) $('rt-chile-visitors').textContent = visitantesChile;
+            if ($('rt-chile-checkout')) $('rt-chile-checkout').textContent = checkoutChile;
+        }
+
         function renderUbicaciones(items) {
             const max = Math.max(1, ...items.map((u) => Number(u.sesiones || 0)));
             return items.map((u) => {
@@ -321,23 +378,27 @@
             }).join('');
         }
 
-        function projectGeoPoint(lat, lng, fallbackKey) {
+        function projectChilePoint(lat, lng, fallbackKey) {
             const latNum = Number(lat);
             const lngNum = Number(lng);
-            if (Number.isFinite(latNum) && Number.isFinite(lngNum)) {
-                const x = ((lngNum + 180) / 360) * 100;
-                const y = ((90 - latNum) / 180) * 100;
+            if (Number.isFinite(latNum) && Number.isFinite(lngNum) && latNum <= -17 && latNum >= -56.5 && lngNum >= -76.5 && lngNum <= -65.0) {
+                const yNorm = (latNum - (-17.0)) / (-56.5 - (-17.0));
+                const xNorm = (lngNum - (-76.5)) / (-65.0 - (-76.5));
+                const visualCurve = Math.sin(yNorm * Math.PI * 1.15) * 8 - 3;
+                const widthAtLat = 28 - Math.abs(yNorm - .46) * 16;
+                const x = 44 + (xNorm - .5) * Math.max(10, widthAtLat) + visualCurve;
+                const y = 7 + yNorm * 86;
                 return {
-                    x: Math.max(10, Math.min(90, x)),
-                    y: Math.max(10, Math.min(90, y)),
+                    x: Math.max(28, Math.min(68, x)),
+                    y: Math.max(6, Math.min(94, y)),
+                    inChile: true,
                 };
             }
             const seed = pointSeed(fallbackKey || 'fallback');
-            const angle = (seed % 360) * Math.PI / 180;
-            const radius = 18 + (seed % 46);
             return {
-                x: Math.max(14, Math.min(86, 50 + Math.cos(angle) * radius)),
-                y: Math.max(14, Math.min(86, 50 + Math.sin(angle) * radius * .82)),
+                x: 83 + (seed % 8),
+                y: 18 + (seed % 64),
+                inChile: false,
             };
         }
 
@@ -358,8 +419,8 @@
                 return;
             }
             box.innerHTML = points.map((p, idx) => {
-                const pos = projectGeoPoint(p.lat, p.lng, `${p.key}-${idx}`);
-                const klass = p.type === 'order' ? 'order' : (p.type === 'checkout' ? 'checkout' : '');
+                const pos = projectChilePoint(p.lat, p.lng, `${p.key}-${idx}`);
+                const klass = [p.type === 'order' ? 'order' : (p.type === 'checkout' ? 'checkout' : ''), pos.inChile ? '' : 'outside'].filter(Boolean).join(' ');
                 const label = p.label || (p.type === 'order' ? 'Pedido reciente' : 'Visitante en tienda');
                 return `<span class="map-point ${klass}" data-label="${escapeHtml(label)}" style="left:${pos.x}%;top:${pos.y}%;"></span>`;
             }).join('');
@@ -513,6 +574,7 @@
         $('rt-search').addEventListener('input', () => {
             if (!state.realtime) return;
             const ubicacionesFiltradas = filtrarUbicaciones(state.realtime.ubicaciones || []);
+            actualizarResumenChile(ubicacionesFiltradas);
             $('rt-ubicaciones').innerHTML = ubicacionesFiltradas.length ? renderUbicaciones(ubicacionesFiltradas) : '<div class="muted">Sin ubicaciones con ese filtro.</div>';
             renderMapPoints({ ...state.realtime, ubicaciones: ubicacionesFiltradas });
         });
