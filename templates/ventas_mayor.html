@@ -302,6 +302,15 @@
             font-weight: 900;
             color: #0f172a;
         }
+        .seller-save-status {
+            grid-column: 1 / -1;
+            min-height: 16px;
+            font-size: .78rem;
+            font-weight: 800;
+            color: #64748b;
+        }
+        .seller-save-status.error { color: #b91c1c; }
+        .seller-save-status.ok { color: #047857; }
         .cart-item {
             border: 1px solid var(--line);
             border-radius: 8px;
@@ -637,20 +646,39 @@
                     <label>% comision
                         <input id="seller-comision-${Number(v.id)}" type="number" min="0" max="100" step="0.01" value="${n(v.comision_pct)}">
                     </label>
-                    <button type="button" class="btn btn-outline" onclick="guardarPerfilVendedorMayorista(${Number(v.id)})">Guardar</button>
+                    <button type="button" class="btn btn-outline" data-seller-save="${Number(v.id)}">Guardar</button>
+                    <div class="seller-save-status" id="seller-status-${Number(v.id)}"></div>
                 </div>
             `).join('') || '<div style="color:#64748b;">No hay vendedores activos registrados.</div>';
         }
+        function setSellerStatus(id, text, type = '') {
+            const el = document.getElementById(`seller-status-${Number(id)}`);
+            if (!el) return;
+            el.textContent = text || '';
+            el.classList.toggle('error', type === 'error');
+            el.classList.toggle('ok', type === 'ok');
+        }
         async function guardarPerfilVendedorMayorista(id) {
             const v = vendedoresMayoristas.find((x) => Number(x.id || 0) === Number(id));
-            if (!v) return;
+            if (!v) {
+                status('Vendedor no encontrado en la lista activa.', true);
+                return;
+            }
             const contacto = document.getElementById(`seller-contact-${Number(id)}`)?.value || '';
             const comision = n(document.getElementById(`seller-comision-${Number(id)}`)?.value || 0);
+            const btn = document.querySelector(`[data-seller-save="${Number(id)}"]`);
+            const oldText = btn ? btn.textContent : '';
             try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Guardando...';
+                }
+                setSellerStatus(id, 'Guardando cambios...');
                 status('Actualizando vendedor...');
                 const res = await fetch(`/api/ventas/mayoristas/vendedores/${Number(id)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({
                         nombre: v.nombre,
                         contacto,
@@ -659,16 +687,27 @@
                         activo: true,
                     }),
                 });
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 401 || res.status === 403) {
+                    throw new Error('Sesion admin expirada. Vuelve a iniciar sesion para guardar.');
+                }
                 if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar vendedor');
                 vendedoresMayoristas = (Array.isArray(data.vendedores) ? data.vendedores : vendedoresMayoristas)
                     .filter((seller) => Number(seller.activo ?? 1) === 1);
                 renderVendedoresMayoristas(String(document.getElementById('vendedor-id')?.value || ''));
+                setSellerStatus(id, 'Guardado correctamente.', 'ok');
                 status('Perfil de vendedor actualizado.');
             } catch (err) {
+                setSellerStatus(id, err.message || 'Error al actualizar vendedor.', 'error');
                 status(err.message || 'Error al actualizar vendedor.', true);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = oldText || 'Guardar';
+                }
             }
         }
+        window.guardarPerfilVendedorMayorista = guardarPerfilVendedorMayorista;
         async function registrarVendedorMayorista() {
             const nombreEl = document.getElementById('nuevo-vendedor-nombre');
             const contactoEl = document.getElementById('nuevo-vendedor-contacto');
@@ -915,6 +954,11 @@
         }
         document.getElementById('product-search')?.addEventListener('input', renderProductos);
         document.getElementById('product-filter')?.addEventListener('change', renderProductos);
+        document.getElementById('vendedores-activos-list')?.addEventListener('click', (ev) => {
+            const btn = ev.target.closest('[data-seller-save]');
+            if (!btn) return;
+            guardarPerfilVendedorMayorista(Number(btn.dataset.sellerSave || 0));
+        });
         document.getElementById('filtro-vendedor')?.addEventListener('input', () => {
             clearTimeout(window.__mayorFilterTimer);
             window.__mayorFilterTimer = setTimeout(() => cargarHistorialMayor().catch(console.error), 280);
