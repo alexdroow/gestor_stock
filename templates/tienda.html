@@ -9013,7 +9013,14 @@
             try {
                 const payload = {
                     codigo_descuento: codigo,
-                    items: carrito.map((it) => ({ id: it.id, cantidad: it.cantidad })),
+                    items: carrito.map((it) => ({
+                        id: it.id,
+                        cantidad: it.cantidad,
+                        pack_items: Array.isArray(it.pack_items) ? it.pack_items.map((x) => ({
+                            subproducto_id: Number(x.subproducto_id || 0),
+                            cantidad: Number(x.cantidad || 0),
+                        })) : [],
+                    })),
                     cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
                     cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
                 };

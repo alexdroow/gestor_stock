@@ -10207,7 +10207,53 @@ def api_tienda_validar_cupon():
             int(p.get("id") or 0): _serializar_producto_tienda(p, categorias_map=categorias_map, now_local=now_local)
             for p in _obtener_productos_para_venta()
         }
+        conn_pack = None
+        pack_rules_by_product = {}
+        try:
+            item_ids = sorted({int((x or {}).get("id") or 0) for x in items_req if isinstance(x, dict)})
+            item_ids = [x for x in item_ids if x > 0]
+            if item_ids:
+                conn_pack = get_db()
+                cur_pack = conn_pack.cursor()
+                _ensure_producto_pack_subopciones_table(cur_pack)
+                placeholders = ",".join(["?"] * len(item_ids))
+                cur_pack.execute(
+                    f"""
+                    SELECT s.producto_pack_id, s.subproducto_id, s.max_cantidad,
+                           COALESCE(p.nombre, 'Producto #' || s.subproducto_id) AS subproducto_nombre,
+                           COALESCE(p.activo_tienda, 1) AS subproducto_activo_tienda
+                    FROM producto_pack_subopciones s
+                    LEFT JOIN productos p ON p.id = s.subproducto_id
+                    WHERE s.producto_pack_id IN ({placeholders})
+                    ORDER BY s.orden ASC, s.id ASC
+                    """,
+                    tuple(item_ids),
+                )
+                for rr in cur_pack.fetchall():
+                    pack_id = int(rr["producto_pack_id"] or 0)
+                    pack_rules_by_product.setdefault(pack_id, {"max_total": 0, "items": {}})
+                    pack_rules_by_product[pack_id]["items"][int(rr["subproducto_id"] or 0)] = {
+                        "max_cantidad": int(rr["max_cantidad"] or 1),
+                        "activo_tienda": bool(rr["subproducto_activo_tienda"]),
+                        "nombre": str(rr["subproducto_nombre"] or "").strip() or f"Producto #{int(rr['subproducto_id'] or 0)}",
+                    }
+                cur_pack.execute(
+                    f"""
+                    SELECT producto_pack_id, max_total
+                    FROM producto_pack_subopciones_config
+                    WHERE producto_pack_id IN ({placeholders})
+                    """,
+                    tuple(item_ids),
+                )
+                for rr in cur_pack.fetchall():
+                    pack_id = int(rr["producto_pack_id"] or 0)
+                    pack_rules_by_product.setdefault(pack_id, {"max_total": 0, "items": {}})
+                    pack_rules_by_product[pack_id]["max_total"] = int(rr["max_total"] or 0)
+        finally:
+            if conn_pack:
+                conn_pack.close()
         items_serializados = []
+        pack_detalle_por_producto = {}
         subtotal = 0.0
         for idx, raw in enumerate(items_req, start=1):
             if not isinstance(raw, dict):
