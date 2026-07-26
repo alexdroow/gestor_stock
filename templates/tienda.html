@@ -6799,7 +6799,11 @@
                 return;
             }
             const isAgenda = String(categoriaActiva || "").toUpperCase() === "AGENDA";
-            document.body.classList.toggle("agenda-beta-modal-open", isAgenda);
+            const modalActive = isAgenda && Boolean(
+                modalAgendaCakeBuilderEl?.classList.contains("active")
+                || modalAgendaCakeCartEl?.classList.contains("active")
+            );
+            document.body.classList.toggle("agenda-beta-modal-open", modalActive);
         }
 
         function _agendaPaso2Completo() {
@@ -7043,6 +7047,10 @@
             } catch (_e) {}
         }
 
+        function _agendaCakeDraftClear() {
+            try { localStorage.removeItem(AGENDA_BETA_DRAFT_KEY); } catch (_e) {}
+        }
+
         function _agendaCakeDraftLoad() {
             if (!(Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui"))) return;
             try {
@@ -7089,16 +7097,20 @@
 
         function _abrirModalAgendaCakeBuilder() {
             if (!modalAgendaCakeBuilderEl) return;
-            _agendaCakeDraftLoad();
+            if (!String(agendaCakeCategoriaActiva || "").trim()) _agendaCakeDraftLoad();
             modalAgendaCakeBuilderEl.classList.add("active");
             _toggleAgendaCakeFloatingUi();
+            _agendaBetaSyncModalState();
             _agendaCakeApplyStep();
         }
 
-        function _cerrarModalAgendaCakeBuilder() {
-            _agendaCakeDraftSave();
+        function _cerrarModalAgendaCakeBuilder(opts = null) {
+            const keepDraft = Boolean(opts && opts.keepDraft);
+            if (keepDraft) _agendaCakeDraftSave();
+            else _agendaCakeDraftClear();
             modalAgendaCakeBuilderEl?.classList.remove("active");
             _toggleAgendaCakeFloatingUi();
+            _agendaBetaSyncModalState();
         }
 
         function _abrirModalAgendaCakeCart() {
@@ -7122,6 +7134,7 @@
             }
             modalAgendaCakeCartEl.classList.add("active");
             _toggleAgendaCakeFloatingUi();
+            _agendaBetaSyncModalState();
         }
 
         function _cerrarModalAgendaCakeCart() {
@@ -7142,11 +7155,13 @@
                 _agendaBetaSyncHeader();
             }
             _toggleAgendaCakeFloatingUi();
+            _agendaBetaSyncModalState();
         }
 
         function _toggleAgendaCakeFloatingUi() {
             const modalActive = Boolean(modalAgendaCakeBuilderEl?.classList.contains("active") || modalAgendaCakeCartEl?.classList.contains("active"));
             document.body.classList.toggle("agenda-cake-modal-open", modalActive && document.body.classList.contains("mobile-ui"));
+            _agendaBetaSyncModalState();
             _reflowMobileFloatingButtons();
         }
 
