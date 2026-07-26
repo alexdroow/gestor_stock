@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Valoracion - Pasteleria Sucree</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --orange: #ff7a00;
+            --orange-dark: #c2410c;
+            --ink: #111827;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --soft: #fff7ed;
+            --green: #10b981;
+            --blue: #2563eb;
+        }
+        body {
+            min-height: 100vh;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at 18% 8%, rgba(255, 183, 77, .34), transparent 28%),
+                linear-gradient(180deg, #fffaf2, #f8fafc 58%, #fff);
+            color: var(--ink);
+        }
+        .wrap {
+            min-height: 100vh;
+            width: min(100%, 520px);
+            margin: 0 auto;
+            padding: max(18px, env(safe-area-inset-top)) 16px 24px;
+            display: grid;
+            align-content: start;
+            gap: 14px;
+        }
+        .hero {
+            border: 1px solid rgba(251, 146, 60, .28);
+            background: rgba(255,255,255,.86);
+            border-radius: 26px;
+            padding: 18px;
+            box-shadow: 0 22px 60px rgba(194,65,12,.12);
+            overflow: hidden;
+            position: relative;
+        }
+        .hero:after {
+            content: "";
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            right: -54px;
+            top: -56px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, rgba(255,122,0,.22), rgba(255,255,255,0));
+        }
+        .brand { display: flex; align-items: center; gap: 10px; color: var(--orange-dark); font-weight: 900; letter-spacing: -.02em; }
+        .brand-mark { width: 42px; height: 42px; border-radius: 15px; background: linear-gradient(135deg, #f59e0b, #fb5607); color: white; display: grid; place-items: center; font-size: 22px; box-shadow: 0 10px 24px rgba(245, 158, 11, .28); }
+        h1 { font-size: clamp(30px, 9vw, 46px); line-height: .98; letter-spacing: -.055em; margin-top: 18px; max-width: 10ch; }
+        .lead { margin-top: 10px; color: #475569; line-height: 1.45; font-weight: 600; }
+        .card {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.94);
+            border-radius: 22px;
+            padding: 16px;
+            box-shadow: 0 12px 32px rgba(15,23,42,.06);
+        }
+        .grid { display: grid; gap: 12px; }
+        label { display: grid; gap: 7px; font-size: 12px; color: #475569; font-weight: 900; text-transform: uppercase; letter-spacing: .035em; }
+        input, textarea {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 13px 14px;
+            font: inherit;
+            background: #fff;
+            color: var(--ink);
+            outline: none;
+        }
+        input:focus, textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 4px rgba(251,146,60,.16); }
+        .phone { display: grid; grid-template-columns: 74px 1fr; gap: 8px; }
+        .prefix { display: grid; place-items: center; border: 1px solid #fed7aa; background: #fff7ed; color: #9a3412; border-radius: 14px; font-weight: 950; }
+        .btn {
+            border: 0;
+            border-radius: 16px;
+            min-height: 48px;
+            padding: 12px 16px;
+            font: inherit;
+            font-weight: 950;
+            cursor: pointer;
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        .btn.primary { background: linear-gradient(135deg, var(--orange), #fb5607); color: white; box-shadow: 0 14px 28px rgba(249,115,22,.23); }
+        .btn.green { background: var(--green); color: white; }
+        .stars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px; }
+        .star {
+            min-height: 50px;
+            border: 1px solid #fed7aa;
+            border-radius: 15px;
+            background: #fff;
+            color: #cbd5e1;
+            font-size: 28px;
+            line-height: 1;
+        }
+        .star.active { background: #fff7ed; color: #f59e0b; border-color: #fb923c; }
+        .question { border: 1px solid #e5e7eb; border-radius: 18px; padding: 12px; display: grid; gap: 10px; }
+        .question strong { font-size: 15px; }
+        .options { display: grid; gap: 8px; }
+        .option {
+            display: grid;
+            grid-template-columns: 24px 1fr;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 10px;
+            font-size: 14px;
+            color: #334155;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .option input { width: 18px; height: 18px; accent-color: var(--orange); }
+        .hidden { display: none !important; }
+        .status { min-height: 22px; color: #9a3412; font-weight: 850; font-size: 14px; }
+        .counter { text-align: right; color: var(--muted); font-size: 12px; font-weight: 800; }
+        .thanks { text-align: center; padding: 28px 18px; }
+        .thanks h2 { font-size: 30px; letter-spacing: -.04em; margin-bottom: 8px; }
+        .thanks p { color: #475569; line-height: 1.45; }
+        @media (min-width: 760px) {
+            body { display: grid; place-items: center; }
+            .wrap { min-height: auto; padding: 28px 16px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="hero">
+            <div class="brand"><span class="brand-mark">★</span><span>Pasteleria Sucree</span></div>
+            <h1>Queremos saber como estuvo tu experiencia</h1>
+            <p class="lead">Esta pagina es interna para clientes. Ingresa con tus datos y deja tu valoracion en menos de un minuto.</p>
+        </section>
+
+        <section class="card grid" id="access-card">
+            <label>Nombre opcional
+                <input id="cliente-nombre" maxlength="80" autocomplete="name" placeholder="Ej: Maria">
+            </label>
+            <label>Correo
+                <input id="cliente-email" type="email" autocomplete="email" placeholder="correo@ejemplo.com">
+            </label>
+            <label>Telefono
+                <div class="phone">
+                    <div class="prefix">+569</div>
+                    <input id="cliente-telefono" inputmode="numeric" maxlength="8" placeholder="12345678" autocomplete="tel">
+                </div>
+            </label>
+            <button class="btn primary" id="btn-acceder" type="button">Entrar a valorar</button>
+            <div class="status" id="access-status"></div>
+        </section>
+
+        <section class="card grid hidden" id="rating-card">
+            <div>
+                <h2 style="letter-spacing:-.035em;">Tu valoracion</h2>
+                <p style="color:#64748b;margin-top:4px;">Selecciona estrellas y responde una opcion por pregunta.</p>
+            </div>
+            <div class="stars" id="stars"></div>
+            <div class="grid" id="questions"></div>
+            <label>Mensaje opcional
+                <textarea id="comentario" maxlength="250" rows="4" placeholder="Puedes dejar un agradecimiento, sugerencia o detalle que nos ayude a mejorar."></textarea>
+            </label>
+            <div class="counter"><span id="char-count">0</span>/250</div>
+            <button class="btn green" id="btn-enviar" type="button">Enviar valoracion</button>
+            <div class="status" id="rating-status"></div>
+        </section>
+
+        <section class="card thanks hidden" id="thanks-card">
+            <h2>Muchas gracias</h2>
+            <p>Tu valoracion quedo registrada. Si Pasteleria Sucree activa un descuento de agradecimiento, lo veras al entrar a la tienda con estos mismos datos.</p>
+            <button class="btn primary" type="button" onclick="location.href='/tienda'" style="margin-top:18px;">Ir a la tienda</button>
+        </section>
+    </main>
+
+    <script>
+        const preguntasDefault = [
+            { id: "calidad", label: "Calidad del producto", opciones: ["Excelente", "Buena", "Regular", "Debe mejorar"] },
+            { id: "atencion", label: "Atencion recibida", opciones: ["Excelente", "Buena", "Regular", "Debe mejorar"] },
+            { id: "entrega", label: "Retiro o despacho", opciones: ["Muy puntual", "Correcto", "Con atraso", "No aplica"] },
+            { id: "recomendacion", label: "Recomendarias Pasteleria Sucree", opciones: ["Si", "Tal vez", "No"] },
+        ];
+        const $ = (id) => document.getElementById(id);
+        let cliente = null;
+        let estrellas = 0;
+        let preguntas = preguntasDefault;
+
+        function esc(v) {
+            return String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+        }
+        function tel8() {
+            const raw = String($("cliente-telefono").value || "").replace(/\D+/g, "").slice(0, 8);
+            $("cliente-telefono").value = raw;
+            return raw;
+        }
+        function payloadCliente() {
+            return {
+                nombre: String($("cliente-nombre").value || "").trim(),
+                email: String($("cliente-email").value || "").trim().toLowerCase(),
+                telefono: `+569${tel8()}`,
+            };
+        }
+        function renderStars() {
+            $("stars").innerHTML = [1,2,3,4,5].map((n) => `<button type="button" class="star ${n <= estrellas ? "active" : ""}" data-star="${n}">★</button>`).join("");
+        }
+        function renderQuestions() {
+            $("questions").innerHTML = preguntas.map((q) => `
+                <div class="question">
+                    <strong>${esc(q.label)}</strong>
+                    <div class="options">
+                        ${(q.opciones || []).map((op) => `
+                            <label class="option">
+                                <input type="radio" name="q-${esc(q.id)}" value="${esc(op)}">
+                                <span>${esc(op)}</span>
+                            </label>
+                        `).join("")}
+                    </div>
+                </div>
+            `).join("");
+        }
+        async function requestJson(url, payload) {
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify(payload || {}),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "No se pudo completar la accion");
+            return data;
+        }
+        async function acceder() {
+            $("access-status").textContent = "";
+            try {
+                const payload = payloadCliente();
+                if (!payload.email.includes("@")) throw new Error("Ingresa un correo valido.");
+                if (!/^\+569\d{8}$/.test(payload.telefono)) throw new Error("El telefono debe tener 8 digitos despues de +569.");
+                const data = await requestJson("/api/valoracion/acceso", payload);
+                cliente = data.cliente || payload;
+                preguntas = Array.isArray(data.preguntas) ? data.preguntas : preguntasDefault;
+                $("access-card").classList.add("hidden");
+                $("rating-card").classList.remove("hidden");
+                renderQuestions();
+                renderStars();
+            } catch (e) {
+                $("access-status").textContent = e.message || "No se pudo acceder.";
+            }
+        }
+        function respuestas() {
+            const out = {};
+            for (const q of preguntas) {
+                const selected = document.querySelector(`input[name="q-${CSS.escape(q.id)}"]:checked`);
+                if (!selected) throw new Error(`Responde: ${q.label}`);
+                out[q.id] = selected.value;
+            }
+            return out;
+        }
+        async function enviar() {
+            $("rating-status").textContent = "";
+            try {
+                if (!cliente) throw new Error("Primero ingresa tus datos.");
+                if (estrellas < 1) throw new Error("Selecciona una valoracion con estrellas.");
+                const payload = {
+                    ...payloadCliente(),
+                    nombre: String(cliente.nombre || $("cliente-nombre").value || "").trim(),
+                    estrellas,
+                    respuestas: respuestas(),
+                    comentario: String($("comentario").value || "").trim().slice(0, 250),
+                };
+                await requestJson("/api/valoracion/enviar", payload);
+                $("rating-card").classList.add("hidden");
+                $("thanks-card").classList.remove("hidden");
+            } catch (e) {
+                $("rating-status").textContent = e.message || "No se pudo enviar.";
+            }
+        }
+        $("cliente-telefono").addEventListener("input", tel8);
+        $("btn-acceder").addEventListener("click", acceder);
+        $("btn-enviar").addEventListener("click", enviar);
+        $("stars").addEventListener("click", (ev) => {
+            const n = Number(ev.target?.dataset?.star || 0);
+            if (!n) return;
+            estrellas = n;
+            renderStars();
+        });
+        $("comentario").addEventListener("input", () => {
+            $("char-count").textContent = String($("comentario").value.length);
+        });
+        renderStars();
+    </script>
+</body>
+</html>

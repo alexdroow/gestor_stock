@@ -8246,6 +8246,56 @@ def migrar_db():
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS tienda_valoracion_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                descuento_activo INTEGER NOT NULL DEFAULT 1,
+                descuento_tipo TEXT NOT NULL DEFAULT 'porcentaje',
+                descuento_valor REAL NOT NULL DEFAULT 10,
+                dias_vigencia INTEGER NOT NULL DEFAULT 30,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO tienda_valoracion_config (
+                id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia, actualizado_en
+            ) VALUES (1, 1, 'porcentaje', 10, 30, CURRENT_TIMESTAMP)
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tienda_valoraciones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente_id INTEGER,
+                cliente_nombre TEXT DEFAULT '',
+                cliente_email TEXT NOT NULL,
+                cliente_telefono TEXT NOT NULL,
+                estrellas INTEGER NOT NULL DEFAULT 0,
+                preguntas_json TEXT NOT NULL DEFAULT '{}',
+                comentario TEXT DEFAULT '',
+                descuento_asignado_id INTEGER,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(cliente_id) REFERENCES tienda_clientes(id),
+                FOREIGN KEY(descuento_asignado_id) REFERENCES tienda_cliente_cupones(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_valoraciones_cliente
+            ON tienda_valoraciones(cliente_email, cliente_telefono, creado_en DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tienda_valoraciones_fecha
+            ON tienda_valoraciones(creado_en DESC)
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS tienda_clientes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT DEFAULT '',

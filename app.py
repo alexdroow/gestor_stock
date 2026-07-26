@@ -223,11 +223,13 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/presencial", "/tienda/presencial/", "/admin/login", "/admin/logout", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
     if ruta.startswith("/tienda/flow/"):
         return True
     if ruta.startswith("/api/tienda/"):
+        return True
+    if ruta.startswith("/api/valoracion/"):
         return True
     return False
 
@@ -7657,11 +7659,461 @@ def _ensure_adm_pagina_tables(cursor):
         ON tienda_descuento_campanas(activo, fecha_inicio, fecha_fin)
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tienda_valoracion_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            descuento_activo INTEGER NOT NULL DEFAULT 1,
+            descuento_tipo TEXT NOT NULL DEFAULT 'porcentaje',
+            descuento_valor REAL NOT NULL DEFAULT 10,
+            dias_vigencia INTEGER NOT NULL DEFAULT 30,
+            actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO tienda_valoracion_config (
+            id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia, actualizado_en
+        ) VALUES (1, 1, 'porcentaje', 10, 30, CURRENT_TIMESTAMP)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tienda_valoraciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cliente_id INTEGER,
+            cliente_nombre TEXT DEFAULT '',
+            cliente_email TEXT NOT NULL,
+            cliente_telefono TEXT NOT NULL,
+            estrellas INTEGER NOT NULL DEFAULT 0,
+            preguntas_json TEXT NOT NULL DEFAULT '{}',
+            comentario TEXT DEFAULT '',
+            descuento_asignado_id INTEGER,
+            creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+            actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(cliente_id) REFERENCES tienda_clientes(id),
+            FOREIGN KEY(descuento_asignado_id) REFERENCES tienda_cliente_cupones(id)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_tienda_valoraciones_cliente
+        ON tienda_valoraciones(cliente_email, cliente_telefono, creado_en DESC)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_tienda_valoraciones_fecha
+        ON tienda_valoraciones(creado_en DESC)
+        """
+    )
 
 
 @app.route('/adm-pagina')
 def adm_pagina():
     return render_template('adm_pagina.html')
+
+
+@app.route('/valoracion')
+def valoracion_cliente():
+    return render_template('valoracion.html')
+
+
+def _valoracion_config_cursor(cursor):
+    _ensure_adm_pagina_tables(cursor)
+    cursor.execute("SELECT * FROM tienda_valoracion_config WHERE id = 1 LIMIT 1")
+    row = cursor.fetchone()
+    if not row:
+        return {"descuento_activo": 1, "descuento_tipo": "porcentaje", "descuento_valor": 10, "dias_vigencia": 30}
+    cfg = dict(row)
+    tipo = str(cfg.get("descuento_tipo") or "porcentaje").strip().lower()
+    if tipo not in {"porcentaje", "monto_fijo"}:
+        tipo = "porcentaje"
+    return {
+        "descuento_activo": 1 if int(cfg.get("descuento_activo") or 0) else 0,
+        "descuento_tipo": tipo,
+        "descuento_valor": max(0.0, float(cfg.get("descuento_valor") or 0)),
+        "dias_vigencia": max(1, min(365, int(cfg.get("dias_vigencia") or 30))),
+    }
+
+
+def _valoracion_resumen_descuento(cfg):
+    if not cfg or not int(cfg.get("descuento_activo") or 0):
+        return "Sin descuento activo"
+    valor = float(cfg.get("descuento_valor") or 0)
+    if str(cfg.get("descuento_tipo") or "") == "monto_fijo":
+        return f"${int(round(valor)):,}".replace(",", ".")
+    return f"{int(round(valor))}%"
+
+
+def _valoracion_preguntas_default():
+    return [
+        {
+            "id": "calidad",
+            "label": "Calidad del producto",
+            "opciones": ["Excelente", "Buena", "Regular", "Debe mejorar"],
+        },
+        {
+            "id": "atencion",
+            "label": "Atencion recibida",
+            "opciones": ["Excelente", "Buena", "Regular", "Debe mejorar"],
+        },
+        {
+            "id": "entrega",
+            "label": "Retiro o despacho",
+            "opciones": ["Muy puntual", "Correcto", "Con atraso", "No aplica"],
+        },
+        {
+            "id": "recomendacion",
+            "label": "Recomendarias Pasteleria Sucree",
+            "opciones": ["Si", "Tal vez", "No"],
+        },
+    ]
+
+
+def _normalizar_respuestas_valoracion(raw):
+    data = raw if isinstance(raw, dict) else {}
+    out = {}
+    for pregunta in _valoracion_preguntas_default():
+        pid = pregunta["id"]
+        val = str(data.get(pid) or "").strip()[:80]
+        if val not in pregunta["opciones"]:
+            raise ValueError(f"Debes responder: {pregunta['label']}")
+        out[pid] = val
+    return out
+
+
+def _obtener_o_crear_cliente_valoracion(cursor, data):
+    email = _normalizar_email(data.get("email"))
+    if not email:
+        raise ValueError("Ingresa un correo valido.")
+    telefono = _normalizar_telefono_cl(data.get("telefono"))
+    if not telefono:
+        raise ValueError("El telefono debe tener exactamente 8 digitos despues de +569.")
+    nombre = str(data.get("nombre") or "").strip()[:80] or _nombre_desde_email(email)
+    cli = _obtener_cliente_por_contacto_cursor(cursor, email, telefono)
+    if not cli:
+        cli = _upsert_cliente_tienda_cursor(
+            cursor,
+            nombre=nombre,
+            email=email,
+            telefono=telefono,
+            email_confirmado=1,
+        )
+    return cli
+
+
+def _asignar_descuento_valoracion_cursor(cursor, valoracion_id):
+    _ensure_adm_pagina_tables(cursor)
+    cursor.execute(
+        """
+        SELECT v.*, tc.id AS cliente_existe
+        FROM tienda_valoraciones v
+        LEFT JOIN tienda_clientes tc ON tc.id = v.cliente_id
+        WHERE v.id = ?
+        LIMIT 1
+        """,
+        (int(valoracion_id),),
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise ValueError("Valoracion no encontrada.")
+    val = dict(row)
+    if int(val.get("descuento_asignado_id") or 0) > 0:
+        cursor.execute(
+            """
+            SELECT cc.id, c.codigo
+            FROM tienda_cliente_cupones cc
+            JOIN tienda_cupones c ON c.id = cc.cupon_id
+            WHERE cc.id = ?
+            LIMIT 1
+            """,
+            (int(val.get("descuento_asignado_id") or 0),),
+        )
+        cup = cursor.fetchone()
+        if cup:
+            return {"regalo_id": int(cup["id"]), "codigo": str(cup["codigo"] or ""), "ya_existia": True}
+    cfg = _valoracion_config_cursor(cursor)
+    if not int(cfg.get("descuento_activo") or 0):
+        raise ValueError("El descuento de agradecimiento esta desactivado.")
+    cliente_id = int(val.get("cliente_id") or 0)
+    if cliente_id <= 0:
+        cli = _obtener_cliente_por_contacto_cursor(cursor, val.get("cliente_email"), val.get("cliente_telefono"))
+        if not cli:
+            cli = _upsert_cliente_tienda_cursor(
+                cursor,
+                nombre=val.get("cliente_nombre") or _nombre_desde_email(val.get("cliente_email")),
+                email=val.get("cliente_email"),
+                telefono=val.get("cliente_telefono"),
+                email_confirmado=1,
+            )
+        cliente_id = int(cli.get("id") or 0)
+        cursor.execute("UPDATE tienda_valoraciones SET cliente_id = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?", (cliente_id, int(valoracion_id)))
+    cursor.execute("SELECT id, nombre, email, telefono FROM tienda_clientes WHERE id = ? LIMIT 1", (cliente_id,))
+    cli_row = cursor.fetchone()
+    if not cli_row:
+        raise ValueError("Cliente no encontrado para asignar descuento.")
+    cli = dict(cli_row)
+    codigo_base = f"GRACIAS{cliente_id}{int(valoracion_id)}"
+    codigo = _normalizar_cupon_codigo(codigo_base)
+    suffix = 0
+    while True:
+        try:
+            cursor.execute(
+                """
+                INSERT INTO tienda_cupones (
+                    codigo, nombre, tipo_descuento, valor_descuento, activo,
+                    fecha_inicio, fecha_fin, usos_max_total, usos_max_por_cliente, monto_minimo, solo_sin_oferta
+                ) VALUES (?, ?, ?, ?, 1, date('now', 'localtime'), date('now', '+' || ? || ' days', 'localtime'), 1, 1, 0, 0)
+                """,
+                (
+                    codigo,
+                    "Gracias por tu valoracion",
+                    str(cfg.get("descuento_tipo") or "porcentaje"),
+                    float(cfg.get("descuento_valor") or 0),
+                    int(cfg.get("dias_vigencia") or 30),
+                ),
+            )
+            break
+        except sqlite3.IntegrityError:
+            suffix += 1
+            codigo = _normalizar_cupon_codigo(f"{codigo_base}{suffix}")
+            if suffix > 20:
+                raise
+    cupon_id = int(cursor.lastrowid or 0)
+    venc = (datetime.now(ZoneInfo("America/Santiago")).date() + timedelta(days=int(cfg.get("dias_vigencia") or 30))).isoformat()
+    cliente_ref = _normalizar_cliente_ref(cli.get("email"), cli.get("telefono"))
+    cursor.execute(
+        """
+        INSERT INTO tienda_cliente_cupones (
+            cliente_id, cliente_ref, cupon_id, activo, usado, nota, asignado_por, fecha_vencimiento, fecha_asignado
+        ) VALUES (?, ?, ?, 1, 0, ?, 'valoracion', ?, CURRENT_TIMESTAMP)
+        """,
+        (
+            cliente_id,
+            cliente_ref,
+            cupon_id,
+            f"Descuento de agradecimiento por valorar: {_valoracion_resumen_descuento(cfg)}",
+            venc,
+        ),
+    )
+    regalo_id = int(cursor.lastrowid or 0)
+    cursor.execute(
+        "UPDATE tienda_valoraciones SET descuento_asignado_id = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+        (regalo_id, int(valoracion_id)),
+    )
+    return {"regalo_id": regalo_id, "codigo": codigo, "ya_existia": False}
+
+
+@app.route('/api/valoracion/acceso', methods=['POST'])
+def api_valoracion_acceso():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cli = _obtener_o_crear_cliente_valoracion(cursor, data)
+        conn.commit()
+        return jsonify({"success": True, "cliente": cli, "preguntas": _valoracion_preguntas_default()})
+    except ValueError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/valoracion/enviar', methods=['POST'])
+def api_valoracion_enviar():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        estrellas = int(data.get("estrellas") or 0)
+        if estrellas < 1 or estrellas > 5:
+            return jsonify({"success": False, "error": "Selecciona una valoracion entre 1 y 5 estrellas."}), 400
+        respuestas = _normalizar_respuestas_valoracion(data.get("respuestas") or {})
+        comentario = str(data.get("comentario") or "").strip()[:250]
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        _ensure_adm_pagina_tables(cursor)
+        cli = _obtener_o_crear_cliente_valoracion(cursor, data)
+        cursor.execute(
+            """
+            INSERT INTO tienda_valoraciones (
+                cliente_id, cliente_nombre, cliente_email, cliente_telefono, estrellas, preguntas_json, comentario, creado_en, actualizado_en
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                int(cli.get("id") or 0),
+                str(cli.get("nombre") or data.get("nombre") or "").strip()[:80],
+                str(cli.get("email") or "").strip().lower(),
+                str(cli.get("telefono") or "").strip(),
+                estrellas,
+                json.dumps(respuestas, ensure_ascii=False),
+                comentario,
+            ),
+        )
+        valoracion_id = int(cursor.lastrowid or 0)
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "valoracion_id": valoracion_id})
+    except ValueError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/valoraciones', methods=['GET'])
+def api_adm_pagina_valoraciones_get():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        q = str(request.args.get("q") or "").strip().lower()
+        desde = _adm_parse_fecha(request.args.get("desde")) if str(request.args.get("desde") or "").strip() else None
+        hasta = _adm_parse_fecha(request.args.get("hasta")) if str(request.args.get("hasta") or "").strip() else None
+        params = []
+        where = []
+        if q:
+            where.append("(LOWER(v.cliente_nombre) LIKE ? OR LOWER(v.cliente_email) LIKE ? OR v.cliente_telefono LIKE ?)")
+            like = f"%{q}%"
+            params.extend([like, like, like])
+        if desde:
+            where.append("date(v.creado_en, 'localtime') >= date(?)")
+            params.append(desde)
+        if hasta:
+            where.append("date(v.creado_en, 'localtime') <= date(?)")
+            params.append(hasta)
+        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+        cursor.execute(
+            f"""
+            SELECT v.*, c.codigo AS cupon_codigo, cc.usado AS cupon_usado, cc.fecha_vencimiento AS cupon_vencimiento
+            FROM tienda_valoraciones v
+            LEFT JOIN tienda_cliente_cupones cc ON cc.id = v.descuento_asignado_id
+            LEFT JOIN tienda_cupones c ON c.id = cc.cupon_id
+            {where_sql}
+            ORDER BY datetime(v.creado_en) DESC, v.id DESC
+            LIMIT 200
+            """,
+            tuple(params),
+        )
+        valoraciones = []
+        for row in cursor.fetchall():
+            item = dict(row)
+            try:
+                item["respuestas"] = json.loads(str(item.get("preguntas_json") or "{}"))
+            except Exception:
+                item["respuestas"] = {}
+            valoraciones.append(item)
+        cursor.execute("SELECT COUNT(*) AS total, AVG(estrellas) AS promedio FROM tienda_valoraciones")
+        metric = dict(cursor.fetchone() or {})
+        cfg = _valoracion_config_cursor(cursor)
+        return jsonify({
+            "success": True,
+            "valoraciones": valoraciones,
+            "preguntas": _valoracion_preguntas_default(),
+            "config": cfg,
+            "metrics": {
+                "total": int(metric.get("total") or 0),
+                "promedio": round(float(metric.get("promedio") or 0), 2),
+            },
+        })
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/valoraciones/config', methods=['POST'])
+def api_adm_pagina_valoraciones_config():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        tipo = str(data.get("descuento_tipo") or "porcentaje").strip().lower()
+        if tipo not in {"porcentaje", "monto_fijo"}:
+            return jsonify({"success": False, "error": "Tipo de descuento invalido."}), 400
+        valor = float(data.get("descuento_valor") or 0)
+        if valor < 0 or (tipo == "porcentaje" and valor > 100):
+            return jsonify({"success": False, "error": "Valor de descuento invalido."}), 400
+        dias = max(1, min(365, int(data.get("dias_vigencia") or 30)))
+        activo = 1 if bool(data.get("descuento_activo", True)) else 0
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        _ensure_adm_pagina_tables(cursor)
+        cursor.execute(
+            """
+            INSERT INTO tienda_valoracion_config (id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia, actualizado_en)
+            VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                descuento_activo = excluded.descuento_activo,
+                descuento_tipo = excluded.descuento_tipo,
+                descuento_valor = excluded.descuento_valor,
+                dias_vigencia = excluded.dias_vigencia,
+                actualizado_en = CURRENT_TIMESTAMP
+            """,
+            (activo, tipo, valor, dias),
+        )
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, "config": _valoracion_config_cursor(cursor)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/valoraciones/<int:valoracion_id>/descuento', methods=['POST'])
+def api_adm_pagina_valoraciones_descuento(valoracion_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        result = _asignar_descuento_valoracion_cursor(cursor, int(valoracion_id))
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, **result})
+    except ValueError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/adm-pagina/realtime', methods=['GET'])

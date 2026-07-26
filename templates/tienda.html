@@ -9491,6 +9491,46 @@
         }
         window.aplicarCuponRegalado = aplicarCuponRegalado;
 
+        function mostrarAvisoCuponValoracion(cupones) {
+            const items = Array.isArray(cupones) ? cupones : [];
+            const cup = items.find((c) => String(c.asignado_por || "").toLowerCase() === "valoracion" || /valoracion|agradecimiento/i.test(String(c.nota || "")));
+            if (!cup) return;
+            const codigo = String(cup.codigo || "").trim();
+            if (!codigo) return;
+            const storageKey = `sucree_valoracion_cupon_aviso_${codigo}`;
+            try {
+                if (sessionStorage.getItem(storageKey) === "1") return;
+                sessionStorage.setItem(storageKey, "1");
+            } catch (_) {}
+            const tipo = String(cup.tipo_descuento || "porcentaje").trim().toLowerCase();
+            const valor = Number(cup.valor_descuento || 0);
+            const beneficio = tipo === "monto_fijo" ? money.format(valor) : `${Math.round(valor)}%`;
+            const old = document.getElementById("valoracion-cupon-modal");
+            if (old) old.remove();
+            const overlay = document.createElement("div");
+            overlay.id = "valoracion-cupon-modal";
+            overlay.className = "modal-overlay active";
+            overlay.innerHTML = `
+                <div class="modal" style="width:min(420px,94vw);border:1px solid #fed7aa;box-shadow:0 24px 70px rgba(194,65,12,.22);">
+                    <h3 style="margin:0;">Gracias por valorar</h3>
+                    <div style="border:1px solid #fed7aa;background:#fff7ed;border-radius:14px;padding:12px;color:#7c2d12;display:grid;gap:6px;">
+                        <strong>Tienes un descuento de agradecimiento disponible.</strong>
+                        <span>Cupon: <b>${esc(codigo)}</b> · Beneficio: <b>${esc(beneficio)}</b></span>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-muted" type="button" data-close-valoracion-cupon>Cerrar</button>
+                        <button class="btn-primary" type="button" data-use-valoracion-cupon>Usar descuento</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.querySelector("[data-close-valoracion-cupon]")?.addEventListener("click", () => overlay.remove());
+            overlay.querySelector("[data-use-valoracion-cupon]")?.addEventListener("click", () => {
+                aplicarCuponRegalado(codigo);
+                overlay.remove();
+            });
+        }
+
         async function registrarCuentaCliente() {
             if (cuentaModo === "login") {
                 return iniciarSesionCliente();
@@ -9639,6 +9679,7 @@
                 renderCuponesCliente(cupones);
                 if (cupones.length > 0) {
                     msg(`Tienes ${cupones.length} cupon(es) disponibles en Mi cuenta.`, false);
+                    mostrarAvisoCuponValoracion(cupones);
                 }
                 _sincronizarPedidoActivoDesdeHistorial();
             } catch (e) {
