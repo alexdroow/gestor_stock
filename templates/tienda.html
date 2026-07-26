@@ -4580,6 +4580,7 @@
             localStorage.setItem(CAT_STORAGE_KEY, "TODOS");
         }
         let cuponAplicado = { codigo: "", descuento_monto: 0 };
+        let agendaCuponAuto = null;
         let tiendaAbierta = true;
         let tiendaEstadoMensaje = "";
         let mensajePostPedido = "Tu pedido fue ingresado correctamente y sera contactado a la brevedad.";
@@ -6539,6 +6540,33 @@
             return 0;
         }
 
+        async function _cargarCuponAutoAgenda(payload) {
+            agendaCuponAuto = null;
+            try {
+                if (String(payload?.tipo || "") !== "torta") return null;
+                const subtotal = Number(_agendaSubtotalEstimado(payload) || 0);
+                if (subtotal <= 0) return null;
+                const res = await fetch("/api/tienda/agenda/cupon-disponible", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    cache: "no-store",
+                    body: JSON.stringify({
+                        tipo: "torta",
+                        email: payload.email,
+                        telefono: payload.telefono,
+                        subtotal,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) return null;
+                agendaCuponAuto = data.cupon || null;
+                return agendaCuponAuto;
+            } catch (_) {
+                agendaCuponAuto = null;
+                return null;
+            }
+        }
+
         function _resetAgendaShippingQuote() {
             agendaShippingQuote = null;
             _renderAgendaShippingQuote();
@@ -8168,7 +8196,9 @@
             const shipping = payload?.shipping_quote || null;
             const shippingVisible = Boolean(payload.entrega_tipo === "despacho" && shipping && shipping.inside_maipu && Number.isFinite(Number(shipping.shipping_fee)));
             const shippingFee = shippingVisible ? Number(shipping.shipping_fee || 0) : 0;
-            const totalEstimado = subtotalEstimado + shippingFee;
+            const descuentoAuto = Number(agendaCuponAuto?.descuento_monto || 0);
+            const totalEstimado = Math.max(0, subtotalEstimado - descuentoAuto) + shippingFee;
+            const cuponAutoHtml = descuentoAuto > 0 ? `<div><strong>Cupon automatico:</strong> ${esc(String(agendaCuponAuto?.codigo || ""))}</div><div><strong>Descuento:</strong> -${esc(money.format(descuentoAuto))}</div>` : "";
             let detalleCatalogoHtml = "";
             if (String(payload.tipo || "") === "torta" && payload.catalogo_torta) {
                 const cat = payload.catalogo_torta;
@@ -8223,8 +8253,9 @@
                 <div><strong>Direccion:</strong> ${esc(direccionTxt || "-")}</div>
                 <div><strong>Pin mapa:</strong> ${esc(pinTxt)}</div>
                 <div><strong>Subtotal estimado:</strong> ${esc(money.format(subtotalEstimado))}</div>
+                ${cuponAutoHtml}
                 ${shippingVisible ? `<div><strong>Despacho estimado:</strong> ${esc(money.format(shippingFee))}</div>` : ""}
-                ${shippingVisible ? `<div><strong>Total estimado:</strong> ${esc(money.format(totalEstimado))}</div>` : ""}
+                ${(shippingVisible || descuentoAuto > 0) ? `<div><strong>Total estimado:</strong> ${esc(money.format(totalEstimado))}</div>` : ""}
                 ${payload.entrega_tipo === "despacho" && !shippingVisible ? `<div style="margin-top:6px;padding:7px 8px;border:1px solid #fed7aa;border-radius:8px;background:#fffbeb;color:#7c2d12;font-weight:700;">${esc(String((shipping && shipping.warning) || tiendaUiCfg.agenda_delivery_outside_warning || TIENDA_UI_DEFAULTS.agenda_delivery_outside_warning))}</div>` : ""}
                 ${detalleCatalogoHtml}
                 <div style="margin-top:6px;"><strong>Detalle:</strong> ${esc(payload.detalle || "Sin detalle")}</div>
@@ -8362,7 +8393,9 @@
             const shipping = payload?.shipping_quote || null;
             const shippingVisible = Boolean(payload.entrega_tipo === "despacho" && shipping && shipping.inside_maipu && Number.isFinite(Number(shipping.shipping_fee)));
             const shippingFee = shippingVisible ? Number(shipping.shipping_fee || 0) : 0;
-            const totalEstimado = subtotalEstimado + shippingFee;
+            const descuentoAuto = Math.max(0, Number(payload?.cupon_auto?.descuento_monto || agendaCuponAuto?.descuento_monto || 0));
+            const cuponAutoCodigo = String(payload?.cupon_auto?.codigo || agendaCuponAuto?.codigo || "").trim();
+            const totalEstimado = Math.max(0, subtotalEstimado - descuentoAuto) + shippingFee;
             const reservaLabel = Number(reservaId || 0) > 0 ? `#${Number(reservaId)}` : "(borrador)";
 
             let detallePedido = String(payload.detalle || "Reserva desde tienda online").trim();
@@ -8385,6 +8418,11 @@
                 linesCat.push(`Entrega: ${entregaTxt}`);
                 if (payload.entrega_tipo === "despacho") linesCat.push(`Pin mapa: ${pinTxt}`);
                 if (cat.nota) linesCat.push(`Nota catalogo: ${cat.nota}`);
+                if (descuentoAuto > 0) {
+                    linesCat.push(`Cupon aplicado: ${cuponAutoCodigo || "-"}`);
+                    linesCat.push(`Descuento aplicado: -${money.format(descuentoAuto)}`);
+                    linesCat.push(`Total estimado productos: ${money.format(Math.max(0, subtotalEstimado - descuentoAuto))}`);
+                }
                 detallePedido = linesCat.join("\n");
             } else if (String(payload.tipo || "") === "pastel") {
                 if (String(payload.pastel_modo || "catalogo") === "especial") {
@@ -8471,6 +8509,13 @@
                 drawLink("Mapa de referencia (OpenStreetMap)", mapUrl);
             } else {
                 drawField("Entrega", "Retiro en local Sucree");
+            }
+
+            if (descuentoAuto > 0) {
+                drawSectionTitle("Descuento automatico");
+                drawField("Cupon", cuponAutoCodigo || "-");
+                drawField("Descuento aplicado", `-${money.format(descuentoAuto)}`);
+                drawField("Total con descuento", money.format(totalEstimado));
             }
 
             drawSectionTitle("Detalle del Pedido");
@@ -8591,6 +8636,10 @@
                 const payloadFinal = {
                     ...payload,
                     shipping_quote: reserva.shipping_quote || payload.shipping_quote || null,
+                    cupon_auto: reserva.cupon_codigo ? {
+                        codigo: String(reserva.cupon_codigo || ""),
+                        descuento_monto: Number(reserva.descuento_cupon || 0),
+                    } : (agendaCuponAuto || null),
                 };
                 const pdfInfo = _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
                 try {
@@ -8700,6 +8749,7 @@
                 return _agendaMsg("No se pudo cotizar despacho. Reintenta confirmar el pin.", "err");
             }
             agendaReservaPendiente = payload;
+            await _cargarCuponAutoAgenda(payload);
             _renderAgendaConfirmacion(payload);
             if (inlineFlow) {
                 if (agendaCakeFlowConfirmDetailEl && agendaConfirmarDetalleEl) {
@@ -9481,6 +9531,9 @@
                 const valor = Number(c.valor_descuento || 0);
                 const beneficio = tipo === "monto_fijo" ? money.format(valor) : `${valor}%`;
                 const vence = String(c.fecha_vencimiento || c.fecha_fin || "").trim();
+                const alcance = String(c.alcance || "tienda").trim().toLowerCase();
+                const alcanceLabel = alcance === "ambos" ? "Tienda + agendar tortas" : (alcance === "agenda_torta" ? "Solo agendar tortas" : "Solo tienda");
+                const usableEnTienda = alcance !== "agenda_torta";
                 return `
                     <div style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:4px;">
                         <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
@@ -9488,9 +9541,10 @@
                             <span class="pill">${esc(beneficio)}</span>
                         </div>
                         <div style="font-size:.82rem;color:#334155;">${esc(String(c.nombre || "Cupon de beneficio"))}</div>
+                        <div style="font-size:.78rem;color:#0f766e;font-weight:800;">${esc(alcanceLabel)}</div>
                         ${vence ? `<div style="font-size:.78rem;color:#64748b;">Vence: ${esc(vence)}</div>` : ""}
                         <div style="display:flex;justify-content:flex-end;">
-                            <button class="btn-primary" type="button" onclick="aplicarCuponRegalado('${esc(code)}')">Usar cupon</button>
+                            ${usableEnTienda ? `<button class="btn-primary" type="button" onclick="aplicarCuponRegalado('${esc(code)}')">Usar cupon</button>` : `<button class="btn-muted" type="button" disabled>Usar al agendar torta</button>`}
                         </div>
                     </div>
                 `;
@@ -9512,6 +9566,9 @@
             const tipo = String(cup.tipo_descuento || "porcentaje").trim().toLowerCase();
             const valor = Number(cup.valor_descuento || 0);
             const beneficio = tipo === "monto_fijo" ? money.format(valor) : `${Math.round(valor)}%`;
+            const alcance = String(cup.alcance || "tienda").trim().toLowerCase();
+            const alcanceLabel = alcance === "ambos" ? "en tienda o al agendar tortas" : (alcance === "agenda_torta" ? "al agendar tortas" : "en tienda");
+            const usableEnTienda = alcance !== "agenda_torta";
             const old = document.getElementById("valoracion-cupon-modal");
             if (old) old.remove();
             const overlay = document.createElement("div");
@@ -9522,11 +9579,11 @@
                     <h3 style="margin:0;">Gracias por valorar</h3>
                     <div style="border:1px solid #fed7aa;background:#fff7ed;border-radius:14px;padding:12px;color:#7c2d12;display:grid;gap:6px;">
                         <strong>Tienes un descuento de agradecimiento disponible.</strong>
-                        <span>Cupon: <b>${esc(codigo)}</b> · Beneficio: <b>${esc(beneficio)}</b></span>
+                        <span>Cupon: <b>${esc(codigo)}</b> · Beneficio: <b>${esc(beneficio)}</b> · Uso: <b>${esc(alcanceLabel)}</b></span>
                     </div>
                     <div class="modal-actions">
                         <button class="btn-muted" type="button" data-close-valoracion-cupon>Cerrar</button>
-                        <button class="btn-primary" type="button" data-use-valoracion-cupon>Usar descuento</button>
+                        ${usableEnTienda ? `<button class="btn-primary" type="button" data-use-valoracion-cupon>Usar descuento</button>` : `<button class="btn-primary" type="button" data-ir-agenda-cupon>Agendar torta</button>`}
                     </div>
                 </div>
             `;
@@ -9535,6 +9592,10 @@
             overlay.querySelector("[data-use-valoracion-cupon]")?.addEventListener("click", () => {
                 aplicarCuponRegalado(codigo);
                 overlay.remove();
+            });
+            overlay.querySelector("[data-ir-agenda-cupon]")?.addEventListener("click", () => {
+                overlay.remove();
+                document.getElementById("agenda")?.scrollIntoView({ behavior: "smooth", block: "start" });
             });
         }
 

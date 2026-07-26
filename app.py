@@ -5301,12 +5301,54 @@ def _obtener_cupon_por_codigo(codigo):
             conn.close()
 
 
+def _normalizar_cupon_alcance(raw):
+    val = str(raw or "tienda").strip().lower()
+    if val in {"ambos", "todo", "todos", "tienda_agenda", "tienda_y_agenda"}:
+        return "ambos"
+    if val in {"agenda", "agenda_torta", "agendar_tortas", "tortas"}:
+        return "agenda_torta"
+    return "tienda"
+
+
+def _cupon_alcance_permite(cupon, contexto):
+    alcance = _normalizar_cupon_alcance((cupon or {}).get("alcance"))
+    ctx = _normalizar_cupon_alcance(contexto)
+    if alcance == "ambos":
+        return True
+    return alcance == ctx
+
+
+def _cupon_alcance_label(raw):
+    alcance = _normalizar_cupon_alcance(raw)
+    if alcance == "ambos":
+        return "Tienda y agendar tortas"
+    if alcance == "agenda_torta":
+        return "Solo agendar tortas"
+    return "Solo tienda"
+
+
+def _ensure_column_cursor(cursor, table_name, column_name, ddl):
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    cols = {str(r[1] if not isinstance(r, sqlite3.Row) else r["name"]).lower() for r in cursor.fetchall()}
+    if str(column_name).lower() not in cols:
+        try:
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}")
+        except sqlite3.OperationalError as exc:
+            if "no such table" not in str(exc).lower():
+                raise
+
+
 def _listar_cupones_regalados_cliente_cursor(cursor, cliente_id, solo_disponibles=False):
+    _ensure_column_cursor(cursor, "tienda_cupones", "alcance", "TEXT DEFAULT 'tienda'")
+    _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_realizados", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_max", "INTEGER NOT NULL DEFAULT 1")
     sql = """
-        SELECT cc.id, cc.cliente_id, cc.cupon_id, cc.activo, cc.usado, cc.usado_venta_id, cc.nota,
+        SELECT cc.id, cc.cliente_id, cc.cupon_id, cc.activo, cc.usado, cc.usado_venta_id,
+               COALESCE(cc.usos_realizados, 0) AS usos_realizados, COALESCE(cc.usos_max, 1) AS usos_max, cc.nota,
                cc.asignado_por, cc.fecha_asignado, cc.fecha_vencimiento, cc.fecha_usado,
                c.codigo, c.nombre, c.tipo_descuento, c.valor_descuento, c.activo AS cupon_activo,
-               c.fecha_inicio, c.fecha_fin, c.monto_minimo
+               c.fecha_inicio, c.fecha_fin, c.monto_minimo, COALESCE(c.alcance, 'tienda') AS alcance,
+               c.usos_max_total, c.usos_max_por_cliente
         FROM tienda_cliente_cupones cc
         JOIN tienda_cupones c ON c.id = cc.cupon_id
         WHERE cc.cliente_id = ?
@@ -5328,7 +5370,7 @@ def _listar_cupones_regalados_cliente_cursor(cursor, cliente_id, solo_disponible
     return [dict(r) for r in cursor.fetchall()]
 
 
-def _marcar_cupon_regalado_usado_cursor(cursor, cupon_id, cliente_ref, venta_id):
+def _marcar_cupon_regalado_usado_cursor(cursor, cupon_id, cliente_ref, venta_id=None):
     if not cupon_id or not cliente_ref:
         return 0
     today = datetime.now().date().isoformat()
@@ -5340,6 +5382,7 @@ def _marcar_cupon_regalado_usado_cursor(cursor, cupon_id, cliente_ref, venta_id)
           AND LOWER(TRIM(COALESCE(cliente_ref, ''))) = LOWER(TRIM(?))
           AND activo = 1
           AND usado = 0
+          AND COALESCE(usos_realizados, 0) < COALESCE(usos_max, 1)
           AND (fecha_vencimiento IS NULL OR TRIM(fecha_vencimiento) = '' OR fecha_vencimiento >= ?)
         ORDER BY datetime(fecha_asignado) ASC, id ASC
         LIMIT 1
@@ -5353,21 +5396,24 @@ def _marcar_cupon_regalado_usado_cursor(cursor, cupon_id, cliente_ref, venta_id)
     cursor.execute(
         """
         UPDATE tienda_cliente_cupones
-        SET usado = 1,
+        SET usos_realizados = COALESCE(usos_realizados, 0) + 1,
+            usado = CASE WHEN COALESCE(usos_realizados, 0) + 1 >= COALESCE(usos_max, 1) THEN 1 ELSE 0 END,
             usado_venta_id = ?,
             fecha_usado = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
-        (int(venta_id), rid),
+        (int(venta_id) if venta_id else None, rid),
     )
     return int(cursor.rowcount or 0)
 
 
-def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref):
+def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref, contexto="tienda"):
     if not cupon:
         return {"ok": False, "error": "Cupon no encontrado"}
     if not int(cupon.get("activo") or 0):
         return {"ok": False, "error": "Cupon inactivo"}
+    if not _cupon_alcance_permite(cupon, contexto):
+        return {"ok": False, "error": f"Este cupon aplica para {_cupon_alcance_label(cupon.get('alcance'))}"}
 
     now_dt = datetime.now()
     hoy = now_dt.date().isoformat()
@@ -5400,6 +5446,9 @@ def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cli
     try:
         conn = get_db()
         cursor = conn.cursor()
+        _ensure_column_cursor(cursor, "tienda_cupones", "alcance", "TEXT DEFAULT 'tienda'")
+        _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_realizados", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_max", "INTEGER NOT NULL DEFAULT 1")
         cursor.execute(
             "SELECT COUNT(*) AS total FROM tienda_cliente_cupones WHERE cupon_id = ? AND activo = 1",
             (int(cupon["id"]),),
@@ -5416,6 +5465,7 @@ def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cli
                   AND LOWER(TRIM(COALESCE(cliente_ref, ''))) = LOWER(TRIM(?))
                   AND activo = 1
                   AND usado = 0
+                  AND COALESCE(usos_realizados, 0) < COALESCE(usos_max, 1)
                   AND (fecha_vencimiento IS NULL OR TRIM(fecha_vencimiento) = '' OR fecha_vencimiento >= ?)
                 """,
                 (int(cupon["id"]), str(cliente_ref or "").strip(), hoy),
@@ -7659,6 +7709,9 @@ def _ensure_adm_pagina_tables(cursor):
         ON tienda_descuento_campanas(activo, fecha_inicio, fecha_fin)
         """
     )
+    _ensure_column_cursor(cursor, "tienda_cupones", "alcance", "TEXT DEFAULT 'tienda'")
+    _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_realizados", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_max", "INTEGER NOT NULL DEFAULT 1")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS tienda_valoracion_config (
@@ -7667,15 +7720,22 @@ def _ensure_adm_pagina_tables(cursor):
             descuento_tipo TEXT NOT NULL DEFAULT 'porcentaje',
             descuento_valor REAL NOT NULL DEFAULT 10,
             dias_vigencia INTEGER NOT NULL DEFAULT 30,
+            descuento_alcance TEXT NOT NULL DEFAULT 'ambos',
+            usos_max_total INTEGER NOT NULL DEFAULT 1,
+            usos_max_por_cliente INTEGER NOT NULL DEFAULT 1,
             actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    _ensure_column_cursor(cursor, "tienda_valoracion_config", "descuento_alcance", "TEXT NOT NULL DEFAULT 'ambos'")
+    _ensure_column_cursor(cursor, "tienda_valoracion_config", "usos_max_total", "INTEGER NOT NULL DEFAULT 1")
+    _ensure_column_cursor(cursor, "tienda_valoracion_config", "usos_max_por_cliente", "INTEGER NOT NULL DEFAULT 1")
     cursor.execute(
         """
         INSERT OR IGNORE INTO tienda_valoracion_config (
-            id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia, actualizado_en
-        ) VALUES (1, 1, 'porcentaje', 10, 30, CURRENT_TIMESTAMP)
+            id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia,
+            descuento_alcance, usos_max_total, usos_max_por_cliente, actualizado_en
+        ) VALUES (1, 1, 'porcentaje', 10, 30, 'ambos', 1, 1, CURRENT_TIMESTAMP)
         """
     )
     cursor.execute(
@@ -7726,7 +7786,7 @@ def _valoracion_config_cursor(cursor):
     cursor.execute("SELECT * FROM tienda_valoracion_config WHERE id = 1 LIMIT 1")
     row = cursor.fetchone()
     if not row:
-        return {"descuento_activo": 1, "descuento_tipo": "porcentaje", "descuento_valor": 10, "dias_vigencia": 30}
+        return {"descuento_activo": 1, "descuento_tipo": "porcentaje", "descuento_valor": 10, "dias_vigencia": 30, "descuento_alcance": "ambos", "usos_max_total": 1, "usos_max_por_cliente": 1}
     cfg = dict(row)
     tipo = str(cfg.get("descuento_tipo") or "porcentaje").strip().lower()
     if tipo not in {"porcentaje", "monto_fijo"}:
@@ -7736,6 +7796,9 @@ def _valoracion_config_cursor(cursor):
         "descuento_tipo": tipo,
         "descuento_valor": max(0.0, float(cfg.get("descuento_valor") or 0)),
         "dias_vigencia": max(1, min(365, int(cfg.get("dias_vigencia") or 30))),
+        "descuento_alcance": _normalizar_cupon_alcance(cfg.get("descuento_alcance") or "ambos"),
+        "usos_max_total": max(1, min(9999, int(cfg.get("usos_max_total") or 1))),
+        "usos_max_por_cliente": max(1, min(9999, int(cfg.get("usos_max_por_cliente") or 1))),
     }
 
 
@@ -7743,9 +7806,8 @@ def _valoracion_resumen_descuento(cfg):
     if not cfg or not int(cfg.get("descuento_activo") or 0):
         return "Sin descuento activo"
     valor = float(cfg.get("descuento_valor") or 0)
-    if str(cfg.get("descuento_tipo") or "") == "monto_fijo":
-        return f"${int(round(valor)):,}".replace(",", ".")
-    return f"{int(round(valor))}%"
+    beneficio = f"${int(round(valor)):,}".replace(",", ".") if str(cfg.get("descuento_tipo") or "") == "monto_fijo" else f"{int(round(valor))}%"
+    return f"{beneficio} ({_cupon_alcance_label(cfg.get('descuento_alcance'))})"
 
 
 def _valoracion_preguntas_default():
@@ -7865,8 +7927,8 @@ def _asignar_descuento_valoracion_cursor(cursor, valoracion_id):
                 """
                 INSERT INTO tienda_cupones (
                     codigo, nombre, tipo_descuento, valor_descuento, activo,
-                    fecha_inicio, fecha_fin, usos_max_total, usos_max_por_cliente, monto_minimo, solo_sin_oferta
-                ) VALUES (?, ?, ?, ?, 1, date('now', 'localtime'), date('now', '+' || ? || ' days', 'localtime'), 1, 1, 0, 0)
+                    fecha_inicio, fecha_fin, usos_max_total, usos_max_por_cliente, monto_minimo, solo_sin_oferta, alcance
+                ) VALUES (?, ?, ?, ?, 1, date('now', 'localtime'), date('now', '+' || ? || ' days', 'localtime'), ?, ?, 0, 0, ?)
                 """,
                 (
                     codigo,
@@ -7874,6 +7936,9 @@ def _asignar_descuento_valoracion_cursor(cursor, valoracion_id):
                     str(cfg.get("descuento_tipo") or "porcentaje"),
                     float(cfg.get("descuento_valor") or 0),
                     int(cfg.get("dias_vigencia") or 30),
+                    int(cfg.get("usos_max_total") or 1),
+                    int(cfg.get("usos_max_por_cliente") or 1),
+                    _normalizar_cupon_alcance(cfg.get("descuento_alcance") or "ambos"),
                 ),
             )
             break
@@ -7888,13 +7953,15 @@ def _asignar_descuento_valoracion_cursor(cursor, valoracion_id):
     cursor.execute(
         """
         INSERT INTO tienda_cliente_cupones (
-            cliente_id, cliente_ref, cupon_id, activo, usado, nota, asignado_por, fecha_vencimiento, fecha_asignado
-        ) VALUES (?, ?, ?, 1, 0, ?, 'valoracion', ?, CURRENT_TIMESTAMP)
+            cliente_id, cliente_ref, cupon_id, activo, usado, usos_realizados, usos_max,
+            nota, asignado_por, fecha_vencimiento, fecha_asignado
+        ) VALUES (?, ?, ?, 1, 0, 0, ?, ?, 'valoracion', ?, CURRENT_TIMESTAMP)
         """,
         (
             cliente_id,
             cliente_ref,
             cupon_id,
+            min(int(cfg.get("usos_max_total") or 1), int(cfg.get("usos_max_por_cliente") or 1)),
             f"Descuento de agradecimiento por valorar: {_valoracion_resumen_descuento(cfg)}",
             venc,
         ),
@@ -7905,6 +7972,157 @@ def _asignar_descuento_valoracion_cursor(cursor, valoracion_id):
         (regalo_id, int(valoracion_id)),
     )
     return {"regalo_id": regalo_id, "codigo": codigo, "ya_existia": False}
+
+
+def _crear_descuento_valoracion_para_cliente_cursor(cursor, cliente_id, cfg=None, asignado_por="valoracion_manual"):
+    _ensure_adm_pagina_tables(cursor)
+    cfg = cfg or _valoracion_config_cursor(cursor)
+    if not int(cfg.get("descuento_activo") or 0):
+        raise ValueError("El descuento de agradecimiento esta desactivado.")
+    cursor.execute("SELECT id, nombre, email, telefono FROM tienda_clientes WHERE id = ? LIMIT 1", (int(cliente_id),))
+    row = cursor.fetchone()
+    if not row:
+        raise ValueError("Cliente no encontrado.")
+    cli = dict(row)
+    cliente_ref = _normalizar_cliente_ref(cli.get("email"), cli.get("telefono"))
+    if not cliente_ref:
+        raise ValueError("El cliente no tiene correo o telefono valido.")
+    alcance = _normalizar_cupon_alcance(cfg.get("descuento_alcance") or "ambos")
+    codigo_base = f"GRACIAS{int(cliente_id)}{int(time.time())}"
+    codigo = _normalizar_cupon_codigo(codigo_base)
+    suffix = 0
+    while True:
+        try:
+            cursor.execute(
+                """
+                INSERT INTO tienda_cupones (
+                    codigo, nombre, tipo_descuento, valor_descuento, activo,
+                    fecha_inicio, fecha_fin, usos_max_total, usos_max_por_cliente,
+                    monto_minimo, solo_sin_oferta, alcance
+                ) VALUES (?, ?, ?, ?, 1, date('now', 'localtime'), date('now', '+' || ? || ' days', 'localtime'), ?, ?, 0, 0, ?)
+                """,
+                (
+                    codigo,
+                    "Gracias por valorar Sucree",
+                    str(cfg.get("descuento_tipo") or "porcentaje"),
+                    float(cfg.get("descuento_valor") or 0),
+                    int(cfg.get("dias_vigencia") or 30),
+                    int(cfg.get("usos_max_total") or 1),
+                    int(cfg.get("usos_max_por_cliente") or 1),
+                    alcance,
+                ),
+            )
+            break
+        except sqlite3.IntegrityError:
+            suffix += 1
+            codigo = _normalizar_cupon_codigo(f"{codigo_base}{suffix}")
+            if suffix > 20:
+                raise
+    cupon_id = int(cursor.lastrowid or 0)
+    venc = (datetime.now(ZoneInfo("America/Santiago")).date() + timedelta(days=int(cfg.get("dias_vigencia") or 30))).isoformat()
+    cursor.execute(
+        """
+        INSERT INTO tienda_cliente_cupones (
+            cliente_id, cliente_ref, cupon_id, activo, usado, usos_realizados, usos_max,
+            nota, asignado_por, fecha_vencimiento, fecha_asignado
+        ) VALUES (?, ?, ?, 1, 0, 0, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        (
+            int(cliente_id),
+            cliente_ref,
+            cupon_id,
+            min(int(cfg.get("usos_max_total") or 1), int(cfg.get("usos_max_por_cliente") or 1)),
+            f"Descuento de agradecimiento asignado manualmente: {_valoracion_resumen_descuento(cfg)}",
+            asignado_por,
+            venc,
+        ),
+    )
+    return {
+        "regalo_id": int(cursor.lastrowid or 0),
+        "cupon_id": cupon_id,
+        "codigo": codigo,
+        "alcance": alcance,
+        "cliente": cli,
+    }
+
+
+def _listar_descuentos_valoracion_cursor(cursor, limit=120):
+    _ensure_adm_pagina_tables(cursor)
+    cursor.execute(
+        """
+        SELECT cc.id AS regalo_id, cc.cliente_id, cc.activo, cc.usado,
+               COALESCE(cc.usos_realizados, 0) AS usos_realizados,
+               COALESCE(cc.usos_max, 1) AS usos_max,
+               cc.nota, cc.asignado_por,
+               cc.fecha_asignado, cc.fecha_vencimiento, cc.fecha_usado,
+               c.id AS cupon_id, c.codigo, c.nombre AS cupon_nombre, c.tipo_descuento, c.valor_descuento,
+               c.activo AS cupon_activo, COALESCE(c.alcance, 'tienda') AS alcance,
+               c.usos_max_total, c.usos_max_por_cliente,
+               tc.nombre AS cliente_nombre, tc.email AS cliente_email, tc.telefono AS cliente_telefono
+        FROM tienda_cliente_cupones cc
+        JOIN tienda_cupones c ON c.id = cc.cupon_id
+        JOIN tienda_clientes tc ON tc.id = cc.cliente_id
+        WHERE LOWER(COALESCE(cc.asignado_por, '')) LIKE 'valoracion%'
+           OR LOWER(COALESCE(cc.nota, '')) LIKE '%valoracion%'
+           OR LOWER(COALESCE(cc.nota, '')) LIKE '%agradecimiento%'
+        ORDER BY datetime(cc.fecha_asignado) DESC, cc.id DESC
+        LIMIT ?
+        """,
+        (int(limit or 120),),
+    )
+    return [dict(r) for r in cursor.fetchall()]
+
+
+def _buscar_cupon_valoracion_agenda_torta(email, telefono, subtotal):
+    conn = None
+    try:
+        email_norm = _normalizar_email(email)
+        tel_norm = _normalizar_telefono_cl(telefono)
+        if not email_norm or not tel_norm:
+            return None
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        cli = _obtener_cliente_por_contacto_cursor(cursor, email_norm, tel_norm)
+        if not cli:
+            return None
+        cliente_ref = _normalizar_cliente_ref(cli.get("email"), cli.get("telefono"))
+        candidatos = _listar_cupones_regalados_cliente_cursor(cursor, int(cli.get("id") or 0), solo_disponibles=True)
+        best = None
+        for cup in candidatos:
+            if not _cupon_alcance_permite(cup, "agenda_torta"):
+                continue
+            asignado_por = str(cup.get("asignado_por") or "").strip().lower()
+            nota = str(cup.get("nota") or "").strip().lower()
+            if not (asignado_por.startswith("valoracion") or "valoracion" in nota or "agradecimiento" in nota):
+                continue
+            valid = _validar_cupon_y_calcular_descuento(
+                cup,
+                float(subtotal or 0),
+                [],
+                cliente_ref,
+                contexto="agenda_torta",
+            )
+            if not valid.get("ok"):
+                continue
+            descuento = float(valid.get("descuento_monto") or 0)
+            if descuento <= 0:
+                continue
+            item = {
+                **cup,
+                "cliente_id": int(cli.get("id") or 0),
+                "cliente_ref": cliente_ref,
+                "descuento_monto": round(descuento, 2),
+                "total_con_descuento": round(max(0.0, float(subtotal or 0) - descuento), 2),
+            }
+            if best is None or float(item["descuento_monto"]) > float(best.get("descuento_monto") or 0):
+                best = item
+        return best
+    except Exception:
+        return None
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/valoracion/acceso', methods=['POST'])
@@ -8024,12 +8242,14 @@ def api_adm_pagina_valoraciones_get():
             except Exception:
                 item["respuestas"] = {}
             valoraciones.append(item)
+        descuentos_asignados = _listar_descuentos_valoracion_cursor(cursor)
         cursor.execute("SELECT COUNT(*) AS total, AVG(estrellas) AS promedio FROM tienda_valoraciones")
         metric = dict(cursor.fetchone() or {})
         cfg = _valoracion_config_cursor(cursor)
         return jsonify({
             "success": True,
             "valoraciones": valoraciones,
+            "descuentos_asignados": descuentos_asignados,
             "preguntas": _valoracion_preguntas_default(),
             "config": cfg,
             "metrics": {
@@ -8060,6 +8280,9 @@ def api_adm_pagina_valoraciones_config():
         if valor < 0 or (tipo == "porcentaje" and valor > 100):
             return jsonify({"success": False, "error": "Valor de descuento invalido."}), 400
         dias = max(1, min(365, int(data.get("dias_vigencia") or 30)))
+        alcance = _normalizar_cupon_alcance(data.get("descuento_alcance") or "ambos")
+        usos_max_total = max(1, min(9999, int(data.get("usos_max_total") or 1)))
+        usos_max_por_cliente = max(1, min(9999, int(data.get("usos_max_por_cliente") or 1)))
         activo = 1 if bool(data.get("descuento_activo", True)) else 0
         conn = get_db()
         cursor = conn.cursor()
@@ -8067,16 +8290,22 @@ def api_adm_pagina_valoraciones_config():
         _ensure_adm_pagina_tables(cursor)
         cursor.execute(
             """
-            INSERT INTO tienda_valoracion_config (id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia, actualizado_en)
-            VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO tienda_valoracion_config (
+                id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia,
+                descuento_alcance, usos_max_total, usos_max_por_cliente, actualizado_en
+            )
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(id) DO UPDATE SET
                 descuento_activo = excluded.descuento_activo,
                 descuento_tipo = excluded.descuento_tipo,
                 descuento_valor = excluded.descuento_valor,
                 dias_vigencia = excluded.dias_vigencia,
+                descuento_alcance = excluded.descuento_alcance,
+                usos_max_total = excluded.usos_max_total,
+                usos_max_por_cliente = excluded.usos_max_por_cliente,
                 actualizado_en = CURRENT_TIMESTAMP
             """,
-            (activo, tipo, valor, dias),
+            (activo, tipo, valor, dias, alcance, usos_max_total, usos_max_por_cliente),
         )
         conn.commit()
         crear_backup()
@@ -8107,6 +8336,124 @@ def api_adm_pagina_valoraciones_descuento(valoracion_id):
         if conn:
             conn.rollback()
         return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/valoraciones/clientes', methods=['GET'])
+def api_adm_pagina_valoraciones_clientes():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        q = str(request.args.get("q") or "").strip().lower()
+        if len(q) < 3:
+            return jsonify({"success": True, "clientes": []})
+        digits = re.sub(r"\D+", "", q)
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        like = f"%{q}%"
+        params = [like, like]
+        where_tel = ""
+        if digits:
+            where_tel = " OR REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefono, ''), '+', ''), ' ', ''), '-', ''), '.', '') LIKE ?"
+            params.append(f"%{digits}%")
+        cursor.execute(
+            f"""
+            SELECT id, nombre, email, telefono, actualizado_en
+            FROM tienda_clientes
+            WHERE LOWER(COALESCE(nombre, '')) LIKE ?
+               OR LOWER(COALESCE(email, '')) LIKE ?
+               {where_tel}
+            ORDER BY datetime(COALESCE(actualizado_en, creado_en, '1970-01-01')) DESC, id DESC
+            LIMIT 20
+            """,
+            tuple(params),
+        )
+        return jsonify({"success": True, "clientes": [dict(r) for r in cursor.fetchall()]})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/valoraciones/descuento-cliente', methods=['POST'])
+def api_adm_pagina_valoraciones_descuento_cliente():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        cliente_id = int(data.get("cliente_id") or 0)
+        if cliente_id <= 0:
+            return jsonify({"success": False, "error": "Selecciona un cliente valido."}), 400
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        result = _crear_descuento_valoracion_para_cliente_cursor(cursor, cliente_id)
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True, **result})
+    except ValueError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/adm-pagina/valoraciones/descuento/<int:regalo_id>/eliminar', methods=['POST'])
+def api_adm_pagina_valoraciones_descuento_eliminar(regalo_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        _ensure_adm_pagina_tables(cursor)
+        cursor.execute(
+            """
+            SELECT cc.id, cc.cupon_id
+            FROM tienda_cliente_cupones cc
+            WHERE cc.id = ? AND (
+                LOWER(COALESCE(cc.asignado_por, '')) LIKE 'valoracion%'
+                OR LOWER(COALESCE(cc.nota, '')) LIKE '%valoracion%'
+                OR LOWER(COALESCE(cc.nota, '')) LIKE '%agradecimiento%'
+            )
+            LIMIT 1
+            """,
+            (int(regalo_id),),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError("Descuento no encontrado.")
+        cupon_id = int(row["cupon_id"] or 0)
+        cursor.execute(
+            "UPDATE tienda_cliente_cupones SET activo = 0, nota = COALESCE(nota, '') || ' | Desactivado desde Valoraciones', fecha_usado = COALESCE(fecha_usado, CURRENT_TIMESTAMP) WHERE id = ?",
+            (int(regalo_id),),
+        )
+        if cupon_id > 0:
+            cursor.execute("UPDATE tienda_cupones SET activo = 0, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?", (cupon_id,))
+        conn.commit()
+        crear_backup()
+        return jsonify({"success": True})
+    except ValueError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 404
     except Exception as e:
         if conn:
             conn.rollback()
@@ -9703,6 +10050,37 @@ def api_tienda_checkout_despacho_cotizar():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/api/tienda/agenda/cupon-disponible', methods=['POST'])
+def api_tienda_agenda_cupon_disponible():
+    try:
+        data = request.get_json(silent=True) or {}
+        email = _normalizar_email(data.get("email"))
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        subtotal = max(0.0, float(data.get("subtotal") or 0))
+        tipo = _normalizar_tipo_reserva_tienda(data.get("tipo"))
+        if tipo != "torta":
+            return jsonify({"success": True, "cupon": None})
+        cup = _buscar_cupon_valoracion_agenda_torta(email, telefono, subtotal)
+        if not cup:
+            return jsonify({"success": True, "cupon": None})
+        return jsonify({
+            "success": True,
+            "cupon": {
+                "regalo_id": int(cup.get("id") or cup.get("regalo_id") or 0),
+                "cupon_id": int(cup.get("cupon_id") or 0),
+                "codigo": str(cup.get("codigo") or ""),
+                "nombre": str(cup.get("nombre") or ""),
+                "tipo_descuento": str(cup.get("tipo_descuento") or "porcentaje"),
+                "valor_descuento": float(cup.get("valor_descuento") or 0),
+                "alcance": _normalizar_cupon_alcance(cup.get("alcance") or "agenda_torta"),
+                "descuento_monto": round(float(cup.get("descuento_monto") or 0), 2),
+                "total_con_descuento": round(float(cup.get("total_con_descuento") or 0), 2),
+            },
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/tienda/agenda/reservar', methods=['POST'])
 def api_tienda_agenda_reservar():
     conn = None
@@ -9870,6 +10248,13 @@ def api_tienda_agenda_reservar():
                 return jsonify({"success": False, "error": "Coordenadas de despacho invalidas"}), 400
             shipping_quote = _cotizar_envio_agenda(latitud, longitud, cfg_tienda=cfg_tienda, hora_inicio=hora_inicio)
 
+        cupon_agenda_auto = None
+        descuento_agenda_auto = 0.0
+        if tipo_pedido == "torta" and subtotal_estimado > 0:
+            cupon_agenda_auto = _buscar_cupon_valoracion_agenda_torta(email, telefono, subtotal_estimado)
+            if cupon_agenda_auto:
+                descuento_agenda_auto = max(0.0, min(float(subtotal_estimado), float(cupon_agenda_auto.get("descuento_monto") or 0)))
+
         fecha_hoy = datetime.now(ZoneInfo("America/Santiago")).date()
         fecha_req = datetime.strptime(fecha, "%Y-%m-%d").date()
         if fecha_req < fecha_hoy:
@@ -9981,6 +10366,10 @@ def api_tienda_agenda_reservar():
                     ingredientes = f"{ingredientes}\n- {ref}"
             else:
                 ingredientes = f"{ingredientes}\nReferencias: -"
+            if descuento_agenda_auto > 0 and cupon_agenda_auto:
+                codigo_desc = str(cupon_agenda_auto.get("codigo") or "").strip()
+                ingredientes = f"{ingredientes}\nCupon aplicado: {codigo_desc or '-'}"
+                ingredientes = f"{ingredientes}\nDescuento aplicado: -{_fmt_clp(descuento_agenda_auto)}"
             try:
                 if isinstance(catalogo_torta_payload, dict) and catalogo_torta_payload:
                     builder_raw = {
@@ -10006,6 +10395,12 @@ def api_tienda_agenda_reservar():
                         "referencia_urls": refs,
                         "nota": str(catalogo_torta_resumen.get("nota") or ""),
                     }
+                if descuento_agenda_auto > 0 and cupon_agenda_auto:
+                    builder_raw["descuento_tipo"] = "monto"
+                    builder_raw["descuento_valor"] = round(float(descuento_agenda_auto), 2)
+                    builder_raw["cupon_codigo"] = str(cupon_agenda_auto.get("codigo") or "")
+                    builder_raw["cupon_id"] = int(cupon_agenda_auto.get("cupon_id") or 0)
+                    builder_raw["cupon_regalo_id"] = int(cupon_agenda_auto.get("id") or 0)
                 ingredientes = f"{ingredientes}\n--- Builder JSON ---\n{json.dumps(builder_raw, ensure_ascii=False, separators=(',', ':'))}"
             except Exception:
                 pass
@@ -10034,7 +10429,7 @@ def api_tienda_agenda_reservar():
                 else:
                     ingredientes = f"{ingredientes}\n{str(shipping_quote.get('warning') or '')}"
         despacho_estimado_txt = float(shipping_quote.get("shipping_fee") or 0) if (shipping_quote and bool(shipping_quote.get("inside_maipu"))) else 0.0
-        total_estimado_txt = float(subtotal_estimado) + float(despacho_estimado_txt)
+        total_estimado_txt = max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) + float(despacho_estimado_txt)
         ingredientes = f"{ingredientes}\nTotal estimado pedido: {_fmt_clp(total_estimado_txt)}"
         codigo_op = f"OPA-TI-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"[:80]
         codigo_pedido = ""
@@ -10073,6 +10468,24 @@ def api_tienda_agenda_reservar():
                 "UPDATE agenda_eventos SET codigo_pedido = ? WHERE id = ?",
                 (codigo_pedido, reserva_id),
             )
+            if descuento_agenda_auto > 0 and cupon_agenda_auto:
+                regalo_id = int(cupon_agenda_auto.get("id") or 0)
+                cupon_id_auto = int(cupon_agenda_auto.get("cupon_id") or 0)
+                cliente_ref_auto = str(cupon_agenda_auto.get("cliente_ref") or _normalizar_cliente_ref(email, telefono)).strip()
+                if regalo_id > 0:
+                    cursor.execute(
+                        """
+                        UPDATE tienda_cliente_cupones
+                        SET usos_realizados = COALESCE(usos_realizados, 0) + 1,
+                            usado = CASE WHEN COALESCE(usos_realizados, 0) + 1 >= COALESCE(usos_max, 1) THEN 1 ELSE 0 END,
+                            fecha_usado = CURRENT_TIMESTAMP,
+                            nota = COALESCE(nota, '') || ?
+                        WHERE id = ? AND usado = 0 AND COALESCE(usos_realizados, 0) < COALESCE(usos_max, 1)
+                        """,
+                        (f" | Usado en agenda torta #{reserva_id}", regalo_id),
+                    )
+                elif cupon_id_auto > 0 and cliente_ref_auto:
+                    _marcar_cupon_regalado_usado_cursor(cursor, cupon_id_auto, cliente_ref_auto, venta_id=None)
         cliente = _upsert_cliente_tienda_cursor(
             cursor,
             nombre=nombre,
@@ -10098,7 +10511,7 @@ def api_tienda_agenda_reservar():
         conn.commit()
         crear_backup()
         despacho_estimado = float(shipping_quote.get("shipping_fee") or 0) if (shipping_quote and bool(shipping_quote.get("inside_maipu"))) else 0.0
-        total_estimado = float(subtotal_estimado) + float(despacho_estimado)
+        total_estimado = max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) + float(despacho_estimado)
         return jsonify(
             {
                 "success": True,
@@ -10120,6 +10533,8 @@ def api_tienda_agenda_reservar():
                     "pastel_especial": pastel_especial_detalle if tipo_pedido == "pastel" else None,
                     "shipping_quote": shipping_quote if entrega_tipo == "despacho" else None,
                     "subtotal_estimado": round(float(subtotal_estimado), 2),
+                    "descuento_cupon": round(float(descuento_agenda_auto), 2),
+                    "cupon_codigo": str((cupon_agenda_auto or {}).get("codigo") or "") if cupon_agenda_auto else "",
                     "despacho_estimado": round(float(despacho_estimado), 2),
                     "total_estimado": round(float(total_estimado), 2),
                 },
@@ -10322,7 +10737,7 @@ def api_tienda_validar_cupon():
 
         cliente_ref = _normalizar_cliente_ref(data.get("cliente_email"), data.get("cliente_telefono"))
         cupon = _obtener_cupon_por_codigo(cupon_codigo)
-        valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref)
+        valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref, contexto="tienda")
         if not valid.get("ok"):
             return jsonify({"success": False, "error": valid.get("error", "Cupon invalido")}), 400
 
@@ -15638,7 +16053,7 @@ def api_tienda_checkout():
         # Nota: el sistema de nivel se mantiene en BD pero no aplica en checkout.
         if cupon_codigo:
             cupon = _obtener_cupon_por_codigo(cupon_codigo)
-            valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref)
+            valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref, contexto="tienda")
             if not valid.get("ok"):
                 return jsonify({'success': False, 'error': valid.get("error", "Cupon invalido")}), 400
             descuento_monto = float(valid.get("descuento_monto") or 0)

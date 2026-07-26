@@ -7966,11 +7966,13 @@ def migrar_db():
                 usos_max_por_cliente INTEGER,
                 monto_minimo REAL NOT NULL DEFAULT 0,
                 solo_sin_oferta INTEGER NOT NULL DEFAULT 0,
+                alcance TEXT NOT NULL DEFAULT 'tienda',
                 creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
                 actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        _ensure_column(conn, "tienda_cupones", "alcance", "TEXT NOT NULL DEFAULT 'tienda'")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tienda_cupon_usos (
@@ -8252,15 +8254,22 @@ def migrar_db():
                 descuento_tipo TEXT NOT NULL DEFAULT 'porcentaje',
                 descuento_valor REAL NOT NULL DEFAULT 10,
                 dias_vigencia INTEGER NOT NULL DEFAULT 30,
+                descuento_alcance TEXT NOT NULL DEFAULT 'ambos',
+                usos_max_total INTEGER NOT NULL DEFAULT 1,
+                usos_max_por_cliente INTEGER NOT NULL DEFAULT 1,
                 actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        _ensure_column(conn, "tienda_valoracion_config", "descuento_alcance", "TEXT NOT NULL DEFAULT 'ambos'")
+        _ensure_column(conn, "tienda_valoracion_config", "usos_max_total", "INTEGER NOT NULL DEFAULT 1")
+        _ensure_column(conn, "tienda_valoracion_config", "usos_max_por_cliente", "INTEGER NOT NULL DEFAULT 1")
         conn.execute(
             """
             INSERT OR IGNORE INTO tienda_valoracion_config (
-                id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia, actualizado_en
-            ) VALUES (1, 1, 'porcentaje', 10, 30, CURRENT_TIMESTAMP)
+                id, descuento_activo, descuento_tipo, descuento_valor, dias_vigencia,
+                descuento_alcance, usos_max_total, usos_max_por_cliente, actualizado_en
+            ) VALUES (1, 1, 'porcentaje', 10, 30, 'ambos', 1, 1, CURRENT_TIMESTAMP)
             """
         )
         conn.execute(
@@ -8408,6 +8417,8 @@ def migrar_db():
                 activo INTEGER NOT NULL DEFAULT 1,
                 usado INTEGER NOT NULL DEFAULT 0,
                 usado_venta_id INTEGER,
+                usos_realizados INTEGER NOT NULL DEFAULT 0,
+                usos_max INTEGER NOT NULL DEFAULT 1,
                 nota TEXT DEFAULT '',
                 asignado_por TEXT NOT NULL DEFAULT 'admin',
                 fecha_asignado TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -8997,6 +9008,8 @@ def migrar_db():
             )
             """
         )
+        _ensure_column(conn, "tienda_cliente_cupones", "usos_realizados", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "tienda_cliente_cupones", "usos_max", "INTEGER NOT NULL DEFAULT 1")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS calculadora_compras_draft (

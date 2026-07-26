@@ -315,9 +315,24 @@
                             <label>Tipo<select id="val-desc-tipo"><option value="porcentaje">Porcentaje</option><option value="monto_fijo">Monto fijo</option></select></label>
                             <label>Valor<input id="val-desc-valor" type="number" min="0" step="1" value="10"></label>
                             <label>Dias vigencia<input id="val-desc-dias" type="number" min="1" max="365" step="1" value="30"></label>
+                            <label>Alcance<select id="val-desc-alcance"><option value="ambos">Toda la tienda + agendar tortas</option><option value="tienda">Solo tienda</option><option value="agenda_torta">Solo agendar tortas</option></select></label>
+                            <label>Usos por cliente<input id="val-desc-usos-cliente" type="number" min="1" max="9999" step="1" value="1"></label>
+                            <label>Usos totales<input id="val-desc-usos-total" type="number" min="1" max="9999" step="1" value="1"></label>
                         </div>
                         <button class="btn btn-green" id="btn-val-config" style="margin-top:12px;width:100%;">Guardar configuracion</button>
                         <div class="status" id="val-status"></div>
+                    </div>
+                    <div class="card">
+                        <h3>Asignar descuento a cliente</h3>
+                        <p class="muted">Busca por correo o telefono y entrega el descuento configurado arriba.</p>
+                        <div class="form-grid" style="margin-top:12px;">
+                            <label>Correo o telefono<input id="val-cliente-q" placeholder="Ej: cliente@correo.cl o +569..."></label>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                            <button class="btn btn-primary" id="btn-val-buscar-cliente">Buscar cliente</button>
+                            <button class="btn btn-green" id="btn-val-asignar-cliente" disabled>Asignar descuento</button>
+                        </div>
+                        <div id="val-cliente-resultados" style="display:grid;gap:8px;margin-top:12px;"></div>
                     </div>
                 </div>
                 <div class="card">
@@ -330,13 +345,22 @@
                     </div>
                     <div class="rating-list" id="valoraciones-list"><div class="muted">Sin valoraciones registradas.</div></div>
                 </div>
+                <div class="card">
+                    <div class="campaign-head">
+                        <div>
+                            <h3>Descuentos asignados</h3>
+                            <p class="muted">Controla cupones de agradecimiento activos, usados o eliminados.</p>
+                        </div>
+                    </div>
+                    <div class="rating-list" id="valoracion-descuentos-list"><div class="muted">Sin descuentos asignados.</div></div>
+                </div>
             </section>
         </main>
     </div>
 
     <script>
         const money = (v) => '$' + Math.round(Number(v || 0)).toLocaleString('es-CL');
-        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], valoraciones: [], preguntasValoracion: [], selected: new Set(), realtime: null };
+        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], valoraciones: [], preguntasValoracion: [], descuentosValoracion: [], clientesValoracion: [], selectedClienteValoracion: null, selected: new Set(), realtime: null };
         const $ = (id) => document.getElementById(id);
         const pointSeed = (txt) => {
             let h = 0;
@@ -633,6 +657,7 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || 'No se pudieron cargar valoraciones');
                 state.valoraciones = Array.isArray(data.valoraciones) ? data.valoraciones : [];
+                state.descuentosValoracion = Array.isArray(data.descuentos_asignados) ? data.descuentos_asignados : [];
                 state.preguntasValoracion = Array.isArray(data.preguntas) ? data.preguntas : [];
                 const cfg = data.config || {};
                 $('val-total').textContent = Number(data.metrics?.total || 0);
@@ -641,7 +666,11 @@
                 $('val-desc-tipo').value = String(cfg.descuento_tipo || 'porcentaje');
                 $('val-desc-valor').value = String(Number(cfg.descuento_valor || 0));
                 $('val-desc-dias').value = String(Number(cfg.dias_vigencia || 30));
+                $('val-desc-alcance').value = String(cfg.descuento_alcance || 'ambos');
+                $('val-desc-usos-total').value = String(Number(cfg.usos_max_total || 1));
+                $('val-desc-usos-cliente').value = String(Number(cfg.usos_max_por_cliente || 1));
                 renderValoraciones();
+                renderDescuentosValoracion();
                 $('val-status').textContent = '';
             } catch (err) {
                 $('valoraciones-list').innerHTML = `<div class="muted">${escapeHtml(err.message || 'Error valoraciones')}</div>`;
@@ -680,6 +709,49 @@
             }).join('');
         }
 
+        function labelAlcanceValoracion(raw) {
+            const val = String(raw || 'tienda').trim().toLowerCase();
+            if (val === 'ambos') return 'Tienda + agenda tortas';
+            if (val === 'agenda_torta') return 'Solo agendar tortas';
+            return 'Solo tienda';
+        }
+
+        function renderDescuentosValoracion() {
+            const box = $('valoracion-descuentos-list');
+            if (!box) return;
+            const items = state.descuentosValoracion || [];
+            if (!items.length) {
+                box.innerHTML = '<div class="muted">Sin descuentos asignados.</div>';
+                return;
+            }
+            box.innerHTML = items.map((d) => {
+                const activo = Number(d.activo || 0) === 1 && Number(d.cupon_activo || 0) === 1;
+                const usado = Number(d.usado || 0) === 1;
+                const tipo = String(d.tipo_descuento || 'porcentaje').toLowerCase();
+                const beneficio = tipo === 'monto_fijo' ? money(d.valor_descuento || 0) : `${Number(d.valor_descuento || 0)}%`;
+                const usos = `${Number(d.usos_realizados || 0)}/${Number(d.usos_max || d.usos_max_por_cliente || 1)}`;
+                return `<div class="rating-card">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                        <div>
+                            <strong>${escapeHtml(d.cliente_nombre || 'Cliente')}</strong>
+                            <div class="muted" style="font-size:12px;">${escapeHtml(d.cliente_email || '')} · ${escapeHtml(d.cliente_telefono || '')}</div>
+                            <div class="muted" style="font-size:12px;">Asignado: ${escapeHtml(d.fecha_asignado || '-')} · Vence: ${escapeHtml(d.fecha_vencimiento || '-')}</div>
+                        </div>
+                        <span class="badge ${activo && !usado ? 'green' : 'gray'}">${activo && !usado ? 'Disponible' : (usado ? 'Usado' : 'Inactivo')}</span>
+                    </div>
+                    <div class="answer-grid">
+                        <div class="answer-pill"><strong>Codigo</strong>${escapeHtml(d.codigo || '-')}</div>
+                        <div class="answer-pill"><strong>Beneficio</strong>${escapeHtml(beneficio)}</div>
+                        <div class="answer-pill"><strong>Alcance</strong>${escapeHtml(labelAlcanceValoracion(d.alcance))}</div>
+                        <div class="answer-pill"><strong>Usos</strong>${escapeHtml(usos)}</div>
+                    </div>
+                    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+                        <button class="btn btn-red" data-val-del-desc="${Number(d.regalo_id || 0)}" ${activo && !usado ? '' : 'disabled'}>Eliminar descuento</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
         async function guardarConfigValoracion() {
             $('val-status').textContent = 'Guardando configuracion...';
             try {
@@ -691,6 +763,9 @@
                         descuento_tipo: $('val-desc-tipo').value,
                         descuento_valor: Number($('val-desc-valor').value || 0),
                         dias_vigencia: Number($('val-desc-dias').value || 30),
+                        descuento_alcance: $('val-desc-alcance').value,
+                        usos_max_total: Number($('val-desc-usos-total').value || 1),
+                        usos_max_por_cliente: Number($('val-desc-usos-cliente').value || 1),
                     }),
                 });
                 const data = await res.json();
@@ -713,6 +788,87 @@
                 await loadValoraciones();
             } catch (err) {
                 $('val-status').textContent = err.message || 'Error al asignar descuento.';
+            }
+        }
+
+        function renderClientesValoracion() {
+            const box = $('val-cliente-resultados');
+            if (!box) return;
+            const items = state.clientesValoracion || [];
+            if (!items.length) {
+                box.innerHTML = '<div class="muted">Busca un cliente para seleccionarlo.</div>';
+                state.selectedClienteValoracion = null;
+                if ($('btn-val-asignar-cliente')) $('btn-val-asignar-cliente').disabled = true;
+                return;
+            }
+            box.innerHTML = items.map((c) => {
+                const selected = Number(state.selectedClienteValoracion || 0) === Number(c.id || 0);
+                return `<button type="button" class="check-row ${selected ? 'active' : ''}" data-val-cliente-id="${Number(c.id || 0)}" style="text-align:left;text-transform:none;letter-spacing:0;color:var(--ink);">
+                    <span><strong>${escapeHtml(c.nombre || 'Cliente')}</strong><br><span class="muted">${escapeHtml(c.email || '-')} · ${escapeHtml(c.telefono || '-')}</span></span>
+                    <span class="badge ${selected ? 'green' : 'gray'}">${selected ? 'Seleccionado' : 'Elegir'}</span>
+                </button>`;
+            }).join('');
+        }
+
+        async function buscarClientesValoracion() {
+            const q = String($('val-cliente-q')?.value || '').trim();
+            if (q.length < 3) {
+                $('val-status').textContent = 'Ingresa al menos 3 caracteres para buscar cliente.';
+                return;
+            }
+            $('val-status').textContent = 'Buscando cliente...';
+            try {
+                const res = await fetch(`/api/adm-pagina/valoraciones/clientes?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo buscar cliente');
+                state.clientesValoracion = Array.isArray(data.clientes) ? data.clientes : [];
+                state.selectedClienteValoracion = state.clientesValoracion.length === 1 ? Number(state.clientesValoracion[0].id || 0) : null;
+                renderClientesValoracion();
+                if ($('btn-val-asignar-cliente')) $('btn-val-asignar-cliente').disabled = !state.selectedClienteValoracion;
+                $('val-status').textContent = state.clientesValoracion.length ? 'Cliente encontrado. Puedes asignar el descuento.' : 'No se encontraron clientes con ese dato.';
+            } catch (err) {
+                $('val-status').textContent = err.message || 'Error buscando cliente.';
+            }
+        }
+
+        async function asignarDescuentoClienteValoracion() {
+            const clienteId = Number(state.selectedClienteValoracion || 0);
+            if (!clienteId) {
+                $('val-status').textContent = 'Selecciona un cliente primero.';
+                return;
+            }
+            if (!confirm('Asignar el descuento configurado a este cliente?')) return;
+            $('val-status').textContent = 'Asignando descuento al cliente...';
+            try {
+                const res = await fetch('/api/adm-pagina/valoraciones/descuento-cliente', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ cliente_id: clienteId }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo asignar descuento');
+                $('val-status').textContent = `Descuento asignado. Cupon: ${data.codigo || '-'}`;
+                state.clientesValoracion = [];
+                state.selectedClienteValoracion = null;
+                if ($('val-cliente-q')) $('val-cliente-q').value = '';
+                renderClientesValoracion();
+                await loadValoraciones();
+            } catch (err) {
+                $('val-status').textContent = err.message || 'Error asignando descuento.';
+            }
+        }
+
+        async function eliminarDescuentoValoracion(id) {
+            if (!confirm('Eliminar/desactivar este descuento de agradecimiento?')) return;
+            $('val-status').textContent = 'Eliminando descuento...';
+            try {
+                const res = await fetch(`/api/adm-pagina/valoraciones/descuento/${Number(id)}/eliminar`, { method: 'POST', headers: { Accept: 'application/json' } });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo eliminar descuento');
+                $('val-status').textContent = 'Descuento eliminado.';
+                await loadValoraciones();
+            } catch (err) {
+                $('val-status').textContent = err.message || 'Error eliminando descuento.';
             }
         }
 
@@ -742,9 +898,28 @@
             loadValoraciones();
         });
         $('btn-val-config').addEventListener('click', guardarConfigValoracion);
+        $('btn-val-buscar-cliente').addEventListener('click', buscarClientesValoracion);
+        $('btn-val-asignar-cliente').addEventListener('click', asignarDescuentoClienteValoracion);
+        $('val-cliente-q').addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                buscarClientesValoracion();
+            }
+        });
+        $('val-cliente-resultados').addEventListener('click', (ev) => {
+            const btn = ev.target?.closest?.('[data-val-cliente-id]');
+            if (!btn) return;
+            state.selectedClienteValoracion = Number(btn.dataset.valClienteId || 0);
+            if ($('btn-val-asignar-cliente')) $('btn-val-asignar-cliente').disabled = !state.selectedClienteValoracion;
+            renderClientesValoracion();
+        });
         $('valoraciones-list').addEventListener('click', (ev) => {
             const id = ev.target?.dataset?.valDesc;
             if (id) asignarDescuentoValoracion(id);
+        });
+        $('valoracion-descuentos-list').addEventListener('click', (ev) => {
+            const id = ev.target?.dataset?.valDelDesc;
+            if (id) eliminarDescuentoValoracion(id);
         });
         $('rt-search').addEventListener('input', () => {
             if (!state.realtime) return;
