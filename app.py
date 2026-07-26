@@ -15,6 +15,7 @@ import shutil
 import hashlib
 import hmac
 import ipaddress
+import secrets
 import subprocess
 import threading
 import sqlite3
@@ -7810,6 +7811,17 @@ def _valoracion_resumen_descuento(cfg):
     return f"{beneficio} ({_cupon_alcance_label(cfg.get('descuento_alcance'))})"
 
 
+def _generar_codigo_gracias_unico_cursor(cursor):
+    alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789#$"
+    for _ in range(80):
+        largo = secrets.choice((3, 4, 5))
+        codigo = _normalizar_cupon_codigo("GRACIAS" + "".join(secrets.choice(alfabeto) for _ in range(largo)))
+        cursor.execute("SELECT 1 FROM tienda_cupones WHERE codigo = ? LIMIT 1", (codigo,))
+        if not cursor.fetchone():
+            return codigo
+    raise ValueError("No se pudo generar un codigo de cupon unico. Intenta nuevamente.")
+
+
 def _valoracion_preguntas_default():
     return [
         {
@@ -7918,9 +7930,7 @@ def _asignar_descuento_valoracion_cursor(cursor, valoracion_id):
     if not cli_row:
         raise ValueError("Cliente no encontrado para asignar descuento.")
     cli = dict(cli_row)
-    codigo_base = f"GRACIAS{cliente_id}{int(valoracion_id)}"
-    codigo = _normalizar_cupon_codigo(codigo_base)
-    suffix = 0
+    codigo = _generar_codigo_gracias_unico_cursor(cursor)
     while True:
         try:
             cursor.execute(
@@ -7943,10 +7953,7 @@ def _asignar_descuento_valoracion_cursor(cursor, valoracion_id):
             )
             break
         except sqlite3.IntegrityError:
-            suffix += 1
-            codigo = _normalizar_cupon_codigo(f"{codigo_base}{suffix}")
-            if suffix > 20:
-                raise
+            codigo = _generar_codigo_gracias_unico_cursor(cursor)
     cupon_id = int(cursor.lastrowid or 0)
     venc = (datetime.now(ZoneInfo("America/Santiago")).date() + timedelta(days=int(cfg.get("dias_vigencia") or 30))).isoformat()
     cliente_ref = _normalizar_cliente_ref(cli.get("email"), cli.get("telefono"))
@@ -7988,9 +7995,7 @@ def _crear_descuento_valoracion_para_cliente_cursor(cursor, cliente_id, cfg=None
     if not cliente_ref:
         raise ValueError("El cliente no tiene correo o telefono valido.")
     alcance = _normalizar_cupon_alcance(cfg.get("descuento_alcance") or "ambos")
-    codigo_base = f"GRACIAS{int(cliente_id)}{int(time.time())}"
-    codigo = _normalizar_cupon_codigo(codigo_base)
-    suffix = 0
+    codigo = _generar_codigo_gracias_unico_cursor(cursor)
     while True:
         try:
             cursor.execute(
@@ -8014,10 +8019,7 @@ def _crear_descuento_valoracion_para_cliente_cursor(cursor, cliente_id, cfg=None
             )
             break
         except sqlite3.IntegrityError:
-            suffix += 1
-            codigo = _normalizar_cupon_codigo(f"{codigo_base}{suffix}")
-            if suffix > 20:
-                raise
+            codigo = _generar_codigo_gracias_unico_cursor(cursor)
     cupon_id = int(cursor.lastrowid or 0)
     venc = (datetime.now(ZoneInfo("America/Santiago")).date() + timedelta(days=int(cfg.get("dias_vigencia") or 30))).isoformat()
     cursor.execute(
@@ -8224,7 +8226,9 @@ def api_adm_pagina_valoraciones_get():
         where_sql = ("WHERE " + " AND ".join(where)) if where else ""
         cursor.execute(
             f"""
-            SELECT v.*, c.codigo AS cupon_codigo, cc.usado AS cupon_usado, cc.fecha_vencimiento AS cupon_vencimiento
+            SELECT v.*, c.codigo AS cupon_codigo, c.activo AS cupon_activo,
+                   cc.activo AS cupon_regalo_activo, cc.usado AS cupon_usado,
+                   cc.fecha_vencimiento AS cupon_vencimiento
             FROM tienda_valoraciones v
             LEFT JOIN tienda_cliente_cupones cc ON cc.id = v.descuento_asignado_id
             LEFT JOIN tienda_cupones c ON c.id = cc.cupon_id

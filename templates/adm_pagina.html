@@ -366,7 +366,7 @@
 
     <script>
         const money = (v) => '$' + Math.round(Number(v || 0)).toLocaleString('es-CL');
-        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], valoraciones: [], preguntasValoracion: [], descuentosValoracion: [], clientesValoracion: [], selectedClienteValoracion: null, selected: new Set(), realtime: null };
+        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], valoraciones: [], preguntasValoracion: [], descuentosValoracion: [], clientesValoracion: [], selectedClienteValoracion: null, valoracionConfig: {}, selected: new Set(), realtime: null };
         const $ = (id) => document.getElementById(id);
         const pointSeed = (txt) => {
             let h = 0;
@@ -666,6 +666,7 @@
                 state.descuentosValoracion = Array.isArray(data.descuentos_asignados) ? data.descuentos_asignados : [];
                 state.preguntasValoracion = Array.isArray(data.preguntas) ? data.preguntas : [];
                 const cfg = data.config || {};
+                state.valoracionConfig = cfg;
                 $('val-total').textContent = Number(data.metrics?.total || 0);
                 $('val-promedio').textContent = Number(data.metrics?.promedio || 0).toFixed(1);
                 $('val-desc-activo').value = String(Number(cfg.descuento_activo ?? 1));
@@ -696,8 +697,10 @@
                 `).join('');
                 const codigo = String(v.cupon_codigo || '').trim();
                 const usado = Number(v.cupon_usado || 0) === 1;
+                const descuentoActivo = Number(state.valoracionConfig?.descuento_activo ?? 1) === 1;
+                const cuponDisponible = descuentoActivo && Number(v.cupon_activo ?? 1) === 1 && Number(v.cupon_regalo_activo ?? 1) === 1 && !usado;
                 const btn = codigo
-                    ? `<span class="badge ${usado ? 'gray' : 'green'}">Cupon ${escapeHtml(codigo)}${usado ? ' usado' : ''}</span>`
+                    ? `<span class="badge ${cuponDisponible ? 'green' : 'gray'}">Cupon ${escapeHtml(codigo)}${cuponDisponible ? '' : (usado ? ' usado' : ' inactivo')}</span>`
                     : `<button class="btn btn-green" data-val-desc="${Number(v.id)}">Asignar descuento</button>`;
                 return `<div class="rating-card">
                     <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
@@ -731,7 +734,8 @@
                 return;
             }
             box.innerHTML = items.map((d) => {
-                const activo = Number(d.activo || 0) === 1 && Number(d.cupon_activo || 0) === 1;
+                const descuentoActivo = Number(state.valoracionConfig?.descuento_activo ?? 1) === 1;
+                const activo = descuentoActivo && Number(d.activo || 0) === 1 && Number(d.cupon_activo || 0) === 1;
                 const usado = Number(d.usado || 0) === 1;
                 const tipo = String(d.tipo_descuento || 'porcentaje').toLowerCase();
                 const beneficio = tipo === 'monto_fijo' ? money(d.valor_descuento || 0) : `${Number(d.valor_descuento || 0)}%`;
