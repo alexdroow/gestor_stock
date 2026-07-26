@@ -4612,6 +4612,7 @@
         let clienteRegistrado = null;
         let historialComprasCliente = [];
         let cuponesClienteDisponibles = [];
+        let cuponesClienteLoadedAt = Date.now();
         let carritoVacioTexto = "El carrito esta vacio.";
         const FLOW_CHECKOUT_DRAFT_KEY = "tienda_flow_checkout_draft_v1";
         const FLOW_RETURN_TRACK_KEY = "tienda_flow_return_track_v1";
@@ -9517,10 +9518,23 @@
             aplicarCupon();
         }
 
-        function renderCuponesCliente(cupones) {
+        function tiempoRestanteCuponCliente(c) {
+            const base = Number(c?.segundos_restantes);
+            if (!Number.isFinite(base)) return "";
+            const restante = Math.max(0, base - Math.floor((Date.now() - Number(cuponesClienteLoadedAt || Date.now())) / 1000));
+            const dias = Math.floor(restante / 86400);
+            const horas = Math.floor((restante % 86400) / 3600);
+            const mins = Math.floor((restante % 3600) / 60);
+            if (dias > 0) return `${dias}d ${horas}h`;
+            if (horas > 0) return `${horas}h ${mins}m`;
+            return `${mins}m`;
+        }
+
+        function renderCuponesCliente(cupones, resetClock = true) {
             if (!cuentaCuponesEl) return;
             const items = Array.isArray(cupones) ? cupones : [];
             cuponesClienteDisponibles = items;
+            if (resetClock) cuponesClienteLoadedAt = Date.now();
             if (!items.length) {
                 cuentaCuponesEl.innerHTML = `<div style="color:#64748b;font-size:.88rem;">No tienes cupones asignados.</div>`;
                 return;
@@ -9534,6 +9548,7 @@
                 const alcance = String(c.alcance || "tienda").trim().toLowerCase();
                 const alcanceLabel = alcance === "ambos" ? "Tienda + agendar tortas" : (alcance === "agenda_torta" ? "Solo agendar tortas" : "Solo tienda");
                 const usableEnTienda = alcance !== "agenda_torta";
+                const restante = tiempoRestanteCuponCliente(c);
                 return `
                     <div style="border:1px solid #e5e7eb;border-radius:9px;padding:8px;display:grid;gap:4px;">
                         <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
@@ -9543,6 +9558,7 @@
                         <div style="font-size:.82rem;color:#334155;">${esc(String(c.nombre || "Cupon de beneficio"))}</div>
                         <div style="font-size:.78rem;color:#0f766e;font-weight:800;">${esc(alcanceLabel)}</div>
                         ${vence ? `<div style="font-size:.78rem;color:#64748b;">Vence: ${esc(vence)}</div>` : ""}
+                        ${restante ? `<div style="font-size:.78rem;color:#b45309;font-weight:900;">Tiempo para usarlo: ${esc(restante)}</div>` : ""}
                         <div style="display:flex;justify-content:flex-end;">
                             ${usableEnTienda ? `<button class="btn-primary" type="button" onclick="aplicarCuponRegalado('${esc(code)}')">Usar cupon</button>` : `<button class="btn-muted" type="button" disabled>Usar al agendar torta</button>`}
                         </div>
@@ -12083,6 +12099,9 @@
         cargarProductos();
         _trackTienda("view");
         setInterval(() => _trackTienda("heartbeat"), 5000);
+        setInterval(() => {
+            if (cuponesClienteDisponibles.length) renderCuponesCliente(cuponesClienteDisponibles, false);
+        }, 60000);
         window.addEventListener("pagehide", _trackTiendaLeave);
         window.addEventListener("beforeunload", _trackTiendaLeave);
     </script>

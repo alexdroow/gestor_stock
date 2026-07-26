@@ -5368,7 +5368,67 @@ def _listar_cupones_regalados_cliente_cursor(cursor, cliente_id, solo_disponible
         params.extend([hoy, hoy, hoy])
     sql += " ORDER BY datetime(cc.fecha_asignado) DESC, cc.id DESC"
     cursor.execute(sql, tuple(params))
-    return [dict(r) for r in cursor.fetchall()]
+    return [_estado_cupon_cliente(dict(r)) for r in cursor.fetchall()]
+
+
+def _estado_cupon_cliente(row, ahora=None):
+    ahora = ahora or datetime.now(ZoneInfo("America/Santiago"))
+    hoy = ahora.date().isoformat()
+    venc = str(row.get("fecha_vencimiento") or row.get("fecha_fin") or "").strip()
+    usado = int(row.get("usado") or 0) == 1
+    activo = int(row.get("activo") or 0) == 1 and int(row.get("cupon_activo") or 0) == 1
+    usos_realizados = int(row.get("usos_realizados") or 0)
+    usos_max = max(1, int(row.get("usos_max") or 1))
+    vencido = bool(venc and venc < hoy)
+    disponible = activo and not usado and not vencido and usos_realizados < usos_max
+    if usado or usos_realizados >= usos_max:
+        estado = "usado"
+    elif vencido:
+        estado = "vencido"
+    elif not activo:
+        estado = "inactivo"
+    else:
+        estado = "activo"
+    segundos_restantes = None
+    if venc and disponible:
+        try:
+            vence_dt = datetime.fromisoformat(venc[:10]).replace(hour=23, minute=59, second=59, tzinfo=ZoneInfo("America/Santiago"))
+            segundos_restantes = max(0, int((vence_dt - ahora).total_seconds()))
+        except Exception:
+            segundos_restantes = None
+    out = dict(row)
+    out["estado"] = estado
+    out["disponible"] = 1 if disponible else 0
+    out["segundos_restantes"] = segundos_restantes
+    return out
+
+
+def _listar_cupones_cliente_por_email_cursor(cursor, email, limit=30):
+    email_norm = _normalizar_email(email)
+    if not email_norm:
+        return []
+    _ensure_column_cursor(cursor, "tienda_cupones", "alcance", "TEXT DEFAULT 'tienda'")
+    _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_realizados", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column_cursor(cursor, "tienda_cliente_cupones", "usos_max", "INTEGER NOT NULL DEFAULT 1")
+    cursor.execute(
+        """
+        SELECT cc.id, cc.cliente_id, cc.cupon_id, cc.activo, cc.usado, cc.usado_venta_id,
+               COALESCE(cc.usos_realizados, 0) AS usos_realizados,
+               COALESCE(cc.usos_max, 1) AS usos_max,
+               cc.nota, cc.asignado_por, cc.fecha_asignado, cc.fecha_vencimiento, cc.fecha_usado,
+               c.codigo, c.nombre, c.tipo_descuento, c.valor_descuento, c.activo AS cupon_activo,
+               c.fecha_inicio, c.fecha_fin, COALESCE(c.alcance, 'tienda') AS alcance,
+               tc.nombre AS cliente_nombre, tc.email AS cliente_email, tc.telefono AS cliente_telefono
+        FROM tienda_cliente_cupones cc
+        JOIN tienda_cupones c ON c.id = cc.cupon_id
+        JOIN tienda_clientes tc ON tc.id = cc.cliente_id
+        WHERE LOWER(TRIM(COALESCE(tc.email, ''))) = LOWER(TRIM(?))
+        ORDER BY datetime(cc.fecha_asignado) DESC, cc.id DESC
+        LIMIT ?
+        """,
+        (email_norm, int(limit or 30)),
+    )
+    return [_estado_cupon_cliente(dict(r)) for r in cursor.fetchall()]
 
 
 def _marcar_cupon_regalado_usado_cursor(cursor, cupon_id, cliente_ref, venta_id=None):
@@ -8245,6 +8305,7 @@ def api_adm_pagina_valoraciones_get():
                 item["respuestas"] = json.loads(str(item.get("preguntas_json") or "{}"))
             except Exception:
                 item["respuestas"] = {}
+            item["cupones_historial"] = _listar_cupones_cliente_por_email_cursor(cursor, item.get("cliente_email"), limit=20)
             valoraciones.append(item)
         descuentos_asignados = _listar_descuentos_valoracion_cursor(cursor)
         cursor.execute("SELECT COUNT(*) AS total, AVG(estrellas) AS promedio FROM tienda_valoraciones")

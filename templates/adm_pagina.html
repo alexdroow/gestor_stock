@@ -366,7 +366,7 @@
 
     <script>
         const money = (v) => '$' + Math.round(Number(v || 0)).toLocaleString('es-CL');
-        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], valoraciones: [], preguntasValoracion: [], descuentosValoracion: [], clientesValoracion: [], selectedClienteValoracion: null, valoracionConfig: {}, selected: new Set(), realtime: null };
+        const state = { tab: 'realtime', tipo: 'productos', productos: [], campanas: [], valoraciones: [], valoracionesLoadedAt: Date.now(), preguntasValoracion: [], descuentosValoracion: [], clientesValoracion: [], selectedClienteValoracion: null, valoracionConfig: {}, selected: new Set(), realtime: null };
         const $ = (id) => document.getElementById(id);
         const pointSeed = (txt) => {
             let h = 0;
@@ -663,6 +663,7 @@
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || 'No se pudieron cargar valoraciones');
                 state.valoraciones = Array.isArray(data.valoraciones) ? data.valoraciones : [];
+                state.valoracionesLoadedAt = Date.now();
                 state.descuentosValoracion = Array.isArray(data.descuentos_asignados) ? data.descuentos_asignados : [];
                 state.preguntasValoracion = Array.isArray(data.preguntas) ? data.preguntas : [];
                 const cfg = data.config || {};
@@ -712,6 +713,7 @@
                         <div class="stars-view">${ratingStars(v.estrellas)}</div>
                     </div>
                     <div class="answer-grid">${answers || '<div class="muted">Sin respuestas.</div>'}</div>
+                    ${renderHistorialCuponesValoracion(v)}
                     ${String(v.comentario || '').trim() ? `<div style="border-left:4px solid #f59e0b;padding:8px 10px;background:#fff7ed;border-radius:10px;color:#334155;">${escapeHtml(v.comentario)}</div>` : ''}
                     <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">${btn}</div>
                 </div>`;
@@ -723,6 +725,49 @@
             if (val === 'ambos') return 'Tienda + agenda tortas';
             if (val === 'agenda_torta') return 'Solo agendar tortas';
             return 'Solo tienda';
+        }
+
+        function tiempoCuponValoracion(c) {
+            const base = Number(c?.segundos_restantes);
+            if (!Number.isFinite(base)) return 'Sin fecha limite';
+            const restante = Math.max(0, base - Math.floor((Date.now() - Number(state.valoracionesLoadedAt || Date.now())) / 1000));
+            const dias = Math.floor(restante / 86400);
+            const horas = Math.floor((restante % 86400) / 3600);
+            const mins = Math.floor((restante % 3600) / 60);
+            if (dias > 0) return `${dias}d ${horas}h`;
+            if (horas > 0) return `${horas}h ${mins}m`;
+            return `${mins}m`;
+        }
+
+        function labelTipoCuponValoracion(c) {
+            const tipo = String(c?.tipo_descuento || 'porcentaje').toLowerCase();
+            const valor = Number(c?.valor_descuento || 0);
+            return tipo === 'monto_fijo' ? money(valor) : `${valor}%`;
+        }
+
+        function renderHistorialCuponesValoracion(v) {
+            const cupones = Array.isArray(v.cupones_historial) ? v.cupones_historial : [];
+            if (!cupones.length) {
+                return '<div class="answer-pill"><strong>Historial de cupones</strong>Sin cupones registrados para este correo.</div>';
+            }
+            const rows = cupones.map((c) => {
+                const estado = String(c.estado || '').toLowerCase();
+                const descuentoActivo = Number(state.valoracionConfig?.descuento_activo ?? 1) === 1;
+                const disponible = descuentoActivo && Number(c.disponible || 0) === 1;
+                const badge = disponible ? 'green' : 'gray';
+                const estadoLabel = disponible ? 'Activo' : (!descuentoActivo ? 'Inactivo' : (estado || 'Inactivo'));
+                const vence = String(c.fecha_vencimiento || c.fecha_fin || '-').trim() || '-';
+                return `<div class="answer-pill" style="display:grid;gap:4px;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                        <strong>${escapeHtml(c.codigo || 'CUPON')}</strong>
+                        <span class="badge ${badge}">${escapeHtml(estadoLabel)}</span>
+                    </div>
+                    <div>Tipo: ${escapeHtml(labelTipoCuponValoracion(c))} · ${escapeHtml(labelAlcanceValoracion(c.alcance))}</div>
+                    <div>Caduca: ${escapeHtml(vence)} · Queda: ${escapeHtml(disponible ? tiempoCuponValoracion(c) : '-')}</div>
+                    <div>Usos: ${Number(c.usos_realizados || 0)}/${Number(c.usos_max || 1)}</div>
+                </div>`;
+            }).join('');
+            return `<div style="display:grid;gap:8px;"><strong style="font-size:12px;color:#475569;text-transform:uppercase;">Historial de cupones del correo</strong>${rows}</div>`;
         }
 
         function renderDescuentosValoracion() {
@@ -945,6 +990,7 @@
         loadRealtime();
         setInterval(loadRealtime, 1000);
         setInterval(() => { if (state.tab === 'descuentos') renderCampanas(); }, 1000);
+        setInterval(() => { if (state.tab === 'valoraciones' && state.valoraciones.length) renderValoraciones(); }, 60000);
     </script>
 </body>
 </html>
