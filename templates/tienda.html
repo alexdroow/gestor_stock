@@ -6568,6 +6568,51 @@
             }
         }
 
+        function _cuponAgendaTortaDisponible() {
+            const items = Array.isArray(cuponesClienteDisponibles) ? cuponesClienteDisponibles : [];
+            return items.find((c) => {
+                const alcance = String(c?.alcance || "tienda").trim().toLowerCase();
+                const disponible = Number(c?.disponible ?? 1) === 1;
+                const usado = Number(c?.usado || 0) === 1;
+                return disponible && !usado && (alcance === "agenda_torta" || alcance === "ambos");
+            }) || null;
+        }
+
+        function _descuentoAgendaCuponMonto(cupon, subtotal) {
+            const monto = Math.max(0, Number(subtotal || 0));
+            if (!cupon || monto <= 0) return 0;
+            const tipo = String(cupon.tipo_descuento || "porcentaje").trim().toLowerCase();
+            const valor = Math.max(0, Number(cupon.valor_descuento || 0));
+            if (tipo === "monto_fijo") return Math.min(monto, valor);
+            return Math.min(monto, monto * (Math.min(100, valor) / 100));
+        }
+
+        function _precioAgendaCuponHtml(precioBase) {
+            const precio = Math.max(0, Number(precioBase || 0));
+            if (!_isCakePricesVisible()) return "";
+            const cupon = _cuponAgendaTortaDisponible();
+            if (!cupon) return esc(money.format(precio));
+            const descuento = _descuentoAgendaCuponMonto(cupon, precio);
+            if (descuento <= 0) return esc(money.format(precio));
+            const final = Math.max(0, precio - descuento);
+            return `<span style="display:inline-flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:center;">
+                <del style="color:#94a3b8;font-weight:800;">${esc(money.format(precio))}</del>
+                <strong style="color:#16a34a;">${esc(money.format(final))}</strong>
+            </span>`;
+        }
+
+        function _agendaCuponTortaAvisoHtml() {
+            const cupon = _cuponAgendaTortaDisponible();
+            if (!cupon) return "";
+            const tipo = String(cupon.tipo_descuento || "porcentaje").trim().toLowerCase();
+            const valor = Number(cupon.valor_descuento || 0);
+            const beneficio = tipo === "monto_fijo" ? money.format(valor) : `${Math.round(valor)}%`;
+            const codigo = String(cupon.codigo || "").trim();
+            return `<div style="border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:12px;padding:9px 10px;font-size:.82rem;font-weight:800;margin:8px 0;">
+                Tienes un cupon para agendar tortas${codigo ? `: ${esc(codigo)}` : ""}. Los precios ya muestran el descuento de ${esc(beneficio)} y se usara automaticamente al reservar.
+            </div>`;
+        }
+
         function _resetAgendaShippingQuote() {
             agendaShippingQuote = null;
             _renderAgendaShippingQuote();
@@ -7613,13 +7658,18 @@
                     if (!sizesRender.length) {
                         agendaCakeSizeCardsEl.innerHTML = `<div style="display:block;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">Sin tamanos configurados.</div>`;
                     } else {
+                        const cuponAvisoHtml = _agendaCuponTortaAvisoHtml();
+                        if (cuponAvisoHtml) {
+                            const aviso = document.createElement("div");
+                            aviso.innerHTML = cuponAvisoHtml;
+                            agendaCakeSizeCardsEl.appendChild(aviso.firstElementChild);
+                        }
                         sizesRender.forEach((s) => {
                             const sid = String(s.id || "");
-                            const label = `${String(s.nombre || "")}${_isCakePricesVisible() ? ` - ${money.format(Number(s.precio || 0))}` : ""}`;
                             const btn = document.createElement("button");
                             btn.type = "button";
                             btn.className = `agenda-cake-card ${sid === String(agendaCakeSelection.size_id || "") ? "active" : ""}`;
-                            btn.textContent = label;
+                            btn.innerHTML = `${esc(String(s.nombre || ""))}${_isCakePricesVisible() ? ` - ${_precioAgendaCuponHtml(Number(s.precio || 0))}` : ""}`;
                             btn.addEventListener("click", () => agendaCakeSelectSize(sid));
                             agendaCakeSizeCardsEl.appendChild(btn);
                         });
@@ -9730,6 +9780,7 @@
                 renderHistorialCliente([]);
                 renderHistorialAgendaCliente([]);
                 renderCuponesCliente([]);
+                _renderAgendaCakeBuilder();
                 return;
             }
             try {
@@ -9761,6 +9812,7 @@
                 renderHistorialAgendaCliente(Array.isArray(data.agenda_reservas) ? data.agenda_reservas : []);
                 const cupones = Array.isArray(data.cupones_disponibles) ? data.cupones_disponibles : [];
                 renderCuponesCliente(cupones);
+                _renderAgendaCakeBuilder();
                 if (cupones.length > 0) {
                     msg(`Tienes ${cupones.length} cupon(es) disponibles en Mi cuenta.`, false);
                     mostrarAvisoCuponValoracion(cupones);
@@ -9771,6 +9823,7 @@
                 renderHistorialCliente([]);
                 renderHistorialAgendaCliente([]);
                 renderCuponesCliente([]);
+                _renderAgendaCakeBuilder();
                 msg(e.message || "No se pudo cargar historial", true);
             }
         }
