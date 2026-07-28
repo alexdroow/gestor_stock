@@ -4818,6 +4818,410 @@
             color: var(--beta-green-dark) !important;
             box-shadow: inset 0 0 0 1px rgba(22,133,74,.24);
         }
+        .beta-app-hero,
+        .beta-benefits-row,
+        .beta-catalog-title,
+        .beta-conditions-card {
+            display: none;
+        }
+        body.mobile-ui.tienda-preview-draft .tienda-hero {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 260px;
+            overflow: hidden;
+            position: relative;
+            border-radius: 28px;
+            background:
+                radial-gradient(circle at 88% 18%, rgba(255,255,255,.95) 0 16%, transparent 17%),
+                linear-gradient(135deg, #fff3ea 0%, #fff8ef 50%, #f6fbf1 100%);
+            box-shadow: 0 24px 52px rgba(15,23,42,.11);
+            isolation: isolate;
+            animation: betaHeroIn .36s ease-out both;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(255,255,255,.86) 0 40%, transparent 72%);
+            pointer-events: none;
+            z-index: -1;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero__copy {
+            display: grid;
+            align-content: center;
+            gap: 12px;
+            padding: 24px 0 24px 22px;
+            z-index: 2;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero__copy h1 {
+            margin: 0;
+            max-width: 190px;
+            color: #101828;
+            font-size: clamp(2rem, 9vw, 2.58rem);
+            line-height: 1.04;
+            letter-spacing: -.055em;
+            font-weight: 900;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero__copy h1::first-letter {
+            letter-spacing: -.08em;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero__copy p {
+            margin: 0;
+            max-width: 165px;
+            color: #475467;
+            font-size: .9rem;
+            line-height: 1.45;
+            font-weight: 650;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero__stroke {
+            width: 54px;
+            height: 14px;
+            display: block;
+            border-bottom: 3px solid var(--beta-green);
+            border-radius: 50%;
+            transform: rotate(-8deg);
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero__media {
+            position: absolute;
+            right: -34px;
+            top: 0;
+            bottom: 0;
+            width: 64%;
+            z-index: 1;
+        }
+        body.mobile-ui.tienda-preview-draft .beta-app-hero__media img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            object-position: center;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-section {
+            display: flex !important;
+            flex-direction: column;
+            gap: 16px !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #agenda-section-title {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-benefits-row {
+            order: 1;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            padding: 10px;
+            margin-top: -36px;
+            border-radius: 22px;
+            background: rgba(255,255,255,.95);
+            border: 1px solid rgba(226,232,240,.72);
+            box-shadow: 0 18px 38px rgba(15,23,42,.10);
+            z-index: 2;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-benefit-card {
+            display: grid;
+            justify-items: center;
+            align-content: center;
+            gap: 7px;
+            min-height: 72px;
+            padding: 7px 4px;
+            border-radius: 18px;
+            background: linear-gradient(145deg, #f0fdf4, #fff);
+            text-align: center;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-benefit-card:nth-child(2) {
+            background: linear-gradient(145deg, #fff1f2, #fff);
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-benefit-card span {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: var(--beta-green-dark);
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-benefit-card:nth-child(2) span {
+            background: #ffe4e6;
+            color: #be123c;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-benefit-card strong {
+            max-width: 78px;
+            color: #344054;
+            font-size: .66rem;
+            line-height: 1.22;
+            font-weight: 850;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-beta-head {
+            order: 2;
+            display: grid !important;
+            gap: 9px;
+            padding: 16px !important;
+            border-radius: 24px !important;
+            background: #fff !important;
+            border: 1px solid rgba(226,232,240,.72) !important;
+            box-shadow: 0 16px 34px rgba(15,23,42,.07) !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-beta-question {
+            color: var(--beta-ink) !important;
+            font-size: .98rem !important;
+            line-height: 1.25 !important;
+            font-weight: 900 !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-beta-progress {
+            height: 8px !important;
+            border-radius: 999px !important;
+            background: #e9edf2 !important;
+            overflow: hidden;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-mobile-steps {
+            order: 3;
+            margin-top: -8px;
+            padding: 0 8px 4px !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-type-bar {
+            order: 4;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-cake-wrap,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-pastel-wrap {
+            order: 5;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-catalog-title {
+            display: block;
+            margin: 2px 0 2px;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-catalog-title h3 {
+            margin: 0;
+            color: var(--beta-ink);
+            font-size: 1.16rem;
+            line-height: 1.1;
+            letter-spacing: -.025em;
+            font-weight: 900;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-catalog-title p {
+            margin: 5px 0 0;
+            color: #667085;
+            font-size: .82rem;
+            line-height: 1.35;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-days {
+            order: 6;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-hours {
+            order: 7;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #agenda-reserva-form {
+            order: 8;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-beta-nav {
+            order: 9;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-conditions-card {
+            order: 20;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 22px;
+            background: #f4fbf6;
+            border: 1px solid #d9f0df;
+            color: #14532d;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-conditions-card div {
+            display: grid;
+            gap: 2px;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-conditions-card strong {
+            font-size: .92rem;
+            font-weight: 900;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .beta-conditions-card span {
+            color: #44705a;
+            font-size: .76rem;
+            line-height: 1.25;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-subtitle-toggle {
+            order: 21;
+            justify-self: stretch;
+            width: 100%;
+            justify-content: center;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-subtitle {
+            order: 22;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card {
+            display: grid !important;
+            grid-template-rows: auto 1fr !important;
+            min-height: 100%;
+            border-radius: 24px !important;
+            background: #fff !important;
+            overflow: hidden;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__media {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            overflow: hidden;
+            background: #f8fafc;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__media > img {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+            object-fit: cover;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__badge {
+            position: absolute !important;
+            left: 10px !important;
+            top: 10px !important;
+            z-index: 3;
+            border-radius: 999px !important;
+            padding: 5px 9px !important;
+            background: #dff5e7 !important;
+            color: var(--beta-green-dark) !important;
+            font-size: .68rem !important;
+            line-height: 1 !important;
+            font-weight: 900 !important;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__favorite {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 3;
+            width: 34px !important;
+            height: 34px !important;
+            min-height: 34px !important;
+            padding: 0 !important;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(255,255,255,.72) !important;
+            border-radius: 999px !important;
+            background: rgba(255,255,255,.24) !important;
+            color: #fff !important;
+            font-size: 1.35rem !important;
+            line-height: 1 !important;
+            box-shadow: 0 10px 20px rgba(15,23,42,.18) !important;
+            backdrop-filter: blur(8px);
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__body {
+            display: grid !important;
+            grid-template-rows: auto auto auto auto 1fr auto;
+            align-content: start;
+            gap: 8px !important;
+            padding: 12px !important;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__title {
+            margin: 0 !important;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            color: var(--beta-ink) !important;
+            font-size: .98rem !important;
+            line-height: 1.18 !important;
+            font-weight: 900 !important;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__description {
+            margin: 0 !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            color: #667085 !important;
+            font-size: .78rem !important;
+            line-height: 1.42 !important;
+        }
+        body.mobile-ui.tienda-preview-draft .cake-card__action {
+            align-self: end;
+            width: 100%;
+            min-height: 40px !important;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 9px 12px !important;
+            border: 0 !important;
+            border-radius: 999px !important;
+            background: #edf8f1 !important;
+            color: var(--beta-green-dark) !important;
+            font-size: .8rem !important;
+            font-weight: 900 !important;
+            box-shadow: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-card {
+            border: 1px solid rgba(226,232,240,.72) !important;
+            box-shadow: 0 18px 34px rgba(15,23,42,.08) !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-card > img {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-bullets {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-cake-catalog-actions {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active {
+            align-items: flex-end !important;
+            justify-content: center !important;
+            background: rgba(15,23,42,.54) !important;
+            backdrop-filter: blur(5px);
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .modal {
+            width: 100% !important;
+            max-width: 520px !important;
+            height: min(94vh, 860px) !important;
+            max-height: min(94vh, 860px) !important;
+            margin: 0 !important;
+            border-radius: 30px 30px 0 0 !important;
+            overflow: hidden !important;
+            display: grid !important;
+            grid-template-rows: auto auto auto 1fr auto;
+            transform: translateY(0);
+            animation: betaSheetIn .24s ease-out both;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .modal::before {
+            content: "";
+            justify-self: center;
+            width: 46px;
+            height: 5px;
+            margin: 7px 0 2px;
+            border-radius: 999px;
+            background: #d1d5db;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .agenda-cake-step-head,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .agenda-cake-step-progress,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .agenda-cake-step-label {
+            position: static !important;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .agenda-cake-builder,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .agenda-cake-flow-pane.active {
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 12px !important;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .modal-actions {
+            position: sticky !important;
+            bottom: 0 !important;
+            z-index: 10;
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+            border-top: 1px solid rgba(226,232,240,.82);
+        }
+        @keyframes betaSheetIn {
+            from { opacity: .92; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         @media (max-width: 359px) {
             body.mobile-ui.tienda-preview-draft .layout {
                 padding-left: 12px !important;
@@ -4911,6 +5315,43 @@
             border-radius: 14px !important;
             font-size: .76rem !important;
         }
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-builder.active,
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-cart.active {
+            align-items: flex-end !important;
+            justify-content: center !important;
+            background: rgba(15,23,42,.54) !important;
+        }
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-builder.active .modal,
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-cart.active .modal {
+            width: 100% !important;
+            max-width: 520px !important;
+            height: min(94vh, 860px) !important;
+            max-height: min(94vh, 860px) !important;
+            margin: 0 !important;
+            padding: 0 16px calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+            border-radius: 30px 30px 0 0 !important;
+            overflow: hidden !important;
+            display: grid !important;
+            grid-template-rows: auto auto auto 1fr auto !important;
+            background: #fff !important;
+        }
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-builder.active .agenda-cake-builder,
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            min-height: 0 !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-builder.active .modal-actions,
+        body.mobile-ui.tienda-preview-draft #modal-agenda-cake-cart.active .modal-actions {
+            margin-left: -16px !important;
+            margin-right: -16px !important;
+            position: sticky !important;
+            bottom: 0 !important;
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            align-items: center;
+        }
         @media (max-width: 359px) {
             body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .layout {
                 padding-left: 12px !important;
@@ -4998,6 +5439,16 @@
         <section class="content">
             <div class="tienda-estado-banner" id="tienda-estado-banner">Cargando estado de tienda...</div>
             <div class="tienda-custom-banner" id="tienda-custom-banner" style="display:none;"></div>
+            <section class="beta-app-hero" id="beta-app-hero" aria-label="Portada agenda">
+                <div class="beta-app-hero__copy">
+                    <h1>Agenda tu torta favorita</h1>
+                    <p>Elige tu torta, selecciona la fecha y nosotros nos encargamos del resto.</p>
+                    <span class="beta-app-hero__stroke" aria-hidden="true"></span>
+                </div>
+                <div class="beta-app-hero__media">
+                    <img id="beta-app-hero-img" src="" alt="Torta Sucree">
+                </div>
+            </section>
             <div class="tienda-hero" id="tienda-hero" style="display:none;">
                 <div class="tienda-hero-copy">
                     <div class="tienda-hero-badge" id="tienda-hero-badge"></div>
@@ -5038,7 +5489,7 @@
                 </div>
                 <h2 id="agenda-section-title">Agenda tu pedido</h2>
                 <div class="agenda-subtitle" id="agenda-section-subtitle">Selecciona dia y hora disponible para reservar tu pedido.</div>
-                <button type="button" class="agenda-subtitle-toggle" id="agenda-subtitle-toggle">Ver detalles</button>
+                <button type="button" class="agenda-subtitle-toggle" id="agenda-subtitle-toggle">Ver condiciones</button>
                 <div class="agenda-beta-head" id="agenda-beta-head">
                     <div class="agenda-beta-progress"><span id="agenda-beta-progress-fill"></span></div>
                     <div class="agenda-beta-question" id="agenda-beta-question">Paso 1: Elige el tipo de pedido</div>
@@ -5054,12 +5505,27 @@
                     <button type="button" class="agenda-mobile-step-btn" data-step="3">3. Fecha y hora</button>
                     <button type="button" class="agenda-mobile-step-btn" data-step="4">4. Datos</button>
                 </div>
+                <div class="beta-benefits-row" aria-label="Beneficios">
+                    <div class="beta-benefit-card"><span aria-hidden="true">i</span><strong>Ingredientes de calidad</strong></div>
+                    <div class="beta-benefit-card"><span aria-hidden="true">h</span><strong>Hechas con amor</strong></div>
+                    <div class="beta-benefit-card"><span aria-hidden="true">e</span><strong>Entrega puntual</strong></div>
+                </div>
                 <div class="agenda-cake-wrap" id="agenda-cake-wrap" style="display:none;">
+                    <div class="beta-catalog-title">
+                        <h3>Explora nuestras tortas</h3>
+                        <p>Selecciona una opcion para ver tamanos, sabores y personalizacion.</p>
+                    </div>
                     <div class="agenda-cake-catalog-grid" id="agenda-cake-grid"></div>
                     <div class="agenda-cake-catalog-actions">
                         <button type="button" class="btn-primary" id="agenda-cake-open-cart">Ver resumen de cotizacion</button>
                     </div>
                     <div class="agenda-cake-empty" id="agenda-cake-debug" style="display:none;"></div>
+                </div>
+                <div class="beta-conditions-card">
+                    <div>
+                        <strong>Informacion importante</strong>
+                        <span>Lee las condiciones antes de agendar.</span>
+                    </div>
                 </div>
                 <div class="agenda-pastel-wrap" id="agenda-pastel-wrap" style="display:none;">
                     <div class="agenda-pastel-head">
@@ -5646,6 +6112,7 @@
         const tiendaHeroCtaEl = document.getElementById("tienda-hero-cta");
         const tiendaHeroMediaEl = document.getElementById("tienda-hero-media");
         const tiendaHeroImageEl = document.getElementById("tienda-hero-image");
+        const betaAppHeroImgEl = document.getElementById("beta-app-hero-img");
         const waFabEl = document.getElementById("wa-fab");
         const waFabIconEl = document.getElementById("wa-fab-icon");
         const tiendaCustomCssEl = document.getElementById("tienda-custom-css");
@@ -6431,6 +6898,7 @@
                 const img = String(tiendaUiCfg.hero_image_url || "").trim();
                 tiendaHeroMediaEl.style.display = img ? "" : "none";
                 if (img) tiendaHeroImageEl.src = img;
+                if (betaAppHeroImgEl) betaAppHeroImgEl.src = img || "/static/watermark_logo_full_backup.png";
             }
 
             const root = document.documentElement;
@@ -7557,25 +8025,30 @@
             const floatImg = String(tiendaUiCfg.offer_float_image_url || "").trim();
             const floatIcon = String(tiendaUiCfg.offer_float_icon || "").trim();
             return `
-                <article class="item-card ${esOferta ? "oferta" : ""} ${agotado ? "agotado" : ""} ${tiendaAdminMode ? "admin-editable" : ""}" data-product-id="${Number(p.id || 0)}" onclick="agregarDesdeTarjeta(event, ${p.id}, ${agotado ? "true" : "false"})" ${agotado ? "" : "title=\"Agregar al carrito\""}>
-                    ${Boolean(p.destacado_tienda) ? `<span class="fav-tag">#de tus favoritos</span>` : ""}
-                    ${badgeOn ? `<span class="offer-custom-badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
-                    ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
-                    <div class="item-photo">
+                <article class="item-card cake-card ${esOferta ? "oferta" : ""} ${agotado ? "agotado" : ""} ${tiendaAdminMode ? "admin-editable" : ""}" data-product-id="${Number(p.id || 0)}" onclick="agregarDesdeTarjeta(event, ${p.id}, ${agotado ? "true" : "false"})" ${agotado ? "" : "title=\"Agregar al carrito\""}>
+                    <div class="item-photo cake-card__media">
                         ${fotoHtml(p)}
+                        ${Boolean(p.destacado_tienda) ? `<span class="fav-tag cake-card__badge">#de tus favoritos</span>` : ""}
+                        ${badgeOn ? `<span class="offer-custom-badge cake-card__badge">${badgeIcon ? `<span class="ico">${esc(badgeIcon)}</span>` : ""}<span class="txt">${esc(badgeText)}</span></span>` : ""}
+                        <button class="cake-card__favorite" type="button" aria-label="Favorito" onclick="event.stopPropagation();">♡</button>
                         ${agotado ? `<span class="agotado-overlay">Agotado</span>` : ""}
                         <button class="photo-add" type="button" onclick="event.stopPropagation();agregar(${p.id})" ${agotado ? "disabled title=\"Producto agotado\"" : "title=\"Agregar al carrito\""}><span class="plus" aria-hidden="true">+</span></button>
+                        ${esOferta && floatImg ? `<span class="offer-float image"><img src="${esc(floatImg)}" alt="Oferta"></span>` : (esOferta && floatIcon ? `<span class="offer-float icon">${esc(floatIcon)}</span>` : "")}
                     </div>
-                    <div class="item-body">
-                        <div class="item-name">${esc(p.nombre)}</div>
+                    <div class="item-body cake-card__body">
+                        <h3 class="item-name cake-card__title">${esc(p.nombre)}</h3>
+                        <p class="item-desc cake-card__description">${esc(desc || "Sin descripcion")}</p>
                         <div class="price-row">
                             <span class="price-final">${money.format(finalPrice)}</span>
                             ${hasDiscount ? `<span class="price-old">${money.format(oldPrice)}</span>` : ""}
                             ${hasDiscount ? `<span class="discount-chip">-${Math.round(n(p.descuento_tienda_pct))}%</span>` : ""}
                             ${agotado ? `<span class="agotado-chip">${esc(agotadoText)}</span>` : ""}
                         </div>
-                        <div class="item-desc">${esc(desc || "Sin descripcion")}</div>
                         <div class="stock">Disponible: ${esc(stockTexto)}</div>
+                        <button class="cake-card__action" type="button" ${agotado ? "disabled" : ""}>
+                            <span>Agregar</span>
+                            <span aria-hidden="true">-&gt;</span>
+                        </button>
                     </div>
                 </article>
             `;
@@ -8199,7 +8672,7 @@
                 agendaSubtitleToggleEl.style.display = longText ? "inline-flex" : "none";
                 if (!longText) agendaSubtitleExpanded = false;
                 agendaSubtitleEl.classList.toggle("expanded", Boolean(agendaSubtitleExpanded));
-                agendaSubtitleToggleEl.textContent = agendaSubtitleExpanded ? "Ocultar detalles" : "Ver detalles";
+                agendaSubtitleToggleEl.textContent = agendaSubtitleExpanded ? "Ocultar condiciones" : "Ver condiciones";
             }
             const maxUnlocked = _agendaStepMaxUnlocked();
             // El avance principal se controla por acciones del usuario (pasos/taps),
@@ -8557,13 +9030,20 @@
                     "Sabores y extras",
                 ];
                 return `
-                    <article class="agenda-cake-cat-card ${active ? "active" : ""}" data-cake-card="${esc(cid)}">
-                        <img src="${esc(img || _cakePlaceholderByName(c.nombre))}" alt="${esc(String(c.nombre || cid))}" loading="lazy">
-                        <div class="agenda-cake-cat-body">
-                            ${badge ? `<span class="agenda-cake-cat-badge">${esc(badge)}</span>` : ""}
-                            <div class="agenda-cake-cat-name">${esc(String(c.nombre || cid))}</div>
-                            <div class="agenda-cake-cat-desc">${esc(desc)}</div>
+                    <article class="agenda-cake-cat-card cake-card ${active ? "active" : ""}" data-cake-card="${esc(cid)}">
+                        <div class="cake-card__media">
+                            <img src="${esc(img || _cakePlaceholderByName(c.nombre))}" alt="${esc(String(c.nombre || cid))}" loading="lazy">
+                            ${badge ? `<span class="agenda-cake-cat-badge cake-card__badge">${esc(badge)}</span>` : ""}
+                            <button class="cake-card__favorite" type="button" aria-label="Favorito" onclick="event.stopPropagation();">♡</button>
+                        </div>
+                        <div class="agenda-cake-cat-body cake-card__body">
+                            <h3 class="agenda-cake-cat-name cake-card__title">${esc(String(c.nombre || cid))}</h3>
+                            <p class="agenda-cake-cat-desc cake-card__description">${esc(desc)}</p>
                             <ul class="agenda-cake-cat-bullets">${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+                            <button class="cake-card__action" type="button">
+                                <span>Ver detalles</span>
+                                <span aria-hidden="true">-&gt;</span>
+                            </button>
                         </div>
                     </article>
                 `;
@@ -13252,10 +13732,12 @@
         });
         modalAgendaCakeBuilderEl?.addEventListener("click", (ev) => {
             if (!document.body.classList.contains("mobile-ui")) return;
+            if (document.body.classList.contains("tienda-preview-draft")) return;
             if (ev.target === modalAgendaCakeBuilderEl) _cerrarModalAgendaCakeBuilder();
         });
         modalAgendaCakeCartEl?.addEventListener("click", (ev) => {
             if (!document.body.classList.contains("mobile-ui")) return;
+            if (document.body.classList.contains("tienda-preview-draft")) return;
             if (ev.target === modalAgendaCakeCartEl) _cerrarModalAgendaCakeCart();
         });
         if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
@@ -13367,7 +13849,7 @@
         agendaSubtitleToggleEl?.addEventListener("click", () => {
             agendaSubtitleExpanded = !agendaSubtitleExpanded;
             if (agendaSubtitleEl) agendaSubtitleEl.classList.toggle("expanded", agendaSubtitleExpanded);
-            if (agendaSubtitleToggleEl) agendaSubtitleToggleEl.textContent = agendaSubtitleExpanded ? "Ocultar detalles" : "Ver detalles";
+            if (agendaSubtitleToggleEl) agendaSubtitleToggleEl.textContent = agendaSubtitleExpanded ? "Ocultar condiciones" : "Ver condiciones";
         });
         agendaPastelOpenCatalogEl?.addEventListener("click", agendaPastelAbrirCatalogo);
         agendaPastelModeCatalogEl?.addEventListener("click", () => {
