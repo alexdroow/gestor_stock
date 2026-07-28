@@ -4421,6 +4421,433 @@
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.agenda-cake-modal-open .agenda-beta-bottom-nav {
             display: none !important;
         }
+
+        /* ===== BETA movil completa: tienda + agenda estilo app ===== */
+        body.mobile-ui.tienda-preview-draft {
+            --beta-app-bg: #fbfaf7;
+            --beta-card: #ffffff;
+            --beta-green: #16854a;
+            --beta-green-dark: #0f6d3b;
+            --beta-green-soft: #eaf7ef;
+            --beta-ink: #111827;
+            --beta-muted: #667085;
+            --beta-border: #edf0f2;
+            background:
+                radial-gradient(circle at 20% 0%, rgba(22,133,74,.08), transparent 28%),
+                linear-gradient(180deg, #fff 0%, var(--beta-app-bg) 38%, #fff 100%) !important;
+            color: var(--beta-ink);
+            overflow-x: hidden !important;
+        }
+        body.mobile-ui.tienda-preview-draft .topbar {
+            left: 16px !important;
+            right: 16px !important;
+            top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+            width: auto !important;
+            min-height: 58px !important;
+            padding: 8px 14px !important;
+            border: 1px solid rgba(226,232,240,.62) !important;
+            border-radius: 0 0 22px 22px !important;
+            background: rgba(255,255,255,.94) !important;
+            box-shadow: 0 18px 42px rgba(15,23,42,.10) !important;
+            backdrop-filter: blur(18px);
+        }
+        body.mobile-ui.tienda-preview-draft .mobile-menu-btn {
+            width: 44px !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 14px !important;
+            background: transparent !important;
+            color: transparent !important;
+            box-shadow: none !important;
+            position: relative;
+        }
+        body.mobile-ui.tienda-preview-draft .mobile-menu-btn::before {
+            content: "";
+            width: 20px;
+            height: 14px;
+            display: block;
+            margin: auto;
+            background:
+                linear-gradient(var(--beta-ink), var(--beta-ink)) 0 0 / 20px 2px no-repeat,
+                linear-gradient(var(--beta-ink), var(--beta-ink)) 0 6px / 16px 2px no-repeat,
+                linear-gradient(var(--beta-ink), var(--beta-ink)) 0 12px / 20px 2px no-repeat;
+        }
+        body.mobile-ui.tienda-preview-draft .brand-with-logo {
+            position: absolute !important;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            min-width: 150px;
+            pointer-events: auto;
+        }
+        body.mobile-ui.tienda-preview-draft .brand-logo,
+        body.mobile-ui.tienda-preview-draft .brand-banner-wrap,
+        body.mobile-ui.tienda-preview-draft .brand-banner-mobile {
+            max-height: 44px !important;
+            height: 44px !important;
+            width: auto !important;
+            object-fit: contain !important;
+        }
+        body.mobile-ui.tienda-preview-draft .brand,
+        body.mobile-ui.tienda-preview-draft #brand-text {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft .search {
+            position: relative;
+            order: 5;
+            grid-column: 1 / -1;
+            width: 100%;
+            margin-top: 10px;
+        }
+        body.mobile-ui.tienda-preview-draft .search input {
+            min-height: 48px !important;
+            border-radius: 18px !important;
+            border: 0 !important;
+            background: #f3f4f6 !important;
+            box-shadow: inset 0 0 0 1px rgba(226,232,240,.7);
+            padding-left: 44px !important;
+            font-size: .92rem !important;
+        }
+        body.mobile-ui.tienda-preview-draft .search::before {
+            content: "";
+            position: absolute;
+            left: 16px;
+            top: calc(50% + 5px);
+            width: 16px;
+            height: 16px;
+            border: 2px solid #667085;
+            border-radius: 999px;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        body.mobile-ui.tienda-preview-draft .search::after {
+            content: "";
+            position: absolute;
+            left: 30px;
+            top: calc(50% + 15px);
+            width: 8px;
+            height: 2px;
+            background: #667085;
+            transform: rotate(45deg);
+            transform-origin: left center;
+            pointer-events: none;
+        }
+        body.mobile-ui.tienda-preview-draft .layout {
+            padding: calc(82px + env(safe-area-inset-top, 0px)) 16px calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        body.mobile-ui.tienda-preview-draft .content {
+            gap: 18px !important;
+        }
+        body.mobile-ui.tienda-preview-draft .tienda-hero {
+            min-height: 258px !important;
+            max-height: 310px !important;
+            border-radius: 28px !important;
+            overflow: hidden;
+            box-shadow: 0 22px 48px rgba(15,23,42,.12);
+            isolation: isolate;
+            animation: betaHeroIn .36s ease-out both;
+        }
+        body.mobile-ui.tienda-preview-draft .tienda-hero::after {
+            background:
+                linear-gradient(90deg, rgba(255,255,255,.94) 0%, rgba(255,255,255,.72) 42%, rgba(255,255,255,.12) 78%) !important;
+        }
+        body.mobile-ui.tienda-preview-draft .tienda-hero-copy {
+            padding: 24px 20px !important;
+            align-content: center;
+        }
+        body.mobile-ui.tienda-preview-draft .tienda-hero-title {
+            max-width: 68% !important;
+            font-size: clamp(1.85rem, 8.2vw, 2.35rem) !important;
+            line-height: 1.04 !important;
+            letter-spacing: -.045em;
+        }
+        body.mobile-ui.tienda-preview-draft .tienda-hero-subtitle {
+            max-width: 58% !important;
+            color: #334155 !important;
+            font-size: .95rem !important;
+        }
+        body.mobile-ui.tienda-preview-draft .tienda-hero-cta {
+            align-self: start;
+            min-height: 42px !important;
+            border-radius: 999px !important;
+            padding: 10px 16px !important;
+            background: var(--beta-green) !important;
+        }
+        body.mobile-ui.tienda-preview-draft .mobile-cat-strip {
+            display: flex !important;
+            gap: 10px !important;
+            padding: 2px 0 2px !important;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        body.mobile-ui.tienda-preview-draft .mobile-cat-strip::-webkit-scrollbar {
+            display: none;
+        }
+        body.mobile-ui.tienda-preview-draft .mobile-cat-chip {
+            flex: 0 0 auto;
+            min-height: 44px !important;
+            border-radius: 999px !important;
+            border: 1px solid var(--beta-border) !important;
+            background: #fff !important;
+            color: #344054 !important;
+            padding: 10px 15px !important;
+            box-shadow: 0 10px 22px rgba(15,23,42,.05);
+            transition: transform .18s ease, background .18s ease, color .18s ease, border .18s ease;
+        }
+        body.mobile-ui.tienda-preview-draft .mobile-cat-chip.active,
+        body.mobile-ui.tienda-preview-draft .mobile-cat-chip.agenda-entry {
+            background: var(--beta-green-soft) !important;
+            color: var(--beta-green-dark) !important;
+            border-color: #c7ead4 !important;
+        }
+        body.mobile-ui.tienda-preview-draft .section {
+            border: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+        }
+        body.mobile-ui.tienda-preview-draft .section > h2,
+        body.mobile-ui.tienda-preview-draft .ofertas-head h2 {
+            margin: 4px 0 12px !important;
+            color: var(--beta-ink);
+            font-size: 1.12rem !important;
+            letter-spacing: -.02em;
+        }
+        body.mobile-ui.tienda-preview-draft .grid,
+        body.mobile-ui.tienda-preview-draft #categorias-wrap .grid {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 16px !important;
+        }
+        body.mobile-ui.tienda-preview-draft .ofertas-track {
+            gap: 16px !important;
+            padding: 0 0 4px !important;
+        }
+        body.mobile-ui.tienda-preview-draft .ofertas-track .item-card {
+            flex-basis: min(210px, 56vw) !important;
+            width: min(210px, 56vw) !important;
+            min-width: min(210px, 56vw) !important;
+        }
+        body.mobile-ui.tienda-preview-draft .item-card {
+            border-radius: 22px !important;
+            border: 1px solid rgba(226,232,240,.72) !important;
+            background: #fff !important;
+            box-shadow: 0 18px 34px rgba(15,23,42,.08) !important;
+            overflow: hidden;
+            transform: translateZ(0);
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+        body.mobile-ui.tienda-preview-draft .item-card:active {
+            transform: scale(.985);
+        }
+        body.mobile-ui.tienda-preview-draft .item-photo {
+            aspect-ratio: 1 / 1 !important;
+            min-height: 0 !important;
+            background: #f8fafc;
+        }
+        body.mobile-ui.tienda-preview-draft .item-photo img {
+            object-fit: cover;
+        }
+        body.mobile-ui.tienda-preview-draft .photo-add {
+            width: 38px !important;
+            height: 38px !important;
+            right: 10px !important;
+            bottom: 10px !important;
+            border-radius: 999px !important;
+            background: rgba(255,255,255,.92) !important;
+            color: var(--beta-green-dark) !important;
+            border: 1px solid rgba(22,133,74,.22) !important;
+            box-shadow: 0 8px 18px rgba(15,23,42,.14);
+        }
+        body.mobile-ui.tienda-preview-draft .fav-tag,
+        body.mobile-ui.tienda-preview-draft .offer-custom-badge {
+            top: 10px !important;
+            left: 10px !important;
+            right: auto !important;
+            border-radius: 999px !important;
+            background: #dff5e7 !important;
+            color: var(--beta-green-dark) !important;
+            box-shadow: none !important;
+            font-size: .68rem !important;
+        }
+        body.mobile-ui.tienda-preview-draft .item-body {
+            padding: 12px 12px 14px !important;
+            gap: 8px !important;
+        }
+        body.mobile-ui.tienda-preview-draft .item-name {
+            min-height: 0 !important;
+            font-size: .96rem !important;
+            line-height: 1.2 !important;
+            font-weight: 850 !important;
+            color: var(--beta-ink);
+        }
+        body.mobile-ui.tienda-preview-draft .item-desc {
+            min-height: 0 !important;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            color: #667085 !important;
+            font-size: .78rem !important;
+            line-height: 1.42;
+        }
+        body.mobile-ui.tienda-preview-draft .price-row {
+            order: 3;
+            gap: 5px;
+        }
+        body.mobile-ui.tienda-preview-draft .price-final {
+            color: var(--beta-green-dark) !important;
+            font-size: .96rem !important;
+            font-weight: 900 !important;
+        }
+        body.mobile-ui.tienda-preview-draft .stock {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: fit-content;
+            max-width: 100%;
+            min-height: 26px;
+            border-radius: 999px;
+            padding: 4px 8px !important;
+            background: #f1f5f9;
+            color: #667085 !important;
+            font-size: .68rem !important;
+            font-weight: 800;
+        }
+        body.mobile-ui.tienda-preview-draft .cart-panel {
+            border-radius: 24px !important;
+            border: 1px solid rgba(226,232,240,.85) !important;
+            box-shadow: 0 22px 48px rgba(15,23,42,.12) !important;
+        }
+        body.mobile-ui.tienda-preview-draft .mobile-menu-fab,
+        body.mobile-ui.tienda-preview-draft .mobile-cart-fab,
+        body.mobile-ui.tienda-preview-draft .mobile-agenda-summary-fab,
+        body.mobile-ui.tienda-preview-draft .mobile-order-fab,
+        body.mobile-ui.tienda-preview-draft .wa-fab {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-beta-bottom-nav {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            z-index: 4500;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 4px;
+            min-height: 66px;
+            padding: 8px;
+            border: 1px solid rgba(226,232,240,.9);
+            border-radius: 26px;
+            background: rgba(255,255,255,.96);
+            box-shadow: 0 18px 45px rgba(15,23,42,.16);
+            backdrop-filter: blur(16px);
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-beta-bottom-nav button {
+            min-width: 0;
+            min-height: 50px;
+            border: 0;
+            border-radius: 18px;
+            background: transparent;
+            color: #667085;
+            display: grid;
+            place-items: center;
+            gap: 2px;
+            padding: 5px 3px;
+            font-size: .62rem;
+            font-weight: 800;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-beta-bottom-nav button:first-child {
+            background: #ecfdf5;
+            color: var(--beta-green-dark);
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-beta-bottom-nav span {
+            width: 23px;
+            height: 23px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            background: #f1f5f9;
+            color: inherit;
+            font-size: .68rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-beta-bottom-nav strong {
+            display: block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: .62rem;
+        }
+        body.mobile-ui.tienda-preview-draft.cart-open .agenda-beta-bottom-nav,
+        body.mobile-ui.tienda-preview-draft.agenda-cake-modal-open .agenda-beta-bottom-nav {
+            display: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-modal.active .modal {
+            border-radius: 30px 30px 0 0 !important;
+            box-shadow: 0 -18px 42px rgba(15,23,42,.18) !important;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-head,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-media,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-size-panel,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-topper-card {
+            border-color: rgba(226,232,240,.72) !important;
+            border-radius: 22px !important;
+            box-shadow: 0 14px 28px rgba(15,23,42,.06);
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-card,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-chip,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-pill {
+            border-radius: 999px !important;
+            min-height: 44px;
+        }
+        body.mobile-ui.tienda-preview-draft .agenda-cake-card.active,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-chip.active,
+        body.mobile-ui.tienda-preview-draft .agenda-cake-pill.active {
+            background: #ecfdf5 !important;
+            border-color: var(--beta-green) !important;
+            color: var(--beta-green-dark) !important;
+            box-shadow: inset 0 0 0 1px rgba(22,133,74,.24);
+        }
+        @media (max-width: 359px) {
+            body.mobile-ui.tienda-preview-draft .layout {
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+            }
+            body.mobile-ui.tienda-preview-draft .grid,
+            body.mobile-ui.tienda-preview-draft #categorias-wrap .grid {
+                grid-template-columns: 1fr !important;
+            }
+            body.mobile-ui.tienda-preview-draft .tienda-hero-title {
+                max-width: 78% !important;
+                font-size: 1.72rem !important;
+            }
+            body.mobile-ui.tienda-preview-draft .tienda-hero-subtitle {
+                max-width: 72% !important;
+            }
+            body.mobile-ui.tienda-preview-draft .agenda-beta-bottom-nav {
+                left: 8px;
+                right: 8px;
+                gap: 2px;
+                padding: 7px 6px;
+            }
+            body.mobile-ui.tienda-preview-draft .agenda-beta-bottom-nav strong {
+                font-size: .58rem;
+            }
+        }
+        @keyframes betaHeroIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active,
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active {
             background: #fff !important;
@@ -4768,9 +5195,9 @@
             <span aria-hidden="true">a</span>
             <strong>Agendar</strong>
         </button>
-        <button type="button" onclick="abrirPedidoActivoMobile()" aria-label="Ver mis pedidos">
+        <button type="button" onclick="abrirCarritoMobile()" aria-label="Ver carrito">
             <span aria-hidden="true">p</span>
-            <strong>Mis pedidos</strong>
+            <strong>Carrito</strong>
         </button>
         <button type="button" onclick="window.location.href='/tienda'" aria-label="Ir a inicio">
             <span aria-hidden="true">i</span>
