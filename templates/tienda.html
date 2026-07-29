@@ -8325,9 +8325,7 @@
             padding: 0 !important;
             scrollbar-width: thin !important;
         }
-        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host.agenda-flow-dates-compact {
-            max-height: clamp(138px, 24dvh, 190px) !important;
-        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host.agenda-flow-dates-compact,
         body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host.agenda-flow-hours-ready {
             max-height: none !important;
         }
@@ -8399,6 +8397,63 @@
             display: grid !important;
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 10px !important;
+        }
+        /* Override definitivo: paso 5 movil en dos mitades reales, sin superposiciones. */
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"],
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+            display: grid !important;
+            grid-template-rows: auto auto minmax(0, 1fr) auto minmax(0, 1fr) !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            gap: 8px !important;
+            padding: 2px 14px 12px !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-hours-host {
+            display: block !important;
+            min-height: 0 !important;
+            height: 100% !important;
+            max-height: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            overscroll-behavior: contain !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+            padding: 0 2px 4px 0 !important;
+            position: relative !important;
+            z-index: 0 !important;
+            contain: content !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-days-host .agenda-days,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host .agenda-hours,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host .agenda-days,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-hours-host .agenda-hours {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] .agenda-flow-subtitle {
+            position: relative !important;
+            z-index: 1 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fffef9 !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] .agenda-day-btn,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] .agenda-hour-btn {
+            min-height: 56px !important;
+            padding: 8px 10px !important;
+            border-radius: 16px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host.agenda-flow-dates-compact .agenda-day-btn {
+            min-height: 56px !important;
+            opacity: 1 !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host.agenda-flow-dates-compact .agenda-day-btn small {
+            display: block !important;
         }
         @media (max-height: 720px) {
             body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-product-card {
@@ -12198,7 +12253,10 @@
             };
             if (agendaCakeFlowLabelEl) agendaCakeFlowLabelEl.textContent = labels[agendaCakeFlowStep] || "Paso";
             if (agendaCakeFlowProgressFillEl) agendaCakeFlowProgressFillEl.style.width = `${Math.round(((agendaCakeFlowStep + 4) / 6) * 100)}%`;
-            if (agendaCakeFlowPrevEl) agendaCakeFlowPrevEl.disabled = agendaCakeFlowStep <= 1;
+            if (agendaCakeFlowPrevEl) {
+                const puedeVolverAlArmado = document.body.classList.contains("mobile-ui") && agendaCakeFlowStep <= 1;
+                agendaCakeFlowPrevEl.disabled = agendaCakeFlowStep <= 1 && !puedeVolverAlArmado;
+            }
             if (agendaCakeFlowNextEl) agendaCakeFlowNextEl.textContent = agendaCakeFlowStep >= 2 ? "Resumen listo" : "Siguiente";
             if (agendaDaysListEl) agendaDaysListEl.style.display = agendaCakeFlowStep === 1 ? "" : "none";
             if (agendaHoursListEl) agendaHoursListEl.style.display = agendaCakeFlowStep === 1 ? "" : "none";
@@ -17085,6 +17143,12 @@
         agendaCakeCloseCartEl?.addEventListener("click", _cerrarModalAgendaCakeCart);
         agendaCakeClearQuoteEl?.addEventListener("click", _agendaBorrarCotizacion);
         agendaCakeFlowPrevEl?.addEventListener("click", () => {
+            if (Number(agendaCakeFlowStep || 1) <= 1 && document.body.classList.contains("mobile-ui")) {
+                agendaCakeBuilderStep = 4;
+                _cerrarModalAgendaCakeCart();
+                _abrirModalAgendaCakeBuilder();
+                return;
+            }
             agendaCakeFlowStep = Math.max(1, Number(agendaCakeFlowStep || 1) - 1);
             _agendaCakeApplyFlowStep();
         });
