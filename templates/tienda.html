@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Tienda</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -11797,7 +11800,8 @@
         let agendaCakeBuilderStep = 1;
         let agendaCakeFlowStep = 1;
         let agendaCakeFlowFechaElegida = false;
-        const AGENDA_BETA_DRAFT_KEY = "agenda_beta_cake_draft_v1";
+        const AGENDA_BETA_DRAFT_KEY = "agenda_beta_cake_draft_v2";
+        try { localStorage.removeItem("agenda_beta_cake_draft_v1"); } catch (_e) {}
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
@@ -14484,7 +14488,7 @@
                             <h3 class="agenda-cake-cat-name cake-card__title">${esc(String(c.nombre || cid))}</h3>
                             <p class="agenda-cake-cat-desc cake-card__description">${esc(desc)}</p>
                             <ul class="agenda-cake-cat-bullets">${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
-                            <button class="cake-card__action" type="button">
+                            <button class="cake-card__action" type="button" data-cake-open="${esc(cid)}">
                                 <span>Ver detalles</span>
                                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
@@ -14492,9 +14496,11 @@
                     </article>
                 `;
             }).join("");
-            agendaCakeGridEl.querySelectorAll("[data-cake-card]").forEach((el) => {
-                el.addEventListener("click", () => {
-                    const cid = String(el.getAttribute("data-cake-card") || "");
+            agendaCakeGridEl.querySelectorAll("[data-cake-open]").forEach((btn) => {
+                btn.addEventListener("click", (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    const cid = String(btn.getAttribute("data-cake-open") || "");
                     agendaCakeSelectCategory(cid, { openModal: true });
                 });
             });
