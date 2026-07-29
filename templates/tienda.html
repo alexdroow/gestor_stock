@@ -8455,6 +8455,38 @@
         body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host.agenda-flow-dates-compact .agenda-day-btn small {
             display: block !important;
         }
+        /* Fix scroll real en horas: flex evita que Chrome movil deje crecer la grilla fuera del panel. */
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"],
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            touch-action: pan-y !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-days-host,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-hours-host {
+            flex: 1 1 0 !important;
+            min-height: 112px !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow-y: scroll !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior: contain !important;
+            touch-action: pan-y !important;
+            contain: none !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-hours-host {
+            flex-basis: 0 !important;
+            padding-bottom: 72px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] #agenda-cake-flow-hours-host .agenda-hours {
+            padding-bottom: 18px !important;
+        }
         @media (max-height: 720px) {
             body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-product-card {
                 grid-template-columns: 52px 1fr !important;
