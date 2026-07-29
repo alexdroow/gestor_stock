@@ -8291,17 +8291,16 @@
             font-size: .62rem !important;
             line-height: 1.05 !important;
         }
-        /* Correccion final paso 5 movil: fechas y horas son bloques separados con scroll interno. */
+        /* Paso 5 movil: fechas y horas conviven en la ventana fija con scroll independiente. */
         body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
-            display: flex !important;
-            flex-direction: column !important;
+            display: grid !important;
+            grid-template-rows: auto auto minmax(0, .86fr) auto minmax(0, 1.14fr) !important;
             min-height: 0 !important;
             height: 100% !important;
-            overflow-y: auto !important;
+            overflow-y: hidden !important;
             overflow-x: hidden !important;
             overscroll-behavior: contain !important;
-            -webkit-overflow-scrolling: touch !important;
-            touch-action: pan-y !important;
+            touch-action: none !important;
             gap: 10px !important;
             padding: 2px 14px 14px !important;
         }
@@ -8316,11 +8315,21 @@
         body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
         body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
             display: block !important;
-            flex: 0 0 auto !important;
             min-height: 0 !important;
             max-height: none !important;
-            overflow: visible !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            overscroll-behavior: contain !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
             padding: 0 !important;
+            scrollbar-width: thin !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host.agenda-flow-dates-compact {
+            max-height: clamp(138px, 24dvh, 190px) !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host.agenda-flow-hours-ready {
+            max-height: none !important;
         }
         body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host .agenda-days,
         body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host .agenda-hours {
@@ -8345,9 +8354,20 @@
             flex-direction: column !important;
             justify-content: center !important;
             align-items: flex-start !important;
-            min-height: 68px !important;
-            padding: 11px 12px !important;
+            min-height: 62px !important;
+            padding: 9px 12px !important;
             border-radius: 18px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host.agenda-flow-dates-compact .agenda-day-btn {
+            min-height: 48px !important;
+            padding: 7px 10px !important;
+            border-radius: 15px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host.agenda-flow-dates-compact .agenda-day-btn:not(.active) {
+            opacity: .82 !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host.agenda-flow-dates-compact .agenda-day-btn small {
+            display: none !important;
         }
         body.mobile-ui #modal-agenda-cake-cart.active .agenda-day-btn span,
         body.mobile-ui #modal-agenda-cake-cart.active .agenda-hour-btn span {
@@ -8363,14 +8383,15 @@
             white-space: normal !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
-            display: flex !important;
-            flex-direction: column !important;
-            overflow-y: auto !important;
+            display: grid !important;
+            grid-template-rows: auto auto minmax(0, .86fr) auto minmax(0, 1.14fr) !important;
+            overflow-y: hidden !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
             display: block !important;
-            overflow: visible !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
             max-height: none !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-days-host .agenda-days,
@@ -13246,6 +13267,12 @@
             const modalHorarioMovilActivo = document.body.classList.contains("mobile-ui")
                 && Boolean(modalAgendaCakeCartEl?.classList.contains("active"))
                 && Number(agendaCakeFlowStep || 1) === 1;
+            if (agendaCakeFlowDaysHostEl) {
+                agendaCakeFlowDaysHostEl.classList.toggle("agenda-flow-dates-compact", modalHorarioMovilActivo && Boolean(agendaCakeFlowFechaElegida));
+            }
+            if (agendaCakeFlowHoursHostEl) {
+                agendaCakeFlowHoursHostEl.classList.toggle("agenda-flow-hours-ready", modalHorarioMovilActivo && Boolean(agendaCakeFlowFechaElegida));
+            }
             const puedeAutoSeleccionarFecha = !modalHorarioMovilActivo || Boolean(agendaCakeFlowFechaElegida);
 
             if (puedeAutoSeleccionarFecha && (!agendaFechaActiva || !dias.some((d) => String(d.fecha || "") === agendaFechaActiva))) {
@@ -14020,7 +14047,6 @@
                     try {
                         if (agendaCakeFlowHoursHostEl) {
                             agendaCakeFlowHoursHostEl.scrollTop = 0;
-                            agendaCakeFlowHoursHostEl.scrollIntoView({ behavior: "smooth", block: "start" });
                         }
                     } catch (_) {}
                 }, 40);
