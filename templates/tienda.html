@@ -7206,8 +7206,8 @@
             height: 100% !important;
             min-height: 0 !important;
             display: grid !important;
-            grid-template-rows: auto auto auto minmax(0, 1fr) auto !important;
-            gap: 7px !important;
+            grid-template-rows: auto minmax(0, 1fr) auto !important;
+            gap: 10px !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-intro {
             padding: 0 !important;
@@ -7221,6 +7221,10 @@
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-intro p {
             font-size: .76rem !important;
             line-height: 1.18 !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-product-card,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-benefits {
+            display: none !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-product-card {
             grid-template-columns: 64px 1fr !important;
@@ -7281,19 +7285,19 @@
             min-height: 0 !important;
             display: grid !important;
             grid-template-columns: 1fr !important;
-            grid-auto-rows: minmax(62px, auto) !important;
-            gap: clamp(6px, 1.55dvh, 10px) !important;
+            grid-auto-rows: minmax(86px, auto) !important;
+            gap: clamp(9px, 1.65dvh, 13px) !important;
             padding-bottom: 4px !important;
             overflow: visible !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option {
             min-height: 0 !important;
             height: auto !important;
-            grid-template-columns: 22px 34px 1fr 26px !important;
-            gap: 8px !important;
-            padding: clamp(8px, 1.8dvh, 12px) 11px !important;
-            border-radius: 16px !important;
-            box-shadow: 0 6px 18px rgba(18,32,23,.05) !important;
+            grid-template-columns: 24px 54px 1fr 26px !important;
+            gap: 12px !important;
+            padding: clamp(11px, 2dvh, 15px) 14px !important;
+            border-radius: 18px !important;
+            box-shadow: 0 8px 22px rgba(18,32,23,.055) !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__radio {
             width: 19px !important;
@@ -7301,23 +7305,44 @@
             border-width: 2px !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__icon svg {
-            width: 34px !important;
-            height: 34px !important;
+            width: 48px !important;
+            height: 48px !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__body {
-            gap: 1px !important;
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) auto !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__copy {
+            min-width: 0 !important;
+            display: grid !important;
+            gap: 2px !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__body strong {
-            font-size: clamp(.78rem, 3.35vw, .92rem) !important;
-            line-height: 1.08 !important;
+            font-size: clamp(.93rem, 4.05vw, 1.08rem) !important;
+            line-height: 1.12 !important;
+            letter-spacing: -.025em !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__body em {
-            font-size: .66rem !important;
-            line-height: 1.08 !important;
+            font-size: .75rem !important;
+            line-height: 1.12 !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__body b {
-            font-size: clamp(.84rem, 3.6vw, .98rem) !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            min-width: max-content !important;
+            font-size: clamp(.96rem, 4.25vw, 1.12rem) !important;
             line-height: 1.08 !important;
+            text-align: right !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__body b > span {
+            justify-content: flex-end !important;
+            gap: 5px !important;
+            text-align: right !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__body b del {
+            font-size: .82em !important;
         }
         body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-option__check {
             width: 23px !important;
@@ -7395,7 +7420,7 @@
                 display: none !important;
             }
             body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .agenda-cake-step-pane[data-step="1"].active {
-                grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+                grid-template-rows: auto minmax(0, 1fr) auto !important;
             }
             body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-coupon-bottom .agenda-cake-coupon-alert {
                 padding: 6px 8px !important;
@@ -11705,8 +11730,10 @@
                                 <span class="cake-size-option__radio" aria-hidden="true"></span>
                                 <span class="cake-size-option__icon" aria-hidden="true">${_agendaCakeSizeIconSvg()}</span>
                                 <span class="cake-size-option__body">
-                                    <strong>${esc(String(s.nombre || "Tamano"))}</strong>
-                                    ${porciones ? `<em>${esc(porciones)}</em>` : ""}
+                                    <span class="cake-size-option__copy">
+                                        <strong>${esc(String(s.nombre || "Tamano"))}</strong>
+                                        ${porciones ? `<em>${esc(porciones)}</em>` : ""}
+                                    </span>
                                     ${_isCakePricesVisible() ? `<b>${_precioAgendaCuponHtml(Number(s.precio || 0))}</b>` : ""}
                                 </span>
                                 <span class="cake-size-option__check" aria-hidden="true">
