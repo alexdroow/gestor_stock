@@ -3976,6 +3976,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         abono = float(reserva.get("abono") or 0)
     except (TypeError, ValueError):
         abono = 0.0
+    abono = max(0.0, abono)
+    saldo_final = max(0.0, total_final - abono)
 
     sabores = [str(x.get("nombre") or "").strip() for x in ((catalog_data or {}).get("sabores") or []) if str(x.get("nombre") or "").strip()]
     extras = [f"{x.get('nombre')} x{int(x.get('qty') or 0)}" for x in ((catalog_data or {}).get("extras") or []) if str(x.get("nombre") or "").strip()]
@@ -4189,24 +4191,24 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         ("Productos", _fmt_money(subtotal_productos)),
         ("Despacho", _fmt_money(despacho_total)),
         ("Descuento", f"-{_fmt_money(descuento_total)}" if descuento_total else "$0"),
-        ("Abono", _fmt_money(abono)),
+        ("Abono", f"-{_fmt_money(abono)}" if abono else "$0"),
     ]
-    yy = 344
+    yy = 346
     for label, value in pay_rows:
         c.setFillColorRGB(*text_dark)
         c.setFont("Helvetica-Bold", 8.2)
         c.drawString(374, yy, label)
         c.setFont("Helvetica", 9.2)
         c.drawRightString(535, yy, value)
-        yy -= 20
+        yy -= 18
     c.setStrokeColorRGB(*border)
-    c.line(374, 288, 535, 288)
+    c.line(374, 278, 535, 278)
     c.setFillColorRGB(*brown)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(455, 275, "TOTAL FINAL")
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(455, 266, "TOTAL FINAL")
     c.setFillColorRGB(*orange)
-    c.setFont("Helvetica-Bold", 21)
-    c.drawCentredString(455, 252, _fmt_money(total_final))
+    c.setFont("Helvetica-Bold", 19)
+    c.drawCentredString(455, 247, _fmt_money(saldo_final))
 
     # Observaciones
     _draw_round(42, 204, 511, 34, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
