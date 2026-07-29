@@ -1105,6 +1105,57 @@
         #modal-evento .modal-body {
             padding: 20px 24px 16px;
         }
+
+        .seguimiento-admin-card {
+            border: 1px solid #bbf7d0;
+            background: linear-gradient(135deg, #f0fdf4, #ffffff);
+            border-radius: 14px;
+            padding: 14px;
+            margin: 12px 0 16px;
+        }
+
+        .seguimiento-admin-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .seguimiento-admin-title {
+            font-weight: 800;
+            color: #14532d;
+            font-size: 14px;
+        }
+
+        .seguimiento-admin-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #166534;
+            font-weight: 800;
+            font-size: 12px;
+            text-decoration: none;
+        }
+
+        .seguimiento-admin-grid {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .seguimiento-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #166534;
+            font-size: 12px;
+            font-weight: 800;
+        }
         
         .modal-header {
             padding: 20px 24px;
@@ -2189,6 +2240,30 @@
                 <div class="form-group">
                     <label>Codigo de pedido</label>
                     <input type="text" id="evento-codigo-pedido" readonly placeholder="Se genera automaticamente al guardar">
+                </div>
+
+                <div class="seguimiento-admin-card" id="seguimiento-admin-card" style="display:none;">
+                    <div class="seguimiento-admin-head">
+                        <div>
+                            <div class="seguimiento-admin-title">Seguimiento visible para cliente (QR)</div>
+                            <div class="form-hint" id="seguimiento-admin-updated">Se actualiza cuando guardas el estado.</div>
+                        </div>
+                        <a href="#" target="_blank" rel="noopener noreferrer" class="seguimiento-admin-link" id="seguimiento-admin-link">Abrir seguimiento</a>
+                    </div>
+                    <div class="seguimiento-admin-grid">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Estado del pedido</label>
+                            <select id="evento-seguimiento-estado">
+                                <option value="pendiente">Pendiente</option>
+                                <option value="recepcionado">Recepcionado</option>
+                                <option value="produccion">En produccion</option>
+                                <option value="espera_envio">A la espera de envio/retiro</option>
+                                <option value="despachado">Despachado</option>
+                                <option value="entregado">Entregado</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-success" onclick="guardarSeguimientoPedido()">Actualizar QR</button>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -5235,8 +5310,17 @@
             const direccion = evento.es_envio ? (String(evento.direccion || '-')) : 'Retiro en tienda';
             const countdown = obtenerTextoCuentaRegresiva(evento);
             const saboresHtml = (resumenTorta.sabores || []).map((s) => `<li>${escapeHtml(String(s || '-'))}</li>`).join('');
+            const seguimientoEstado = normalizarEstadoSeguimientoAgenda(evento.seguimiento_estado);
+            const seguimientoLabel = SEGUIMIENTO_ESTADOS_LABELS[seguimientoEstado] || 'Pendiente';
+            const codigoPedido = String(evento.codigo_pedido || '').trim();
+            const trackingLink = seguimientoUrlPedido(codigoPedido);
             return `
                 <div class="resumen-pedido-grid">
+                    <div class="resumen-pedido-card">
+                        <div class="resumen-pedido-label">Estado QR cliente</div>
+                        <div class="resumen-pedido-value">${escapeHtml(seguimientoLabel)}</div>
+                        ${trackingLink ? `<a class="seguimiento-admin-link" href="${escapeHtml(trackingLink)}" target="_blank" rel="noopener noreferrer">Abrir vista cliente</a>` : ''}
+                    </div>
                     <div class="resumen-pedido-card">
                         <div class="resumen-pedido-label">Fecha</div>
                         <div class="resumen-pedido-value">${escapeHtml(fechaLarga)}</div>
@@ -5595,6 +5679,7 @@
             document.getElementById('grupo-direccion').style.display = 'none';
             document.getElementById('evento-tipo').disabled = false;
             mostrarBloqueTortaManual(false);
+            actualizarSeguimientoAdmin(null);
             const mapaWrap = document.getElementById('mapa-preview');
             if (mapaWrap) mapaWrap.style.display = 'none';
             limpiarMapaEstado();
@@ -5664,6 +5749,89 @@
                 : 'Generar PDF final del pedido';
         }
 
+        const SEGUIMIENTO_ESTADOS_LABELS = {
+            pendiente: 'Pendiente',
+            recepcionado: 'Recepcionado',
+            produccion: 'En produccion',
+            espera_envio: 'A la espera de envio/retiro',
+            despachado: 'Despachado',
+            entregado: 'Entregado'
+        };
+
+        function normalizarEstadoSeguimientoAgenda(estado) {
+            const raw = String(estado || 'pendiente').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            const aliases = {
+                recibido: 'recepcionado',
+                confirmado: 'recepcionado',
+                en_produccion: 'produccion',
+                preparando: 'produccion',
+                listo_retiro: 'espera_envio',
+                enviado: 'despachado',
+                completado: 'entregado'
+            };
+            const val = aliases[raw] || raw;
+            return Object.prototype.hasOwnProperty.call(SEGUIMIENTO_ESTADOS_LABELS, val) ? val : 'pendiente';
+        }
+
+        function seguimientoUrlPedido(codigo) {
+            const cod = String(codigo || '').trim();
+            if (!cod) return '';
+            return `${window.location.origin}/seguimiento/${encodeURIComponent(cod)}`;
+        }
+
+        function actualizarSeguimientoAdmin(evento) {
+            const card = document.getElementById('seguimiento-admin-card');
+            const select = document.getElementById('evento-seguimiento-estado');
+            const link = document.getElementById('seguimiento-admin-link');
+            const updated = document.getElementById('seguimiento-admin-updated');
+            if (!card || !select || !link || !updated) return;
+            const tipo = String((evento && evento.tipo) || (document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
+            const codigo = String((evento && evento.codigo_pedido) || document.getElementById('evento-codigo-pedido')?.value || '').trim();
+            const tienePedido = tipo !== 'bloqueo' && Boolean(codigo);
+            card.style.display = tienePedido ? 'block' : 'none';
+            if (!tienePedido) return;
+            const estado = normalizarEstadoSeguimientoAgenda(evento && evento.seguimiento_estado);
+            select.value = estado;
+            const url = seguimientoUrlPedido(codigo);
+            link.href = url;
+            link.textContent = 'Abrir seguimiento QR';
+            const fecha = String((evento && evento.seguimiento_actualizado) || '').trim();
+            updated.innerHTML = `<span class="seguimiento-pill">${escapeHtml(SEGUIMIENTO_ESTADOS_LABELS[estado] || 'Pendiente')}</span>${fecha ? ` <span class="form-hint">Actualizado: ${escapeHtml(fecha)}</span>` : ''}`;
+        }
+
+        async function guardarSeguimientoPedido() {
+            const idNum = Number((document.getElementById('evento-id') || {}).value || (eventoEditando && eventoEditando.id) || 0);
+            const select = document.getElementById('evento-seguimiento-estado');
+            if (!idNum || !select) {
+                alert('Primero guarda o abre un pedido con codigo.');
+                return;
+            }
+            try {
+                mostrarLoading(true);
+                const response = await fetch(`/api/agenda/evento/${idNum}/seguimiento`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ estado: select.value })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar el seguimiento');
+                }
+                const idx = eventos.findIndex((e) => Number(e.id || 0) === idNum);
+                if (idx >= 0 && data.evento) eventos[idx] = data.evento;
+                eventoEditando = data.evento || eventoEditando;
+                actualizarSeguimientoAdmin(eventoEditando);
+                renderizarCalendario();
+                renderizarProximos();
+                renderizarBorradores();
+                alert('Seguimiento actualizado. El QR ya muestra este estado al cliente.');
+            } catch (error) {
+                alert('[ERROR] ' + String(error.message || error));
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
         function actualizarAccionesGuardadoModal() {
             const btnDraft = document.getElementById('btn-guardar-borrador');
             const btnGuardar = document.getElementById('btn-guardar-evento');
@@ -5711,6 +5879,7 @@
             actualizarVisibilidadBotonPdf();
             actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
+            actualizarSeguimientoAdmin(null);
             abrirModal();
         }
 
@@ -5783,6 +5952,7 @@
             actualizarVisibilidadBotonPdf();
             actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
+            actualizarSeguimientoAdmin(evento);
             abrirModal();
         }
         

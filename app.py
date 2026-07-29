@@ -226,11 +226,15 @@ def _ruta_es_publica(path):
         return True
     if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
+    if ruta.startswith("/seguimiento/"):
+        return True
     if ruta.startswith("/tienda/flow/"):
         return True
     if ruta.startswith("/api/tienda/"):
         return True
     if ruta.startswith("/api/valoracion/"):
+        return True
+    if ruta.startswith("/api/seguimiento/"):
         return True
     return False
 
@@ -338,7 +342,7 @@ from database import (
     obtener_calculadora_compras_draft, guardar_calculadora_compras_draft, limpiar_calculadora_compras_draft,
     registrar_historial_cambio, listar_historial_cambios, eliminar_historial_cambio,
     descartar_insumos_masivo,
-    obtener_evento_agenda_por_id, actualizar_estado_evento_agenda,
+    obtener_evento_agenda_por_id, actualizar_estado_evento_agenda, actualizar_seguimiento_evento_agenda,
     eliminar_eventos_agenda_pasados,
     obtener_notas_agenda, guardar_nota_agenda, eliminar_nota_agenda,
     guardar_factura_archivo, obtener_facturas_archivadas, obtener_factura_archivo,
@@ -1204,6 +1208,69 @@ def tienda_publica_agendar():
 def tienda_publica_agendar_beta():
     # Compatibilidad: mantenemos la ruta antigua apuntando a la oficial.
     return redirect(url_for('tienda_publica_agendar'))
+
+
+SEGUIMIENTO_AGENDA_ESTADOS = [
+    {"key": "pendiente", "label": "Pendiente", "descripcion": "Tu pedido fue registrado y esta pendiente de revision."},
+    {"key": "recepcionado", "label": "Recepcionado", "descripcion": "Pasteleria Sucree ya reviso la informacion de tu pedido."},
+    {"key": "produccion", "label": "En produccion", "descripcion": "Tu pedido esta siendo preparado por nuestro equipo."},
+    {"key": "espera_envio", "label": "A la espera de envio/retiro", "descripcion": "Tu pedido esta listo para coordinar entrega o retiro."},
+    {"key": "despachado", "label": "Despachado", "descripcion": "Tu pedido ya fue despachado o va camino a destino."},
+    {"key": "entregado", "label": "Entregado", "descripcion": "Tu pedido fue entregado correctamente."},
+]
+
+
+def _seguimiento_agenda_label(estado):
+    key = str(estado or "pendiente").strip().lower()
+    for item in SEGUIMIENTO_AGENDA_ESTADOS:
+        if item["key"] == key:
+            return item["label"]
+    return "Pendiente"
+
+
+def _seguimiento_agenda_payload(evento):
+    ev = dict(evento or {})
+    estado = str(ev.get("seguimiento_estado") or "pendiente").strip().lower() or "pendiente"
+    estado_keys = [x["key"] for x in SEGUIMIENTO_AGENDA_ESTADOS]
+    if estado not in estado_keys:
+        estado = "pendiente"
+    try:
+        indice = estado_keys.index(estado)
+    except ValueError:
+        indice = 0
+    cliente = str(ev.get("cliente") or "").strip()
+    return {
+        "codigo_pedido": str(ev.get("codigo_pedido") or "").strip(),
+        "titulo": str(ev.get("titulo") or "Pedido Sucree").strip(),
+        "cliente": cliente.split()[0] if cliente else "",
+        "fecha": str(ev.get("fecha") or "").strip(),
+        "hora": str(ev.get("hora_entrega") or ev.get("hora_inicio") or "").strip(),
+        "modalidad": "Despacho" if bool(ev.get("es_envio")) else "Retiro en tienda",
+        "estado": estado,
+        "estado_label": _seguimiento_agenda_label(estado),
+        "estado_actualizado": str(ev.get("seguimiento_actualizado") or ev.get("creado") or "").strip(),
+        "paso_actual": indice + 1,
+        "pasos_total": len(SEGUIMIENTO_AGENDA_ESTADOS),
+        "estados": SEGUIMIENTO_AGENDA_ESTADOS,
+    }
+
+
+@app.route('/seguimiento/<codigo_pedido>')
+def seguimiento_pedido(codigo_pedido):
+    codigo = str(codigo_pedido or "").strip().upper()
+    return render_template("seguimiento_pedido.html", codigo_pedido=codigo)
+
+
+@app.route('/api/seguimiento/<codigo_pedido>')
+def api_seguimiento_pedido(codigo_pedido):
+    try:
+        from database import obtener_evento_agenda_por_codigo
+        evento = obtener_evento_agenda_por_codigo(codigo_pedido)
+        if not evento or str(evento.get("tipo") or "").strip().lower() == "bloqueo":
+            return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+        return jsonify({"success": True, "pedido": _seguimiento_agenda_payload(evento)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/tienda/presencial')
@@ -4172,9 +4239,10 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.setFillColorRGB(*orange)
     c.setFont("Helvetica-Bold", 7)
     c.drawCentredString(490.5, 170, "ESCANEA PARA VER")
-    c.drawCentredString(490.5, 160, "TERMINOS COMPLETOS")
+    c.drawCentredString(490.5, 160, "ESTADO DEL PEDIDO")
     _draw_round(461, 104, 58, 52, radius=4, stroke=(1, 1, 1), fill=(1, 1, 1), lw=0)
-    _draw_qr(466, 109, 48, f"{PUBLIC_BASE_URL}/tienda/agendar")
+    seguimiento_url = f"{_public_base_url()}/seguimiento/{quote(codigo_txt)}" if codigo_txt and codigo_txt != "-" else f"{PUBLIC_BASE_URL}/tienda/agendar"
+    _draw_qr(466, 109, 48, seguimiento_url)
 
     # Pie de pagina
     _draw_round(42, 42, 511, 34, radius=7, stroke=brown, fill=brown, lw=0)
@@ -22396,6 +22464,25 @@ def api_agenda_estado(id):
             crear_backup()
             return jsonify(resultado)
         return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/agenda/evento/<int:id>/seguimiento', methods=['POST'])
+def api_agenda_evento_seguimiento(id):
+    try:
+        data = request.get_json(silent=True) or {}
+        estado = data.get('estado')
+        resultado = actualizar_seguimiento_evento_agenda(id, estado)
+        if not resultado.get('success'):
+            return jsonify(resultado), 400
+        evento = obtener_evento_agenda_por_id(id)
+        crear_backup()
+        return jsonify({
+            'success': True,
+            'evento': evento,
+            'seguimiento': _seguimiento_agenda_payload(evento),
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

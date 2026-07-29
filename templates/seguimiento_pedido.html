@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguimiento de pedido - Sucree</title>
+    <style>
+        :root {
+            --green: #168342;
+            --green-dark: #0f5f31;
+            --green-soft: #eaf8ef;
+            --orange: #ff8500;
+            --ink: #101827;
+            --muted: #667085;
+            --line: #dde7df;
+            --card: #ffffff;
+            --bg: #f7fbf7;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 20% 0%, rgba(255, 133, 0, 0.12), transparent 28rem),
+                linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+        }
+        .page {
+            width: min(100%, 520px);
+            margin: 0 auto;
+            padding: max(18px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+        }
+        .hero {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            padding: 22px;
+            box-shadow: 0 20px 50px rgba(16, 24, 39, 0.09);
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            color: var(--green-dark);
+        }
+        .brand-mark span:first-child {
+            width: 42px;
+            height: 42px;
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #fff2df, #fff);
+            box-shadow: inset 0 0 0 1px rgba(255, 133, 0, 0.16);
+        }
+        .live {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            color: var(--green);
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .live::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 0 6px rgba(22, 131, 66, 0.12);
+        }
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(30px, 8vw, 42px);
+            line-height: 0.98;
+            letter-spacing: -0.04em;
+        }
+        .subtitle {
+            margin: 0 0 18px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+        .code-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 100%;
+            padding: 10px 13px;
+            border-radius: 999px;
+            color: var(--green-dark);
+            background: var(--green-soft);
+            font-weight: 900;
+            font-size: 13px;
+            word-break: break-word;
+        }
+        .status-card {
+            margin-top: 16px;
+            padding: 18px;
+            border-radius: 22px;
+            background: linear-gradient(135deg, #113f26, #168342);
+            color: #fff;
+        }
+        .status-label {
+            margin: 0 0 4px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            opacity: 0.78;
+        }
+        .status-title {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.05;
+        }
+        .status-desc {
+            margin: 10px 0 0;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .meta {
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.78);
+        }
+        .meta small {
+            display: block;
+            color: var(--muted);
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+        }
+        .meta strong {
+            display: block;
+            font-size: 15px;
+        }
+        .timeline {
+            margin-top: 16px;
+            display: grid;
+            gap: 10px;
+        }
+        .step {
+            display: grid;
+            grid-template-columns: 38px 1fr;
+            gap: 10px;
+            align-items: start;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: #fff;
+        }
+        .dot {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            color: #98a2b3;
+            background: #eef2f6;
+            font-weight: 900;
+        }
+        .step.done .dot,
+        .step.active .dot {
+            color: #fff;
+            background: var(--green);
+        }
+        .step.active {
+            border-color: rgba(22, 131, 66, 0.34);
+            box-shadow: 0 10px 28px rgba(22, 131, 66, 0.12);
+        }
+        .step strong {
+            display: block;
+            margin-bottom: 3px;
+        }
+        .step span {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.35;
+        }
+        .actions {
+            position: sticky;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        button, a.btn {
+            min-height: 46px;
+            border: 0;
+            border-radius: 999px;
+            font-weight: 900;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .btn-refresh { background: var(--green); color: #fff; }
+        .btn-store { background: #fff; color: var(--green-dark); border: 1px solid var(--line); }
+        .error {
+            margin-top: 16px;
+            padding: 14px;
+            border-radius: 18px;
+            color: #9f1239;
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
+            font-weight: 800;
+        }
+        .updated {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+        @media (min-width: 760px) {
+            .page { padding-top: 36px; }
+            .timeline { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <div class="brand">
+                <div class="brand-mark"><span>S</span><span>SUCREE</span></div>
+                <div class="live">Ahora</div>
+            </div>
+            <h1>Seguimiento de pedido</h1>
+            <p class="subtitle">Escaneaste el codigo QR de tu comprobante. Aqui puedes revisar en que etapa va tu pedido.</p>
+            <div class="code-chip">Codigo: <span id="codigo">{{ codigo_pedido }}</span></div>
+            <div id="status-root">
+                <div class="status-card">
+                    <p class="status-label">Consultando</p>
+                    <h2 class="status-title">Cargando estado...</h2>
+                    <p class="status-desc">Estamos revisando la informacion actualizada de tu pedido.</p>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn-refresh" type="button" onclick="cargarSeguimiento(true)">Actualizar</button>
+                <a class="btn btn-store" href="/tienda">Ir a la tienda</a>
+            </div>
+            <div class="updated" id="updated-text">Actualizacion automatica cada 30 segundos.</div>
+        </section>
+    </main>
+
+    <script>
+        const CODIGO_PEDIDO = {{ codigo_pedido|tojson }};
+        const root = document.getElementById('status-root');
+        const updated = document.getElementById('updated-text');
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderPedido(pedido) {
+            const estados = Array.isArray(pedido.estados) ? pedido.estados : [];
+            const estadoActual = String(pedido.estado || 'pendiente');
+            const actualIndex = estados.findIndex((x) => String(x.key) === estadoActual);
+            const actual = estados[actualIndex] || estados[0] || { label: 'Pendiente', descripcion: 'Pedido registrado.' };
+            const steps = estados.map((item, idx) => {
+                const cls = idx < actualIndex ? 'done' : (idx === actualIndex ? 'active' : '');
+                const symbol = idx < actualIndex ? '&check;' : (idx + 1);
+                return `
+                    <div class="step ${cls}">
+                        <div class="dot">${escapeHtml(symbol)}</div>
+                        <div>
+                            <strong>${escapeHtml(item.label)}</strong>
+                            <span>${escapeHtml(item.descripcion)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            root.innerHTML = `
+                <div class="status-card">
+                    <p class="status-label">Estado actual</p>
+                    <h2 class="status-title">${escapeHtml(actual.label)}</h2>
+                    <p class="status-desc">${escapeHtml(actual.descripcion)}</p>
+                </div>
+                <div class="meta-grid">
+                    <div class="meta"><small>Pedido</small><strong>${escapeHtml(pedido.titulo || '-')}</strong></div>
+                    <div class="meta"><small>Modalidad</small><strong>${escapeHtml(pedido.modalidad || '-')}</strong></div>
+                    <div class="meta"><small>Fecha</small><strong>${escapeHtml(pedido.fecha || '-')}</strong></div>
+                    <div class="meta"><small>Hora</small><strong>${escapeHtml(pedido.hora || '-')}</strong></div>
+                </div>
+                <div class="timeline">${steps}</div>
+            `;
+            updated.textContent = `Ultima actualizacion: ${pedido.estado_actualizado || new Date().toLocaleTimeString('es-CL')}. Se refresca cada 30 segundos.`;
+        }
+
+        function renderError(message) {
+            root.innerHTML = `<div class="error">${escapeHtml(message || 'No pudimos encontrar este pedido.')}</div>`;
+        }
+
+        async function cargarSeguimiento(manual) {
+            try {
+                if (manual) updated.textContent = 'Actualizando...';
+                const res = await fetch(`/api/seguimiento/${encodeURIComponent(CODIGO_PEDIDO)}`, { cache: 'no-store' });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Pedido no encontrado');
+                renderPedido(data.pedido || {});
+            } catch (error) {
+                renderError(error.message || error);
+                updated.textContent = 'Revisa que el codigo de pedido sea correcto.';
+            }
+        }
+
+        cargarSeguimiento(false);
+        setInterval(() => cargarSeguimiento(false), 30000);
+    </script>
+</body>
+</html>

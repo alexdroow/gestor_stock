@@ -7702,6 +7702,8 @@ def migrar_db():
         _ensure_column(conn, "agenda_eventos", "codigo_pedido", "TEXT")
         _ensure_column(conn, "agenda_eventos", "cliente_email", "TEXT")
         _ensure_column(conn, "agenda_eventos", "cliente_telefono", "TEXT")
+        _ensure_column(conn, "agenda_eventos", "seguimiento_estado", "TEXT DEFAULT 'pendiente'")
+        _ensure_column(conn, "agenda_eventos", "seguimiento_actualizado", "TEXT")
         _ensure_column(conn, "ventas", "codigo_pedido", "TEXT")
         _ensure_column(conn, "ventas", "canal_venta", "TEXT DEFAULT 'presencial'")
         _ensure_column(conn, "ventas", "codigo_operacion", "TEXT")
@@ -7728,6 +7730,8 @@ def migrar_db():
         _ensure_column(conn, "producciones", "codigo_operacion", "TEXT")
         conn.execute("UPDATE agenda_eventos SET codigo_operacion = COALESCE(NULLIF(codigo_operacion, ''), 'OPA-LEGACY-' || id)")
         conn.execute("UPDATE agenda_eventos SET codigo_pedido = UPPER(TRIM(codigo_pedido)) WHERE codigo_pedido IS NOT NULL")
+        conn.execute("UPDATE agenda_eventos SET seguimiento_estado = COALESCE(NULLIF(TRIM(seguimiento_estado), ''), 'pendiente')")
+        conn.execute("UPDATE agenda_eventos SET seguimiento_actualizado = COALESCE(NULLIF(TRIM(seguimiento_actualizado), ''), creado, datetime('now'))")
         conn.execute(
             """
             UPDATE agenda_eventos
@@ -12521,6 +12525,77 @@ def actualizar_estado_evento_agenda(evento_id, estado):
         return {"success": False, "error": str(e)}
     finally:
         conn.close()
+
+
+def _normalizar_seguimiento_evento_agenda(estado, default="pendiente"):
+    estado_norm = str(estado or "").strip().lower()
+    estado_norm = estado_norm.replace("-", "_").replace(" ", "_")
+    aliases = {
+        "recibido": "recepcionado",
+        "recepcion": "recepcionado",
+        "confirmado": "recepcionado",
+        "en_produccion": "produccion",
+        "preparacion": "produccion",
+        "en_preparacion": "produccion",
+        "preparando": "produccion",
+        "espera_envio": "espera_envio",
+        "a_la_espera_de_envio": "espera_envio",
+        "listo_para_envio": "espera_envio",
+        "listo_retiro": "espera_envio",
+        "enviado": "despachado",
+        "finalizado": "entregado",
+        "completado": "entregado",
+    }
+    estado_norm = aliases.get(estado_norm, estado_norm)
+    permitidos = {"pendiente", "recepcionado", "produccion", "espera_envio", "despachado", "entregado"}
+    if estado_norm in permitidos:
+        return estado_norm
+    return str(default or "pendiente").strip().lower()
+
+
+def actualizar_seguimiento_evento_agenda(evento_id, estado):
+    """Actualiza el estado de seguimiento visible para el cliente por QR."""
+    try:
+        evento_id = int(evento_id)
+    except (TypeError, ValueError):
+        return {"success": False, "error": "Evento invalido"}
+    if evento_id <= 0:
+        return {"success": False, "error": "Evento invalido"}
+
+    estado_normalizado = _normalizar_seguimiento_evento_agenda(estado, default="")
+    if estado_normalizado not in {"pendiente", "recepcionado", "produccion", "espera_envio", "despachado", "entregado"}:
+        return {"success": False, "error": "Estado de seguimiento invalido"}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM agenda_eventos WHERE id = ? AND tipo <> 'bloqueo'", (evento_id,))
+        actual = cursor.fetchone()
+        if not actual:
+            return {"success": False, "error": "Pedido/Reserva no encontrado"}
+        actualizado = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            """
+            UPDATE agenda_eventos
+            SET seguimiento_estado = ?,
+                seguimiento_actualizado = ?
+            WHERE id = ?
+            """,
+            (estado_normalizado, actualizado, evento_id),
+        )
+        conn.commit()
+        return {
+            "success": True,
+            "id": evento_id,
+            "seguimiento_estado": estado_normalizado,
+            "seguimiento_actualizado": actualizado,
+        }
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
 
 def _normalizar_codigo_pedido_agenda(codigo):
     txt = str(codigo or "").strip().upper()
