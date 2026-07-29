@@ -8965,7 +8965,17 @@
             --brand: var(--sucree-primary-600) !important;
             --brand-dark: var(--sucree-primary-700) !important;
             --brand-soft: var(--sucree-primary-50) !important;
+            --primary: var(--sucree-primary-600) !important;
+            --primary-dark: var(--sucree-primary-800) !important;
+            --primary-soft: var(--sucree-primary-50) !important;
             --accent: var(--sucree-chocolate-700) !important;
+            --accent-soft: var(--sucree-primary-50) !important;
+            --surface: var(--sucree-white) !important;
+            --background: var(--sucree-background) !important;
+            --text: var(--sucree-title) !important;
+            --border: var(--sucree-border) !important;
+            --shadow-sm: var(--sucree-shadow-sm) !important;
+            --shadow-md: var(--sucree-shadow-md) !important;
             --card-bg: var(--sucree-white) !important;
             --page-bg: var(--sucree-background) !important;
             --text-main: var(--sucree-title) !important;
@@ -9089,6 +9099,7 @@
         body.agenda-beta-mode .cake-size-option__check,
         body.agenda-beta-mode .cake-choice-card__check,
         body.agenda-beta-mode .cake-size-option.active .cake-size-option__radio,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-option.active .cake-size-option__radio,
         body.tienda-preview-draft.tienda-preview-agenda .cake-size-option__check,
         body.tienda-preview-draft.tienda-preview-agenda .cake-choice-card__check,
         body.tienda-preview-draft.tienda-preview-agenda .cake-size-option.active .cake-size-option__radio {
@@ -9132,6 +9143,10 @@
         body.agenda-beta-mode .agenda-type-bar,
         body.agenda-beta-mode .agenda-beta-head,
         body.agenda-beta-mode .agenda-mobile-steps,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .modal,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .modal,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-step-head,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-step-head,
         body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-builder,
         body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cart,
         body.tienda-preview-draft.tienda-preview-agenda .agenda-pastel-wrap,
@@ -9142,6 +9157,72 @@
             background: rgba(255, 255, 255, .94) !important;
             border-color: var(--sucree-border) !important;
             box-shadow: 0 16px 40px rgba(74, 44, 23, .08) !important;
+        }
+
+        body.mobile-ui.agenda-beta-mode .booking-header-cart__badge,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-builder-stepper__item.is-active strong,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-builder-stepper__item.is-done strong,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .cake-builder-stepper__item.is-active strong,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .cake-builder-stepper__item.is-done strong {
+            background: var(--sucree-primary-600) !important;
+            color: var(--sucree-inverse) !important;
+            box-shadow: 0 0 0 5px var(--sucree-white), 0 8px 20px rgba(239, 125, 0, .22) !important;
+        }
+
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-builder-stepper__item.is-active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-builder-stepper__item.is-done,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .cake-builder-stepper__item.is-active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .cake-builder-stepper__item.is-done,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-benefits span,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-note,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-option__body b,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-option__price,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-flow-title,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-flow-subtitle {
+            color: var(--sucree-primary-700) !important;
+        }
+
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-option.active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-choice-card.active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-day-btn.active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-hour-btn.active,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-delivery-btn.active {
+            border-color: var(--sucree-primary-600) !important;
+            background: linear-gradient(135deg, var(--sucree-primary-50), var(--sucree-white)) !important;
+            color: var(--sucree-title) !important;
+            box-shadow: 0 12px 28px rgba(239, 125, 0, .14) !important;
+        }
+
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-option__check,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-choice-card__check {
+            background: var(--sucree-primary-600) !important;
+            color: var(--sucree-inverse) !important;
+        }
+
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-note,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .cake-size-benefits,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .agenda-cake-coupon-alert,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .cake-size-note,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-cake-coupon-alert {
+            background: linear-gradient(135deg, var(--sucree-primary-50), var(--sucree-surface)) !important;
+            border-color: rgba(239, 125, 0, .2) !important;
+        }
+
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .btn-primary,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .btn-primary,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .agenda-flow-btn,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active #agenda-btn-reservar {
+            background: linear-gradient(135deg, var(--sucree-primary-500), var(--sucree-primary-700)) !important;
+            border-color: var(--sucree-primary-600) !important;
+            color: var(--sucree-inverse) !important;
+            box-shadow: 0 16px 34px rgba(239, 125, 0, .24) !important;
+        }
+
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-builder.active .btn-muted,
+        body.mobile-ui.agenda-beta-mode #modal-agenda-cake-cart.active .btn-muted {
+            background: var(--sucree-white) !important;
+            border-color: var(--sucree-border) !important;
+            color: var(--sucree-title) !important;
         }
     </style>
 </head>
