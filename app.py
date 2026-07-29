@@ -6644,7 +6644,8 @@ def api_tienda_admin_agenda_reserva_pdf(reserva_id):
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT id, tipo, fecha, hora_inicio, hora_fin, cliente, telefono, direccion, ingredientes, codigo_operacion
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono, direccion,
+                   ingredientes, total, abono, codigo_operacion, codigo_pedido, motivo, estado
             FROM agenda_eventos
             WHERE id = ?
             LIMIT 1
@@ -6661,6 +6662,63 @@ def api_tienda_admin_agenda_reserva_pdf(reserva_id):
             return jsonify({"success": False, "error": "No se pudo generar el PDF"}), 500
         download = str(request.args.get("download") or "").strip() in ("1", "true", "si")
         return send_file(abs_path, as_attachment=download, download_name=filename, mimetype="application/pdf")
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/tienda/agenda/reserva/<int:reserva_id>/pdf', methods=['POST'])
+def api_tienda_agenda_reserva_pdf_publica(reserva_id):
+    conn = None
+    try:
+        if int(reserva_id or 0) <= 0:
+            return jsonify({"success": False, "error": "ID de reserva invalido"}), 400
+
+        data = request.get_json(silent=True) or {}
+        email = str(data.get("email") or "").strip().lower()
+        telefono = str(data.get("telefono") or "").strip()
+        codigo = str(data.get("codigo_pedido") or data.get("codigo") or "").strip()
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono, direccion,
+                   ingredientes, total, abono, codigo_operacion, codigo_pedido, motivo, estado
+            FROM agenda_eventos
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (int(reserva_id),),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Reserva no encontrada"}), 404
+        reserva = dict(row)
+
+        def _solo_digitos(valor):
+            return re.sub(r"\D+", "", str(valor or ""))
+
+        codigo_pedido = str(reserva.get("codigo_pedido") or "").strip()
+        codigo_operacion = str(reserva.get("codigo_operacion") or "").strip()
+        ingredientes_txt = str(reserva.get("ingredientes") or "").lower()
+        tel_req = _solo_digitos(telefono)
+        tel_row = _solo_digitos(reserva.get("telefono"))
+
+        codigo_ok = bool(codigo and codigo in {codigo_pedido, codigo_operacion})
+        email_ok = bool(email and email in ingredientes_txt)
+        tel_ok = bool(tel_req and tel_row and (tel_req.endswith(tel_row[-8:]) or tel_row.endswith(tel_req[-8:])))
+        if not (codigo_ok or email_ok or tel_ok):
+            return jsonify({"success": False, "error": "No autorizado para descargar esta reserva"}), 403
+
+        filename = _crear_pdf_reserva_agenda_tienda(reserva)
+        abs_path = os.path.join(static_dir, "tienda_pedidos_pdf", filename)
+        if not os.path.exists(abs_path):
+            return jsonify({"success": False, "error": "No se pudo generar el PDF"}), 500
+        media_url = f"{_public_base_url(request.url_root)}/static/tienda_pedidos_pdf/{quote(filename)}"
+        return jsonify({"success": True, "media_url": media_url, "filename": filename})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:

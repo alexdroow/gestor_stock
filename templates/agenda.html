@@ -6200,6 +6200,21 @@
                 alert('Este pedido aun no tiene codigo. Guarda y vuelve a abrir para generar el PDF final.');
                 return;
             }
+            try {
+                mostrarLoading(true);
+                const res = await fetch(`/api/agenda/evento/${Number(eventoEditando.id)}/pdf`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success || !data.media_url) {
+                    throw new Error(data.error || 'No se pudo generar el PDF final.');
+                }
+                window.open(String(data.media_url), '_blank', 'noopener,noreferrer');
+                return;
+            } catch (error) {
+                alert(error?.message || 'No se pudo generar el PDF final.');
+                return;
+            } finally {
+                mostrarLoading(false);
+            }
             await asegurarMapaParaPDF(e);
 
             let mapaImagenDataURL = null;

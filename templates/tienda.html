@@ -13380,7 +13380,36 @@
             document.body.classList.remove("agenda-confirm-open");
         }
 
-        function _descargarComprobanteReservaAgenda(payload, reservaId = 0) {
+        async function _descargarComprobanteReservaAgenda(payload, reservaId = 0) {
+            const reservaNumero = Number(reservaId || 0);
+            if (reservaNumero > 0) {
+                try {
+                    const data = await _fetchJsonWithTimeout(`/api/tienda/agenda/reserva/${reservaNumero}/pdf`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            email: payload?.email || "",
+                            telefono: payload?.telefono || "",
+                            codigo_pedido: payload?.codigo_pedido || payload?.codigo || "",
+                        }),
+                    }, 18000);
+                    const mediaUrl = String(data?.media_url || "").trim();
+                    const fileName = String(data?.filename || `orden_reserva_tienda_${reservaNumero}.pdf`).trim();
+                    if (!mediaUrl) throw new Error("No se recibio el enlace del PDF final.");
+                    const link = document.createElement("a");
+                    link.href = mediaUrl;
+                    link.target = "_blank";
+                    link.rel = "noopener";
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    return { fileName, blobUrl: mediaUrl };
+                } catch (err) {
+                    _agendaMsg(err?.message || "No se pudo generar el PDF final.", "err");
+                    return null;
+                }
+            }
             const jspdf = window.jspdf || null;
             if (!jspdf || !jspdf.jsPDF) {
                 _agendaMsg("No se pudo cargar generador PDF.", "err");
@@ -13749,7 +13778,7 @@
                         descuento_monto: Number(reserva.descuento_cupon || 0),
                     } : (agendaCuponAuto || null),
                 };
-                const pdfInfo = _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
+                const pdfInfo = await _descargarComprobanteReservaAgenda(payloadFinal, Number(reserva.id || 0));
                 try {
                     localStorage.setItem("tienda_ultima_reserva_chat", JSON.stringify({
                         reserva_id: Number(reserva.id || 0),
