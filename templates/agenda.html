@@ -1077,8 +1077,8 @@
 
         /* Modal principal de reservas: mas ancho y con acciones siempre visibles */
         #modal-evento .modal {
-            width: min(96vw, 860px);
-            max-width: 860px;
+            width: min(98vw, 1180px);
+            max-width: 1180px;
             max-height: 94vh;
         }
 
@@ -1104,6 +1104,329 @@
 
         #modal-evento .modal-body {
             padding: 20px 24px 16px;
+        }
+
+        .pedido-ficha-dashboard {
+            display: none;
+            margin-bottom: 18px;
+            color: #3a281a;
+        }
+
+        .pedido-ficha-dashboard.active {
+            display: block;
+        }
+
+        .pedido-ficha-topbar {
+            position: sticky;
+            top: -20px;
+            z-index: 4;
+            display: grid;
+            grid-template-columns: minmax(240px, 1.3fr) repeat(5, minmax(118px, 1fr));
+            gap: 10px;
+            align-items: stretch;
+            margin: -4px -4px 16px;
+            padding: 10px;
+            border: 1px solid #f4dcc2;
+            border-radius: 18px;
+            background: rgba(255, 251, 246, .96);
+            box-shadow: 0 12px 30px rgba(58, 40, 26, .08);
+            backdrop-filter: blur(8px);
+        }
+
+        .pedido-ficha-hero-title {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .pedido-ficha-index,
+        .pedido-ficha-icon {
+            width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            flex: 0 0 auto;
+            background: #f58200;
+            color: #fff;
+            font-weight: 900;
+            box-shadow: 0 8px 18px rgba(245, 130, 0, .22);
+        }
+
+        .pedido-ficha-icon {
+            background: #fff7ed;
+            color: #9a4c16;
+            border: 1px solid #f4dcc2;
+            box-shadow: none;
+        }
+
+        .pedido-ficha-kicker {
+            font-size: 11px;
+            color: #8b5e34;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            margin-bottom: 2px;
+        }
+
+        .pedido-ficha-main-title {
+            font-size: 15px;
+            font-weight: 900;
+            color: #2f1d10;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pedido-ficha-subtitle {
+            font-size: 12px;
+            color: #6b4a2d;
+            margin-top: 2px;
+        }
+
+        .pedido-ficha-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
+            border: 1px solid #c7f0d3;
+            background: #ecfdf3;
+            color: #166534;
+        }
+
+        .pedido-ficha-pill.warn {
+            border-color: #fed7aa;
+            background: #fff7ed;
+            color: #c45f00;
+        }
+
+        .pedido-ficha-layout {
+            display: grid;
+            grid-template-columns: minmax(270px, .74fr) minmax(0, 1.72fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        .pedido-ficha-left,
+        .pedido-ficha-right {
+            display: grid;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .pedido-ficha-card {
+            border: 1px solid #f0dfcf;
+            border-radius: 16px;
+            background: #fffdf9;
+            box-shadow: 0 10px 22px rgba(58, 40, 26, .05);
+            padding: 14px;
+            min-width: 0;
+        }
+
+        .pedido-ficha-product {
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .pedido-ficha-product-media {
+            height: 150px;
+            background: linear-gradient(135deg, #4a2c17, #8b5e34);
+            overflow: hidden;
+        }
+
+        .pedido-ficha-product-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .pedido-ficha-product-body {
+            padding: 13px 14px 14px;
+        }
+
+        .pedido-ficha-card-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            color: #3a281a;
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .02em;
+        }
+
+        .pedido-ficha-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .pedido-ficha-row {
+            display: grid;
+            grid-template-columns: minmax(96px, .62fr) minmax(0, 1fr);
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px dashed #ead8c4;
+            font-size: 12px;
+        }
+
+        .pedido-ficha-row:last-child {
+            border-bottom: 0;
+        }
+
+        .pedido-ficha-label {
+            color: #7b614a;
+            font-weight: 800;
+        }
+
+        .pedido-ficha-value {
+            color: #2f1d10;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .pedido-ficha-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .pedido-ficha-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            border: 1px solid #f0dfcf;
+            border-radius: 10px;
+            padding: 8px 10px;
+            background: #fffaf4;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .pedido-ficha-check {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            border: 1px solid #fdba74;
+            color: #f58200;
+            font-size: 11px;
+            flex: 0 0 auto;
+        }
+
+        .pedido-ficha-payment {
+            background: linear-gradient(135deg, #fff7ed, #fffdf9);
+            border-color: #fed7aa;
+        }
+
+        .pedido-ficha-total-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 7px 0;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .pedido-ficha-total-line.strong {
+            margin-top: 8px;
+            padding-top: 12px;
+            border-top: 1px dashed #d6b896;
+            color: #d16b00;
+            font-size: 18px;
+            font-weight: 950;
+        }
+
+        .pedido-ficha-actions {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .pedido-ficha-action {
+            border: 1px solid #f0dfcf;
+            background: #fffaf4;
+            color: #6b3a12;
+            border-radius: 12px;
+            padding: 9px 8px;
+            font-size: 11px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .pedido-ficha-action:hover {
+            border-color: #f58200;
+            transform: translateY(-1px);
+        }
+
+        .pedido-ficha-timeline {
+            display: grid;
+            gap: 9px;
+        }
+
+        .pedido-ficha-timeitem {
+            display: grid;
+            grid-template-columns: 22px 1fr auto;
+            gap: 8px;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .pedido-ficha-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px #d1d5db;
+        }
+
+        .pedido-ficha-timeitem.done .pedido-ficha-dot,
+        .pedido-ficha-timeitem.current .pedido-ficha-dot {
+            background: #2e7d32;
+            box-shadow: 0 0 0 1px #2e7d32;
+        }
+
+        .pedido-ficha-timeitem.current .pedido-ficha-label {
+            color: #166534;
+        }
+
+        .pedido-ficha-edit-zone {
+            margin-top: 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #f8fafc;
+            padding: 14px;
+        }
+
+        .pedido-ficha-edit-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .pedido-ficha-raw-fields {
+            display: grid;
+            gap: 0;
         }
 
         .seguimiento-admin-card {
@@ -1921,6 +2244,20 @@
             .resumen-pedido-grid {
                 grid-template-columns: 1fr;
             }
+            .pedido-ficha-topbar {
+                position: static;
+                grid-template-columns: 1fr 1fr;
+            }
+            .pedido-ficha-hero-title {
+                grid-column: 1 / -1;
+            }
+            .pedido-ficha-layout,
+            .pedido-ficha-grid {
+                grid-template-columns: 1fr;
+            }
+            .pedido-ficha-actions {
+                grid-template-columns: 1fr 1fr;
+            }
         }
         
         #darkModeBtn {
@@ -2237,6 +2574,11 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="evento-id">
+                <div class="pedido-ficha-dashboard" id="pedido-ficha-dashboard"></div>
+                <div class="pedido-ficha-edit-title" id="pedido-ficha-edit-title" style="display:none;">
+                    <span>Ficha editable del pedido</span>
+                    <span class="form-hint">Puedes corregir datos y guardar cambios</span>
+                </div>
                 <div class="form-group">
                     <label>Codigo de pedido</label>
                     <input type="text" id="evento-codigo-pedido" readonly placeholder="Se genera automaticamente al guardar">
@@ -3597,6 +3939,291 @@
             return filtradas.length ? filtradas : [{ titulo: tituloDefault, items: ['-'] }];
         }
 
+        function _extraerBuilderJsonAgenda(texto) {
+            const source = String(texto || '').replace(/\r\n?/g, '\n');
+            const lineas = source.split('\n').map((ln) => String(ln || '').trim()).filter(Boolean);
+            let inJson = false;
+            for (const line of lineas) {
+                const sec = line.match(/^---\s*(.+?)\s*---$/);
+                if (sec && sec[1]) {
+                    inJson = String(sec[1] || '').trim().toLowerCase() === 'builder json';
+                    continue;
+                }
+                if (inJson && line.startsWith('{') && line.endsWith('}')) {
+                    try {
+                        return JSON.parse(line);
+                    } catch (_) {
+                        return null;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function _extraerFichaTortaDesdeDetalle(evento) {
+            const detalle = String((evento && evento.ingredientes) || '');
+            const secciones = detalleEnSecciones(detalle, 'Detalle pedido');
+            const catalogo = secciones.find((s) => String((s && s.titulo) || '').trim().toLowerCase() === 'catalogo torta');
+            const entregaSec = secciones.find((s) => String((s && s.titulo) || '').trim().toLowerCase() === 'entrega');
+            const parsed = _extraerBuilderJsonAgenda(detalle) || {};
+            const datos = {
+                categoria: '-',
+                tamano: '-',
+                bizcocho: '-',
+                descripcion: String((evento && evento.titulo) || '').trim() || '-',
+                nota: '-',
+                referencias: '-',
+                sabores: [],
+                extras: [],
+                topper: [],
+                otros: [],
+                modalidad: (evento && evento.es_envio) ? 'Despacho' : 'Retiro en local',
+                direccion: (evento && evento.es_envio) ? (String((evento && evento.direccion) || '-').trim() || '-') : 'Sucree Pasteleria',
+                imagen_url: '',
+                raw: parsed
+            };
+
+            if (parsed && parsed.categoria_id && tortaCatalogoPublico) {
+                const cat = _catalogFind('categorias', parsed.categoria_id);
+                if (cat && cat.imagen_url) datos.imagen_url = String(cat.imagen_url || '').trim();
+            }
+
+            const ingest = (items) => {
+                let bucket = '';
+                (Array.isArray(items) ? items : []).forEach((raw) => {
+                    const line = String(raw || '').trim();
+                    if (!line) return;
+                    const low = line.toLowerCase();
+                    const kv = line.match(/^([^:]+):\s*(.*)$/);
+                    if (kv) {
+                        const key = String(kv[1] || '').trim().toLowerCase();
+                        const val = String(kv[2] || '').trim();
+                        if (key.startsWith('categoria')) datos.categoria = val || '-';
+                        else if (key.startsWith('tamano') || key.startsWith('tama')) datos.tamano = val || '-';
+                        else if (key.startsWith('bizcocho')) datos.bizcocho = val || '-';
+                        else if (key.startsWith('descripcion')) datos.descripcion = val || datos.descripcion;
+                        else if (key.startsWith('nota catalogo')) datos.nota = val || '-';
+                        else if (key.startsWith('referencias')) datos.referencias = val || '-';
+                        else if (key.startsWith('subtotal') || key.startsWith('descuento') || key.startsWith('total')) bucket = '';
+                        else if (['sabores', 'extras', 'topper', 'otros cargos'].includes(key)) {
+                            bucket = key === 'otros cargos' ? 'otros' : key;
+                            if (val && val !== '-') {
+                                val.split(val.includes('|') ? '|' : ',').map((x) => x.trim()).filter(Boolean).forEach((x) => datos[bucket].push(x));
+                            }
+                        }
+                        return;
+                    }
+                    if (['extras:', 'sabores:', 'topper:', 'otros cargos:'].includes(low)) {
+                        bucket = low.replace(':', '') === 'otros cargos' ? 'otros' : low.replace(':', '');
+                        return;
+                    }
+                    if (bucket && line.startsWith('-')) {
+                        const val = line.replace(/^-+\s*/, '').trim();
+                        if (val && val !== '-') datos[bucket].push(val);
+                    }
+                });
+            };
+            ingest(catalogo && catalogo.items);
+            ingest(entregaSec && entregaSec.items);
+
+            if (entregaSec && Array.isArray(entregaSec.items)) {
+                entregaSec.items.forEach((raw) => {
+                    const line = String(raw || '').trim();
+                    const kv = line.match(/^([^:]+):\s*(.*)$/);
+                    if (!kv) return;
+                    const key = String(kv[1] || '').trim().toLowerCase();
+                    const val = String(kv[2] || '').trim();
+                    if (key.startsWith('modalidad')) datos.modalidad = val || datos.modalidad;
+                    if (key.startsWith('direccion')) datos.direccion = val || datos.direccion;
+                });
+            }
+
+            if (!datos.sabores.length) datos.sabores = ['-'];
+            if (!datos.extras.length) datos.extras = ['-'];
+            if (!datos.topper.length) datos.topper = ['Sin topper'];
+            if (!datos.otros.length) datos.otros = ['-'];
+            return datos;
+        }
+
+        function _pedidoFichaDesdeFormulario(evento = null) {
+            const ev = evento || eventoEditando || {};
+            const total = _normalizarNumero(document.getElementById('evento-total')?.value || ev.total, 0);
+            const abono = _normalizarNumero(document.getElementById('evento-abono')?.value || ev.abono, 0);
+            const saldo = Math.max(0, total - abono);
+            const fecha = String(document.getElementById('evento-fecha')?.value || ev.fecha || '').trim();
+            const hora = String(document.getElementById('evento-entrega')?.value || document.getElementById('evento-hora-inicio')?.value || ev.hora_entrega || ev.hora_inicio || '').slice(0, 5) || '-';
+            const tipo = String(document.getElementById('evento-tipo')?.value || ev.tipo || '').trim().toLowerCase();
+            const esEnvio = Boolean(document.getElementById('evento-envio')?.checked || ev.es_envio);
+            const detalle = _extraerFichaTortaDesdeDetalle({
+                ...ev,
+                titulo: document.getElementById('evento-titulo')?.value || ev.titulo,
+                ingredientes: document.getElementById('evento-ingredientes')?.value || ev.ingredientes,
+                es_envio: esEnvio,
+                direccion: document.getElementById('evento-direccion')?.value || ev.direccion
+            });
+            return {
+                id: Number(ev.id || document.getElementById('evento-id')?.value || 0),
+                codigo: String(document.getElementById('evento-codigo-pedido')?.value || ev.codigo_pedido || '-').trim() || '-',
+                titulo: String(document.getElementById('evento-titulo')?.value || ev.titulo || detalle.categoria || 'Pedido').trim(),
+                cliente: String(document.getElementById('evento-cliente')?.value || ev.cliente || '-').trim() || '-',
+                telefono: String(document.getElementById('evento-telefono')?.value || ev.telefono || '-').trim() || '-',
+                fecha,
+                fecha_larga: fecha ? formatearFechaLarga(fecha) : '-',
+                hora,
+                tipo,
+                total,
+                abono,
+                saldo,
+                estado: normalizarEstadoAgenda(ev.estado, 'pendiente'),
+                seguimiento: normalizarEstadoSeguimientoAgenda(document.getElementById('evento-seguimiento-estado')?.value || ev.seguimiento_estado),
+                creado: String(ev.creado || ev.fecha_creacion || '-').trim() || '-',
+                actualizado: String(ev.actualizado || ev.seguimiento_actualizado || '-').trim() || '-',
+                alerta: String(document.getElementById('evento-alerta')?.value || ev.alerta_minutos || '1440'),
+                detalle
+            };
+        }
+
+        function _listaFichaHtml(items) {
+            const arr = Array.isArray(items) && items.length ? items : ['-'];
+            return arr.map((item) => `
+                <div class="pedido-ficha-list-item">
+                    <span>${escapeHtml(item || '-')}</span>
+                    <span class="pedido-ficha-check">&#10003;</span>
+                </div>
+            `).join('');
+        }
+
+        function renderFichaPedidoEdicion(evento = null) {
+            const box = document.getElementById('pedido-ficha-dashboard');
+            const editTitle = document.getElementById('pedido-ficha-edit-title');
+            if (!box) return;
+            const ev = evento || eventoEditando;
+            const tipo = String((ev && ev.tipo) || document.getElementById('evento-tipo')?.value || '').trim().toLowerCase();
+            const tienePedido = Boolean(ev && Number(ev.id || 0) > 0 && tipo !== 'bloqueo');
+            box.classList.toggle('active', tienePedido);
+            if (editTitle) editTitle.style.display = tienePedido ? 'flex' : 'none';
+            if (!tienePedido) {
+                box.innerHTML = '';
+                return;
+            }
+
+            const ficha = _pedidoFichaDesdeFormulario(ev);
+            const detalle = ficha.detalle || {};
+            const estadoLabel = SEGUIMIENTO_ESTADOS_LABELS[ficha.seguimiento] || 'Pendiente';
+            const tracking = seguimientoUrlPedido(ficha.codigo);
+            const countdown = obtenerTextoCuentaRegresiva({
+                fecha: ficha.fecha,
+                hora_entrega: ficha.hora,
+                hora_inicio: ficha.hora
+            }) || 'Sin tiempo estimado';
+            const imgHtml = detalle.imagen_url
+                ? `<img src="${escapeHtml(detalle.imagen_url)}" alt="${escapeHtml(ficha.titulo)}">`
+                : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:28px;">Sucree</div>`;
+            const timeline = [
+                ['Pedido recibido', ficha.creado || '-'],
+                ['Abono registrado', ficha.abono > 0 ? formatoMonedaCLP(ficha.abono) : '-'],
+                ['En preparacion', ficha.seguimiento === 'produccion' ? 'Actual' : '-'],
+                ['Lista para entrega', ['espera_envio', 'despachado', 'entregado'].includes(ficha.seguimiento) ? 'Actual' : '-'],
+                ['Entregada', ficha.seguimiento === 'entregado' ? 'Actual' : '-']
+            ].map(([label, value]) => {
+                const done = (label === 'Pedido recibido') || (label === 'Abono registrado' && ficha.abono > 0) || (label === 'Entregada' && ficha.seguimiento === 'entregado');
+                const current = String(value || '') === 'Actual';
+                return `<div class="pedido-ficha-timeitem ${done ? 'done' : ''} ${current ? 'current' : ''}">
+                    <span class="pedido-ficha-dot"></span>
+                    <span class="pedido-ficha-label">${escapeHtml(label)}</span>
+                    <span class="pedido-ficha-value">${escapeHtml(value || '-')}</span>
+                </div>`;
+            }).join('');
+
+            box.innerHTML = `
+                <div class="pedido-ficha-topbar">
+                    <div class="pedido-ficha-hero-title">
+                        <span class="pedido-ficha-index">1</span>
+                        <div>
+                            <div class="pedido-ficha-main-title">${escapeHtml(ficha.titulo || detalle.categoria || 'Pedido')}</div>
+                            <div class="pedido-ficha-subtitle">Pedido #${escapeHtml(ficha.codigo)}</div>
+                        </div>
+                    </div>
+                    <div><div class="pedido-ficha-kicker">Entrega</div><div class="pedido-ficha-main-title">${escapeHtml(ficha.fecha_larga)}</div></div>
+                    <div><div class="pedido-ficha-kicker">Hora</div><div class="pedido-ficha-main-title">${escapeHtml(ficha.hora)}</div></div>
+                    <div><div class="pedido-ficha-kicker">Modalidad</div><div class="pedido-ficha-main-title">${escapeHtml(detalle.modalidad || '-')}</div></div>
+                    <div><div class="pedido-ficha-kicker">Saldo pendiente</div><div class="pedido-ficha-main-title" style="color:#d16b00;">${formatoMonedaCLP(ficha.saldo)}</div></div>
+                    <div class="pedido-ficha-pill ${ficha.estado === 'borrador' ? 'warn' : ''}">&#10003; ${escapeHtml(ficha.estado === 'borrador' ? 'Pendiente' : 'Confirmado')}</div>
+                </div>
+                <div class="pedido-ficha-layout">
+                    <div class="pedido-ficha-left">
+                        <div class="pedido-ficha-card pedido-ficha-product">
+                            <div class="pedido-ficha-product-media">${imgHtml}</div>
+                            <div class="pedido-ficha-product-body">
+                                <div class="pedido-ficha-main-title">${escapeHtml(detalle.categoria || ficha.titulo || '-')}</div>
+                                <div class="pedido-ficha-subtitle">${escapeHtml(detalle.tamano || '-')}</div>
+                                <div class="pedido-ficha-pill warn" style="margin-top:10px;">${escapeHtml(detalle.bizcocho || 'Detalle torta')}</div>
+                            </div>
+                        </div>
+                        <div class="pedido-ficha-card">
+                            <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">$</span> Pago</div>
+                            <div class="pedido-ficha-total-line"><span>Total del pedido</span><span>${formatoMonedaCLP(ficha.total)}</span></div>
+                            <div class="pedido-ficha-total-line"><span>Abono recibido</span><span style="color:#166534;">${formatoMonedaCLP(ficha.abono)}</span></div>
+                            <div class="pedido-ficha-total-line strong"><span>Saldo pendiente</span><span>${formatoMonedaCLP(ficha.saldo)}</span></div>
+                        </div>
+                        <div class="pedido-ficha-card">
+                            <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">@</span> Cliente</div>
+                            <div class="pedido-ficha-main-title">${escapeHtml(ficha.cliente)}</div>
+                            <div class="pedido-ficha-subtitle">${escapeHtml(ficha.telefono)}</div>
+                            <div class="pedido-ficha-subtitle">Referencia: ${escapeHtml(detalle.referencias || '-')}</div>
+                        </div>
+                        <div class="pedido-ficha-card">
+                            <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">!</span> Acciones rapidas</div>
+                            <div class="pedido-ficha-actions">
+                                <button type="button" class="pedido-ficha-action" onclick="contactarClienteWhatsAppEvento()">WhatsApp</button>
+                                <button type="button" class="pedido-ficha-action" onclick="enviarCotizacionWhatsAppCliente()">WhatsApp + PDF</button>
+                                <button type="button" class="pedido-ficha-action" onclick="generarPDF()">Ver PDF</button>
+                                <button type="button" class="pedido-ficha-action" onclick="navigator.clipboard && navigator.clipboard.writeText('${escapeHtml(tracking)}')">Copiar enlace</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pedido-ficha-right">
+                        <div class="pedido-ficha-grid">
+                            <div class="pedido-ficha-card">
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">i</span> Detalles del pedido</div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Categoria</span><span class="pedido-ficha-value">${escapeHtml(detalle.categoria || '-')}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Tamano</span><span class="pedido-ficha-value">${escapeHtml(detalle.tamano || '-')}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Bizcocho</span><span class="pedido-ficha-value">${escapeHtml(detalle.bizcocho || '-')}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Nota</span><span class="pedido-ficha-value">${escapeHtml(detalle.nota || '-')}</span></div>
+                            </div>
+                            <div class="pedido-ficha-card">
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">&#10003;</span> Sabores y rellenos</div>
+                                <div class="pedido-ficha-list">${_listaFichaHtml(detalle.sabores)}</div>
+                            </div>
+                            <div class="pedido-ficha-card">
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">+</span> Extras</div>
+                                <div class="pedido-ficha-list">${_listaFichaHtml(detalle.extras)}</div>
+                            </div>
+                            <div class="pedido-ficha-card">
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">E</span> Entrega</div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Modalidad</span><span class="pedido-ficha-value">${escapeHtml(detalle.modalidad || '-')}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Direccion</span><span class="pedido-ficha-value">${escapeHtml(detalle.direccion || '-')}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Fecha</span><span class="pedido-ficha-value">${escapeHtml(ficha.fecha_larga)}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Hora</span><span class="pedido-ficha-value">${escapeHtml(ficha.hora)}</span></div>
+                            </div>
+                            <div class="pedido-ficha-card">
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">T</span> Linea de tiempo</div>
+                                <div class="event-countdown ${escapeHtml(claseCuentaRegresiva({fecha: ficha.fecha, hora_entrega: ficha.hora}))}">${escapeHtml(countdown)}</div>
+                                <div class="pedido-ficha-timeline" style="margin-top:10px;">${timeline}</div>
+                            </div>
+                            <div class="pedido-ficha-card">
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">QR</span> Seguimiento</div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Estado</span><span class="pedido-ficha-value">${escapeHtml(estadoLabel)}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Enlace</span><span class="pedido-ficha-value">${tracking ? `<a href="${escapeHtml(tracking)}" target="_blank" rel="noopener noreferrer">Ver seguimiento</a>` : '-'}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Topper</span><span class="pedido-ficha-value">${escapeHtml((detalle.topper || []).join(', ') || '-')}</span></div>
+                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Otros cargos</span><span class="pedido-ficha-value">${escapeHtml((detalle.otros || []).join(', ') || '-')}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         function normalizarChecklistNota(items) {
             let source = items;
             if (typeof source === 'string') {
@@ -3803,11 +4430,23 @@
             if (telefonoInput) {
                 telefonoInput.addEventListener('input', actualizarBotonWhatsAppCliente);
             }
+            ['evento-codigo-pedido', 'evento-titulo', 'evento-fecha', 'evento-hora-inicio', 'evento-entrega', 'evento-cliente', 'evento-telefono', 'evento-direccion', 'evento-total', 'evento-abono', 'evento-ingredientes', 'evento-seguimiento-estado'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const evtName = ['SELECT', 'INPUT', 'TEXTAREA'].includes(el.tagName) ? 'input' : 'change';
+                el.addEventListener(evtName, () => {
+                    if (eventoEditando && Number(eventoEditando.id || 0) > 0) renderFichaPedidoEdicion(eventoEditando);
+                });
+                el.addEventListener('change', () => {
+                    if (eventoEditando && Number(eventoEditando.id || 0) > 0) renderFichaPedidoEdicion(eventoEditando);
+                });
+            });
             const notaTortaEl = document.getElementById('torta-nota');
             if (notaTortaEl) {
                 notaTortaEl.addEventListener('input', () => {
                     if (!tortaBuilder) tortaBuilder = _tortaBuilderVacio();
                     tortaBuilder.nota = String(notaTortaEl.value || '').slice(0, 500);
+                    if (eventoEditando && Number(eventoEditando.id || 0) > 0) renderFichaPedidoEdicion(eventoEditando);
                 });
             }
             const fechaEventoEl = document.getElementById('evento-fecha');
@@ -5662,6 +6301,7 @@
             document.getElementById('evento-hora-inicio').value = horaInicioSugerida || config.horaInicio;
             actualizarVisibilidadBotonPdf();
             actualizarAccionesGuardadoModal();
+            renderFichaPedidoEdicion(null);
             abrirModal();
         }
         
@@ -5688,6 +6328,7 @@
             limpiarMapaEstado();
             actualizarBotonWhatsAppCliente();
             actualizarAccionesGuardadoModal();
+            renderFichaPedidoEdicion(null);
         }
         
         function abrirConfig() {
@@ -5827,6 +6468,7 @@
                 if (idx >= 0 && data.evento) eventos[idx] = data.evento;
                 eventoEditando = data.evento || eventoEditando;
                 actualizarSeguimientoAdmin(eventoEditando);
+                renderFichaPedidoEdicion(eventoEditando);
                 renderizarCalendario();
                 renderizarProximos();
                 renderizarBorradores();
@@ -5886,6 +6528,7 @@
             actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
             actualizarSeguimientoAdmin(null);
+            renderFichaPedidoEdicion(null);
             abrirModal();
         }
 
@@ -5959,6 +6602,7 @@
             actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
             actualizarSeguimientoAdmin(evento);
+            renderFichaPedidoEdicion(evento);
             abrirModal();
         }
         
@@ -5998,11 +6642,13 @@
             if (!esEnvio) {
                 if (mapaWrap) mapaWrap.style.display = 'none';
                 limpiarMapaEstado();
+                if (eventoEditando && Number(eventoEditando.id || 0) > 0) renderFichaPedidoEdicion(eventoEditando);
                 return;
             }
 
             if (mapaWrap) mapaWrap.style.display = 'block';
             actualizarMapaDesdeDireccion();
+            if (eventoEditando && Number(eventoEditando.id || 0) > 0) renderFichaPedidoEdicion(eventoEditando);
         }
         
         function calcularRestante() {
@@ -6010,6 +6656,9 @@
             const abono = parseFloat(document.getElementById('evento-abono').value) || 0;
             const restante = Math.max(0, total - abono);
             document.getElementById('evento-restante').textContent = `$${restante.toLocaleString()}`;
+            if (eventoEditando && Number(eventoEditando.id || 0) > 0) {
+                renderFichaPedidoEdicion(eventoEditando);
+            }
         }
         
         // PRÓXIMOS EVENTOS
