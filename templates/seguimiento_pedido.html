@@ -102,6 +102,44 @@
             font-size: 13px;
             word-break: break-word;
         }
+        .lookup {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin: 14px 0 6px;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            background: #fff;
+        }
+        .lookup label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .lookup-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+        }
+        .lookup input {
+            width: 100%;
+            min-height: 46px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 0 14px;
+            font: inherit;
+            font-weight: 800;
+            text-transform: uppercase;
+            outline: none;
+        }
+        .lookup input:focus {
+            border-color: rgba(22, 131, 66, 0.6);
+            box-shadow: 0 0 0 4px rgba(22, 131, 66, 0.12);
+        }
+        .btn-search { background: var(--orange); color: #fff; padding: 0 16px; }
         .status-card {
             margin-top: 16px;
             padding: 18px;
@@ -244,13 +282,20 @@
                 <div class="live">Ahora</div>
             </div>
             <h1>Seguimiento de pedido</h1>
-            <p class="subtitle">Escaneaste el codigo QR de tu comprobante. Aqui puedes revisar en que etapa va tu pedido.</p>
-            <div class="code-chip">Codigo: <span id="codigo">{{ codigo_pedido }}</span></div>
+            <p class="subtitle">Escanea el codigo QR de tu comprobante o ingresa manualmente tu codigo de pedido para revisar el avance.</p>
+            <form class="lookup" onsubmit="buscarCodigoSeguimiento(event)">
+                <label for="codigo-input">Codigo de pedido</label>
+                <div class="lookup-row">
+                    <input id="codigo-input" type="text" value="{{ codigo_pedido }}" placeholder="Ej: AGD-20260731-000085" autocomplete="off">
+                    <button class="btn-search" type="submit">Ver</button>
+                </div>
+            </form>
+            <div class="code-chip" id="codigo-chip" style="display:none;">Codigo: <span id="codigo"></span></div>
             <div id="status-root">
                 <div class="status-card">
-                    <p class="status-label">Consultando</p>
-                    <h2 class="status-title">Cargando estado...</h2>
-                    <p class="status-desc">Estamos revisando la informacion actualizada de tu pedido.</p>
+                    <p class="status-label">Consulta</p>
+                    <h2 class="status-title">Ingresa tu codigo</h2>
+                    <p class="status-desc">El codigo aparece en tu comprobante PDF y tambien viene integrado en el QR.</p>
                 </div>
             </div>
             <div class="actions">
@@ -262,9 +307,12 @@
     </main>
 
     <script>
-        const CODIGO_PEDIDO = {{ codigo_pedido|tojson }};
+        let codigoPedidoActual = {{ codigo_pedido|tojson }};
         const root = document.getElementById('status-root');
         const updated = document.getElementById('updated-text');
+        const codigoInput = document.getElementById('codigo-input');
+        const codigoChip = document.getElementById('codigo-chip');
+        const codigoText = document.getElementById('codigo');
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -282,7 +330,7 @@
             const actual = estados[actualIndex] || estados[0] || { label: 'Pendiente', descripcion: 'Pedido registrado.' };
             const steps = estados.map((item, idx) => {
                 const cls = idx < actualIndex ? 'done' : (idx === actualIndex ? 'active' : '');
-                const symbol = idx < actualIndex ? '&check;' : (idx + 1);
+                const symbol = idx < actualIndex ? 'OK' : (idx + 1);
                 return `
                     <div class="step ${cls}">
                         <div class="dot">${escapeHtml(symbol)}</div>
@@ -308,6 +356,10 @@
                 <div class="timeline">${steps}</div>
             `;
             updated.textContent = `Ultima actualizacion: ${pedido.estado_actualizado || new Date().toLocaleTimeString('es-CL')}. Se refresca cada 30 segundos.`;
+            if (codigoChip && codigoText) {
+                codigoText.textContent = pedido.codigo_pedido || codigoPedidoActual || '';
+                codigoChip.style.display = 'inline-flex';
+            }
         }
 
         function renderError(message) {
@@ -315,9 +367,14 @@
         }
 
         async function cargarSeguimiento(manual) {
+            const codigo = String(codigoPedidoActual || '').trim().toUpperCase();
+            if (!codigo) {
+                updated.textContent = 'Ingresa el codigo de pedido para consultar.';
+                return;
+            }
             try {
                 if (manual) updated.textContent = 'Actualizando...';
-                const res = await fetch(`/api/seguimiento/${encodeURIComponent(CODIGO_PEDIDO)}`, { cache: 'no-store' });
+                const res = await fetch(`/api/seguimiento/${encodeURIComponent(codigo)}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || 'Pedido no encontrado');
                 renderPedido(data.pedido || {});
@@ -327,7 +384,21 @@
             }
         }
 
-        cargarSeguimiento(false);
+        function buscarCodigoSeguimiento(event) {
+            if (event) event.preventDefault();
+            const codigo = String((codigoInput && codigoInput.value) || '').trim().toUpperCase();
+            if (!codigo) {
+                renderError('Ingresa el codigo de pedido para consultar.');
+                return;
+            }
+            codigoPedidoActual = codigo;
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState({}, '', `/seguimiento/${encodeURIComponent(codigo)}`);
+            }
+            cargarSeguimiento(true);
+        }
+
+        if (codigoPedidoActual) cargarSeguimiento(false);
         setInterval(() => cargarSeguimiento(false), 30000);
     </script>
 </body>

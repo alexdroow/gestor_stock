@@ -226,7 +226,7 @@ def _ruta_es_publica(path):
         return True
     if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
-    if ruta.startswith("/seguimiento/"):
+    if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):
         return True
     if ruta.startswith("/tienda/flow/"):
         return True
@@ -1255,8 +1255,9 @@ def _seguimiento_agenda_payload(evento):
     }
 
 
+@app.route('/seguimiento')
 @app.route('/seguimiento/<codigo_pedido>')
-def seguimiento_pedido(codigo_pedido):
+def seguimiento_pedido(codigo_pedido=""):
     codigo = str(codigo_pedido or "").strip().upper()
     return render_template("seguimiento_pedido.html", codigo_pedido=codigo)
 
@@ -4243,6 +4244,10 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     _draw_round(461, 104, 58, 52, radius=4, stroke=(1, 1, 1), fill=(1, 1, 1), lw=0)
     seguimiento_url = f"{_public_base_url()}/seguimiento/{quote(codigo_txt)}" if codigo_txt and codigo_txt != "-" else f"{PUBLIC_BASE_URL}/tienda/agendar"
     _draw_qr(466, 109, 48, seguimiento_url)
+    try:
+        c.linkURL(seguimiento_url, (428, 91, 553, 189), relative=0, thickness=0)
+    except Exception:
+        pass
 
     # Pie de pagina
     _draw_round(42, 42, 511, 34, radius=7, stroke=brown, fill=brown, lw=0)
@@ -22148,6 +22153,12 @@ def api_agenda_guardar():
         
         resultado = guardar_evento_agenda(data)
         if resultado.get('success'):
+            seguimiento_estado = str((data or {}).get('seguimiento_estado') or '').strip()
+            if seguimiento_estado and resultado.get('id'):
+                seguimiento_resultado = actualizar_seguimiento_evento_agenda(resultado.get('id'), seguimiento_estado)
+                if seguimiento_resultado.get('success'):
+                    resultado['seguimiento_estado'] = seguimiento_resultado.get('seguimiento_estado')
+                    resultado['seguimiento_actualizado'] = seguimiento_resultado.get('seguimiento_actualizado')
             crear_backup()
         
         return jsonify(resultado)

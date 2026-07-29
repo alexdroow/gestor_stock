@@ -4000,6 +4000,9 @@
                     : (document.getElementById('bloqueo-motivo').value || null),
                 alerta_minutos: parseInt(document.getElementById('evento-alerta').value) || 1440,
                 estado: estadoGuardar,
+                seguimiento_estado: (confirmarReservaTienda && !guardadoBorrador && tipo !== 'bloqueo')
+                    ? 'recepcionado'
+                    : normalizarEstadoSeguimientoAgenda(document.getElementById('evento-seguimiento-estado')?.value || (eventoEditando && eventoEditando.seguimiento_estado)),
                 codigo_pedido: (document.getElementById('evento-codigo-pedido').value || '').trim() || null,
                 codigo_operacion: (eventoEditando && eventoEditando.codigo_operacion) ? String(eventoEditando.codigo_operacion).trim() : null
             };
@@ -5787,16 +5790,19 @@
             if (!card || !select || !link || !updated) return;
             const tipo = String((evento && evento.tipo) || (document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
             const codigo = String((evento && evento.codigo_pedido) || document.getElementById('evento-codigo-pedido')?.value || '').trim();
-            const tienePedido = tipo !== 'bloqueo' && Boolean(codigo);
-            card.style.display = tienePedido ? 'block' : 'none';
-            if (!tienePedido) return;
+            const esPedido = tipo !== 'bloqueo';
+            card.style.display = esPedido ? 'block' : 'none';
+            if (!esPedido) return;
             const estado = normalizarEstadoSeguimientoAgenda(evento && evento.seguimiento_estado);
             select.value = estado;
             const url = seguimientoUrlPedido(codigo);
             link.href = url;
+            link.style.display = url ? 'inline-flex' : 'none';
             link.textContent = 'Abrir seguimiento QR';
             const fecha = String((evento && evento.seguimiento_actualizado) || '').trim();
-            updated.innerHTML = `<span class="seguimiento-pill">${escapeHtml(SEGUIMIENTO_ESTADOS_LABELS[estado] || 'Pendiente')}</span>${fecha ? ` <span class="form-hint">Actualizado: ${escapeHtml(fecha)}</span>` : ''}`;
+            updated.innerHTML = codigo
+                ? `<span class="seguimiento-pill">${escapeHtml(SEGUIMIENTO_ESTADOS_LABELS[estado] || 'Pendiente')}</span>${fecha ? ` <span class="form-hint">Actualizado: ${escapeHtml(fecha)}</span>` : ''}`
+                : '<span class="form-hint">Guarda el pedido para generar codigo QR de seguimiento.</span>';
         }
 
         async function guardarSeguimientoPedido() {
@@ -5980,6 +5986,7 @@
             actualizarVisibilidadBotonPdf();
             actualizarAccionesGuardadoModal();
             actualizarBotonWhatsAppCliente();
+            actualizarSeguimientoAdmin(eventoEditando);
         }
         
         function toggleEnvio() {
