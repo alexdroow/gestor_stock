@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response, send_file, Response, session
+﻿from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response, send_file, Response, session
 import os
 import sys
 import math
@@ -224,7 +224,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
     if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):
         return True
@@ -1189,17 +1189,21 @@ def tienda_publica():
 
 @app.route('/tienda/agendar')
 def tienda_publica_agendar():
+    return redirect(url_for('tienda_publica_agendapedidos'))
+
+
+@app.route('/tienda/agendapedidos')
+def tienda_publica_agendapedidos():
     try:
-        personalizacion = _obtener_tienda_personalizacion()
+        personalizacion = _obtener_tienda_personalizacion(apply_programacion=False, editor_mode="draft")
     except Exception:
         personalizacion = _default_tienda_personalizacion()
-    # Agenda beta pasa a ser la version oficial en la ruta publica de agenda.
     return render_template(
         'tienda.html',
         tienda_personalizacion=personalizacion,
         force_agenda=True,
         modo_presencial=False,
-        agenda_beta=True,
+        agenda_beta=False,
         mobile_detected=_request_is_phone_mobile(),
     )
 
@@ -1207,7 +1211,7 @@ def tienda_publica_agendar():
 @app.route('/tienda/agendar-beta')
 def tienda_publica_agendar_beta():
     # Compatibilidad: mantenemos la ruta antigua apuntando a la oficial.
-    return redirect(url_for('tienda_publica_agendar'))
+    return redirect(url_for('tienda_publica_agendapedidos'))
 
 
 SEGUIMIENTO_AGENDA_ESTADOS = [
@@ -1292,10 +1296,12 @@ def tienda_publica_presencial():
 
 @app.route('/tienda/preview')
 def tienda_preview_admin():
-    if not session.get(_ADMIN_SESSION_KEY):
-        return redirect(url_for("admin_login", next=request.full_path if request.query_string else request.path))
     mode = str(request.args.get("mode") or "live").strip().lower()
     force_agenda = str(request.args.get("agenda") or "0").strip() in {"1", "true", "yes", "on"}
+    if mode == "draft" and force_agenda:
+        return redirect(url_for("tienda_publica_agendapedidos"), code=302)
+    if not session.get(_ADMIN_SESSION_KEY):
+        return redirect(url_for("admin_login", next=request.full_path if request.query_string else request.path))
     try:
         if mode == "draft":
             personalizacion = _obtener_tienda_personalizacion(apply_programacion=False, editor_mode="draft")
@@ -4244,7 +4250,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.drawCentredString(490.5, 170, "ESCANEA PARA VER")
     c.drawCentredString(490.5, 160, "ESTADO DEL PEDIDO")
     _draw_round(461, 104, 58, 52, radius=4, stroke=(1, 1, 1), fill=(1, 1, 1), lw=0)
-    seguimiento_url = f"{_public_base_url()}/seguimiento/{quote(codigo_txt)}" if codigo_txt and codigo_txt != "-" else f"{PUBLIC_BASE_URL}/tienda/agendar"
+    seguimiento_url = f"{_public_base_url()}/seguimiento/{quote(codigo_txt)}" if codigo_txt and codigo_txt != "-" else f"{PUBLIC_BASE_URL}/tienda/agendapedidos"
     _draw_qr(466, 109, 48, seguimiento_url)
     try:
         c.linkURL(seguimiento_url, (428, 91, 553, 189), relative=0, thickness=0)

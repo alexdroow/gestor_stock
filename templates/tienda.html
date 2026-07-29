@@ -206,7 +206,8 @@
         body.tienda-preview-draft .beta-preview-ribbon {
             display: inline-flex;
         }
-        body.agenda-beta-mode.tienda-preview-draft .beta-preview-ribbon {
+        body.agenda-beta-mode.tienda-preview-draft .beta-preview-ribbon,
+        body.tienda-agendapedidos-oficial .beta-preview-ribbon {
             display: none !important;
         }
         body.tienda-preview-draft .topbar {
@@ -10599,7 +10600,7 @@
         }
     </style>
 </head>
-<body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if force_agenda and (agenda_beta or request.path == '/tienda/preview') %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if (request.path == '/tienda/preview' and request.args.get('mode') == 'draft') or (agenda_beta and mobile_detected) %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
+<body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if request.path == '/tienda/agendapedidos' %}{% set _ = _body_cls.append('tienda-agendapedidos-oficial') %}{% endif %}{% if force_agenda and (agenda_beta or request.path in ['/tienda/preview', '/tienda/agendapedidos']) %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if (request.path == '/tienda/preview' and request.args.get('mode') == 'draft') or request.path == '/tienda/agendapedidos' or (agenda_beta and mobile_detected) %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
     <div class="beta-preview-ribbon">BETA ADMIN - no visible para clientes</div>
     <div id="tienda-admin-pill" class="admin-mode-pill">MODO ADMIN ACTIVO</div>
     <header class="topbar">
@@ -11674,7 +11675,8 @@
         const _agendaBetaFromServer = {{ 'true' if agenda_beta else 'false' }};
         const _forceAgendaFromQueryInit = ["agenda", "agendar", "reservas"].includes(String(_agendaUrlParamsInit.get("seccion") || "").trim().toLowerCase());
         const _forceAgendaFromHashInit = ["#agenda", "#agendar", "#reservas"].includes(String(window.location.hash || "").trim().toLowerCase());
-        const _forceAgendaFromPathInit = String(window.location.pathname || "").toLowerCase().startsWith("/tienda/agendar");
+        const _pathInit = String(window.location.pathname || "").toLowerCase();
+        const _forceAgendaFromPathInit = _pathInit.startsWith("/tienda/agendar") || _pathInit.startsWith("/tienda/agendapedidos");
         const _forceAgendaModeInit = Boolean(_forceAgendaFromServer || _forceAgendaFromQueryInit || _forceAgendaFromHashInit || _forceAgendaFromPathInit);
         const _modoPresencialFromQueryInit = ["presencial", "local", "tablet"].includes(String(_agendaUrlParamsInit.get("modo") || "").trim().toLowerCase());
         const _modoPresencialFromPathInit = String(window.location.pathname || "").toLowerCase().startsWith("/tienda/presencial");
@@ -16809,7 +16811,7 @@
                 const url = new URL(window.location.href);
                 const isAgenda = String(cat || "").trim().toUpperCase() === "AGENDA";
                 if (isAgenda) {
-                    url.pathname = "/tienda/agendar";
+                    url.pathname = "/tienda/agendapedidos";
                     url.searchParams.delete("seccion");
                 } else {
                     url.pathname = "/tienda";
