@@ -12553,6 +12553,13 @@ def _normalizar_seguimiento_evento_agenda(estado, default="pendiente"):
     return str(default or "pendiente").strip().lower()
 
 
+def _ensure_agenda_seguimiento_columns(conn):
+    _ensure_column(conn, "agenda_eventos", "seguimiento_estado", "TEXT DEFAULT 'pendiente'")
+    _ensure_column(conn, "agenda_eventos", "seguimiento_actualizado", "TEXT")
+    conn.execute("UPDATE agenda_eventos SET seguimiento_estado = COALESCE(NULLIF(TRIM(seguimiento_estado), ''), 'pendiente')")
+    conn.execute("UPDATE agenda_eventos SET seguimiento_actualizado = COALESCE(NULLIF(TRIM(seguimiento_actualizado), ''), creado, datetime('now'))")
+
+
 def actualizar_seguimiento_evento_agenda(evento_id, estado):
     """Actualiza el estado de seguimiento visible para el cliente por QR."""
     try:
@@ -12569,6 +12576,7 @@ def actualizar_seguimiento_evento_agenda(evento_id, estado):
     conn = get_db()
     cursor = conn.cursor()
     try:
+        _ensure_agenda_seguimiento_columns(conn)
         cursor.execute("SELECT id FROM agenda_eventos WHERE id = ? AND tipo <> 'bloqueo'", (evento_id,))
         actual = cursor.fetchone()
         if not actual:
