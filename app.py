@@ -3663,127 +3663,489 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         items.append(f"Total estimado productos: {_fmt_clp_pdf(total_catalogo)}")
         return {"title": "Catalogo torta", "items": items}
 
-    c = canvas.Canvas(abs_path, pagesize=A4)
-    _, height = A4
-    y = height - 44
-    margin = 40
-    right = 560
-    motivo_raw = str(reserva.get("motivo") or "").strip().lower()
-    es_reserva_pendiente = "reserva cliente tienda online" in motivo_raw
+    def _catalogo_pdf_data_from_builder(builder):
+        if not isinstance(builder, dict):
+            return None
+        try:
+            cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
+            catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+        except Exception:
+            catalogo = {"categorias": [], "sizes": [], "sabores": [], "extras": [], "toppers": []}
 
-    def _ensure_space(needed=20, reset_font=True):
-        nonlocal y
-        if y >= 62 + needed:
-            return
-        c.showPage()
-        y = height - 44
-        if reset_font:
-            c.setFont("Helvetica", 10)
+        def _idx(rows):
+            out = {}
+            for r in (rows or []):
+                key = str((r or {}).get("id") or "").strip().lower()
+                if key:
+                    out[key] = dict(r or {})
+            return out
 
-    def _draw_wrapped(lines, x=margin + 2, font="Helvetica", size=10, step=12):
-        nonlocal y
-        c.setFont(font, size)
-        for ln in lines:
-            _ensure_space(step + 2, reset_font=False)
-            c.drawString(x, y, str(ln or "")[:170])
-            y -= step
+        categorias = _idx(catalogo.get("categorias"))
+        sizes = _idx(catalogo.get("sizes"))
+        sabores = _idx(catalogo.get("sabores"))
+        extras = _idx(catalogo.get("extras"))
+        toppers = _idx(catalogo.get("toppers"))
 
-    c.setFont("Helvetica-Bold", 17)
-    c.drawString(margin, y, f"Reserva agenda tienda #{rid}")
-    y -= 16
-    c.setFont("Helvetica", 10)
-    c.drawString(margin, y, f"Generado: {datetime.now(ZoneInfo('America/Santiago')).strftime('%d-%m-%Y %H:%M:%S')}")
-    y -= 18
-    if es_reserva_pendiente:
-        _ensure_space(34, reset_font=False)
-        c.setFillColorRGB(1.0, 0.95, 0.86)
-        c.roundRect(margin, y - 11, right - margin, 18, 4, stroke=0, fill=1)
-        c.setFillColorRGB(0.62, 0.20, 0.04)
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(margin + 8, y + 1, "RESERVACION PENDIENTE")
-        c.setFillColorRGB(0, 0, 0)
-        y -= 22
-    c.setStrokeColorRGB(0.87, 0.90, 0.95)
-    c.line(margin, y, right, y)
-    y -= 16
+        categoria = categorias.get(str(builder.get("categoria_id") or "").strip().lower()) or {}
+        size = sizes.get(str(builder.get("size_id") or "").strip().lower()) or {}
+        sabor_rows = []
+        seen = set()
+        for raw_sid in (builder.get("sabor_ids") if isinstance(builder.get("sabor_ids"), list) else []):
+            sid = str(raw_sid or "").strip().lower()
+            if not sid or sid in seen:
+                continue
+            row = sabores.get(sid)
+            if row:
+                sabor_rows.append(row)
+                seen.add(sid)
+        extra_rows = []
+        for raw_item in (builder.get("extra_items") if isinstance(builder.get("extra_items"), list) else []):
+            item = dict(raw_item or {})
+            eid = str(item.get("id") or "").strip().lower()
+            row = extras.get(eid)
+            if not row:
+                continue
+            try:
+                qty = int(item.get("qty") or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            if qty > 0:
+                extra_rows.append({"nombre": row.get("nombre"), "precio": float(row.get("precio") or 0), "qty": qty})
+        topper = toppers.get(str(builder.get("topper_id") or "").strip().lower()) if str(builder.get("topper_id") or "").strip() else None
+        otros_cargos = builder.get("otros_cargos") if isinstance(builder.get("otros_cargos"), list) else []
+        refs = [str(x or "").strip() for x in (builder.get("referencia_urls") if isinstance(builder.get("referencia_urls"), list) else []) if str(x or "").strip()]
+        nota = str(builder.get("nota") or "").strip()
 
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, y, "Datos de Reserva")
-    y -= 14
-    _draw_wrapped(_wrap(f"Codigo pedido: {reserva.get('codigo_pedido') or '-'}", max_len=92))
-    _draw_wrapped(_wrap(f"Tipo: {str(reserva.get('tipo') or '').capitalize()}", max_len=92))
-    _draw_wrapped(_wrap(f"Fecha: {reserva.get('fecha') or '-'} {reserva.get('hora_inicio') or '-'}", max_len=92))
-    _draw_wrapped(_wrap(f"Cliente: {reserva.get('cliente') or '-'}", max_len=92))
-    _draw_wrapped(_wrap(f"Telefono: {reserva.get('telefono') or '-'}", max_len=92))
-    _draw_wrapped(_wrap(f"Direccion: {reserva.get('direccion') or 'Retiro en tienda'}", max_len=92))
-    y -= 6
+        subtotal = float(size.get("precio") or 0)
+        subtotal += sum(float(s.get("precio") or 0) for s in sabor_rows)
+        subtotal += sum(float(x.get("precio") or 0) * int(x.get("qty") or 0) for x in extra_rows)
+        if topper:
+            subtotal += float(topper.get("precio") or 0)
+        cargos_rows = []
+        for cargo in otros_cargos:
+            cgo = dict(cargo or {})
+            desc = str(cgo.get("descripcion") or "").strip() or "Cargo manual"
+            try:
+                val = float(cgo.get("valor") or 0)
+            except (TypeError, ValueError):
+                val = 0.0
+            if val > 0:
+                cargos_rows.append({"descripcion": desc, "valor": val})
+                subtotal += val
 
-    c.setFont("Helvetica-Bold", 11)
-    _ensure_space(24, reset_font=False)
-    c.drawString(margin, y, "Detalle del Pedido")
-    y -= 16
+        descuento_tipo = str(builder.get("descuento_tipo") or "ninguno").strip().lower()
+        try:
+            descuento_valor = float(builder.get("descuento_valor") or 0)
+        except (TypeError, ValueError):
+            descuento_valor = 0.0
+        descuento = 0.0
+        if descuento_tipo == "monto":
+            descuento = descuento_valor
+        elif descuento_tipo == "porcentaje":
+            descuento = subtotal * (max(0.0, min(100.0, descuento_valor)) / 100.0)
+        descuento = max(0.0, min(subtotal, descuento))
+        total_productos = max(0.0, subtotal - descuento)
+        return {
+            "categoria": categoria,
+            "size": size,
+            "sabores": sabor_rows,
+            "extras": extra_rows,
+            "topper": topper,
+            "otros_cargos": cargos_rows,
+            "referencias": refs,
+            "nota": nota,
+            "subtotal": subtotal,
+            "descuento": descuento,
+            "total_productos": total_productos,
+            "cupon_codigo": str(builder.get("cupon_codigo") or "").strip(),
+            "imagen_url": str(categoria.get("imagen_url") or "").strip(),
+        }
 
     ingredientes_txt = reserva.get("ingredientes") or ""
     sections = _split_sections(ingredientes_txt, "Ingredientes / Detalles")
     builder_data = _parse_builder_json(ingredientes_txt)
     if not builder_data:
         builder_data = _builder_from_resumen_cliente(ingredientes_txt)
+    catalog_data = _catalogo_pdf_data_from_builder(builder_data) if builder_data else None
     builder_catalog_section = _catalogo_section_from_builder(builder_data) if builder_data else None
     if builder_catalog_section:
         filtered = [sec for sec in sections if str(sec.get("title") or "").strip().lower() != "catalogo torta"]
-        inserted = False
-        merged = []
-        for sec in filtered:
-            merged.append(sec)
-            t = str(sec.get("title") or "").strip().lower()
-            if not inserted and (t in {"ingredientes / detalles", "detalle pedido"}):
-                merged.append(builder_catalog_section)
-                inserted = True
-        if not inserted:
-            merged.insert(0, builder_catalog_section)
-        sections = merged
+        sections = [builder_catalog_section] + filtered
 
-    for section in sections:
-        _ensure_space(26, reset_font=False)
-        c.setFillColorRGB(0.96, 0.97, 0.99)
-        c.roundRect(margin, y - 11, right - margin, 16, 3, stroke=0, fill=1)
-        c.setFillColorRGB(0, 0, 0)
+    def _section_value(prefixes, default=""):
+        lows = [str(p or "").strip().lower() for p in prefixes]
+        for sec in sections:
+            for item in (sec.get("items") or []):
+                raw = str(item or "").strip().lstrip("- ").strip()
+                low = _norm_text(raw)
+                for p in lows:
+                    if low.startswith(p):
+                        return raw.split(":", 1)[1].strip() if ":" in raw else raw
+        return default
+
+    def _money_from_text(label):
+        value = _section_value([label], "")
+        nums = re.findall(r"-?\$?\s*([0-9][0-9\.]*)", str(value or ""))
+        if not nums:
+            return 0.0
+        try:
+            return float(nums[-1].replace(".", ""))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _fecha_larga(fecha_raw):
+        try:
+            dt = datetime.strptime(str(fecha_raw or ""), "%Y-%m-%d")
+            meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+            return f"{dt.day} {meses[dt.month - 1]} {dt.year}"
+        except Exception:
+            return str(fecha_raw or "-").strip() or "-"
+
+    def _fmt_money(value):
+        return _fmt_clp_pdf(value)
+
+    def _safe_text(value, default="-"):
+        txt = str(value if value is not None else "").strip()
+        return txt if txt else default
+
+    def _plain_lines(rows, empty="-"):
+        out = []
+        for row in rows or []:
+            txt = str(row or "").strip().lstrip("- ").strip()
+            if txt and txt != "-":
+                out.append(txt)
+        return out or [empty]
+
+    def _clip(txt, max_chars):
+        txt = str(txt or "").strip()
+        return txt if len(txt) <= max_chars else txt[: max(0, max_chars - 3)].rstrip() + "..."
+
+    def _fit_lines(txt, max_width, font="Helvetica", size=8, max_lines=2):
+        words = str(txt or "").strip().split()
+        if not words:
+            return [""]
+        lines = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip()
+            if c.stringWidth(test, font, size) <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+            if len(lines) >= max_lines:
+                break
+        if current and len(lines) < max_lines:
+            lines.append(current)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+        if words and " ".join(lines).strip() != " ".join(words).strip() and lines:
+            while c.stringWidth(lines[-1] + "...", font, size) > max_width and len(lines[-1]) > 1:
+                lines[-1] = lines[-1][:-1].rstrip()
+            lines[-1] = lines[-1].rstrip(". ") + "..."
+        return lines or [""]
+
+    c = canvas.Canvas(abs_path, pagesize=A4)
+    width, height = A4
+    now = datetime.now(ZoneInfo("America/Santiago"))
+    brown = (0.259, 0.173, 0.091)
+    brown2 = (0.545, 0.355, 0.204)
+    orange = (0.826, 0.424, 0.071)
+    cream = (0.965, 0.913, 0.843)
+    paper = (1.0, 0.992, 0.976)
+    green = (0.0, 0.43, 0.25)
+    text_dark = (0.12, 0.10, 0.09)
+    muted = (0.38, 0.34, 0.30)
+    border = (0.88, 0.80, 0.69)
+
+    motivo_raw = str(reserva.get("motivo") or "").strip().lower()
+    es_reserva_pendiente = "reserva cliente tienda online" in motivo_raw or str(reserva.get("estado") or "").strip().lower() == "pendiente"
+    estado_txt = "PENDIENTE" if es_reserva_pendiente else "CONFIRMADO"
+    codigo_txt = _safe_text(reserva.get("codigo_pedido") or reserva.get("codigo_operacion") or (f"AGD-{rid:06d}" if rid else "-"))
+    fecha_txt = _safe_text(reserva.get("fecha"))
+    hora_txt = _safe_text(reserva.get("hora_entrega") or reserva.get("hora_inicio"))
+    cliente_txt = _safe_text(reserva.get("cliente"))
+    telefono_txt = _safe_text(reserva.get("telefono"))
+    direccion_raw = _safe_text(reserva.get("direccion"), "")
+    entrega_text_from_items = _section_value(["entrega", "modalidad"], "")
+    entrega_norm = _norm_text(entrega_text_from_items or direccion_raw)
+    es_despacho = "despacho" in entrega_norm or (direccion_raw and "retiro" not in _norm_text(direccion_raw))
+    modalidad_txt = "Despacho" if es_despacho else "Retiro en local Sucree"
+    direccion_txt = direccion_raw if es_despacho else "Sucree Pasteleria"
+    referencia_cliente = _section_value(["detalle", "referencia del cliente", "nota catalogo"], "-") or "-"
+
+    size = (catalog_data or {}).get("size") or {}
+    categoria = (catalog_data or {}).get("categoria") or {}
+    titulo_pedido = _safe_text(size.get("nombre") or reserva.get("titulo") or "Torta personalizada")
+    subtitulo_pedido = _safe_text(categoria.get("nombre") or _section_value(["categoria"], "Torta personalizada"))
+    subtotal_productos = float((catalog_data or {}).get("subtotal") or _money_from_text("subtotal estimado productos") or reserva.get("total") or 0)
+    descuento_total = float((catalog_data or {}).get("descuento") or _money_from_text("descuento aplicado") or 0)
+    despacho_total = _money_from_text("envio") if es_despacho else 0.0
+    total_productos = float((catalog_data or {}).get("total_productos") or max(0.0, subtotal_productos - descuento_total))
+    total_final = _money_from_text("total estimado pedido") or (total_productos + despacho_total)
+    try:
+        abono = float(reserva.get("abono") or 0)
+    except (TypeError, ValueError):
+        abono = 0.0
+
+    sabores = [str(x.get("nombre") or "").strip() for x in ((catalog_data or {}).get("sabores") or []) if str(x.get("nombre") or "").strip()]
+    extras = [f"{x.get('nombre')} x{int(x.get('qty') or 0)}" for x in ((catalog_data or {}).get("extras") or []) if str(x.get("nombre") or "").strip()]
+    topper = ((catalog_data or {}).get("topper") or {}) if catalog_data else {}
+    topper_txt = _safe_text(topper.get("nombre") if topper else "Sin topper")
+    otros_cargos = [f"{x.get('descripcion')} ({_fmt_money(x.get('valor') or 0)})" for x in ((catalog_data or {}).get("otros_cargos") or [])]
+    refs = (catalog_data or {}).get("referencias") or []
+    nota_catalogo = _safe_text((catalog_data or {}).get("nota"), "-")
+    if not sabores:
+        sabores = _plain_lines([x for sec in sections if _norm_text(sec.get("title")) == "catalogo torta" for x in sec.get("items", []) if _norm_text(x).startswith("sabores")], "-")
+    imagen_url = str((catalog_data or {}).get("imagen_url") or "").strip()
+
+    def _static_abs_from_url(url):
+        raw = str(url or "").strip()
+        if not raw:
+            return ""
+        parsed = urlparse(raw)
+        path_part = parsed.path if parsed.scheme or parsed.netloc else raw
+        if path_part.startswith("/static/"):
+            rel = unquote(path_part[len("/static/"):]).replace("/", os.sep)
+            candidate = os.path.normpath(os.path.join(static_dir, rel))
+            if candidate.startswith(os.path.normpath(static_dir)) and os.path.isfile(candidate):
+                return candidate
+        if os.path.isfile(raw):
+            return raw
+        return ""
+
+    def _draw_round(x, y, w, h, radius=10, stroke=border, fill=(1, 1, 1), lw=0.7):
+        c.setStrokeColorRGB(*stroke)
+        c.setFillColorRGB(*fill)
+        c.setLineWidth(lw)
+        c.roundRect(x, y, w, h, radius, stroke=1, fill=1)
+
+    def _draw_label_value(x, y, label, value, w=120, label_size=6.6, value_size=8.0):
+        c.setFillColorRGB(*muted)
+        c.setFont("Helvetica-Bold", label_size)
+        c.drawString(x, y, _clip(str(label).upper(), 28))
+        c.setFillColorRGB(*text_dark)
+        c.setFont("Helvetica", value_size)
+        yy = y - 12
+        for ln in _fit_lines(value, w, "Helvetica", value_size, max_lines=2):
+            c.drawString(x, yy, ln)
+            yy -= value_size + 2
+
+    def _draw_section_title(x, y, title, icon=""):
+        c.setFillColorRGB(*orange)
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(margin + 6, y, str(section.get("title") or "Detalle")[:90])
-        y -= 18
-        items = section.get("items") or ["-"]
-        for item in items:
-            bullet = str(item or "-").strip()
-            if not bullet:
-                bullet = "-"
-            if not bullet.startswith("-"):
-                bullet = f"- {bullet}"
-            wrapped = _wrap(bullet, max_len=96)
-            _draw_wrapped(wrapped, x=margin + 8, font="Helvetica", size=9.8, step=11)
-        y -= 4
-    if es_reserva_pendiente:
-        _ensure_space(56, reset_font=False)
-        c.setStrokeColorRGB(0.97, 0.69, 0.28)
-        c.setFillColorRGB(1.0, 0.98, 0.94)
-        c.roundRect(margin, y - 36, right - margin, 42, 4, stroke=1, fill=1)
-        c.setFillColorRGB(0.55, 0.23, 0.06)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(margin + 8, y - 4, "Importante")
-        c.setFillColorRGB(0.20, 0.15, 0.10)
-        y -= 16
-        _draw_wrapped(
-            _wrap(
-                "Esta reserva se encuentra pendiente de confirmacion. "
-                "Cuando tu pedido sea confirmado por Pasteleria, se enviara "
-                "la cotizacion final en PDF con toda la informacion adicional registrada.",
-                max_len=92,
-            ),
-            x=margin + 8,
-            font="Helvetica",
-            size=9.2,
-            step=10,
-        )
-        y -= 6
+        c.drawString(x, y, icon)
+        c.setFillColorRGB(*text_dark)
+        c.setFont("Helvetica-Bold", 8.2)
+        c.drawString(x + (14 if icon else 0), y, str(title or "").upper())
+
+    def _draw_table(rows, x, y, w, h, label_w=72, max_rows=10):
+        row_h = h / max_rows
+        yy = y + h - row_h + 4
+        for idx, (label, value) in enumerate(rows[:max_rows]):
+            if idx:
+                c.setStrokeColorRGB(0.90, 0.84, 0.76)
+                c.setLineWidth(0.4)
+                c.line(x + 8, yy + row_h - 3, x + w - 8, yy + row_h - 3)
+            c.setFillColorRGB(*text_dark)
+            c.setFont("Helvetica-Bold", 7.1)
+            c.drawString(x + 10, yy, _clip(label, 22))
+            c.setFont("Helvetica", 7.1)
+            for n, ln in enumerate(_fit_lines(value, w - label_w - 18, "Helvetica", 7.1, max_lines=1)):
+                c.drawRightString(x + w - 10, yy - (n * 8), ln)
+            yy -= row_h
+
+    def _draw_image_or_placeholder(x, y, w, h, url):
+        img_path = _static_abs_from_url(url)
+        if img_path:
+            try:
+                from reportlab.lib.utils import ImageReader
+                c.drawImage(ImageReader(img_path), x, y, w, h, preserveAspectRatio=True, anchor="c", mask="auto")
+                return
+            except Exception:
+                pass
+        c.setFillColorRGB(0.20, 0.12, 0.06)
+        c.roundRect(x, y, w, h, 10, stroke=0, fill=1)
+        c.setFillColorRGB(0.94, 0.62, 0.20)
+        c.setFont("Helvetica-Bold", 28)
+        c.drawCentredString(x + w / 2, y + h / 2 + 4, "Sucree")
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(x + w / 2, y + h / 2 - 14, "Imagen de referencia")
+
+    def _draw_qr(x, y, size, payload):
+        try:
+            from reportlab.graphics.barcode.qr import QrCodeWidget
+            from reportlab.graphics.shapes import Drawing
+            from reportlab.graphics import renderPDF
+            qr = QrCodeWidget(str(payload or PUBLIC_BASE_URL))
+            bounds = qr.getBounds()
+            bw = bounds[2] - bounds[0]
+            bh = bounds[3] - bounds[1]
+            drawing = Drawing(size, size, transform=[size / bw, 0, 0, size / bh, 0, 0])
+            drawing.add(qr)
+            renderPDF.draw(drawing, c, x, y)
+        except Exception:
+            _draw_round(x, y, size, size, radius=4, stroke=border, fill=(1, 1, 1))
+            c.setFillColorRGB(*muted)
+            c.setFont("Helvetica-Bold", 8)
+            c.drawCentredString(x + size / 2, y + size / 2, "QR")
+
+    # Fondo y marco general
+    c.setFillColorRGB(*paper)
+    c.rect(0, 0, width, height, stroke=0, fill=1)
+    _draw_round(22, 22, width - 44, height - 44, radius=12, stroke=(0.91, 0.84, 0.74), fill=(1, 0.995, 0.985), lw=0.8)
+
+    # Encabezado
+    logo_path = _static_abs_from_url("/static/watermark_logo_full_backup.png") or _static_abs_from_url("/static/pasteleria_sucree.png")
+    if logo_path:
+        try:
+            from reportlab.lib.utils import ImageReader
+            c.drawImage(ImageReader(logo_path), 42, 686, 82, 82, preserveAspectRatio=True, anchor="c", mask="auto")
+        except Exception:
+            pass
+    c.setFillColorRGB(*brown)
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(150, 742, "COMPROBANTE")
+    c.setFillColorRGB(*orange)
+    c.drawString(150, 718, "DE PEDIDO")
+    c.setStrokeColorRGB(*orange)
+    c.setLineWidth(0.8)
+    c.line(150, 706, 320, 706)
+    c.setFillColorRGB(*brown)
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(150, 686, "CODIGO DE PEDIDO")
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(150, 672, _clip(codigo_txt, 30))
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(340, 686, "FECHA DE EMISION")
+    c.setFont("Helvetica-Bold", 9.8)
+    c.drawString(340, 672, now.strftime("%d-%m-%Y  -  %H:%M"))
+    _draw_round(456, 716, 95, 44, radius=7, stroke=brown, fill=brown, lw=0)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawCentredString(503.5, 744, "ESTADO DEL PEDIDO")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(503.5, 726, estado_txt)
+
+    # Tarjeta hero del pedido
+    _draw_round(42, 532, 511, 128, radius=13, stroke=brown, fill=brown, lw=0)
+    _draw_image_or_placeholder(52, 543, 132, 106, imagen_url)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 17)
+    c.drawString(202, 620, _clip(titulo_pedido.upper(), 28))
+    c.setFillColorRGB(*orange)
+    c.setFont("Helvetica-Bold", 11.5)
+    c.drawString(202, 600, _clip(subtitulo_pedido.upper(), 34))
+    c.setFillColorRGB(0.96, 0.90, 0.80)
+    c.setFont("Helvetica", 7.5)
+    c.drawString(202, 578, f"Modalidad: {modalidad_txt}")
+    c.drawString(202, 562, f"Entrega: {_fecha_larga(fecha_txt)}")
+    c.drawString(202, 546, f"Hora: {hora_txt}")
+    c.setStrokeColorRGB(0.72, 0.55, 0.36)
+    c.line(418, 548, 418, 626)
+    c.setFillColorRGB(*orange)
+    c.setFont("Helvetica-Bold", 7.8)
+    c.drawRightString(532, 586, "TOTAL DEL PEDIDO")
+    c.setFont("Helvetica-Bold", 24)
+    c.drawRightString(532, 558, _fmt_money(total_final))
+
+    # Datos cliente y entrega
+    _draw_round(42, 412, 248, 104, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_round(305, 412, 248, 104, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 494, "Datos del cliente", "ID")
+    _draw_label_value(56, 472, "Cliente", cliente_txt, w=190)
+    _draw_label_value(56, 442, "Telefono", telefono_txt, w=190)
+    _draw_label_value(170, 442, "Referencia", referencia_cliente, w=95)
+    _draw_section_title(319, 494, "Detalles de entrega", "EN")
+    _draw_label_value(319, 472, "Modalidad", modalidad_txt, w=190)
+    _draw_label_value(319, 442, "Direccion", direccion_txt, w=205)
+
+    # Resumen pedido y pago
+    _draw_round(42, 250, 300, 146, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_round(356, 250, 197, 146, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 376, "Resumen del pedido", "PD")
+    resumen_rows = [
+        ("Categoria", _safe_text(categoria.get("nombre") or _section_value(["categoria"], "-"))),
+        ("Tamano", _safe_text(size.get("nombre") or _section_value(["tamano"], "-"))),
+        ("Sabores", ", ".join(sabores) if sabores else "-"),
+        ("Rellenos", ", ".join(sabores) if sabores else "-"),
+        ("Extras", ", ".join(extras) if extras else "-"),
+        ("Topper", topper_txt),
+        ("Otros cargos", ", ".join(otros_cargos) if otros_cargos else "-"),
+        ("Nota", nota_catalogo),
+        ("Referencias", f"{len(refs)} archivo(s)" if refs else "-"),
+    ]
+    _draw_table(resumen_rows, 50, 260, 284, 104, label_w=82, max_rows=9)
+
+    _draw_section_title(370, 376, "Resumen de pago", "$ ")
+    pay_rows = [
+        ("Productos", _fmt_money(subtotal_productos)),
+        ("Despacho", _fmt_money(despacho_total)),
+        ("Descuento", f"-{_fmt_money(descuento_total)}" if descuento_total else "$0"),
+        ("Abono", _fmt_money(abono)),
+    ]
+    yy = 344
+    for label, value in pay_rows:
+        c.setFillColorRGB(*text_dark)
+        c.setFont("Helvetica-Bold", 8.2)
+        c.drawString(374, yy, label)
+        c.setFont("Helvetica", 9.2)
+        c.drawRightString(535, yy, value)
+        yy -= 20
+    c.setStrokeColorRGB(*border)
+    c.line(374, 268, 535, 268)
+    c.setFillColorRGB(*brown)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(455, 249, "TOTAL FINAL")
+    c.setFillColorRGB(*orange)
+    c.setFont("Helvetica-Bold", 24)
+    c.drawCentredString(455, 222, _fmt_money(total_final))
+
+    # Observaciones
+    _draw_round(42, 204, 511, 34, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 222, "Observaciones", "NT")
+    obs = _safe_text(_section_value(["detalle", "nota catalogo"], "-"), "-")
+    c.setFillColorRGB(*text_dark)
+    c.setFont("Helvetica", 7.4)
+    c.drawString(154, 222, _clip(obs, 96))
+
+    # Terminos + QR
+    _draw_round(42, 91, 372, 98, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 171, "Terminos y condiciones (resumen)", "OK")
+    terms = [
+        "Una vez iniciado el proceso de elaboracion, el abono no es reembolsable.",
+        "Las imagenes de referencia son orientativas; el producto final puede variar.",
+        "Retiro en local. Si contratas despacho, se coordina mediante reparto externo.",
+        "Al realizar el abono, el cliente declara conocer y aceptar estas condiciones.",
+    ]
+    ty = 154
+    for idx, term in enumerate(terms, start=1):
+        c.setFillColorRGB(*orange)
+        c.circle(58, ty + 2, 5, stroke=0, fill=1)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(58, ty, str(idx))
+        c.setFillColorRGB(*text_dark)
+        c.setFont("Helvetica", 7.1)
+        c.drawString(70, ty, _clip(term, 86))
+        ty -= 18
+    _draw_round(428, 91, 125, 98, radius=8, stroke=brown, fill=brown, lw=0)
+    c.setFillColorRGB(*orange)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawCentredString(490.5, 170, "ESCANEA PARA VER")
+    c.drawCentredString(490.5, 160, "TERMINOS COMPLETOS")
+    _draw_round(461, 104, 58, 52, radius=4, stroke=(1, 1, 1), fill=(1, 1, 1), lw=0)
+    _draw_qr(466, 109, 48, f"{PUBLIC_BASE_URL}/tienda/agendar")
+
+    # Pie de pagina
+    _draw_round(42, 42, 511, 34, radius=7, stroke=brown, fill=brown, lw=0)
+    c.setFillColorRGB(1, 0.96, 0.88)
+    c.setFont("Helvetica", 8)
+    c.drawString(66, 56, "Gracias por preferir Sucree Pasteleria")
+    c.drawCentredString(300, 56, "@sucreepasteleria")
+    c.drawRightString(530, 56, "+56 9 7191 8626")
+
     c.save()
     return filename
 
