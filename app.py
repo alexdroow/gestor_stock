@@ -3391,6 +3391,13 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         txt = txt.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").replace("ü", "u")
         return " ".join(txt.split())
 
+    def _catalogo_torta_pdf_actual():
+        try:
+            cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
+            return _catalogo_torta_publico((cfg_tienda or {}).get("catalogo_torta") or {})
+        except Exception:
+            return {"categorias": [], "sizes": [], "sabores": [], "extras": [], "toppers": []}
+
     def _parse_resumen_cliente_catalogo(txt):
         lines = [str(ln or "").strip() for ln in str(txt or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
         lines = [ln for ln in lines if ln]
@@ -3462,7 +3469,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             return None
         try:
             cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
-            catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+            catalogo = _catalogo_torta_pdf_actual()
         except Exception:
             catalogo = {"categorias": [], "sizes": [], "sabores": [], "extras": [], "toppers": []}
 
@@ -3529,7 +3536,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             return None
         try:
             cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
-            catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+            catalogo = _catalogo_torta_pdf_actual()
         except Exception:
             catalogo = {"categorias": [], "sizes": [], "sabores": [], "extras": [], "toppers": []}
 
@@ -3668,7 +3675,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             return None
         try:
             cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
-            catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+            catalogo = _catalogo_torta_pdf_actual()
         except Exception:
             catalogo = {"categorias": [], "sizes": [], "sabores": [], "extras": [], "toppers": []}
 
@@ -3766,6 +3773,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     builder_data = _parse_builder_json(ingredientes_txt)
     if not builder_data:
         builder_data = _builder_from_resumen_cliente(ingredientes_txt)
+    parsed_catalogo_txt = _parse_resumen_cliente_catalogo(ingredientes_txt) or {}
     catalog_data = _catalogo_pdf_data_from_builder(builder_data) if builder_data else None
     builder_catalog_section = _catalogo_section_from_builder(builder_data) if builder_data else None
     if builder_catalog_section:
@@ -3773,7 +3781,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         sections = [builder_catalog_section] + filtered
 
     def _section_value(prefixes, default=""):
-        lows = [str(p or "").strip().lower() for p in prefixes]
+        lows = [_norm_text(p) for p in prefixes]
         for sec in sections:
             for item in (sec.get("items") or []):
                 raw = str(item or "").strip().lstrip("- ").strip()
@@ -3803,6 +3811,12 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
 
     def _fmt_money(value):
         return _fmt_clp_pdf(value)
+
+    def _to_money_num(value):
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
 
     def _safe_text(value, default="-"):
         txt = str(value if value is not None else "").strip()
@@ -3877,13 +3891,19 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
 
     size = (catalog_data or {}).get("size") or {}
     categoria = (catalog_data or {}).get("categoria") or {}
-    titulo_pedido = _safe_text(size.get("nombre") or reserva.get("titulo") or "Torta personalizada")
-    subtitulo_pedido = _safe_text(categoria.get("nombre") or _section_value(["categoria"], "Torta personalizada"))
-    subtotal_productos = float((catalog_data or {}).get("subtotal") or _money_from_text("subtotal estimado productos") or reserva.get("total") or 0)
+    categoria_txt = _safe_text(categoria.get("nombre") or parsed_catalogo_txt.get("categoria") or _section_value(["categoria"], "Torta personalizada"))
+    tamano_txt = _safe_text(size.get("nombre") or parsed_catalogo_txt.get("tamano") or _section_value(["tamano"], "Torta personalizada"))
+    titulo_pedido = _safe_text(tamano_txt or reserva.get("titulo") or "Torta personalizada")
+    subtitulo_pedido = categoria_txt
+    total_reserva_db = _to_money_num(reserva.get("total"))
+    subtotal_productos = float((catalog_data or {}).get("subtotal") or _money_from_text("subtotal estimado productos") or total_reserva_db or 0)
     descuento_total = float((catalog_data or {}).get("descuento") or _money_from_text("descuento aplicado") or 0)
     despacho_total = _money_from_text("envio") if es_despacho else 0.0
     total_productos = float((catalog_data or {}).get("total_productos") or max(0.0, subtotal_productos - descuento_total))
-    total_final = _money_from_text("total estimado pedido") or (total_productos + despacho_total)
+    total_final = total_reserva_db or _money_from_text("total estimado pedido") or (total_productos + despacho_total)
+    if total_final > 0 and subtotal_productos <= 0:
+        subtotal_productos = max(0.0, total_final - despacho_total + descuento_total)
+        total_productos = max(0.0, subtotal_productos - descuento_total)
     try:
         abono = float(reserva.get("abono") or 0)
     except (TypeError, ValueError):
@@ -3897,8 +3917,26 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     refs = (catalog_data or {}).get("referencias") or []
     nota_catalogo = _safe_text((catalog_data or {}).get("nota"), "-")
     if not sabores:
-        sabores = _plain_lines([x for sec in sections if _norm_text(sec.get("title")) == "catalogo torta" for x in sec.get("items", []) if _norm_text(x).startswith("sabores")], "-")
+        sabores = _plain_lines(parsed_catalogo_txt.get("sabores") or [], "-")
+    if not extras:
+        extras = _plain_lines(parsed_catalogo_txt.get("extras") or [], "-")
+        if extras == ["-"]:
+            extras = []
+    if (not topper_txt or topper_txt == "-") and parsed_catalogo_txt.get("topper"):
+        topper_txt = _safe_text(parsed_catalogo_txt.get("topper"), "Sin topper")
     imagen_url = str((catalog_data or {}).get("imagen_url") or "").strip()
+    if not imagen_url:
+        try:
+            catalogo_img = _catalogo_torta_pdf_actual()
+            want_cat = _norm_text(categoria_txt)
+            for cat_img in (catalogo_img.get("categorias") or []):
+                nombre_img = _norm_text((cat_img or {}).get("nombre"))
+                if want_cat and nombre_img and (nombre_img == want_cat or nombre_img in want_cat or want_cat in nombre_img):
+                    imagen_url = str((cat_img or {}).get("imagen_url") or "").strip()
+                    if imagen_url:
+                        break
+        except Exception:
+            imagen_url = ""
 
     def _static_abs_from_url(url):
         raw = str(url or "").strip()
@@ -4066,8 +4104,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     _draw_round(356, 250, 197, 146, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
     _draw_section_title(56, 376, "Resumen del pedido", "PD")
     resumen_rows = [
-        ("Categoria", _safe_text(categoria.get("nombre") or _section_value(["categoria"], "-"))),
-        ("Tamano", _safe_text(size.get("nombre") or _section_value(["tamano"], "-"))),
+        ("Categoria", categoria_txt),
+        ("Tamano", tamano_txt),
         ("Sabores", ", ".join(sabores) if sabores else "-"),
         ("Rellenos", ", ".join(sabores) if sabores else "-"),
         ("Extras", ", ".join(extras) if extras else "-"),
@@ -4094,13 +4132,13 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         c.drawRightString(535, yy, value)
         yy -= 20
     c.setStrokeColorRGB(*border)
-    c.line(374, 268, 535, 268)
+    c.line(374, 288, 535, 288)
     c.setFillColorRGB(*brown)
     c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(455, 249, "TOTAL FINAL")
+    c.drawCentredString(455, 275, "TOTAL FINAL")
     c.setFillColorRGB(*orange)
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(455, 222, _fmt_money(total_final))
+    c.setFont("Helvetica-Bold", 21)
+    c.drawCentredString(455, 252, _fmt_money(total_final))
 
     # Observaciones
     _draw_round(42, 204, 511, 34, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
@@ -22201,7 +22239,7 @@ def api_agenda_backfill_builder_json():
             return txt_row, qty
 
         cfg_tienda = _obtener_tienda_personalizacion(apply_programacion=True, editor_mode="live")
-        catalogo = _catalogo_torta_publico_desde_personalizacion(cfg_tienda)
+        catalogo = _catalogo_torta_publico((cfg_tienda or {}).get("catalogo_torta") or {})
 
         conn = get_db()
         cur = conn.cursor()
