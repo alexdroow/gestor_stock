@@ -203,6 +203,9 @@
         body.tienda-preview-draft .beta-preview-ribbon {
             display: inline-flex;
         }
+        body.agenda-beta-mode.tienda-preview-draft .beta-preview-ribbon {
+            display: none !important;
+        }
         body.tienda-preview-draft .topbar {
             box-shadow: 0 10px 32px rgba(245, 158, 11, .18);
         }
@@ -10593,7 +10596,7 @@
         }
     </style>
 </head>
-<body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if force_agenda and request.path == '/tienda/preview' %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if request.path == '/tienda/preview' and request.args.get('mode') == 'draft' %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
+<body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if force_agenda and (agenda_beta or request.path == '/tienda/preview') %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if (request.path == '/tienda/preview' and request.args.get('mode') == 'draft') or (agenda_beta and mobile_detected) %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
     <div class="beta-preview-ribbon">BETA ADMIN - no visible para clientes</div>
     <div id="tienda-admin-pill" class="admin-mode-pill">MODO ADMIN ACTIVO</div>
     <header class="topbar">
@@ -11812,6 +11815,9 @@
         const _mobileDetected = Boolean(_isPhoneUA && !_isTabletOrDesktopUA);
         if (_mobileDetected) {
             document.body.classList.add("mobile-ui");
+            if (_agendaBetaFromServer) {
+                document.body.classList.add("tienda-preview-agenda", "tienda-preview-draft");
+            }
         }
         if (!_mobileDetected && _urlParams.get("mobile") === "1") {
             try {
