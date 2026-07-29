@@ -8291,6 +8291,94 @@
             font-size: .62rem !important;
             line-height: 1.05 !important;
         }
+        /* Correccion final paso 5 movil: fechas y horas son bloques separados con scroll interno. */
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+            height: 100% !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            overscroll-behavior: contain !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+            gap: 10px !important;
+            padding: 2px 14px 14px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-flow-subtitle {
+            flex: 0 0 auto !important;
+            margin: 0 !important;
+            color: #105832 !important;
+            font-size: .84rem !important;
+            line-height: 1.15 !important;
+            font-weight: 900 !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
+            display: block !important;
+            flex: 0 0 auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-days-host .agenda-days,
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host .agenda-hours {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host .agenda-flow-empty {
+            grid-column: 1 / -1 !important;
+            border: 1px dashed rgba(16, 88, 50, .25) !important;
+            border-radius: 18px !important;
+            background: rgba(234, 246, 238, .75) !important;
+            color: #657068 !important;
+            font-size: .78rem !important;
+            font-weight: 800 !important;
+            line-height: 1.35 !important;
+            padding: 14px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-day-btn,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-hour-btn {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: flex-start !important;
+            min-height: 68px !important;
+            padding: 11px 12px !important;
+            border-radius: 18px !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-day-btn span,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-hour-btn span {
+            font-size: clamp(.86rem, 3.55vw, 1rem) !important;
+            line-height: 1.1 !important;
+            white-space: normal !important;
+        }
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-day-btn small,
+        body.mobile-ui #modal-agenda-cake-cart.active .agenda-hour-btn small {
+            margin-top: 4px !important;
+            font-size: clamp(.72rem, 3vw, .82rem) !important;
+            line-height: 1.08 !important;
+            white-space: normal !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+            display: flex !important;
+            flex-direction: column !important;
+            overflow-y: auto !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
+            display: block !important;
+            overflow: visible !important;
+            max-height: none !important;
+        }
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-days-host .agenda-days,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host .agenda-hours {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+        }
         @media (max-height: 720px) {
             body.mobile-ui.tienda-preview-draft.tienda-preview-agenda #modal-agenda-cake-builder.active.cake-builder-step-1 .cake-size-product-card {
                 grid-template-columns: 52px 1fr !important;
@@ -9070,7 +9158,9 @@
             <div class="agenda-cake-step-label" id="agenda-cake-flow-step-label">Paso 5 de 6: Horario</div>
             <div class="agenda-cake-flow-pane active" data-flow-step="1">
                 <div class="agenda-mini-title">Paso 5: Elige horario</div>
+                <div class="agenda-flow-subtitle">1. Selecciona una fecha</div>
                 <div id="agenda-cake-flow-days-host"></div>
+                <div class="agenda-flow-subtitle" id="agenda-cake-flow-hours-title">2. Horas disponibles para la fecha seleccionada</div>
                 <div id="agenda-cake-flow-hours-host"></div>
             </div>
             <div class="agenda-cake-flow-pane" data-flow-step="2">
@@ -9366,6 +9456,7 @@
         const agendaCakeFlowPdfEl = document.getElementById("agenda-cake-flow-pdf");
         const agendaCakeFlowDaysHostEl = document.getElementById("agenda-cake-flow-days-host");
         const agendaCakeFlowHoursHostEl = document.getElementById("agenda-cake-flow-hours-host");
+        const agendaCakeFlowHoursTitleEl = document.getElementById("agenda-cake-flow-hours-title");
         const agendaCakeFlowFormHostEl = document.getElementById("agenda-cake-flow-form-host");
         const agendaCakeFlowConfirmDetailEl = document.getElementById("agenda-cake-flow-confirm-detail");
         const agendaCakeCloseXEl = document.getElementById("agenda-cake-close-x");
@@ -9532,6 +9623,7 @@
         };
         let agendaCakeBuilderStep = 1;
         let agendaCakeFlowStep = 1;
+        let agendaCakeFlowFechaElegida = false;
         const AGENDA_BETA_DRAFT_KEY = "agenda_beta_cake_draft_v1";
         const tiendaSessionId = (() => {
             const key = "tienda_session_id";
@@ -12023,6 +12115,9 @@
                 }
                 if (agendaBtnReservarEl) agendaBtnReservarEl.style.display = "none";
                 agendaCakeFlowStep = 1;
+                agendaCakeFlowFechaElegida = false;
+                agendaFechaActiva = "";
+                agendaHoraActiva = "";
                 if (agendaDaysListEl && !String(agendaDaysListEl.innerHTML || "").trim()) {
                     agendaDaysListEl.innerHTML = `<div style="grid-column:1/-1;color:#64748b;font-weight:800;padding:12px;">Cargando dias disponibles...</div>`;
                 }
@@ -13144,16 +13239,23 @@
             if (!dias.length) {
                 agendaDaysListEl.innerHTML = `<div style="color:#64748b;">No hay disponibilidad cargada.</div>`;
                 agendaHoursListEl.innerHTML = "";
+                if (agendaCakeFlowHoursTitleEl) agendaCakeFlowHoursTitleEl.style.display = "none";
                 return;
             }
 
-            if (!agendaFechaActiva || !dias.some((d) => String(d.fecha || "") === agendaFechaActiva)) {
+            const modalHorarioMovilActivo = document.body.classList.contains("mobile-ui")
+                && Boolean(modalAgendaCakeCartEl?.classList.contains("active"))
+                && Number(agendaCakeFlowStep || 1) === 1;
+            const puedeAutoSeleccionarFecha = !modalHorarioMovilActivo || Boolean(agendaCakeFlowFechaElegida);
+
+            if (puedeAutoSeleccionarFecha && (!agendaFechaActiva || !dias.some((d) => String(d.fecha || "") === agendaFechaActiva))) {
                 const firstAvailable = dias.find((d) => !Boolean(d.sin_cupos));
                 agendaFechaActiva = String((firstAvailable || dias[0] || {}).fecha || "");
             }
             const diaActivo = _agendaDiaActual();
             const horas = Array.isArray(diaActivo?.horas) ? diaActivo.horas : [];
-            if (!agendaHoraActiva || !horas.some((h) => String(h.hora_inicio || "") === agendaHoraActiva && Boolean(h.disponible))) {
+            const puedeAutoSeleccionarHora = !modalHorarioMovilActivo;
+            if (puedeAutoSeleccionarHora && (!agendaHoraActiva || !horas.some((h) => String(h.hora_inicio || "") === agendaHoraActiva && Boolean(h.disponible)))) {
                 const firstHour = horas.find((h) => Boolean(h.disponible));
                 agendaHoraActiva = String(firstHour?.hora_inicio || "");
             }
@@ -13171,10 +13273,18 @@
                 `;
             }).join("");
 
-            if (!diaActivo) {
-                agendaHoursListEl.innerHTML = "";
+            if (modalHorarioMovilActivo && !agendaCakeFlowFechaElegida) {
+                agendaHoursListEl.innerHTML = `<div class="agenda-flow-empty">Selecciona primero una fecha para ver sus horas disponibles.</div>`;
+                if (agendaCakeFlowHoursTitleEl) agendaCakeFlowHoursTitleEl.style.display = "none";
                 return;
             }
+
+            if (!diaActivo) {
+                agendaHoursListEl.innerHTML = `<div class="agenda-flow-empty">Selecciona una fecha para cargar horarios.</div>`;
+                if (agendaCakeFlowHoursTitleEl) agendaCakeFlowHoursTitleEl.style.display = "none";
+                return;
+            }
+            if (agendaCakeFlowHoursTitleEl) agendaCakeFlowHoursTitleEl.style.display = "";
             agendaHoursListEl.innerHTML = horas.map((h) => {
                 const hora = String(h.hora_inicio || "");
                 const active = hora === agendaHoraActiva ? "active" : "";
@@ -13899,6 +14009,7 @@
 
         function seleccionarAgendaDia(fecha) {
             agendaFechaActiva = String(fecha || "");
+            agendaCakeFlowFechaElegida = true;
             agendaHoraActiva = "";
             _resetAgendaShippingQuote();
             if (_agendaIsMobileWizardEnabled()) agendaMobileStep = Math.max(agendaMobileStep, 3);
@@ -16953,6 +17064,10 @@
         });
         agendaCakeFlowNextEl?.addEventListener("click", () => {
             if (agendaCakeFlowStep === 1) {
+                if (!agendaCakeFlowFechaElegida || !String(agendaFechaActiva || "").trim()) {
+                    _agendaMsg("Selecciona primero una fecha.", "err");
+                    return;
+                }
                 if (!String(agendaHoraActiva || "").trim()) {
                     _agendaMsg("Selecciona una hora disponible.", "err");
                     return;
