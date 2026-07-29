@@ -47,6 +47,55 @@
             --visual-spacing-scale: 1;
             --font-scale-desktop: 100%;
             --font-scale-mobile: 100%;
+            /* SUCREE DESIGN TOKENS - PALETA OFICIAL
+               Orden maestro: futuras funciones beta de agenda deben reutilizar estos tokens. */
+            --sucree-primary-50: #fff4e2;
+            --sucree-primary-100: #ffe4bf;
+            --sucree-primary-200: #ffc979;
+            --sucree-primary-300: #ffad42;
+            --sucree-primary-400: #f8941c;
+            --sucree-primary-600: #ef7d00;
+            --sucree-primary-700: #c96500;
+            --sucree-primary-800: #9b4a00;
+            --sucree-primary-900: #5a2c08;
+            --sucree-chocolate-50: #f6eadc;
+            --sucree-chocolate-100: #ead2b8;
+            --sucree-chocolate-200: #d5a979;
+            --sucree-chocolate-400: #b88354;
+            --sucree-chocolate-500: #8b5e34;
+            --sucree-chocolate-600: #5a341c;
+            --sucree-chocolate-700: #4a2c17;
+            --sucree-chocolate-800: #321d10;
+            --sucree-chocolate-900: #201209;
+            --sucree-white: #ffffff;
+            --sucree-cream-50: #fffaf3;
+            --sucree-cream-100: #f8efe4;
+            --sucree-warm-gray-200: #dfd8cf;
+            --sucree-warm-gray-400: #aaa39b;
+            --sucree-warm-gray-600: #756e66;
+            --sucree-warm-gray-800: #423a32;
+            --sucree-cacao-900: #24150b;
+            --sucree-success-500: #2f8f46;
+            --sucree-warning-500: #f3a316;
+            --sucree-info-500: #247cc0;
+            --sucree-danger-500: #de3d3a;
+            --sucree-focus: #247cc0;
+            --sucree-radius-md: 18px;
+            --sucree-shadow-sm: 0 6px 18px rgba(74, 44, 23, .07);
+            --sucree-shadow-md: 0 16px 36px rgba(74, 44, 23, .12);
+            --sucree-shadow-lg: 0 24px 60px rgba(74, 44, 23, .16);
+            --sucree-bg: var(--sucree-cream-50);
+            --sucree-surface: var(--sucree-white);
+            --sucree-card: var(--sucree-white);
+            --sucree-border: rgba(74, 44, 23, .14);
+            --sucree-divider: rgba(74, 44, 23, .09);
+            --sucree-title: var(--sucree-chocolate-800);
+            --sucree-subtitle: var(--sucree-chocolate-600);
+            --sucree-body: var(--sucree-cacao-900);
+            --sucree-muted: var(--sucree-warm-gray-600);
+            --sucree-disabled: var(--sucree-warm-gray-400);
+            --sucree-overlay: rgba(32, 18, 9, .52);
+            --sucree-inverse: var(--sucree-white);
         }
         * { box-sizing: border-box; }
         body {
@@ -8527,6 +8576,381 @@
             body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-catalog-grid {
                 grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
             }
+        }
+
+        /* ===== SUCREE PALETA OFICIAL: aplicacion maestra en agenda beta =====
+           No hardcodear nuevos colores en agenda beta: reutilizar estos tokens. */
+        body.agenda-beta-mode,
+        body.tienda-preview-draft.tienda-preview-agenda {
+            --beta-green: var(--sucree-primary-600);
+            --beta-green-dark: var(--sucree-primary-800);
+            --beta-green-soft: var(--sucree-primary-50);
+            --beta-cream: var(--sucree-cream-50);
+            --beta-rose: #fff1ed;
+            --beta-ink: var(--sucree-title);
+            --beta-muted: var(--sucree-muted);
+            --beta-line: var(--sucree-border);
+            --beta-border: var(--sucree-border);
+            --beta-card: var(--sucree-card);
+            --beta-app-bg: var(--sucree-bg);
+            --beta-shadow: var(--sucree-shadow-md);
+            --accent: var(--sucree-primary-600);
+            --accent-dark: var(--sucree-primary-800);
+            --agenda-card-bg: var(--sucree-cream-50);
+            --agenda-card-border: var(--sucree-border);
+            --agenda-slot-available-bg: #eef8ee;
+            --agenda-slot-unavailable-bg: #e8e2da;
+            --agenda-slot-unavailable-text: var(--sucree-warm-gray-600);
+            background:
+                radial-gradient(circle at 14% 0%, rgba(239, 125, 0, .12), transparent 30%),
+                radial-gradient(circle at 92% 10%, rgba(74, 44, 23, .08), transparent 28%),
+                linear-gradient(180deg, var(--sucree-white) 0%, var(--sucree-bg) 58%, var(--sucree-white) 100%) !important;
+            color: var(--sucree-body) !important;
+        }
+        body.agenda-beta-mode button:focus-visible,
+        body.agenda-beta-mode a:focus-visible,
+        body.agenda-beta-mode input:focus-visible,
+        body.agenda-beta-mode select:focus-visible,
+        body.agenda-beta-mode textarea:focus-visible,
+        body.tienda-preview-draft.tienda-preview-agenda button:focus-visible,
+        body.tienda-preview-draft.tienda-preview-agenda a:focus-visible,
+        body.tienda-preview-draft.tienda-preview-agenda input:focus-visible,
+        body.tienda-preview-draft.tienda-preview-agenda select:focus-visible,
+        body.tienda-preview-draft.tienda-preview-agenda textarea:focus-visible {
+            outline: 3px solid rgba(36, 124, 192, .28) !important;
+            outline-offset: 2px !important;
+        }
+        body.agenda-beta-mode .topbar,
+        body.tienda-preview-draft.tienda-preview-agenda .topbar {
+            border-color: var(--sucree-divider) !important;
+            background: rgba(255, 255, 255, .96) !important;
+            box-shadow: 0 14px 34px rgba(74, 44, 23, .08) !important;
+        }
+        body.agenda-beta-mode .tienda-hero,
+        body.agenda-beta-mode .beta-app-hero,
+        body.tienda-preview-draft.tienda-preview-agenda .tienda-hero,
+        body.tienda-preview-draft.tienda-preview-agenda .beta-app-hero {
+            background:
+                radial-gradient(circle at 86% 16%, rgba(255, 255, 255, .9) 0 15%, transparent 16%),
+                linear-gradient(135deg, var(--sucree-primary-50) 0%, var(--sucree-cream-50) 48%, var(--sucree-chocolate-50) 100%) !important;
+            border-color: var(--sucree-divider) !important;
+            box-shadow: var(--sucree-shadow-md) !important;
+        }
+        body.agenda-beta-mode .tienda-hero-title,
+        body.agenda-beta-mode .beta-app-hero__copy h1,
+        body.agenda-beta-mode #agenda-section-title,
+        body.agenda-beta-mode .agenda-beta-question,
+        body.agenda-beta-mode .agenda-cake-cat-name,
+        body.agenda-beta-mode .cake-card__title,
+        body.agenda-beta-mode .agenda-cake-step-head h3,
+        body.agenda-beta-mode .cake-size-intro h4,
+        body.agenda-beta-mode .cake-step-title h4,
+        body.tienda-preview-draft.tienda-preview-agenda .tienda-hero-title,
+        body.tienda-preview-draft.tienda-preview-agenda .beta-app-hero__copy h1,
+        body.tienda-preview-draft.tienda-preview-agenda #agenda-section-title,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-beta-question,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-name,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-card__title,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-step-head h3,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-intro h4,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-step-title h4 {
+            color: var(--sucree-title) !important;
+        }
+        body.agenda-beta-mode .tienda-hero-subtitle,
+        body.agenda-beta-mode .beta-app-hero__copy p,
+        body.agenda-beta-mode .agenda-subtitle,
+        body.agenda-beta-mode .agenda-cake-cat-desc,
+        body.agenda-beta-mode .cake-card__description,
+        body.agenda-beta-mode .cake-size-intro p,
+        body.agenda-beta-mode .cake-step-title p,
+        body.tienda-preview-draft.tienda-preview-agenda .tienda-hero-subtitle,
+        body.tienda-preview-draft.tienda-preview-agenda .beta-app-hero__copy p,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-subtitle,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-desc,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-card__description,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-intro p,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-step-title p {
+            color: var(--sucree-muted) !important;
+        }
+        body.agenda-beta-mode .btn-primary,
+        body.agenda-beta-mode .checkout-btn,
+        body.agenda-beta-mode .tienda-hero-cta,
+        body.agenda-beta-mode #agenda-btn-reservar,
+        body.agenda-beta-mode .modal-actions .btn-primary,
+        body.tienda-preview-draft.tienda-preview-agenda .btn-primary,
+        body.tienda-preview-draft.tienda-preview-agenda .checkout-btn,
+        body.tienda-preview-draft.tienda-preview-agenda .tienda-hero-cta,
+        body.tienda-preview-draft.tienda-preview-agenda #agenda-btn-reservar,
+        body.tienda-preview-draft.tienda-preview-agenda .modal-actions .btn-primary {
+            background: linear-gradient(135deg, var(--sucree-primary-400), var(--sucree-primary-600)) !important;
+            border-color: var(--sucree-primary-600) !important;
+            color: var(--sucree-inverse) !important;
+            box-shadow: 0 14px 30px rgba(239, 125, 0, .22) !important;
+        }
+        body.agenda-beta-mode .modal-actions .btn-muted,
+        body.tienda-preview-draft.tienda-preview-agenda .modal-actions .btn-muted {
+            border-color: var(--sucree-border) !important;
+            background: var(--sucree-white) !important;
+            color: var(--sucree-subtitle) !important;
+        }
+        body.agenda-beta-mode .agenda-type-bar,
+        body.agenda-beta-mode .agenda-beta-head,
+        body.agenda-beta-mode .agenda-mobile-steps,
+        body.agenda-beta-mode .agenda-cake-cat-card,
+        body.agenda-beta-mode .cake-card,
+        body.agenda-beta-mode .agenda-cake-builder,
+        body.agenda-beta-mode .agenda-cake-cart,
+        body.agenda-beta-mode .agenda-pastel-wrap,
+        body.agenda-beta-mode #agenda-reserva-form,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-type-bar,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-beta-head,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-mobile-steps,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-card,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-card,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-builder,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cart,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-pastel-wrap,
+        body.tienda-preview-draft.tienda-preview-agenda #agenda-reserva-form {
+            border-color: var(--sucree-border) !important;
+            background: rgba(255, 255, 255, .96) !important;
+            box-shadow: var(--sucree-shadow-sm) !important;
+        }
+        body.agenda-beta-mode .agenda-cake-modal.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-modal.active {
+            background: rgba(32, 18, 9, .46) !important;
+            backdrop-filter: blur(10px) !important;
+        }
+        body.agenda-beta-mode .agenda-cake-modal.active .modal,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-modal.active .modal {
+            background:
+                radial-gradient(circle at 18% 0%, rgba(239, 125, 0, .09), transparent 32%),
+                linear-gradient(180deg, var(--sucree-white) 0%, var(--sucree-cream-50) 100%) !important;
+            box-shadow: var(--sucree-shadow-lg) !important;
+        }
+        body.agenda-beta-mode .agenda-type-btn,
+        body.agenda-beta-mode .agenda-delivery-btn,
+        body.agenda-beta-mode .agenda-cake-cat-group-btn,
+        body.agenda-beta-mode .agenda-cake-cat-btn,
+        body.agenda-beta-mode .agenda-cake-pill,
+        body.agenda-beta-mode .mobile-cat-chip,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-type-btn,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-delivery-btn,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-group-btn,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-btn,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-pill,
+        body.tienda-preview-draft.tienda-preview-agenda .mobile-cat-chip {
+            border-color: var(--sucree-border) !important;
+            background: var(--sucree-white) !important;
+            color: var(--sucree-subtitle) !important;
+        }
+        body.agenda-beta-mode .agenda-type-btn.active,
+        body.agenda-beta-mode .agenda-delivery-btn.active,
+        body.agenda-beta-mode .agenda-cake-cat-group-btn.active,
+        body.agenda-beta-mode .agenda-cake-cat-btn.active,
+        body.agenda-beta-mode .agenda-cake-pill.active,
+        body.agenda-beta-mode .mobile-cat-chip.active,
+        body.agenda-beta-mode .mobile-cat-chip.agenda-entry,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-type-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-delivery-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-group-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-pill.active,
+        body.tienda-preview-draft.tienda-preview-agenda .mobile-cat-chip.active,
+        body.tienda-preview-draft.tienda-preview-agenda .mobile-cat-chip.agenda-entry {
+            background: var(--sucree-primary-600) !important;
+            border-color: var(--sucree-primary-600) !important;
+            color: var(--sucree-inverse) !important;
+            box-shadow: 0 12px 24px rgba(239, 125, 0, .18) !important;
+        }
+        body.agenda-beta-mode .agenda-beta-progress,
+        body.agenda-beta-mode .agenda-cake-step-progress,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-beta-progress,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-step-progress {
+            background: var(--sucree-warm-gray-200) !important;
+        }
+        body.agenda-beta-mode .agenda-beta-progress > span,
+        body.agenda-beta-mode .agenda-cake-step-progress > span,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-beta-progress > span,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-step-progress > span {
+            background: linear-gradient(90deg, var(--sucree-primary-400), var(--sucree-primary-600)) !important;
+        }
+        body.agenda-beta-mode .agenda-mobile-step-btn:before,
+        body.agenda-beta-mode .cake-builder-stepper__item strong,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-mobile-step-btn:before,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-builder-stepper__item strong {
+            background: var(--sucree-warm-gray-200) !important;
+            color: var(--sucree-muted) !important;
+            box-shadow: 0 0 0 5px var(--sucree-white) !important;
+        }
+        body.agenda-beta-mode .agenda-mobile-step-btn.active:before,
+        body.agenda-beta-mode .agenda-mobile-step-btn.done:before,
+        body.agenda-beta-mode .cake-builder-stepper__item.is-active strong,
+        body.agenda-beta-mode .cake-builder-stepper__item.is-done strong,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-mobile-step-btn.active:before,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-mobile-step-btn.done:before,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-builder-stepper__item.is-active strong,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-builder-stepper__item.is-done strong {
+            background: var(--sucree-primary-600) !important;
+            color: var(--sucree-inverse) !important;
+        }
+        body.agenda-beta-mode .agenda-mobile-step-btn.active,
+        body.agenda-beta-mode .agenda-mobile-step-btn.done,
+        body.agenda-beta-mode .cake-builder-stepper__item.is-active,
+        body.agenda-beta-mode .cake-builder-stepper__item.is-done,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-mobile-step-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-mobile-step-btn.done,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-builder-stepper__item.is-active,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-builder-stepper__item.is-done {
+            color: var(--sucree-primary-800) !important;
+        }
+        body.agenda-beta-mode .agenda-cake-card,
+        body.agenda-beta-mode .cake-size-option,
+        body.agenda-beta-mode .cake-choice-card,
+        body.agenda-beta-mode .agenda-day-btn,
+        body.agenda-beta-mode .agenda-hour-btn,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-card,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-option,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-choice-card,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-day-btn,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-hour-btn {
+            border-color: var(--sucree-border) !important;
+            background: var(--sucree-card) !important;
+            color: var(--sucree-title) !important;
+            box-shadow: var(--sucree-shadow-sm) !important;
+        }
+        body.agenda-beta-mode .agenda-cake-card.active,
+        body.agenda-beta-mode .cake-size-option.active,
+        body.agenda-beta-mode .cake-choice-card.active,
+        body.agenda-beta-mode .agenda-day-btn.active,
+        body.agenda-beta-mode .agenda-hour-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-card.active,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-option.active,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-choice-card.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-day-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-hour-btn.active {
+            border-color: var(--sucree-primary-600) !important;
+            background: linear-gradient(135deg, var(--sucree-primary-50), var(--sucree-white)) !important;
+            color: var(--sucree-primary-900) !important;
+            box-shadow: 0 0 0 3px rgba(239, 125, 0, .12), var(--sucree-shadow-sm) !important;
+        }
+        body.agenda-beta-mode .agenda-hour-btn:not(.sin-cupo),
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-hour-btn:not(.sin-cupo) {
+            background: #eef8ee !important;
+            border-color: rgba(47, 143, 70, .22) !important;
+        }
+        body.agenda-beta-mode .agenda-day-btn.sin-cupo,
+        body.agenda-beta-mode .agenda-hour-btn.sin-cupo,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-day-btn.sin-cupo,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-hour-btn.sin-cupo {
+            background: #e8e2da !important;
+            border-color: #d7cec3 !important;
+            color: var(--sucree-warm-gray-600) !important;
+            box-shadow: none !important;
+        }
+        body.agenda-beta-mode .cake-size-option__price,
+        body.agenda-beta-mode .cake-size-option__body b,
+        body.agenda-beta-mode .cake-builder-summary-bar b,
+        body.agenda-beta-mode .cake-summary-price,
+        body.agenda-beta-mode .price-final,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-option__price,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-option__body b,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-builder-summary-bar b,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-summary-price,
+        body.tienda-preview-draft.tienda-preview-agenda .price-final {
+            color: var(--sucree-primary-700) !important;
+        }
+        body.agenda-beta-mode .cake-size-option.active .cake-size-option__radio,
+        body.agenda-beta-mode .cake-size-option__check,
+        body.agenda-beta-mode .cake-choice-card__check,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-option.active .cake-size-option__radio,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-option__check,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-choice-card__check {
+            background: var(--sucree-primary-600) !important;
+            border-color: var(--sucree-primary-600) !important;
+            color: var(--sucree-inverse) !important;
+        }
+        body.agenda-beta-mode .cake-size-product-card__badge,
+        body.agenda-beta-mode .agenda-cake-cat-badge,
+        body.agenda-beta-mode .cake-card__badge,
+        body.agenda-beta-mode .fav-tag,
+        body.agenda-beta-mode .offer-custom-badge,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-product-card__badge,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-cat-badge,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-card__badge,
+        body.tienda-preview-draft.tienda-preview-agenda .fav-tag,
+        body.tienda-preview-draft.tienda-preview-agenda .offer-custom-badge {
+            background: var(--sucree-primary-50) !important;
+            border-color: rgba(239, 125, 0, .18) !important;
+            color: var(--sucree-primary-800) !important;
+        }
+        body.agenda-beta-mode .cake-size-note,
+        body.agenda-beta-mode .cake-step-help,
+        body.agenda-beta-mode .agenda-cake-coupon-alert,
+        body.agenda-beta-mode .beta-conditions-card,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-note,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-step-help,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-cake-coupon-alert,
+        body.tienda-preview-draft.tienda-preview-agenda .beta-conditions-card {
+            background: var(--sucree-primary-50) !important;
+            border-color: rgba(239, 125, 0, .18) !important;
+            color: var(--sucree-chocolate-700) !important;
+        }
+        body.agenda-beta-mode .cake-size-benefits,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-benefits {
+            background: var(--sucree-cream-50) !important;
+            border-color: var(--sucree-border) !important;
+        }
+        body.agenda-beta-mode .cake-size-benefits span,
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-benefits span {
+            color: var(--sucree-primary-700) !important;
+        }
+        body.agenda-beta-mode .cake-size-benefits span:nth-child(2),
+        body.tienda-preview-draft.tienda-preview-agenda .cake-size-benefits span:nth-child(2) {
+            color: var(--sucree-danger-500) !important;
+        }
+        body.agenda-beta-mode input:not([type="checkbox"]):not([type="radio"]),
+        body.agenda-beta-mode select,
+        body.agenda-beta-mode textarea,
+        body.tienda-preview-draft.tienda-preview-agenda input:not([type="checkbox"]):not([type="radio"]),
+        body.tienda-preview-draft.tienda-preview-agenda select,
+        body.tienda-preview-draft.tienda-preview-agenda textarea {
+            border-color: var(--sucree-border) !important;
+            background: var(--sucree-white) !important;
+            color: var(--sucree-body) !important;
+        }
+        body.agenda-beta-mode input:not([type="checkbox"]):not([type="radio"]):focus,
+        body.agenda-beta-mode select:focus,
+        body.agenda-beta-mode textarea:focus,
+        body.tienda-preview-draft.tienda-preview-agenda input:not([type="checkbox"]):not([type="radio"]):focus,
+        body.tienda-preview-draft.tienda-preview-agenda select:focus,
+        body.tienda-preview-draft.tienda-preview-agenda textarea:focus {
+            border-color: rgba(239, 125, 0, .58) !important;
+            box-shadow: 0 0 0 4px rgba(239, 125, 0, .12) !important;
+        }
+        body.agenda-beta-mode .agenda-status.ok,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-status.ok {
+            color: var(--sucree-success-500) !important;
+        }
+        body.agenda-beta-mode .agenda-status.err,
+        body.tienda-preview-draft.tienda-preview-agenda .agenda-status.err {
+            color: var(--sucree-danger-500) !important;
+        }
+        body.mobile-ui.agenda-beta-mode .agenda-beta-bottom-nav,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-beta-bottom-nav {
+            border-color: var(--sucree-border) !important;
+            background: rgba(255, 255, 255, .96) !important;
+            box-shadow: 0 18px 45px rgba(74, 44, 23, .16) !important;
+        }
+        body.mobile-ui.agenda-beta-mode .agenda-beta-bottom-nav button:first-child,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .agenda-beta-bottom-nav button:first-child {
+            background: var(--sucree-primary-50) !important;
+            color: var(--sucree-primary-800) !important;
+        }
+        body.mobile-ui.agenda-beta-mode .photo-add,
+        body.mobile-ui.tienda-preview-draft.tienda-preview-agenda .photo-add {
+            background: var(--sucree-white) !important;
+            color: var(--sucree-primary-700) !important;
+            border-color: rgba(239, 125, 0, .24) !important;
         }
         </style>
     <style id="tienda-custom-css"></style>
