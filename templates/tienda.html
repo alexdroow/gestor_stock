@@ -9750,27 +9750,580 @@
 
         /* Agenda tortas BETA en escritorio: no toca la experiencia movil */
         @media (min-width: 900px) {
-            body.agenda-beta-mode:not(.mobile-ui) #sec-agenda-reservas {
-                max-width: 1180px;
-                margin-inline: auto;
+            body.agenda-beta-mode:not(.mobile-ui) {
+                --layout-max-width: 1240px;
+                --grid-min-desktop: 220px;
+                background:
+                    radial-gradient(circle at 8% 0%, rgba(239, 125, 0, .10), transparent 28%),
+                    radial-gradient(circle at 96% 12%, rgba(74, 44, 23, .08), transparent 30%),
+                    linear-gradient(180deg, #fffaf3 0%, #fff 42%, #fffaf3 100%) !important;
             }
 
-            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-catalog-grid {
+            body.agenda-beta-mode:not(.mobile-ui) .topbar {
+                width: min(1180px, calc(100vw - 48px));
+                margin: 18px auto 0;
+                position: sticky;
+                top: 14px;
+                border: 1px solid rgba(74, 44, 23, .10) !important;
+                border-radius: 26px;
+                padding: 14px 18px;
+                min-height: 74px;
+                box-shadow: 0 18px 45px rgba(74, 44, 23, .10) !important;
+                backdrop-filter: blur(12px);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .brand-with-logo {
+                gap: 14px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .brand-logo {
+                width: 54px !important;
+                height: 54px !important;
+                object-fit: contain !important;
+                border-radius: 18px !important;
+                padding: 4px;
+                background: #fffaf3;
+                box-shadow: 0 12px 28px rgba(239, 125, 0, .14);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #brand-text {
+                font-size: 1.05rem;
+                letter-spacing: .12em;
+                text-transform: uppercase;
+                color: var(--sucree-primary-800);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .topbar-nav,
+            body.agenda-beta-mode:not(.mobile-ui) .search,
+            body.agenda-beta-mode:not(.mobile-ui) .left-nav,
+            body.agenda-beta-mode:not(.mobile-ui) .cart-panel,
+            body.agenda-beta-mode:not(.mobile-ui) #mobile-menu-fab,
+            body.agenda-beta-mode:not(.mobile-ui) #mobile-cart-fab,
+            body.agenda-beta-mode:not(.mobile-ui) #mobile-order-fab,
+            body.agenda-beta-mode:not(.mobile-ui) #mobile-agenda-summary-fab {
+                display: none !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .booking-header-cart {
+                display: inline-grid !important;
+                place-items: center;
+                width: 48px;
+                height: 48px;
+                border-radius: 16px;
+                border: 1px solid rgba(74, 44, 23, .12);
+                background: #fff;
+                color: var(--sucree-chocolate-800);
+                box-shadow: 0 10px 24px rgba(74, 44, 23, .08);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .topbar-actions {
+                margin-left: auto;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .menu-quick-btn {
+                border-color: rgba(74, 44, 23, .14);
+                border-radius: 999px;
+                background: #fffaf3;
+                color: var(--sucree-chocolate-700);
+                padding: 10px 14px;
+                box-shadow: none;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .layout {
+                width: min(1180px, calc(100vw - 48px));
+                max-width: 1180px;
+                margin: 0 auto;
+                padding: 22px 0 42px;
+                display: grid !important;
+                grid-template-columns: 1fr !important;
+                gap: 18px !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .content {
+                display: grid;
+                grid-template-columns: minmax(360px, .82fr) minmax(520px, 1.18fr);
+                grid-template-areas:
+                    "status status"
+                    "hero agenda";
+                align-items: start;
+                gap: 22px;
+                max-width: none;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #tienda-estado-banner,
+            body.agenda-beta-mode:not(.mobile-ui) #tienda-custom-banner {
+                grid-area: status;
+                border-radius: 999px;
+                padding: 12px 18px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #sec-ofertas,
+            body.agenda-beta-mode:not(.mobile-ui) #sec-destacados,
+            body.agenda-beta-mode:not(.mobile-ui) #categorias-wrap,
+            body.agenda-beta-mode:not(.mobile-ui) .mobile-cat-strip,
+            body.agenda-beta-mode:not(.mobile-ui) .tienda-hero {
+                display: none !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero {
+                grid-area: hero;
+                display: grid !important;
+                min-height: 520px;
+                height: calc(100vh - 188px);
+                max-height: 660px;
+                border: 1px solid rgba(74, 44, 23, .10);
+                border-radius: 34px;
+                overflow: hidden;
+                position: sticky;
+                top: 110px;
+                isolation: isolate;
+                box-shadow: 0 28px 70px rgba(74, 44, 23, .14) !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background:
+                    linear-gradient(90deg, rgba(255, 250, 243, .96) 0 44%, rgba(255, 250, 243, .56) 64%, transparent 100%),
+                    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, .78), transparent 34%);
+                z-index: 2;
+                pointer-events: none;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero__copy {
+                position: relative;
+                z-index: 3;
+                display: grid;
+                align-content: center;
+                gap: 16px;
+                max-width: 58%;
+                padding: 46px 34px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero__copy h1 {
+                margin: 0;
+                font-size: clamp(2.5rem, 4.4vw, 4.45rem);
+                line-height: .98;
+                letter-spacing: -.06em;
+                color: var(--sucree-chocolate-800) !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero__copy p {
+                margin: 0;
+                max-width: 270px;
+                font-size: 1.08rem;
+                line-height: 1.48;
+                font-weight: 650;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero__stroke {
+                width: 84px;
+                height: 18px;
+                display: block;
+                border-bottom: 4px solid var(--sucree-primary-600);
+                border-radius: 50%;
+                transform: rotate(-8deg);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero__media {
+                position: absolute;
+                inset: 0;
+                z-index: 1;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero__media img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                object-position: center;
+                display: block;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #sec-agenda-reservas {
+                grid-area: agenda;
+                display: flex !important;
+                flex-direction: column;
+                max-width: none;
+                margin-inline: 0;
+                padding: 22px !important;
+                border: 1px solid rgba(74, 44, 23, .10) !important;
+                border-radius: 34px !important;
+                background: rgba(255, 255, 255, .88) !important;
+                box-shadow: 0 24px 60px rgba(74, 44, 23, .10) !important;
+                gap: 18px !important;
+                overflow: hidden;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #agenda-beta-close {
+                display: none !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .booking-benefits {
+                display: grid !important;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 18px;
+                gap: 10px;
+                order: 1;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .booking-benefit {
+                display: grid;
+                grid-template-columns: auto 1fr;
+                align-items: center;
+                gap: 10px;
+                min-height: 72px;
+                padding: 12px;
+                border: 1px solid rgba(74, 44, 23, .10);
+                border-radius: 20px;
+                background: linear-gradient(135deg, #fff, #fff8f1);
+                box-shadow: 0 12px 26px rgba(74, 44, 23, .06);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .booking-benefit__icon {
+                width: 42px;
+                height: 42px;
+                display: grid;
+                place-items: center;
+                border-radius: 999px;
+                background: var(--sucree-primary-50);
+                color: var(--sucree-primary-700);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .booking-benefit__icon svg {
+                width: 22px !important;
+                height: 22px !important;
+                display: block;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .booking-benefit__icon--love {
+                background: #fff1ed;
+                color: #e83d5f;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .booking-benefit strong {
+                font-size: .82rem;
+                line-height: 1.18;
+                color: var(--sucree-chocolate-800);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-mobile-steps {
+                order: 2;
+                display: grid !important;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 8px;
+                padding: 14px 12px !important;
+                border: 1px solid rgba(74, 44, 23, .10) !important;
+                border-radius: 24px !important;
+                background: #fff !important;
+                box-shadow: 0 12px 28px rgba(74, 44, 23, .06) !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-mobile-step-btn {
+                position: relative;
+                border: 0;
+                background: transparent;
+                color: var(--sucree-muted);
+                display: grid;
+                place-items: center;
+                gap: 8px;
+                min-height: 70px;
+                padding: 8px 6px;
+                font-weight: 850;
+                cursor: pointer;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-mobile-step-btn::before {
+                content: attr(data-step);
+                width: 34px;
+                height: 34px;
+                display: grid;
+                place-items: center;
+                border-radius: 999px;
+                background: var(--sucree-warm-gray-200);
+                color: var(--sucree-muted);
+                font-weight: 900;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-mobile-step-btn.active::before,
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-mobile-step-btn.done::before {
+                background: var(--sucree-primary-600) !important;
+                color: #fff !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-mobile-step-btn.active,
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-mobile-step-btn.done {
+                color: var(--sucree-primary-800) !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-type-bar {
+                order: 3;
+                padding: 8px !important;
+                border-radius: 999px !important;
+                background: #fffaf3 !important;
+                box-shadow: inset 0 0 0 1px rgba(74, 44, 23, .06) !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-type-actions {
+                gap: 8px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-type-btn {
+                min-height: 46px;
+                border-radius: 999px;
+                text-transform: uppercase;
+                letter-spacing: .02em;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #agenda-section-title,
+            body.agenda-beta-mode:not(.mobile-ui) #agenda-section-subtitle {
+                display: none !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-wrap,
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-pastel-wrap {
+                order: 4;
+                border: 0 !important;
+                padding: 0 !important;
+                background: transparent !important;
+                box-shadow: none !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-catalog-title {
+                display: block;
+                margin: 2px 0 4px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-catalog-title h3 {
+                margin: 0;
+                font-size: 1.55rem;
+                line-height: 1.08;
+                letter-spacing: -.035em;
+                color: var(--sucree-chocolate-800);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-catalog-title p {
+                margin: 6px 0 0;
+                font-size: .94rem;
+                line-height: 1.4;
+                color: var(--sucree-muted);
             }
 
             body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-toolbar {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
-                gap: 14px;
-                align-items: center;
+                display: grid !important;
+                grid-template-columns: 1fr;
+                gap: 12px;
+                align-items: stretch;
+                margin-top: 2px;
             }
 
             body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-groups {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 10px;
+                gap: 9px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-group-btn,
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-pill {
+                min-height: 42px;
+                border-radius: 999px;
+                padding: 9px 14px;
+                font-size: .9rem;
+                font-weight: 850;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-search-wrap {
+                position: relative;
+                display: flex;
+                align-items: center;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-search-wrap svg {
+                position: absolute;
+                left: 16px;
+                width: 20px;
+                height: 20px;
+                color: var(--sucree-muted);
+                pointer-events: none;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-search {
+                width: 100%;
+                height: 50px;
+                border-radius: 18px;
+                border: 1px solid rgba(74, 44, 23, .12);
+                padding: 0 16px 0 46px;
+                background: #fff;
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-catalog-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 16px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-card {
+                border-radius: 24px !important;
+                overflow: hidden;
+                min-height: 100%;
+                box-shadow: 0 18px 40px rgba(74, 44, 23, .09) !important;
+                transition: transform .18s ease, box-shadow .18s ease;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 24px 54px rgba(74, 44, 23, .14) !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__media {
+                aspect-ratio: 4 / 3;
+                overflow: hidden;
+                background: #fff4e2;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__media > img,
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__image,
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-card img {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+                display: block;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__badge {
+                position: absolute !important;
+                top: 12px !important;
+                left: 12px !important;
+                z-index: 2;
+                border-radius: 999px !important;
+                padding: 6px 10px !important;
+                font-size: .72rem !important;
+                line-height: 1 !important;
+                font-weight: 900 !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__favorite {
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                z-index: 2;
+                width: 38px !important;
+                height: 38px !important;
+                min-height: 38px !important;
+                border-radius: 999px !important;
+                background: rgba(255, 255, 255, .28) !important;
+                border: 1px solid rgba(255, 255, 255, .70) !important;
+                color: #fff !important;
+                backdrop-filter: blur(8px);
+                display: grid;
+                place-items: center;
+                padding: 0 !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-body,
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__body {
+                padding: 14px !important;
+                display: grid !important;
+                gap: 9px !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-name,
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__title {
+                margin: 0 !important;
+                font-size: 1.02rem !important;
+                line-height: 1.16 !important;
+                font-weight: 900 !important;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-desc,
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__description {
+                margin: 0 !important;
+                font-size: .86rem !important;
+                line-height: 1.38 !important;
+                display: -webkit-box !important;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-bullets {
+                display: none !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .cake-card__action {
+                width: 100%;
+                min-height: 42px;
+                border-radius: 999px !important;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 14px !important;
+                background: var(--sucree-primary-50) !important;
+                color: var(--sucree-primary-800) !important;
+                border: 0 !important;
+                font-weight: 900;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-catalog-actions {
+                display: flex;
+                justify-content: flex-end;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-catalog-actions .btn-primary {
+                min-height: 46px;
+                border-radius: 999px;
+                padding: 10px 18px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .beta-conditions-card {
+                order: 20;
+                display: flex !important;
+                align-items: center;
+                justify-content: space-between;
+                gap: 14px;
+                padding: 14px 16px;
+                border-radius: 22px;
+                border: 1px solid rgba(239, 125, 0, .16);
+                background: linear-gradient(135deg, #fff8f1, #fff);
+                box-shadow: 0 12px 28px rgba(74, 44, 23, .06);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-days,
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-hours,
+            body.agenda-beta-mode:not(.mobile-ui) #agenda-reserva-form,
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-beta-nav {
+                order: 30;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-beta-bottom-nav {
+                display: none !important;
+            }
+
+            @media (min-width: 1180px) {
+                body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-catalog-grid {
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                }
+            }
+
+            @media (max-width: 1080px) and (min-width: 900px) {
+                body.agenda-beta-mode:not(.mobile-ui) .content {
+                    grid-template-columns: 1fr;
+                    grid-template-areas:
+                        "status"
+                        "hero"
+                        "agenda";
+                }
+
+                body.agenda-beta-mode:not(.mobile-ui) .beta-app-hero {
+                    position: relative;
+                    top: auto;
+                    height: 360px;
+                    min-height: 360px;
+                    max-height: none;
+                }
             }
 
             body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active,
