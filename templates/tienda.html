@@ -9747,6 +9747,297 @@
             border-color: rgba(239, 125, 0, .22) !important;
             color: #c45f00 !important;
         }
+
+        /* Agenda tortas BETA en escritorio: no toca la experiencia movil */
+        @media (min-width: 900px) {
+            body.agenda-beta-mode:not(.mobile-ui) #sec-agenda-reservas {
+                max-width: 1180px;
+                margin-inline: auto;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-catalog-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 18px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-toolbar {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+                gap: 14px;
+                align-items: center;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) .agenda-cake-cat-groups {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 24px !important;
+                overflow: hidden !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .modal,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .modal {
+                width: min(1180px, calc(100vw - 48px)) !important;
+                max-width: 1180px !important;
+                height: min(820px, calc(100vh - 48px)) !important;
+                max-height: calc(100vh - 48px) !important;
+                border-radius: 28px !important;
+                padding: 22px !important;
+                overflow: hidden !important;
+                display: grid !important;
+                grid-template-rows: auto auto auto minmax(0, 1fr) auto auto !important;
+                gap: 14px !important;
+                box-shadow: 0 30px 80px rgba(74, 44, 23, .22) !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .modal {
+                grid-template-rows: auto auto auto minmax(0, 1fr) auto !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-head,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-step-head {
+                border: 1px solid rgba(239, 125, 0, .14) !important;
+                border-radius: 18px !important;
+                padding: 12px 14px !important;
+                position: static !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-head h3,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-step-head h3 {
+                font-size: 1.24rem !important;
+                margin: 0 !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-close-x,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-close-x {
+                width: 42px !important;
+                height: 42px !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-builder-stepper {
+                max-width: 720px;
+                margin: 0 auto;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-builder-summary-bar {
+                max-width: 720px;
+                margin: 0 auto;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-builder,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active {
+                min-height: 0 !important;
+                overflow: hidden !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-pane.active {
+                height: 100%;
+                min-height: 0;
+                overflow: auto;
+                padding: 2px 4px 8px;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-pane[data-step="1"].active {
+                display: grid !important;
+                grid-template-columns: minmax(280px, .92fr) minmax(380px, 1.08fr);
+                grid-template-areas:
+                    "intro sizes"
+                    "product sizes"
+                    "benefits sizes"
+                    "note sizes";
+                gap: 16px;
+                align-items: start;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-intro {
+                grid-area: intro;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-product-card {
+                grid-area: product;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-benefits {
+                grid-area: benefits;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-note {
+                grid-area: note;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-size-panel {
+                grid-area: sizes;
+                min-height: 0;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-size-grid {
+                max-height: 100%;
+                overflow: auto;
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 12px;
+                padding-right: 4px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-product-card {
+                display: grid;
+                grid-template-columns: 180px 1fr;
+                gap: 14px;
+                align-items: stretch;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-product-card__media {
+                min-height: 160px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-step-panel {
+                height: 100%;
+                display: grid;
+                grid-template-rows: auto auto minmax(0, 1fr);
+                gap: 14px;
+                overflow: hidden;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-list,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-files {
+                overflow: auto;
+                min-height: 0;
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 12px;
+                padding-right: 4px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-topper-card {
+                height: 100%;
+                overflow: auto;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 14px;
+                align-content: start;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-topper-card .cake-step-title {
+                grid-column: 1 / -1;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-topper-card textarea {
+                min-height: 150px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-coupon-bottom {
+                max-height: 72px;
+                overflow: auto;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .modal-actions,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .modal-actions {
+                position: static !important;
+                display: flex !important;
+                justify-content: flex-end !important;
+                gap: 10px !important;
+                padding: 12px !important;
+                border: 1px solid rgba(239, 125, 0, .14) !important;
+                border-radius: 18px !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .modal-actions .btn-primary,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-builder.active .modal-actions .btn-muted,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .modal-actions .agenda-flow-btn {
+                flex: 0 0 auto !important;
+                min-width: 138px !important;
+                height: 42px !important;
+                padding: 9px 16px !important;
+                border-radius: 999px !important;
+                font-size: .92rem !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+                display: grid !important;
+                grid-template-columns: minmax(360px, .95fr) minmax(420px, 1.05fr);
+                grid-template-rows: auto auto minmax(0, 1fr);
+                gap: 14px;
+                min-height: 0;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] .agenda-mini-title {
+                grid-column: 1 / -1;
+                grid-row: 1;
+                margin: 0;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] .agenda-flow-subtitle {
+                margin: 0 0 8px;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] > .agenda-flow-subtitle:not(#agenda-cake-flow-hours-title) {
+                grid-column: 1;
+                grid-row: 2;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
+                min-height: 0 !important;
+                max-height: 100% !important;
+                overflow: auto !important;
+                padding: 10px !important;
+                border: 1px solid rgba(139, 94, 52, .16);
+                border-radius: 20px;
+                background: rgba(255, 255, 255, .58);
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-hours-title {
+                grid-column: 2;
+                grid-row: 2;
+                align-self: end;
+                margin-left: 0;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-days-host {
+                grid-column: 1;
+                grid-row: 3;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
+                grid-column: 2;
+                grid-row: 3;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-days,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-hours {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="2"] {
+                display: grid !important;
+                grid-template-columns: minmax(460px, 1fr) minmax(320px, .72fr);
+                gap: 16px;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-form-host,
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-confirm-detail {
+                min-height: 0 !important;
+                overflow: auto !important;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-form-host {
+                grid-row: span 2;
+            }
+
+            body.agenda-beta-mode:not(.mobile-ui) #modal-agenda-cake-cart.active .cake-flow-confirm-actions {
+                align-self: end;
+            }
+        }
     </style>
 </head>
 <body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if force_agenda and request.path == '/tienda/preview' %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if request.path == '/tienda/preview' and request.args.get('mode') == 'draft' %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
@@ -13426,7 +13717,7 @@
         function _abrirModalAgendaCakeCart() {
             if (!modalAgendaCakeCartEl) return;
             _renderAgendaCakeSummary();
-            const betaFlow = _agendaPreviewMobileModalActivo() || (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui"));
+            const betaFlow = _agendaPreviewMobileModalActivo() || Boolean(_agendaBetaFromServer);
             modalAgendaCakeCartEl.classList.add("active");
             if (betaFlow) {
                 if (agendaTypeBarEl) agendaTypeBarEl.style.display = "none";
@@ -13464,7 +13755,7 @@
 
         function _cerrarModalAgendaCakeCart() {
             modalAgendaCakeCartEl?.classList.remove("active");
-            const betaFlow = _agendaPreviewMobileModalActivo() || (Boolean(_agendaBetaFromServer) && document.body.classList.contains("mobile-ui"));
+            const betaFlow = _agendaPreviewMobileModalActivo() || Boolean(_agendaBetaFromServer);
             if (betaFlow) {
                 if (agendaTypeBarEl) agendaTypeBarEl.style.display = "";
                 if (secAgendaReservasEl && agendaDaysListEl && agendaDaysListEl.parentElement !== secAgendaReservasEl) {
@@ -13504,7 +13795,7 @@
             if (agendaCakeFlowLabelEl) agendaCakeFlowLabelEl.textContent = labels[agendaCakeFlowStep] || "Paso";
             if (agendaCakeFlowProgressFillEl) agendaCakeFlowProgressFillEl.style.width = `${Math.round(((agendaCakeFlowStep + 4) / 6) * 100)}%`;
             if (agendaCakeFlowPrevEl) {
-                const puedeVolverAlArmado = document.body.classList.contains("mobile-ui") && agendaCakeFlowStep <= 1;
+                const puedeVolverAlArmado = Boolean(_agendaBetaFromServer) && agendaCakeFlowStep <= 1;
                 agendaCakeFlowPrevEl.disabled = agendaCakeFlowStep <= 1 && !puedeVolverAlArmado;
             }
             if (agendaCakeFlowNextEl) agendaCakeFlowNextEl.textContent = agendaCakeFlowStep >= 2 ? "Resumen listo" : "Siguiente";
@@ -18393,7 +18684,7 @@
         agendaCakeCloseCartEl?.addEventListener("click", _cerrarModalAgendaCakeCart);
         agendaCakeClearQuoteEl?.addEventListener("click", _agendaBorrarCotizacion);
         agendaCakeFlowPrevEl?.addEventListener("click", () => {
-            if (Number(agendaCakeFlowStep || 1) <= 1 && document.body.classList.contains("mobile-ui")) {
+            if (Number(agendaCakeFlowStep || 1) <= 1 && Boolean(_agendaBetaFromServer)) {
                 agendaCakeBuilderStep = 4;
                 _cerrarModalAgendaCakeCart();
                 _abrirModalAgendaCakeBuilder();
@@ -18457,8 +18748,8 @@
                 }
             }
             if (agendaCakeBuilderStep >= 4) {
-                const betaModalMobile = _agendaPreviewMobileModalActivo();
-                if (betaModalMobile) {
+                const betaModalFlow = _agendaPreviewMobileModalActivo() || Boolean(_agendaBetaFromServer);
+                if (betaModalFlow) {
                     _cerrarModalAgendaCakeBuilder({ keepDraft: true });
                     _abrirModalAgendaCakeCart();
                 } else if (_agendaIsMobileWizardEnabled()) {
