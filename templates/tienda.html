@@ -10598,6 +10598,917 @@
                 align-self: end;
             }
         }
+        /* SUCREE STORE REDESIGN - tienda normal, aislado de agenda tortas */
+        body:not(.tienda-preview-agenda) {
+            --store-bg: #fffaf3;
+            --store-surface: #ffffff;
+            --store-card: #fffefd;
+            --store-line: #f0dfcf;
+            --store-text: #24150b;
+            --store-muted: #756e66;
+            --store-primary: #ef7d00;
+            --store-primary-dark: #c96500;
+            --store-chocolate: #4a2c17;
+            --store-soft: #fff4e2;
+            --store-shadow: 0 18px 46px rgba(74, 44, 23, .11);
+            background:
+                radial-gradient(circle at 10% 0%, rgba(255, 173, 66, .16), transparent 34%),
+                linear-gradient(180deg, #fffefd 0%, var(--store-bg) 100%) !important;
+            color: var(--store-text);
+        }
+
+        body:not(.tienda-preview-agenda) .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 1500;
+            min-height: 76px;
+            padding: 12px 28px;
+            display: grid;
+            grid-template-columns: auto minmax(220px, 1fr) minmax(260px, 380px) auto;
+            gap: 18px;
+            align-items: center;
+            background: rgba(255, 255, 255, .94);
+            border-bottom: 1px solid rgba(240, 223, 207, .9);
+            box-shadow: 0 10px 34px rgba(74, 44, 23, .07);
+            backdrop-filter: blur(16px);
+        }
+
+        body:not(.tienda-preview-agenda) .brand-with-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        body:not(.tienda-preview-agenda) .brand-home-link {
+            display: inline-grid;
+            place-items: center;
+            width: 58px;
+            height: 58px;
+            border-radius: 18px;
+            background: var(--store-soft);
+            box-shadow: 0 12px 24px rgba(239, 125, 0, .18);
+            overflow: hidden;
+        }
+
+        body:not(.tienda-preview-agenda) .brand-logo {
+            width: 52px;
+            height: 52px;
+            object-fit: contain;
+            transform: none !important;
+        }
+
+        body:not(.tienda-preview-agenda) .brand-banner-wrap {
+            display: none !important;
+        }
+
+        body:not(.tienda-preview-agenda) #brand-text {
+            font-size: .82rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--store-chocolate);
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        body:not(.tienda-preview-agenda) .topbar-nav {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            min-width: 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        body:not(.tienda-preview-agenda) .topbar-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        body:not(.tienda-preview-agenda) .topbar-nav-btn {
+            border: 0;
+            background: transparent;
+            color: var(--store-chocolate);
+            border-radius: 999px;
+            padding: 12px 14px;
+            font-weight: 850;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .2s ease, color .2s ease, transform .2s ease;
+        }
+
+        body:not(.tienda-preview-agenda) .topbar-nav-btn:hover,
+        body:not(.tienda-preview-agenda) .topbar-nav-btn.active {
+            background: var(--store-soft);
+            color: var(--store-primary-dark);
+            transform: translateY(-1px);
+        }
+
+        body:not(.tienda-preview-agenda) .search {
+            position: relative;
+            min-width: 0;
+        }
+
+        body:not(.tienda-preview-agenda) .search:before {
+            content: "⌕";
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--store-muted);
+            font-size: 1.2rem;
+            pointer-events: none;
+        }
+
+        body:not(.tienda-preview-agenda) #search-input {
+            width: 100%;
+            height: 48px;
+            border: 1px solid var(--store-line);
+            border-radius: 16px;
+            background: #fff;
+            padding: 0 16px 0 42px;
+            color: var(--store-text);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+            outline: none;
+        }
+
+        body:not(.tienda-preview-agenda) #search-input:focus {
+            border-color: var(--store-primary);
+            box-shadow: 0 0 0 4px rgba(239, 125, 0, .13);
+        }
+
+        body:not(.tienda-preview-agenda) .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        body:not(.tienda-preview-agenda) .menu-quick-btn {
+            border: 1px solid var(--store-line);
+            background: #fff;
+            color: var(--store-chocolate);
+            border-radius: 14px;
+            padding: 11px 13px;
+            font-weight: 850;
+            cursor: pointer;
+        }
+
+        body:not(.tienda-preview-agenda) .layout {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 250px minmax(0, 1fr) 292px;
+            gap: 20px;
+            align-items: start;
+        }
+
+        body:not(.tienda-preview-agenda) .left-nav,
+        body:not(.tienda-preview-agenda) .cart-panel,
+        body:not(.tienda-preview-agenda) .section,
+        body:not(.tienda-preview-agenda) .store-products-toolbar {
+            background: rgba(255, 255, 255, .92);
+            border: 1px solid var(--store-line);
+            border-radius: 22px;
+            box-shadow: var(--store-shadow);
+        }
+
+        body:not(.tienda-preview-agenda) .left-nav {
+            position: sticky;
+            top: 100px;
+            padding: 14px;
+            display: grid;
+            gap: 12px;
+        }
+
+        body:not(.tienda-preview-agenda) .left-nav h3 {
+            margin: 0;
+            color: var(--store-chocolate);
+            font-size: .82rem;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+
+        body:not(.tienda-preview-agenda) .cat-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        body:not(.tienda-preview-agenda) .cat-btn {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: var(--store-chocolate);
+            border-radius: 14px;
+            padding: 13px 14px;
+            text-align: left;
+            font-weight: 850;
+            cursor: pointer;
+            transition: background .2s ease, transform .2s ease, color .2s ease;
+        }
+
+        body:not(.tienda-preview-agenda) .cat-btn:before {
+            content: "✦";
+            margin-right: 9px;
+            color: var(--store-primary);
+            font-size: .85rem;
+        }
+
+        body:not(.tienda-preview-agenda) .cat-btn:hover,
+        body:not(.tienda-preview-agenda) .cat-btn.active {
+            background: linear-gradient(135deg, var(--store-soft), #fff);
+            color: var(--store-primary-dark);
+            transform: translateX(2px);
+        }
+
+        body:not(.tienda-preview-agenda) .agenda-quick-btn {
+            border: 1px solid rgba(239, 125, 0, .28);
+            background: linear-gradient(135deg, #fff4e2, #fff);
+            color: var(--store-primary-dark);
+            border-radius: 16px;
+            padding: 13px 14px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        body:not(.tienda-preview-agenda) .content {
+            min-width: 0;
+            display: grid;
+            gap: 16px;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-estado-banner,
+        body:not(.tienda-preview-agenda) .tienda-custom-banner {
+            border-radius: 18px;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+            padding: 12px 15px;
+            font-weight: 850;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(260px, 40%);
+            min-height: 300px;
+            border-radius: 28px;
+            overflow: hidden;
+            border: 1px solid var(--store-line);
+            background: linear-gradient(135deg, #fff4e2 0%, #ffffff 55%, #f6eadc 100%);
+            box-shadow: var(--store-shadow);
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-copy {
+            padding: 36px;
+            display: grid;
+            align-content: center;
+            gap: 12px;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-badge {
+            width: fit-content;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid rgba(239, 125, 0, .22);
+            color: var(--store-primary-dark);
+            padding: 8px 12px;
+            font-weight: 900;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-title {
+            margin: 0;
+            color: var(--store-chocolate);
+            font-size: clamp(2rem, 4vw, 3.6rem);
+            line-height: .98;
+            letter-spacing: -.05em;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-subtitle {
+            color: var(--store-muted);
+            font-size: 1rem;
+            line-height: 1.6;
+            max-width: 52ch;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-cta,
+        body:not(.tienda-preview-agenda) .checkout-btn,
+        body:not(.tienda-preview-agenda) .cake-card__action {
+            border: 0;
+            background: linear-gradient(135deg, var(--store-primary), var(--store-primary-dark));
+            color: #fff;
+            border-radius: 14px;
+            box-shadow: 0 12px 24px rgba(239, 125, 0, .24);
+            transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-cta:hover,
+        body:not(.tienda-preview-agenda) .checkout-btn:hover,
+        body:not(.tienda-preview-agenda) .cake-card__action:hover {
+            transform: translateY(-1px);
+            filter: saturate(1.05);
+            box-shadow: 0 16px 30px rgba(239, 125, 0, .28);
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-media {
+            min-height: 300px;
+            background: #f6eadc;
+        }
+
+        body:not(.tienda-preview-agenda) .tienda-hero-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        body:not(.tienda-preview-agenda) .section {
+            padding: 18px;
+        }
+
+        body:not(.tienda-preview-agenda) .section h2 {
+            color: var(--store-chocolate);
+            margin: 0 0 14px;
+            font-size: 1.15rem;
+            letter-spacing: -.02em;
+        }
+
+        body:not(.tienda-preview-agenda) .store-products-toolbar {
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        body:not(.tienda-preview-agenda) .store-products-toolbar strong {
+            display: block;
+            color: var(--store-chocolate);
+            font-size: 1rem;
+        }
+
+        body:not(.tienda-preview-agenda) #store-products-count {
+            display: block;
+            margin-top: 2px;
+            color: var(--store-muted);
+            font-size: .84rem;
+            font-weight: 700;
+        }
+
+        body:not(.tienda-preview-agenda) .store-products-tools {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        body:not(.tienda-preview-agenda) .store-products-tools label {
+            color: var(--store-muted);
+            font-size: .8rem;
+            font-weight: 850;
+        }
+
+        body:not(.tienda-preview-agenda) #store-sort-select {
+            height: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--store-line);
+            background: #fff;
+            color: var(--store-text);
+            padding: 0 10px;
+            font-weight: 800;
+        }
+
+        body:not(.tienda-preview-agenda) .store-view-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--store-line);
+            border-radius: 12px;
+            background: #fff;
+            color: var(--store-chocolate);
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        body:not(.tienda-preview-agenda) .store-view-btn.active {
+            background: var(--store-primary);
+            color: #fff;
+            border-color: var(--store-primary);
+        }
+
+        body:not(.tienda-preview-agenda) .grid,
+        body:not(.tienda-preview-agenda) .scroller {
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 16px;
+        }
+
+        body:not(.tienda-preview-agenda).store-list-view #categorias-wrap .grid {
+            grid-template-columns: 1fr;
+        }
+
+        body:not(.tienda-preview-agenda) .ofertas-track {
+            gap: 16px;
+            padding: 2px 2px 10px;
+        }
+
+        body:not(.tienda-preview-agenda) .ofertas-track .item-card {
+            flex-basis: min(310px, 78vw);
+        }
+
+        body:not(.tienda-preview-agenda) .item-card {
+            border: 1px solid var(--store-line);
+            border-radius: 22px;
+            background: var(--store-card);
+            overflow: hidden;
+            box-shadow: 0 14px 34px rgba(74, 44, 23, .09);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+
+        body:not(.tienda-preview-agenda) .item-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(239, 125, 0, .32);
+            box-shadow: 0 24px 46px rgba(74, 44, 23, .14);
+        }
+
+        body:not(.tienda-preview-agenda) .item-photo {
+            aspect-ratio: 1.28;
+            min-height: 176px;
+            background: #f6eadc;
+        }
+
+        body:not(.tienda-preview-agenda) .cake-card__favorite {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 6;
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.65);
+            background: rgba(255,255,255,.84);
+            color: var(--store-chocolate);
+            display: grid;
+            place-items: center;
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+        }
+
+        body:not(.tienda-preview-agenda) .cake-card__favorite svg {
+            width: 21px;
+            height: 21px;
+        }
+
+        body:not(.tienda-preview-agenda) .fav-tag,
+        body:not(.tienda-preview-agenda) .offer-custom-badge {
+            top: 10px;
+            left: 10px;
+            right: auto;
+            border-radius: 999px;
+            background: #ecfdf5;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            box-shadow: none;
+        }
+
+        body:not(.tienda-preview-agenda) .photo-add {
+            display: none !important;
+        }
+
+        body:not(.tienda-preview-agenda) .item-body {
+            padding: 14px;
+            gap: 9px;
+        }
+
+        body:not(.tienda-preview-agenda) .item-name {
+            min-height: auto;
+            margin: 0;
+            color: var(--store-text);
+            font-size: 1rem;
+            line-height: 1.25;
+            font-weight: 900;
+        }
+
+        body:not(.tienda-preview-agenda) .item-desc {
+            color: var(--store-muted);
+            font-size: .88rem;
+            line-height: 1.45;
+            min-height: 40px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        body:not(.tienda-preview-agenda) .price-final {
+            color: var(--store-primary-dark);
+            font-size: 1.12rem;
+            font-weight: 950;
+        }
+
+        body:not(.tienda-preview-agenda) .stock {
+            width: fit-content;
+            border-radius: 999px;
+            background: #ecfdf5;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            padding: 4px 8px;
+            font-size: .76rem;
+            font-weight: 850;
+        }
+
+        body:not(.tienda-preview-agenda) .cake-card__action {
+            margin-top: 4px;
+            min-height: 44px;
+            padding: 0 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 950;
+            cursor: pointer;
+        }
+
+        body:not(.tienda-preview-agenda) .cake-card__action svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        body:not(.tienda-preview-agenda).store-list-view #categorias-wrap .item-card {
+            grid-template-columns: 170px minmax(0, 1fr);
+            grid-template-rows: 1fr;
+        }
+
+        body:not(.tienda-preview-agenda).store-list-view #categorias-wrap .item-photo {
+            min-height: 100%;
+            aspect-ratio: auto;
+        }
+
+        body:not(.tienda-preview-agenda) .cart-panel {
+            top: 100px;
+            padding: 18px;
+            border-radius: 24px;
+        }
+
+        body:not(.tienda-preview-agenda) .cart-panel h3 {
+            color: var(--store-chocolate);
+            font-size: 1rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        body:not(.tienda-preview-agenda) .cart-list {
+            max-height: 360px;
+            padding-right: 3px;
+        }
+
+        body:not(.tienda-preview-agenda) .cart-item {
+            border-color: var(--store-line);
+            border-radius: 16px;
+            background: #fffefd;
+        }
+
+        body:not(.tienda-preview-agenda) .qty-btn {
+            border-radius: 10px;
+            border-color: var(--store-line);
+            color: var(--store-chocolate);
+            font-weight: 900;
+        }
+
+        body:not(.tienda-preview-agenda) .coupon-btn,
+        body:not(.tienda-preview-agenda) .clear-cart-btn {
+            border-color: var(--store-primary);
+            color: var(--store-primary-dark);
+            background: #fff;
+            font-weight: 900;
+        }
+
+        body:not(.tienda-preview-agenda) .total {
+            border-top: 1px dashed var(--store-line);
+            padding-top: 12px;
+            color: var(--store-chocolate);
+            font-size: 1.05rem;
+        }
+
+        @media (max-width: 899px) {
+            body.mobile-ui:not(.tienda-preview-agenda) {
+                padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+                background: #fffaf3 !important;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .topbar {
+                grid-template-columns: 48px minmax(0, 1fr) 48px;
+                min-height: 66px;
+                padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 8px;
+                gap: 8px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-menu-btn,
+            body.mobile-ui:not(.tienda-preview-agenda) .booking-header-cart {
+                display: inline-grid !important;
+                place-items: center;
+                width: 44px;
+                height: 44px;
+                border-radius: 14px;
+                border: 1px solid var(--store-line);
+                background: #fff;
+                color: var(--store-chocolate);
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .brand-with-logo {
+                justify-content: center;
+                gap: 8px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .brand-home-link {
+                width: 44px;
+                height: 44px;
+                border-radius: 14px;
+                box-shadow: none;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .brand-logo {
+                width: 40px;
+                height: 40px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) #brand-text {
+                display: none;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .topbar-nav,
+            body.mobile-ui:not(.tienda-preview-agenda) .topbar-actions,
+            body.mobile-ui:not(.tienda-preview-agenda) .search {
+                display: none !important;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .layout {
+                display: block;
+                padding: 12px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .left-nav,
+            body.mobile-ui:not(.tienda-preview-agenda) .cart-panel {
+                display: none !important;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .content {
+                gap: 12px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .tienda-estado-banner,
+            body.mobile-ui:not(.tienda-preview-agenda) .tienda-custom-banner {
+                border-radius: 16px;
+                padding: 10px 12px;
+                font-size: .86rem;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .tienda-hero {
+                grid-template-columns: 1fr;
+                min-height: 0;
+                border-radius: 24px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .tienda-hero-copy {
+                padding: 22px;
+                min-height: 180px;
+                position: relative;
+                z-index: 2;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .tienda-hero-title {
+                font-size: clamp(1.8rem, 10vw, 2.8rem);
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .tienda-hero-subtitle {
+                font-size: .95rem;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .tienda-hero-media {
+                min-height: 170px;
+                max-height: 230px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cat-strip {
+                position: sticky;
+                top: calc(66px + env(safe-area-inset-top, 0px));
+                z-index: 1200;
+                display: flex;
+                gap: 8px;
+                overflow-x: auto;
+                padding: 2px 2px 8px;
+                scrollbar-width: none;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cat-strip::-webkit-scrollbar {
+                display: none;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cat-chip {
+                min-height: 42px;
+                border: 1px solid var(--store-line);
+                border-radius: 999px;
+                background: #fff;
+                color: var(--store-chocolate);
+                padding: 0 14px;
+                font-weight: 900;
+                white-space: nowrap;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cat-chip.active,
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cat-chip.agenda-entry {
+                background: var(--store-primary);
+                color: #fff;
+                border-color: var(--store-primary);
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .section,
+            body.mobile-ui:not(.tienda-preview-agenda) .store-products-toolbar {
+                border-radius: 20px;
+                box-shadow: 0 10px 28px rgba(74, 44, 23, .08);
+                padding: 14px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .store-products-toolbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .store-products-tools {
+                width: 100%;
+                display: grid;
+                grid-template-columns: 1fr 44px 44px;
+                gap: 8px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .store-products-tools label {
+                display: none;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) #store-sort-select {
+                width: 100%;
+                height: 44px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) #sec-ofertas,
+            body.mobile-ui:not(.tienda-preview-agenda) #sec-destacados {
+                display: none !important;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) #categorias-wrap {
+                display: grid;
+                gap: 12px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) #categorias-wrap .section h2 {
+                font-size: 1.05rem;
+                margin-bottom: 10px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) #categorias-wrap .grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .item-card {
+                grid-template-columns: 128px minmax(0, 1fr);
+                grid-template-rows: 1fr;
+                border-radius: 18px;
+                min-height: 142px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .item-photo {
+                aspect-ratio: auto;
+                min-height: 100%;
+                height: 100%;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .item-body {
+                padding: 11px;
+                gap: 6px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .item-name {
+                font-size: .94rem;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .item-desc {
+                min-height: 0;
+                font-size: .78rem;
+                -webkit-line-clamp: 2;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .price-row {
+                gap: 5px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .price-final {
+                font-size: .98rem;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .stock {
+                display: none;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .cake-card__action {
+                min-height: 38px;
+                width: fit-content;
+                min-width: 116px;
+                justify-self: end;
+                border-radius: 12px;
+                font-size: .84rem;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .cake-card__favorite {
+                width: 34px;
+                height: 34px;
+                top: 8px;
+                right: 8px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .fav-tag,
+            body.mobile-ui:not(.tienda-preview-agenda) .offer-custom-badge {
+                font-size: .66rem;
+                padding: 3px 7px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cart-fab {
+                left: 12px;
+                right: 12px;
+                bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+                width: auto;
+                height: 64px;
+                border-radius: 22px;
+                padding: 0 18px;
+                display: flex !important;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                background: linear-gradient(135deg, var(--store-primary), var(--store-primary-dark));
+                color: #fff;
+                box-shadow: 0 18px 40px rgba(239, 125, 0, .34);
+                font-size: 1rem;
+                font-weight: 950;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cart-fab:before {
+                content: "Total";
+                font-size: .76rem;
+                opacity: .9;
+                display: block;
+                margin-right: auto;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cart-fab .total-chip {
+                margin-left: 0;
+                font-size: 1.05rem;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-menu-fab,
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-agenda-summary-fab {
+                display: none !important;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .wa-fab {
+                width: 54px;
+                height: 54px;
+                right: 18px;
+                bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda).cart-open .mobile-cart-modal {
+                display: flex;
+                z-index: 4200;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cart-panel {
+                border-radius: 26px 26px 0 0;
+                border: 1px solid var(--store-line);
+                box-shadow: 0 -18px 44px rgba(74, 44, 23, .18);
+            }
+        }
+
+        @media (min-width: 900px) and (max-width: 1180px) {
+            body:not(.tienda-preview-agenda) .layout {
+                grid-template-columns: 220px minmax(0, 1fr);
+            }
+            body:not(.tienda-preview-agenda) .cart-panel {
+                grid-column: 2;
+                position: static;
+            }
+            body:not(.tienda-preview-agenda) .topbar {
+                grid-template-columns: auto minmax(200px, 1fr) minmax(220px, 320px);
+            }
+            body:not(.tienda-preview-agenda) .topbar-actions {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            body:not(.tienda-preview-agenda) *,
+            body:not(.tienda-preview-agenda) *::before,
+            body:not(.tienda-preview-agenda) *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+            }
+        }
     </style>
 </head>
 <body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if request.path == '/tienda/agendapedidos' %}{% set _ = _body_cls.append('tienda-agendapedidos-oficial') %}{% endif %}{% if force_agenda and (agenda_beta or request.path in ['/tienda/preview', '/tienda/agendapedidos']) %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if (request.path == '/tienda/preview' and request.args.get('mode') == 'draft') or request.path == '/tienda/agendapedidos' or (agenda_beta and mobile_detected) %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
@@ -10687,6 +11598,24 @@
             <div class="section" id="sec-destacados">
                 <h2 id="sec-destacados-title">Articulos destacados</h2>
                 <div class="scroller" id="destacados-list"></div>
+            </div>
+
+            <div class="store-products-toolbar" id="store-products-toolbar">
+                <div>
+                    <strong>Productos</strong>
+                    <span id="store-products-count">Mostrando productos disponibles</span>
+                </div>
+                <div class="store-products-tools">
+                    <label for="store-sort-select">Ordenar por</label>
+                    <select id="store-sort-select" aria-label="Ordenar productos">
+                        <option value="popular">Mas populares</option>
+                        <option value="precio_asc">Precio menor a mayor</option>
+                        <option value="precio_desc">Precio mayor a menor</option>
+                        <option value="nombre">Nombre</option>
+                    </select>
+                    <button type="button" class="store-view-btn active" id="store-view-grid" aria-label="Vista grilla">▦</button>
+                    <button type="button" class="store-view-btn" id="store-view-list" aria-label="Vista lista">☰</button>
+                </div>
             </div>
 
             <div class="section agenda-section booking-app" id="sec-agenda-reservas" style="display:none;">
@@ -11386,6 +12315,11 @@
         const destacadosListEl = document.getElementById("destacados-list");
         const ofertasListEl = document.getElementById("ofertas-list");
         const categoriasWrapEl = document.getElementById("categorias-wrap");
+        const storeProductsToolbarEl = document.getElementById("store-products-toolbar");
+        const storeProductsCountEl = document.getElementById("store-products-count");
+        const storeSortSelectEl = document.getElementById("store-sort-select");
+        const storeViewGridEl = document.getElementById("store-view-grid");
+        const storeViewListEl = document.getElementById("store-view-list");
         const cartListEl = document.getElementById("cart-list");
         const mobileCartListEl = document.getElementById("mobile-cart-list");
         const subtotalMontoEl = document.getElementById("subtotal-monto");
@@ -11669,6 +12603,8 @@
         let carrito = [];
         let packBuilderState = null;
         const CAT_STORAGE_KEY = "tienda_categoria_activa";
+        const STORE_SORT_STORAGE_KEY = "tienda_store_sort";
+        const STORE_VIEW_STORAGE_KEY = "tienda_store_view";
         const _agendaUrlParamsInit = new URLSearchParams(window.location.search);
         const _forceAgendaFromServer = {{ 'true' if force_agenda else 'false' }};
         const _modoPresencialFromServer = {{ 'true' if modo_presencial else 'false' }};
@@ -11683,6 +12619,8 @@
         const MODO_PRESENCIAL = Boolean(_modoPresencialFromServer || _modoPresencialFromQueryInit || _modoPresencialFromPathInit);
         const categoriaInicialGuardada = String(localStorage.getItem(CAT_STORAGE_KEY) || "TODOS");
         let categoriaActiva = _forceAgendaModeInit ? "AGENDA" : (categoriaInicialGuardada === "AGENDA" ? "TODOS" : categoriaInicialGuardada);
+        let storeSortMode = String(localStorage.getItem(STORE_SORT_STORAGE_KEY) || "popular");
+        let storeViewMode = String(localStorage.getItem(STORE_VIEW_STORAGE_KEY) || "grid") === "list" ? "list" : "grid";
         if (!_forceAgendaModeInit && categoriaInicialGuardada === "AGENDA") {
             localStorage.setItem(CAT_STORAGE_KEY, "TODOS");
         }
@@ -16364,6 +17302,46 @@
             }
         }
 
+        function _storeSortedProducts(items) {
+            const arr = Array.isArray(items) ? [...items] : [];
+            const mode = String(storeSortMode || "popular");
+            const precio = (p) => {
+                const finalPriceBase = n(p?.precio_final);
+                return flowPagoHabilitado ? _flowPriceFromBase(finalPriceBase) : finalPriceBase;
+            };
+            if (mode === "precio_asc") {
+                return arr.sort((a, b) => precio(a) - precio(b) || String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+            }
+            if (mode === "precio_desc") {
+                return arr.sort((a, b) => precio(b) - precio(a) || String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+            }
+            if (mode === "nombre") {
+                return arr.sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+            }
+            return arr.sort((a, b) => {
+                const dest = Number(Boolean(b.destacado_tienda)) - Number(Boolean(a.destacado_tienda));
+                if (dest) return dest;
+                const oferta = n(b.descuento_tienda_pct) - n(a.descuento_tienda_pct);
+                if (oferta) return oferta;
+                return Number(a.orden_tienda || 0) - Number(b.orden_tienda || 0);
+            });
+        }
+
+        function _storeSyncToolbar(totalVisible = 0) {
+            const agendaMode = categoriaActiva === "AGENDA";
+            if (storeProductsToolbarEl) storeProductsToolbarEl.style.display = agendaMode ? "none" : "";
+            if (storeProductsCountEl) {
+                const catLabel = categoriaActiva === "TODOS" ? "todas las categorias" : String(categoriaActiva || "productos").toLowerCase();
+                storeProductsCountEl.textContent = `Mostrando ${Number(totalVisible || 0)} producto(s) en ${catLabel}`;
+            }
+            if (storeSortSelectEl && storeSortSelectEl.value !== storeSortMode) {
+                storeSortSelectEl.value = storeSortMode;
+            }
+            document.body.classList.toggle("store-list-view", storeViewMode === "list");
+            storeViewGridEl?.classList.toggle("active", storeViewMode !== "list");
+            storeViewListEl?.classList.toggle("active", storeViewMode === "list");
+        }
+
         function renderSecciones() {
             const agendaMode = categoriaActiva === "AGENDA";
             document.body.classList.toggle(
@@ -16376,6 +17354,7 @@
             if (secDestacadosEl) secDestacadosEl.style.display = agendaMode ? "none" : "";
             if (categoriasWrapEl) categoriasWrapEl.style.display = agendaMode ? "none" : "";
             if (cartPanelEl) cartPanelEl.style.display = agendaMode ? "none" : "";
+            if (storeProductsToolbarEl) storeProductsToolbarEl.style.display = agendaMode ? "none" : "";
             if (secAgendaReservasEl) {
                 secAgendaReservasEl.style.display = agendaMode && Boolean(tiendaUiCfg.agenda_enabled) ? "" : "none";
             }
@@ -16396,11 +17375,12 @@
             _cerrarModalAgendaCakeBuilder();
             _cerrarModalAgendaCakeCart();
             _toggleMobileAgendaSummaryFab();
-            const visibles = productos.filter((p) => productoFiltrado(p));
+            const visibles = _storeSortedProducts(productos.filter((p) => productoFiltrado(p)));
+            _storeSyncToolbar(visibles.length);
 
             const destacados = visibles
                 .filter((p) => Boolean(p.destacado_tienda))
-                .sort((a, b) => Number(a.orden_tienda || 0) - Number(b.orden_tienda || 0));
+                .slice(0, 24);
             const destacadosFinal = destacados.length ? destacados : visibles.slice(0, 12);
             destacadosListEl.innerHTML = destacadosFinal.length
                 ? destacadosFinal.map((p) => cardHtml(p, true)).join("")
@@ -16425,7 +17405,6 @@
                     <h2>${esc(cat)}</h2>
                     <div class="grid">
                         ${porCategoria[cat]
-                            .sort((a, b) => Number(a.orden_tienda || 0) - Number(b.orden_tienda || 0))
                             .map((p) => cardHtml(p))
                             .join("")}
                     </div>
@@ -19195,6 +20174,21 @@
         checkoutConfirmarPinEl?.addEventListener("click", _confirmarPinCheckout);
         document.getElementById("modal-exito-cerrar").addEventListener("click", cerrarModalExito);
         document.getElementById("modal-exito-pdf")?.addEventListener("click", () => window.descargarComprobanteUltimoPedido());
+        storeSortSelectEl?.addEventListener("change", () => {
+            storeSortMode = String(storeSortSelectEl.value || "popular");
+            try { localStorage.setItem(STORE_SORT_STORAGE_KEY, storeSortMode); } catch (_) {}
+            renderSecciones();
+        });
+        storeViewGridEl?.addEventListener("click", () => {
+            storeViewMode = "grid";
+            try { localStorage.setItem(STORE_VIEW_STORAGE_KEY, storeViewMode); } catch (_) {}
+            _storeSyncToolbar(productos.filter((p) => productoFiltrado(p)).length);
+        });
+        storeViewListEl?.addEventListener("click", () => {
+            storeViewMode = "list";
+            try { localStorage.setItem(STORE_VIEW_STORAGE_KEY, storeViewMode); } catch (_) {}
+            _storeSyncToolbar(productos.filter((p) => productoFiltrado(p)).length);
+        });
         pedidoActivoVerEl?.addEventListener("click", verDetallePedidoActivo);
         pedidoActivoFlowRetryEl?.addEventListener("click", reintentarPagoFlowPedidoActivo);
         pedidoActivoChatToggleEl?.addEventListener("click", _abrirModalPedidoChat);
