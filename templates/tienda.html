@@ -10598,6 +10598,818 @@
                 align-self: end;
             }
         }
+        /* SUCREE AGENDA TORTAS DESKTOP - aislado de mobile-ui */
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) {
+            --agenda-desktop-primary: #f5820b;
+            --agenda-desktop-primary-dark: #d86b00;
+            --agenda-desktop-success: #168544;
+            --agenda-desktop-success-soft: #eefaf1;
+            --agenda-desktop-chocolate: #3b2112;
+            --agenda-desktop-cream: #fff8ef;
+            --agenda-desktop-surface: #fffdf9;
+            --agenda-desktop-border: #f0dfcf;
+            --agenda-desktop-muted: #6b625a;
+            --agenda-desktop-shadow: 0 20px 54px rgba(74, 44, 23, .10);
+            background:
+                radial-gradient(circle at 12% 0%, rgba(245, 130, 11, .13), transparent 30%),
+                linear-gradient(180deg, #fffaf2 0%, #fffefd 42%, #f8f6f2 100%) !important;
+            color: #20150e;
+            min-width: 1080px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .beta-preview-ribbon,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .mobile-cart-fab,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .mobile-menu-fab,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .mobile-order-fab,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .mobile-agenda-summary-fab,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .mobile-cat-strip {
+            display: none !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 80;
+            width: min(1320px, calc(100vw - 48px));
+            min-height: 76px;
+            margin: 18px auto 0;
+            padding: 12px 18px;
+            display: grid;
+            grid-template-columns: 176px minmax(360px, 1fr) minmax(240px, 340px) auto;
+            align-items: center;
+            gap: 18px;
+            border: 1px solid rgba(139, 94, 52, .14);
+            border-radius: 24px;
+            background: rgba(255, 253, 249, .94);
+            box-shadow: var(--agenda-desktop-shadow);
+            backdrop-filter: blur(16px);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .brand-with-logo {
+            gap: 10px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .brand-logo {
+            width: 58px;
+            height: 58px;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 14px rgba(245, 130, 11, .18));
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #brand-text {
+            font-size: 1.05rem;
+            color: var(--agenda-desktop-chocolate);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .topbar-nav {
+            justify-content: center;
+            gap: 8px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .topbar-nav a,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .topbar-nav button {
+            min-height: 42px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            color: var(--agenda-desktop-chocolate);
+            font-weight: 800;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .topbar-nav a.active,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .topbar-nav button.active {
+            background: rgba(245, 130, 11, .12);
+            color: var(--agenda-desktop-primary-dark);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .search {
+            min-width: 0;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #search-input {
+            min-height: 46px;
+            border-radius: 999px;
+            border: 1px solid rgba(139, 94, 52, .18);
+            background: #fff;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .layout {
+            width: min(1320px, calc(100vw - 48px));
+            margin: 18px auto 34px;
+            padding: 0;
+            display: grid !important;
+            grid-template-columns: 220px minmax(0, 1fr) 300px;
+            gap: 18px;
+            align-items: start;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .left-nav,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .cart-panel {
+            position: sticky;
+            top: 112px;
+            border: 1px solid rgba(139, 94, 52, .14);
+            border-radius: 24px;
+            background: rgba(255, 253, 249, .92);
+            box-shadow: var(--agenda-desktop-shadow);
+            overflow: hidden;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .left-nav {
+            padding: 16px;
+            display: block !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .cart-panel {
+            padding: 18px;
+            display: block !important;
+            max-height: calc(100vh - 132px);
+            overflow: auto;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #agenda-quick-btn {
+            width: 100%;
+            min-height: 54px;
+            margin-bottom: 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(245, 130, 11, .32);
+            background: linear-gradient(135deg, #fff4e4, #fffdf9);
+            color: var(--agenda-desktop-primary-dark);
+            font-weight: 900;
+            box-shadow: 0 12px 24px rgba(245, 130, 11, .10);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .cat-list {
+            gap: 6px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .cat-btn {
+            min-height: 44px;
+            border-radius: 14px;
+            font-weight: 800;
+            color: var(--agenda-desktop-chocolate);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .cat-btn.active {
+            background: linear-gradient(135deg, var(--agenda-desktop-primary), #ffb04a);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(245, 130, 11, .18);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .content {
+            display: grid;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #sec-ofertas,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #sec-destacados,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #store-products-toolbar,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #categorias-wrap,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .tienda-hero {
+            display: none !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .tienda-estado-banner {
+            border-radius: 18px;
+            border: 1px solid rgba(22, 133, 68, .24);
+            background: linear-gradient(135deg, #effaf2, #fffdf9);
+            color: #166534;
+            font-weight: 800;
+            box-shadow: 0 10px 28px rgba(22, 133, 68, .08);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .beta-app-hero {
+            min-height: 220px;
+            border-radius: 28px;
+            border: 1px solid rgba(139, 94, 52, .14);
+            background: linear-gradient(135deg, rgba(255, 248, 239, .96), rgba(255,255,255,.86));
+            box-shadow: var(--agenda-desktop-shadow);
+            overflow: hidden;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .beta-app-hero__copy {
+            max-width: 420px;
+            padding: 30px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .beta-app-hero__title {
+            color: var(--agenda-desktop-chocolate);
+            font-size: clamp(2rem, 3.4vw, 3.8rem);
+            line-height: .95;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .beta-app-hero__media img {
+            height: 100%;
+            object-fit: cover;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #sec-agenda-reservas {
+            display: grid !important;
+            gap: 18px;
+            padding: 22px;
+            border-radius: 28px;
+            border: 1px solid rgba(139, 94, 52, .14);
+            background: rgba(255, 253, 249, .94);
+            box-shadow: var(--agenda-desktop-shadow);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #agenda-beta-close {
+            display: none !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .booking-benefits {
+            display: grid;
+            grid-template-columns: minmax(230px, 1.4fr) repeat(3, minmax(120px, .7fr));
+            align-items: center;
+            gap: 16px;
+            padding: 18px;
+            border-radius: 22px;
+            border: 1px solid rgba(139, 94, 52, .12);
+            background: #fff;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .booking-benefits:before {
+            content: "Agenda tu torta en 4 simples pasos";
+            font-weight: 950;
+            color: var(--agenda-desktop-chocolate);
+            font-size: 1.25rem;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .booking-benefit {
+            min-height: 78px;
+            padding: 12px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #f5fbf4, #fff);
+            border: 1px solid rgba(22, 133, 68, .12);
+            color: var(--agenda-desktop-chocolate);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .order-stepper {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0;
+            width: min(620px, 100%);
+            margin: 2px auto;
+            position: relative;
+            padding: 0 18px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .order-stepper:before {
+            content: "";
+            position: absolute;
+            top: 20px;
+            left: 68px;
+            right: 68px;
+            height: 2px;
+            background: #ded9d3;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-mobile-step-btn {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+            min-height: 72px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--agenda-desktop-muted);
+            font-weight: 800;
+            pointer-events: none;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-mobile-step-btn:before {
+            content: attr(data-step);
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: #e7e5e1;
+            color: #5f5b56;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,.04);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-mobile-step-btn.active:before,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-mobile-step-btn.done:before {
+            background: linear-gradient(135deg, var(--agenda-desktop-success), #2fa45d);
+            color: #fff;
+            box-shadow: 0 10px 20px rgba(22, 133, 68, .18);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-type-bar {
+            padding: 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(139, 94, 52, .10);
+            background: #f8f5f0;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-type-btn {
+            min-height: 48px;
+            border-radius: 999px;
+            font-weight: 950;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-type-btn.active {
+            background: linear-gradient(135deg, var(--agenda-desktop-success), #2fa45d);
+            color: #fff;
+            border-color: transparent;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #agenda-section-title,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .beta-catalog-title h3 {
+            color: var(--agenda-desktop-chocolate);
+            font-size: 1.45rem;
+            margin: 0;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-wrap {
+            display: grid !important;
+            gap: 16px;
+            border: 0;
+            padding: 0;
+            background: transparent;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-toolbar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 280px;
+            gap: 14px;
+            align-items: center;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-groups {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-group-btn,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-btn {
+            min-height: 42px;
+            padding: 9px 15px;
+            border-radius: 999px;
+            font-weight: 850;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-group-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-btn.active {
+            background: rgba(22, 133, 68, .10);
+            border-color: rgba(22, 133, 68, .36);
+            color: var(--agenda-desktop-success);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-search {
+            min-height: 46px;
+            border-radius: 16px;
+            border: 1px solid rgba(139, 94, 52, .14);
+            background: #fff;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-catalog-grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-card {
+            display: grid;
+            grid-template-rows: 150px 1fr auto;
+            min-height: 330px;
+            border-radius: 22px;
+            overflow: hidden;
+            border: 1px solid rgba(139, 94, 52, .14);
+            background: #fff;
+            box-shadow: 0 14px 34px rgba(74, 44, 23, .08);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(245, 130, 11, .34);
+            box-shadow: 0 20px 44px rgba(74, 44, 23, .13);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-card img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-body {
+            padding: 14px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-name {
+            color: var(--agenda-desktop-chocolate);
+            font-size: 1rem;
+            line-height: 1.2;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-desc {
+            color: var(--agenda-desktop-muted);
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-cat-card .btn-primary,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-catalog-actions .btn-primary {
+            min-height: 44px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--agenda-desktop-primary), #ffa426);
+            box-shadow: 0 12px 22px rgba(245, 130, 11, .18);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .beta-conditions-card {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            padding: 14px;
+            border-radius: 22px;
+            border: 1px solid rgba(22, 133, 68, .12);
+            background: linear-gradient(135deg, #f0faf2, #fffdf9);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 24px !important;
+            overflow: hidden !important;
+            background: rgba(42, 24, 12, .46) !important;
+            backdrop-filter: blur(10px);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .modal,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .modal {
+            width: min(1180px, calc(100vw - 56px)) !important;
+            max-width: 1180px !important;
+            height: min(820px, calc(100vh - 56px)) !important;
+            max-height: calc(100vh - 56px) !important;
+            display: grid !important;
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto auto !important;
+            gap: 14px !important;
+            padding: 22px !important;
+            overflow: hidden !important;
+            border-radius: 28px !important;
+            border: 1px solid rgba(246, 233, 218, .92) !important;
+            background: linear-gradient(180deg, #fffdf9 0%, #fff8ef 100%) !important;
+            box-shadow: 0 32px 90px rgba(42, 24, 12, .28) !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .modal {
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-head,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-step-head {
+            position: static !important;
+            padding: 10px 12px !important;
+            border-radius: 18px !important;
+            border: 1px solid rgba(139, 94, 52, .12) !important;
+            background: #fff !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-head h3,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-step-head h3 {
+            margin: 0 !important;
+            color: var(--agenda-desktop-chocolate);
+            font-size: 1.2rem !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-close-x,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-close-x,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-header-cart {
+            width: 42px !important;
+            height: 42px !important;
+            border-radius: 50% !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-builder-stepper {
+            width: min(640px, 100%);
+            margin: 0 auto;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-builder-stepper__item strong {
+            background: #e6e1dc;
+            color: #5e5750;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-builder-stepper__item.is-active strong,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-builder-stepper__item.is-done strong {
+            background: linear-gradient(135deg, var(--agenda-desktop-success), #2fa45d);
+            color: #fff;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-builder-summary-bar {
+            width: min(680px, 100%);
+            margin: 0 auto;
+            border-radius: 18px;
+            border: 1px solid rgba(22, 133, 68, .13);
+            background: #fff;
+            box-shadow: 0 12px 28px rgba(74, 44, 23, .07);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-label,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-step-label {
+            color: var(--agenda-desktop-success);
+            font-weight: 950;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-builder,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active {
+            min-height: 0 !important;
+            overflow: hidden !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-pane.active {
+            height: 100%;
+            min-height: 0;
+            overflow: auto;
+            padding: 2px 6px 8px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-step-pane[data-step="1"].active {
+            display: grid !important;
+            grid-template-columns: minmax(300px, .86fr) minmax(430px, 1.14fr);
+            grid-template-areas:
+                "intro sizes"
+                "product sizes"
+                "benefits sizes"
+                "note sizes";
+            gap: 16px;
+            align-items: start;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-intro { grid-area: intro; }
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-product-card { grid-area: product; }
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-benefits { grid-area: benefits; }
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-note { grid-area: note; }
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-size-panel { grid-area: sizes; min-height: 0; }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-intro h4,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-step-title h4 {
+            color: var(--agenda-desktop-chocolate);
+            font-size: 1.65rem;
+            line-height: 1.05;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-product-card {
+            display: grid;
+            grid-template-columns: 168px 1fr;
+            gap: 14px;
+            border-radius: 22px;
+            border: 1px solid rgba(139, 94, 52, .13);
+            background: #fff;
+            box-shadow: 0 14px 32px rgba(74, 44, 23, .08);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-product-card__media {
+            min-height: 160px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-product-card__media img {
+            border-radius: 18px;
+            object-fit: cover;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-benefits {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-benefits span,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-note {
+            border-radius: 18px;
+            background: linear-gradient(135deg, #edf8ef, #fff);
+            border: 1px solid rgba(22, 133, 68, .12);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-size-grid {
+            max-height: 100%;
+            min-height: 0;
+            overflow: auto;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            padding: 2px 4px 2px 0;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-card,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-pill,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-day-btn,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-hour-btn {
+            border-radius: 18px;
+            border: 1px solid rgba(139, 94, 52, .14);
+            background: #fff;
+            transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-card:hover,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-pill:hover,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-day-btn:hover,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-hour-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(74, 44, 23, .09);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-card.active,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-pill.active,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-day-btn.active,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-hour-btn.active {
+            border-color: rgba(22, 133, 68, .72);
+            background: linear-gradient(135deg, #eefaf1, #fff);
+            box-shadow: 0 16px 34px rgba(22, 133, 68, .14);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-step-panel {
+            height: 100%;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr);
+            gap: 14px;
+            overflow: hidden;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-list,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-files {
+            min-height: 0;
+            overflow: auto;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            padding-right: 4px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-topper-card {
+            height: 100%;
+            min-height: 0;
+            overflow: auto;
+            display: grid;
+            grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+            gap: 14px;
+            align-content: start;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-topper-card .cake-step-title {
+            grid-column: 1 / -1;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .agenda-cake-topper-card textarea {
+            min-height: 150px;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .cake-size-coupon-bottom {
+            max-height: 74px;
+            overflow: auto;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .modal-actions,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .modal-actions {
+            position: static !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            gap: 10px !important;
+            padding: 12px !important;
+            border-radius: 18px !important;
+            border: 1px solid rgba(139, 94, 52, .12) !important;
+            background: #fff !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .modal-actions .btn-primary,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .modal-actions .btn-muted,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .modal-actions .agenda-flow-btn {
+            flex: 0 0 auto !important;
+            min-width: 136px !important;
+            height: 42px !important;
+            padding: 8px 16px !important;
+            border-radius: 999px !important;
+            font-size: .92rem !important;
+            font-weight: 900 !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active .modal-actions .btn-primary,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .modal-actions .btn-primary {
+            background: linear-gradient(135deg, var(--agenda-desktop-primary), #ffa426) !important;
+            box-shadow: 0 12px 24px rgba(245, 130, 11, .20) !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] {
+            display: grid !important;
+            grid-template-columns: minmax(360px, .95fr) minmax(420px, 1.05fr);
+            grid-template-rows: auto auto minmax(0, 1fr);
+            gap: 14px;
+            min-height: 0;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] .agenda-mini-title {
+            grid-column: 1 / -1;
+            grid-row: 1;
+            margin: 0;
+            color: var(--agenda-desktop-chocolate);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="1"] > .agenda-flow-subtitle:not(#agenda-cake-flow-hours-title) {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-hours-title {
+            grid-column: 2;
+            grid-row: 2;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-days-host {
+            grid-column: 1;
+            grid-row: 3;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-days-host,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-hours-host {
+            min-height: 0 !important;
+            max-height: 100% !important;
+            overflow: auto !important;
+            padding: 10px !important;
+            border: 1px solid rgba(139, 94, 52, .14);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, .66);
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-days,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-hours {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            overflow: visible !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-day-btn,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-hour-btn {
+            min-height: 72px;
+            padding: 12px;
+            text-align: left;
+            color: var(--agenda-desktop-chocolate);
+            font-weight: 850;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .agenda-cake-flow-pane.active[data-flow-step="2"] {
+            display: grid !important;
+            grid-template-columns: minmax(470px, 1fr) minmax(330px, .72fr);
+            gap: 16px;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-form-host,
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-confirm-detail {
+            min-height: 0 !important;
+            overflow: auto !important;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active #agenda-cake-flow-form-host {
+            grid-row: span 2;
+        }
+
+        body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-cart.active .cake-flow-confirm-actions {
+            align-self: end;
+        }
+
+        @media (max-width: 1180px) {
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .topbar,
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .layout {
+                width: min(1120px, calc(100vw - 28px));
+            }
+
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .layout {
+                grid-template-columns: 200px minmax(0, 1fr) 280px;
+                gap: 14px;
+            }
+
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) .agenda-cake-catalog-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) *,
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) *::before,
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) *::after {
+                transition: none !important;
+                animation: none !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
         /* SUCREE STORE REDESIGN - tienda normal, aislado de agenda tortas */
         body:not(.tienda-preview-agenda) {
             --store-bg: #fffaf3;
