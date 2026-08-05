@@ -18763,6 +18763,17 @@
         }
 
         function cambiarCategoria(cat) {
+            const catNorm = String(cat || "").trim().toUpperCase();
+            const pathNow = String(window.location.pathname || "").toLowerCase();
+            if (catNorm === "AGENDA" && !pathNow.startsWith("/tienda/agendapedidos")) {
+                try {
+                    localStorage.setItem(CAT_STORAGE_KEY, "AGENDA");
+                    window.location.assign("/tienda/agendapedidos");
+                } catch (_e) {
+                    window.location.href = "/tienda/agendapedidos";
+                }
+                return;
+            }
             categoriaActiva = cat;
             localStorage.setItem(CAT_STORAGE_KEY, categoriaActiva);
             _actualizarUrlCategoria(categoriaActiva);
