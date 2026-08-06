@@ -16899,7 +16899,7 @@
             const tipo = String(agendaTipoActual || "").trim().toLowerCase();
             if (tipo === "torta") {
                 const sizeSel = _catalogFind("sizes", agendaCakeSelection?.size_id);
-                const required = Math.max(2, Math.min(3, Number(sizeSel?.max_sabores || 3)));
+                const required = _agendaCakeMinSaboresForSize(sizeSel);
                 const picked = Array.isArray(agendaCakeSelection?.sabor_ids) ? agendaCakeSelection.sabor_ids.length : 0;
                 return Boolean(String(agendaCakeSelection?.size_id || "").trim()) && picked >= required;
             }
@@ -16910,6 +16910,15 @@
                 return Array.isArray(agendaPastelItems) && agendaPastelItems.length > 0;
             }
             return false;
+        }
+
+        function _agendaCakeMaxSaboresForSize(size) {
+            const raw = Number(size?.max_sabores);
+            return Math.min(3, Math.max(1, Number.isFinite(raw) && raw > 0 ? raw : 3));
+        }
+
+        function _agendaCakeMinSaboresForSize(size) {
+            return Math.min(2, _agendaCakeMaxSaboresForSize(size));
         }
 
         function _agendaPaso3Completo() {
@@ -17068,7 +17077,7 @@
                 nombre: String(s?.nombre || s?.name || `Tamano ${idx + 1}`).trim(),
                 categoria_id: String(s?.categoria_id || defaultCatId).trim().toLowerCase(),
                 precio: Number(s?.precio || 0),
-                max_sabores: Math.max(1, Number(s?.max_sabores || 1)),
+                max_sabores: _agendaCakeMaxSaboresForSize(s),
                 activo: s?.activo !== false,
             })).filter((s) => Boolean(s.id) && Boolean(s.nombre));
             return {
@@ -17950,7 +17959,12 @@
                 }
 
                 const sizeSelected = _catalogFind("sizes", agendaCakeSelection.size_id);
-                const maxSabores = Math.min(3, Math.max(1, Number(sizeSelected?.max_sabores || 1)));
+                const maxSabores = _agendaCakeMaxSaboresForSize(sizeSelected);
+                const minSabores = _agendaCakeMinSaboresForSize(sizeSelected);
+                const step2HelpEl = document.querySelector('.agenda-cake-step-pane[data-step="2"] .cake-step-help');
+                if (step2HelpEl) {
+                    step2HelpEl.innerHTML = `Para avanzar debes seleccionar al menos <strong>${minSabores}</strong> relleno(s) (maximo <strong>${maxSabores}</strong>).`;
+                }
 
                 if (agendaCakeFlavorsEl) {
                     const sabores = _catalogListByCategoria("sabores");
@@ -18113,7 +18127,7 @@
         function agendaCakeSelectSize(sizeId) {
             agendaCakeSelection.size_id = String(sizeId || "");
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
-            const maxSabores = Math.min(3, Math.max(1, Number(size?.max_sabores || 1)));
+            const maxSabores = _agendaCakeMaxSaboresForSize(size);
             agendaCakeSelection.sabor_ids = (agendaCakeSelection.sabor_ids || []).slice(0, maxSabores);
             if (Boolean(_agendaWizardFromServer) && document.body.classList.contains("mobile-ui")) agendaCakeBuilderStep = Math.max(2, agendaCakeBuilderStep);
             if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
@@ -19105,7 +19119,9 @@
             if (payload.tipo === "torta") {
                 const cat = payload.catalogo_torta || {};
                 if (!String(cat.size_id || "").trim()) return _agendaMsg("Selecciona tamano de torta.", "err");
-                if (!Array.isArray(cat.sabor_ids) || cat.sabor_ids.length < 2) return _agendaMsg("Selecciona al menos 2 rellenos.", "err");
+                const size = _catalogFind("sizes", cat.size_id);
+                const minSabores = _agendaCakeMinSaboresForSize(size);
+                if (!Array.isArray(cat.sabor_ids) || cat.sabor_ids.length < minSabores) return _agendaMsg(`Selecciona al menos ${minSabores} relleno(s).`, "err");
             } else if (payload.tipo === "pastel") {
                 if (String(payload.pastel_modo || "catalogo") === "especial") {
                     if (String(payload.pastel_especial?.detalle || "").trim().length < 8) {
@@ -19167,7 +19183,7 @@
             const sid = String(flavorId || "");
             if (!sid) return false;
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
-            const maxSabores = Math.min(3, Math.max(1, Number(size?.max_sabores || 3)));
+            const maxSabores = _agendaCakeMaxSaboresForSize(size);
             const allowedFlavors = new Set(_catalogListByCategoria("sabores").map((x) => String(x?.id || "")));
             const current = (Array.isArray(agendaCakeSelection.sabor_ids) ? agendaCakeSelection.sabor_ids : []).filter((x) => allowedFlavors.has(String(x || "")));
             if (current.includes(sid)) {
@@ -22312,8 +22328,10 @@
         agendaCakeStepNextEl?.addEventListener("click", () => {
             if (agendaCakeBuilderStep === 2) {
                 const picked = Array.isArray(agendaCakeSelection?.sabor_ids) ? agendaCakeSelection.sabor_ids.length : 0;
-                if (picked < 2) {
-                    _agendaMsg("Debes elegir al menos 2 rellenos para continuar.", "err");
+                const size = _catalogFind("sizes", agendaCakeSelection?.size_id);
+                const minSabores = _agendaCakeMinSaboresForSize(size);
+                if (picked < minSabores) {
+                    _agendaMsg(`Debes elegir al menos ${minSabores} relleno(s) para continuar.`, "err");
                     return;
                 }
             }
@@ -22477,7 +22495,7 @@
         agendaCakeSizeEl?.addEventListener("change", () => {
             agendaCakeSelection.size_id = String(agendaCakeSizeEl.value || "");
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
-            const maxSabores = Math.max(1, Number(size?.max_sabores || 1));
+            const maxSabores = _agendaCakeMaxSaboresForSize(size);
             agendaCakeSelection.sabor_ids = (agendaCakeSelection.sabor_ids || []).slice(0, maxSabores);
             _renderAgendaCakeBuilder();
         });
