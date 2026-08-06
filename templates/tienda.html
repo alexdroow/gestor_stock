@@ -12548,13 +12548,16 @@
 
             body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 > .modal {
                 grid-template-columns: 320px minmax(0, 1fr) !important;
-                grid-template-rows: 48px 48px minmax(0, 1fr) 40px !important;
+                grid-template-rows: auto auto minmax(0, 1fr) auto !important;
                 grid-template-areas:
                     "head head"
                     "stepper stepper"
                     "summary builder"
                     "actions actions" !important;
+                height: min(94dvh, 880px) !important;
+                max-height: calc(100dvh - 24px) !important;
                 align-items: stretch !important;
+                overflow: hidden !important;
                 gap: 6px !important;
             }
 
@@ -12576,6 +12579,7 @@
                 gap: 12px !important;
                 min-height: 0 !important;
                 height: 100% !important;
+                overflow: hidden !important;
                 padding: 14px !important;
                 border: 1px solid #f0dfcf !important;
                 border-radius: 20px !important;
@@ -12629,7 +12633,10 @@
 
             body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .agenda-cake-builder {
                 grid-area: builder !important;
+                display: grid !important;
+                grid-template-rows: minmax(0, 1fr) !important;
                 padding: 0 !important;
+                height: 100% !important;
                 min-height: 0 !important;
                 overflow: hidden !important;
             }
@@ -12660,6 +12667,8 @@
             }
 
             body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .agenda-cake-step-pane[data-step="3"].active {
+                display: grid !important;
+                grid-template-rows: minmax(0, 1fr) !important;
                 height: 100% !important;
                 min-height: 0 !important;
                 overflow: hidden !important;
@@ -12719,13 +12728,16 @@
             body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 #agenda-cake-extras {
                 display: grid !important;
                 grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                grid-auto-rows: minmax(136px, 1fr) !important;
+                grid-auto-rows: minmax(112px, auto) !important;
                 gap: 12px !important;
-                align-content: stretch !important;
+                align-content: start !important;
                 min-height: 0 !important;
                 height: 100% !important;
-                overflow: auto !important;
-                padding: 2px 8px 4px 2px !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                overscroll-behavior: contain !important;
+                scrollbar-gutter: stable !important;
+                padding: 2px 8px 18px 2px !important;
             }
 
             body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .cake-extra-row {
@@ -12738,8 +12750,8 @@
                     "controls controls" !important;
                 gap: 8px 10px !important;
                 align-items: start !important;
-                min-height: 136px !important;
-                height: 100% !important;
+                min-height: 112px !important;
+                height: auto !important;
                 padding: 10px !important;
                 border: 1px solid #f0dfcf !important;
                 border-radius: 18px !important;
