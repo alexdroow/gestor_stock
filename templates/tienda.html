@@ -12959,6 +12959,38 @@
             }
         }
 
+        @media (min-width: 1024px) {
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .agenda-cake-builder,
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .agenda-cake-step-pane[data-step="3"].active,
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .cake-step-panel {
+                min-height: 0 !important;
+                height: 100% !important;
+                overflow: hidden !important;
+            }
+
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .cake-step-panel {
+                display: grid !important;
+                grid-template-rows: auto minmax(0, 1fr) !important;
+            }
+
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 #agenda-cake-extras {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                grid-auto-rows: minmax(112px, 1fr) !important;
+                align-content: stretch !important;
+                align-items: stretch !important;
+                min-height: 0 !important;
+                height: 100% !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                padding: 2px 8px 18px 2px !important;
+            }
+
+            body.tienda-preview-draft.tienda-preview-agenda:not(.mobile-ui) #modal-agenda-cake-builder.active.cake-builder-step-3 .cake-extra-row {
+                min-height: 112px !important;
+                height: 100% !important;
+            }
+        }
+
         /* SUCREE STORE REDESIGN - tienda normal, aislado de agenda tortas */
         body:not(.tienda-preview-agenda) {
             --store-bg: #fffaf3;
