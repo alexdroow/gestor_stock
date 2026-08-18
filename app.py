@@ -5126,8 +5126,9 @@ def _normalizar_catalogo_torta_cfg(raw):
         out["toppers"] = list(base.get("toppers") or [])
 
     # Sincronizacion defensiva de listas por categoria:
-    # si una categoria usa ingredientes por categoria, autocompleta con todos los activos
-    # para evitar que nuevos items queden ocultos en tienda/agenda.
+    # conserva solo los IDs validos y respeta la seleccion manual del admin.
+    # No autocompleta con todos los activos, porque eso vuelve a marcar
+    # ingredientes que fueron desactivados para una categoria especifica.
     sabores_activos_ids = [str(x.get("id") or "").strip() for x in (out.get("sabores") or []) if bool(x.get("activo")) and str(x.get("id") or "").strip()]
     extras_activos_ids = [str(x.get("id") or "").strip() for x in (out.get("extras") or []) if bool(x.get("activo")) and str(x.get("id") or "").strip()]
     toppers_activos_ids = [str(x.get("id") or "").strip() for x in (out.get("toppers") or []) if bool(x.get("activo")) and str(x.get("id") or "").strip()]
@@ -5154,10 +5155,9 @@ def _normalizar_catalogo_torta_cfg(raw):
         return out_ids
 
     for cat in (out.get("categorias") or []):
-        use_cat = bool(cat.get("use_category_ingredients", False))
-        cat["sabores_ids"] = _sync_ids(cat.get("sabores_ids") or [], sabores_set, sabores_activos_ids, autocompletar=use_cat)
-        cat["extras_ids"] = _sync_ids(cat.get("extras_ids") or [], extras_set, extras_activos_ids, autocompletar=use_cat)
-        cat["toppers_ids"] = _sync_ids(cat.get("toppers_ids") or [], toppers_set, toppers_activos_ids, autocompletar=use_cat)
+        cat["sabores_ids"] = _sync_ids(cat.get("sabores_ids") or [], sabores_set, sabores_activos_ids, autocompletar=False)
+        cat["extras_ids"] = _sync_ids(cat.get("extras_ids") or [], extras_set, extras_activos_ids, autocompletar=False)
+        cat["toppers_ids"] = _sync_ids(cat.get("toppers_ids") or [], toppers_set, toppers_activos_ids, autocompletar=False)
 
     return out
 
@@ -5197,25 +5197,26 @@ def _catalogo_torta_publico(cfg):
             **x,
             "min_lead_hours": max(1, int(x.get("min_lead_hours") or 48)),
             "use_category_ingredients": bool(x.get("use_category_ingredients", False)),
-            # Sincronizacion automatica: nuevos activos agregados en admin
-            # se reflejan tambien en tienda y agenda manual.
+            # Respeta la seleccion manual guardada por categoria.
+            # Si un ingrediente se apaga para esta categoria, no debe volver
+            # a aparecer activo en tienda/agenda al refrescar.
             "sabores_ids": _sync_ids_categoria(
                 x.get("sabores_ids") or [],
                 sabores_ids,
                 sabores_ids_orden,
-                autocompletar=bool(x.get("use_category_ingredients", False)),
+                autocompletar=False,
             ),
             "extras_ids": _sync_ids_categoria(
                 x.get("extras_ids") or [],
                 extras_ids,
                 extras_ids_orden,
-                autocompletar=bool(x.get("use_category_ingredients", False)),
+                autocompletar=False,
             ),
             "toppers_ids": _sync_ids_categoria(
                 x.get("toppers_ids") or [],
                 toppers_ids,
                 toppers_ids_orden,
-                autocompletar=bool(x.get("use_category_ingredients", False)),
+                autocompletar=False,
             ),
         }
         for x in categorias_activas
