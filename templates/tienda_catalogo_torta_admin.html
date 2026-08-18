@@ -4,343 +4,289 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catalogo torta admin</title>
-    <style>
+        <style>
         :root {
-            --bg: #f8fafc;
-            --panel: #ffffff;
-            --line: #e2e8f0;
-            --text: #0f172a;
-            --muted: #64748b;
-            --accent: #ea580c;
+            --admin-bg: #fff8ef;
+            --admin-surface: #fffdf9;
+            --admin-card: #ffffff;
+            --admin-card-soft: #fff4e4;
+            --admin-line: #ead8c2;
+            --admin-line-strong: #f4b06a;
+            --admin-text: #2d1b10;
+            --admin-muted: #7a6656;
+            --admin-primary: #f47b00;
+            --admin-primary-dark: #c95f00;
+            --admin-success: #20a464;
+            --admin-danger: #ef4444;
+            --admin-blue: #2d8cff;
+            --admin-purple: #a855f7;
+            --admin-shadow: 0 18px 45px rgba(66, 32, 8, .08);
+            --admin-shadow-sm: 0 8px 22px rgba(66, 32, 8, .06);
+            --admin-radius: 18px;
+            --admin-sidebar: #2b221b;
+            --admin-sidebar-2: #1d1712;
         }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
-        .wrap { width: min(1300px, 100%); margin: 0 auto; padding: 18px; display: grid; gap: 12px; }
-        .top {
-            border: 1px solid var(--line);
-            background: var(--panel);
-            border-radius: 12px;
-            padding: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .top h1 { margin: 0; font-size: 1.15rem; }
-        .links { display: flex; gap: 8px; flex-wrap: wrap; }
-        .links a {
-            text-decoration: none;
-            border: 1px solid #cbd5e1;
-            background: #fff;
-            color: #334155;
-            border-radius: 8px;
-            padding: 7px 10px;
-            font-weight: 700;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: 1.4fr .6fr;
-            gap: 12px;
-            align-items: start;
-        }
-        .panel {
-            border: 1px solid var(--line);
-            background: var(--panel);
-            border-radius: 12px;
-            padding: 12px;
-            display: grid;
-            gap: 10px;
-        }
-        .section {
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px;
-            background: #f8fafc;
-            display: grid;
-            gap: 8px;
-        }
-        .section h2 { margin: 0; font-size: .95rem; }
-        .row {
-            display: grid;
-            grid-template-columns: 1.2fr .6fr .8fr .4fr .4fr auto;
-            gap: 8px;
-            align-items: end;
-        }
-        .row.extras { grid-template-columns: 1.2fr .6fr .5fr .4fr auto; }
-        .row.cat {
-            grid-template-columns: 1.1fr .45fr .45fr .45fr .3fr auto;
-            align-items: start;
-        }
-        .cat-grid {
-            grid-column: 1 / span 5;
-            display: grid;
-            gap: 6px;
-            padding: 8px;
-            border: 1px dashed #cbd5e1;
-            border-radius: 8px;
-            background: #fff;
-        }
-        .cat-tools {
-            grid-column: 1 / span 5;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .cat-cover {
-            display: grid;
-            grid-template-columns: 72px 1fr auto;
-            gap: 8px;
-            align-items: center;
-        }
-        .cat-cover img {
-            width: 72px;
-            height: 72px;
-            border-radius: 10px;
-            border: 1px solid #cbd5e1;
-            object-fit: cover;
-            background: #f1f5f9;
-        }
-        .cat-cover-tools {
-            display: grid;
-            gap: 6px;
-            align-content: start;
-        }
-        .btn-sm {
-            padding: 6px 9px;
-            font-size: .78rem;
-        }
-        .cat-opts {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-        .cat-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            border: 1px solid #cbd5e1;
-            border-radius: 999px;
-            padding: 4px 8px;
-            font-size: .78rem;
-            background: #f8fafc;
-        }
-        label { display: grid; gap: 4px; font-size: .82rem; font-weight: 700; color: #334155; }
-        input, select {
-            width: 100%;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 8px 9px;
-            font: inherit;
-        }
-        .list { display: grid; gap: 7px; }
-        .btn {
-            border: 0;
-            border-radius: 8px;
-            padding: 8px 10px;
-            font-weight: 800;
-            cursor: pointer;
-        }
-        .btn-main { background: var(--accent); color: #fff; }
-        .btn-alt { background: #e2e8f0; color: #334155; }
-        .btn-out { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
-        .btn-del { background: #ef4444; color: #fff; }
-        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .muted { color: var(--muted); font-size: .82rem; }
-        .msg { min-height: 20px; font-size: .9rem; }
-        .msg.ok { color: #166534; }
-        .msg.err { color: #b91c1c; }
-        .summary {
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px;
-            background: #f8fafc;
-            display: grid;
-            gap: 8px;
-            font-size: .86rem;
-        }
-        .crop-modal {
-            position: fixed;
-            inset: 0;
-            z-index: 80;
-            background: rgba(15, 23, 42, .58);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
-        }
-        .crop-modal.active { display: flex; }
-        .crop-panel {
-            width: min(760px, 100%);
-            border: 1px solid #cbd5e1;
-            border-radius: 14px;
-            background: #fff;
-            box-shadow: 0 16px 40px rgba(2, 6, 23, .35);
-            display: grid;
-            gap: 10px;
-            padding: 12px;
-        }
-        .crop-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .crop-title {
-            margin: 0;
-            font-size: 1.02rem;
-            color: #0f172a;
-        }
-        .crop-stage-wrap {
-            border: 1px dashed #cbd5e1;
-            border-radius: 12px;
-            background: #f8fafc;
-            padding: 10px;
-        }
-        .crop-stage {
-            position: relative;
-            width: min(560px, 100%);
-            aspect-ratio: 1 / 1;
-            margin: 0 auto;
-            overflow: hidden;
-            border-radius: 10px;
-            border: 1px solid #dbe3ef;
-            background: #eef2f7;
-            cursor: grab;
-        }
-        .crop-stage.dragging { cursor: grabbing; }
-        .crop-stage img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: 50% 50%;
-            transform: scale(1);
-            transform-origin: 50% 50%;
-            touch-action: none;
-            user-select: none;
-            -webkit-user-drag: none;
-        }
-        .crop-controls {
-            display: grid;
-            gap: 8px;
-        }
-        .crop-range {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 8px;
-            align-items: center;
-        }
-        .crop-range input[type="range"] { width: 100%; }
-        .crop-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        @media (max-width: 980px) {
-            .grid { grid-template-columns: 1fr; }
-            .row, .row.extras { grid-template-columns: 1fr; }
-            .row.cat { grid-template-columns: 1fr; }
-            .cat-grid, .cat-tools { grid-column: auto; }
-            .cat-cover { grid-template-columns: 1fr; }
-            .crop-panel { padding: 10px; }
-        }
+        html { background: var(--admin-bg); }
+        body { margin: 0; min-height: 100vh; font-family: Inter, "Segoe UI", Tahoma, sans-serif; background: radial-gradient(circle at 85% -10%, rgba(244, 123, 0, .12), transparent 36%), linear-gradient(135deg, #fffdf9 0%, #fff7ed 48%, #fffaf4 100%); color: var(--admin-text); }
+        button, input, select { font: inherit; }
+        .admin-shell { display: grid; grid-template-columns: 274px minmax(0, 1fr); min-height: 100vh; }
+        .admin-sidebar { position: sticky; top: 0; min-height: 100vh; padding: 24px 18px; background: radial-gradient(circle at 50% 0%, rgba(244, 123, 0, .22), transparent 34%), linear-gradient(180deg, var(--admin-sidebar), var(--admin-sidebar-2)); color: #fffaf3; display: flex; flex-direction: column; gap: 22px; }
+        .brand-panel { text-align: center; padding: 8px 8px 16px; border-bottom: 1px solid rgba(255,255,255,.13); }
+        .brand-mark { width: 92px; height: 70px; margin: 0 auto 8px; display: grid; place-items: center; color: #ff8a00; font-size: 3rem; }
+        .brand-name { font-family: Georgia, serif; font-size: 1.95rem; line-height: 1; }
+        .brand-sub { font-size: .85rem; color: rgba(255,255,255,.76); margin-top: 4px; }
+        .side-section-title { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.58); margin: 12px 8px 8px; }
+        .side-nav { display: grid; gap: 5px; }
+        .side-link { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 10px 12px; color: rgba(255,255,255,.82); text-decoration: none; border-radius: 12px; font-weight: 750; transition: .18s ease; }
+        .side-link:hover { background: rgba(255,255,255,.08); color: #fff; transform: translateX(2px); }
+        .side-link.active { background: linear-gradient(135deg, #ff9b18, #f36f00); color: #fff; box-shadow: 0 10px 24px rgba(244, 123, 0, .32); }
+        .side-link.sub { margin-left: 22px; min-height: 34px; font-size: .88rem; font-weight: 650; color: rgba(255,255,255,.72); }
+        .side-dot { width: 7px; height: 7px; border-radius: 999px; background: rgba(255,255,255,.76); }
+        .side-footer { margin-top: auto; display: grid; gap: 12px; color: rgba(255,255,255,.82); }
+        .dark-row { display: flex; align-items: center; justify-content: space-between; font-size: .9rem; }
+        .fake-toggle { width: 44px; height: 24px; border-radius: 999px; background: rgba(255,255,255,.16); position: relative; }
+        .fake-toggle:after { content:""; position:absolute; width:18px; height:18px; top:3px; left:4px; border-radius:50%; background:#d6d3d1; }
+        .admin-main { min-width: 0; padding: 0 34px 30px; }
+        .admin-topbar { position: sticky; top: 0; z-index: 20; height: 76px; margin: 0 -34px 24px; padding: 0 34px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: rgba(255, 253, 249, .88); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(234, 216, 194, .85); }
+        .top-left, .top-right { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        .icon-square { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--admin-line); border-radius: 12px; background: #fff; color: var(--admin-text); box-shadow: var(--admin-shadow-sm); font-weight: 900; }
+        .admin-search { position: relative; width: min(440px, 44vw); }
+        .admin-search span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--admin-primary); }
+        .admin-search input { padding-left: 42px; height: 44px; border-radius: 12px; background: #fff; }
+        .bell { position: relative; }
+        .bell:after { content:"0"; position:absolute; top:-5px; right:-5px; width:16px; height:16px; border-radius:50%; background:#ef4444; color:#fff; font-size:.62rem; display:grid; place-items:center; }
+        .admin-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #ff9b18, #e75f00); display:grid; place-items:center; color:#fff; font-weight:900; box-shadow: 0 10px 24px rgba(244,123,0,.25); }
+        .admin-role strong { display:block; font-size:.93rem; } .admin-role span { color: var(--admin-muted); font-size:.78rem; }
+        .module-wrap { max-width: 1640px; margin: 0 auto; display: grid; gap: 18px; }
+        .breadcrumb { display:flex; gap:8px; align-items:center; color: var(--admin-muted); font-size:.85rem; }
+        .module-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; flex-wrap: wrap; }
+        .module-title { display:flex; align-items:center; gap:12px; }
+        .module-title h1 { margin: 0; font-size: clamp(2rem, 3vw, 3.1rem); letter-spacing: -.04em; }
+        .title-icon { font-size: 2.1rem; }
+        .module-subtitle { margin: 6px 0 0 50px; color: var(--admin-muted); font-size: 1rem; }
+        .quick-links { display:flex; flex-wrap:wrap; gap:10px; }
+        .quick-links a { text-decoration:none; color: var(--admin-text); background:#fff; border:1px solid var(--admin-line); padding:10px 14px; border-radius:12px; font-weight:850; box-shadow:var(--admin-shadow-sm); }
+        .metrics { display:grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap:18px; }
+        .metric-card { background:#fff; border:1px solid var(--admin-line); border-radius:16px; padding:18px; box-shadow:var(--admin-shadow-sm); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+        .metric-card small { display:block; color: var(--admin-muted); font-weight:800; margin-bottom:6px; }
+        .metric-card strong { display:block; font-size:1.75rem; line-height:1; }
+        .metric-card span { color: var(--admin-muted); font-size:.85rem; }
+        .metric-icon { width:42px; height:42px; border-radius:14px; display:grid; place-items:center; font-size:1.25rem; }
+        .metric-blue { background:#eaf3ff; color:var(--admin-blue); } .metric-green { background:#e8fbf1; color:var(--admin-success); } .metric-purple { background:#f4eafe; color:var(--admin-purple); } .metric-orange { background:#fff1df; color:var(--admin-primary); }
+        .torta-tabs { display:inline-flex; align-items:center; background:#fff; border:1px solid var(--admin-line); border-radius:14px; padding:5px; box-shadow:var(--admin-shadow-sm); overflow:auto; max-width:100%; }
+        .tab-btn { border:0; background:transparent; color:var(--admin-text); padding:10px 15px; border-radius:10px; cursor:pointer; font-weight:850; white-space:nowrap; text-decoration:none; }
+        .tab-btn.active { background: #fff3e4; color: var(--admin-primary-dark); box-shadow: inset 0 0 0 1px #ffd2a0; }
+        .dashboard-grid { display:grid; grid-template-columns: minmax(640px, 1.35fr) minmax(360px, .9fr); gap:24px; align-items:start; }
+        .left-stack, .right-stack { display:grid; gap:18px; }
+        .panel-card { background: var(--admin-card); border: 1px solid var(--admin-line); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow-sm); padding: 18px; display: grid; gap: 14px; }
+        .panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+        .panel-head h2 { margin:0; font-size:1.13rem; letter-spacing:-.02em; }
+        .panel-head p { margin:5px 0 0; color:var(--admin-muted); font-size:.9rem; }
+        .list { display: grid; gap: 8px; max-height: 610px; overflow:auto; padding-right:4px; }
+        #list-flavors, #list-extras, #list-toppers { max-height: 292px; }
+        #list-categories { max-height: 680px; }
+        .list::-webkit-scrollbar { width: 9px; height: 9px; }
+        .list::-webkit-scrollbar-thumb { background: #ffc487; border-radius: 999px; }
+        .row { display: grid; grid-template-columns: minmax(230px, 1.45fr) 130px minmax(220px, 1fr) 110px 92px 42px; gap: 10px; align-items: center; padding: 10px 8px; border-bottom: 1px solid #f0e4d5; background:#fff; }
+        .row:hover { background:#fffaf4; }
+        .row.extras { grid-template-columns: minmax(210px, 1.4fr) 120px 100px 92px 42px; }
+        .row.cat { grid-template-columns: minmax(220px,1fr) 130px minmax(210px,1fr) minmax(150px,.8fr) 160px 92px 42px; border:1px solid #f0e4d5; border-radius:16px; padding:14px; margin-bottom:8px; }
+        .row label { display:grid; gap:5px; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; font-weight:850; color:#725747; }
+        input, select { width: 100%; min-height: 38px; border: 1px solid var(--admin-line); border-radius: 9px; padding: 8px 10px; background:#fff; color:var(--admin-text); outline:none; transition:border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+        input:focus, select:focus { border-color: var(--admin-primary); box-shadow: 0 0 0 4px rgba(244,123,0,.12); }
+        input[type="checkbox"] { width:18px; height:18px; min-height:18px; accent-color: var(--admin-primary); }
+        .btn { border:0; border-radius: 11px; padding: 9px 13px; font-weight: 900; cursor: pointer; transition: transform .16s ease, box-shadow .16s ease, background .16s ease; }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-main { background: linear-gradient(135deg, #ff9416, #f36f00); color:#fff; box-shadow:0 12px 24px rgba(244,123,0,.25); }
+        .btn-alt { background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; }
+        .btn-out { border:1px solid var(--admin-line); background:#fff; color:var(--admin-primary-dark); }
+        .btn-del { background:#fff1ef; color:#ef3d2f; border:1px solid #ffd2cc; width:38px; height:38px; padding:0; }
+        .btn-sm { padding: 7px 10px; font-size: .78rem; }
+        .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+        .muted { color:var(--admin-muted); font-size:.86rem; }
+        .msg { min-height:22px; font-size:.9rem; font-weight:800; }
+        .msg.ok { color:#138a4d; } .msg.err { color:#c62828; }
+        .rules-grid { display:grid; grid-template-columns: repeat(4, minmax(150px,1fr)); gap:14px; }
+        .rule-box { background:#fffaf4; border:1px solid var(--admin-line); border-radius:14px; padding:12px; display:grid; gap:8px; }
+        .cat-grid { grid-column:1 / -1; display:grid; gap:10px; padding:12px; border:1px dashed #f4b06a; border-radius:14px; background:#fffaf4; }
+        .cat-tools { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+        .cat-cover { display:grid; grid-template-columns:82px 1fr auto; gap:12px; align-items:center; }
+        .cat-cover img { width:82px; height:82px; border-radius:14px; border:1px solid var(--admin-line); object-fit:cover; background:#f8efe6; }
+        .cat-cover-tools { display:grid; gap:7px; }
+        .cat-opts { display:flex; flex-wrap:wrap; gap:7px; }
+        .cat-chip { display:inline-flex; align-items:center; gap:6px; border:1px solid #ead8c2; border-radius:999px; padding:6px 9px; background:#fff; font-size:.78rem; font-weight:800; color:var(--admin-text); }
+        .admin-table-head { display:grid; gap:10px; padding:0 8px 9px; border-bottom:1px solid #ead8c2; color:#725747; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; font-weight:900; }
+        .admin-table-head.sizes { grid-template-columns:minmax(230px,1.45fr) 130px minmax(220px,1fr) 110px 92px 42px; }
+        .admin-table-head.extras { grid-template-columns:minmax(210px,1.4fr) 120px 100px 92px 42px; }
+        .admin-table-head.simple { grid-template-columns:minmax(230px,1.45fr) 130px minmax(220px,1fr) 92px 42px; }
+        .row:not(.extras):has(label[style*="visibility:hidden"]) { grid-template-columns:minmax(230px,1.45fr) 130px minmax(220px,1fr) 92px 42px; }
+        .row:not(.extras):has(label[style*="visibility:hidden"]) label[style*="visibility:hidden"] { display:none !important; }
+        .crop-modal { position:fixed; inset:0; z-index:80; background:rgba(45,27,16,.58); display:none; align-items:center; justify-content:center; padding:16px; }
+        .crop-modal.active { display:flex; }
+        .crop-panel { width:min(760px,100%); border:1px solid var(--admin-line); border-radius:18px; background:#fff; box-shadow:0 18px 52px rgba(45,27,16,.28); display:grid; gap:12px; padding:16px; }
+        .crop-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+        .crop-title { margin:0; font-size:1.02rem; }
+        .crop-stage-wrap { border:1px dashed var(--admin-line-strong); border-radius:14px; background:#fff8ef; padding:10px; }
+        .crop-stage { position:relative; width:min(560px,100%); aspect-ratio:1/1; margin:0 auto; overflow:hidden; border-radius:12px; border:1px solid var(--admin-line); background:#f8efe6; cursor:grab; }
+        .crop-stage.dragging { cursor:grabbing; }
+        .crop-stage img { width:100%; height:100%; object-fit:cover; object-position:50% 50%; transform:scale(1); transform-origin:50% 50%; touch-action:none; user-select:none; -webkit-user-drag:none; }
+        .crop-controls { display:grid; gap:8px; }
+        .crop-range { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+        .crop-range input[type="range"] { width:100%; }
+        .crop-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+        .save-bar { position: sticky; bottom: 16px; z-index: 10; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; background:rgba(255,253,249,.92); backdrop-filter:blur(12px); border:1px solid var(--admin-line); border-radius:16px; box-shadow:var(--admin-shadow); }
+        @media (max-width: 1180px) { .admin-shell { grid-template-columns: 1fr; } .admin-sidebar { position:relative; min-height:auto; flex-direction:row; overflow:auto; padding:12px; } .brand-panel, .side-footer { display:none; } .side-nav { display:flex; min-width:max-content; } .side-section-title { display:none; } .side-link.sub { display:none; } .dashboard-grid, .metrics { grid-template-columns:1fr; } .admin-main { padding: 0 16px 24px; } .admin-topbar { margin:0 -16px 18px; padding:0 16px; } .rules-grid { grid-template-columns:1fr 1fr; } }
+        @media (max-width: 860px) { .row, .row.extras, .row.cat { grid-template-columns:1fr; } .admin-table-head { display:none !important; } .cat-cover { grid-template-columns:1fr; } .metrics { gap:10px; } .module-subtitle { margin-left:0; } .rules-grid { grid-template-columns:1fr; } .admin-search { display:none; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; animation:none !important; } }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='darkmode-fixes.css') }}">
 </head>
 <body>
-    <main class="wrap">
-        <div class="top">
-            <h1>Catalogo torta</h1>
-            <div class="links">
-                <a href="/ventas/admin-personalizacion">Personalizacion tienda</a>
-                <a href="/ventas/admin-visualizador">Visualizador tienda</a>
-                <a href="/ventas/admin-catalogo">Catalogo tienda</a>
-                <a href="/tienda" target="_blank" rel="noopener">Abrir tienda</a>
+    <div class="admin-shell">
+        <aside class="admin-sidebar" aria-label="Navegacion administrador catalogo tortas">
+            <div class="brand-panel">
+                <div class="brand-mark">SC</div>
+                <div class="brand-name">Sucr&eacute;e</div>
+                <div class="brand-sub">Pasteler&iacute;a</div>
             </div>
-        </div>
+            <div>
+                <div class="side-section-title">Catalogo</div>
+                <nav class="side-nav">
+                    <a class="side-link" href="/">Dashboard</a>
+                    <a class="side-link" href="/agenda">Pedidos</a>
+                    <a class="side-link active" href="/ventas/admin-catalogo-torta">Tortas</a>
+                    <a class="side-link sub" href="#panel-sizes"><span class="side-dot"></span>Tamanos base</a>
+                    <a class="side-link sub" href="#panel-flavors"><span class="side-dot"></span>Sabores</a>
+                    <a class="side-link sub" href="#panel-extras"><span class="side-dot"></span>Extras</a>
+                    <a class="side-link sub" href="#panel-toppers"><span class="side-dot"></span>Toppers</a>
+                    <a class="side-link sub" href="#panel-categories"><span class="side-dot"></span>Categorias</a>
+                    <a class="side-link" href="/insumos">Ingredientes</a>
+                </nav>
+                <div class="side-section-title">Gestion</div>
+                <nav class="side-nav">
+                    <a class="side-link" href="/clientes">Clientes</a>
+                    <a class="side-link" href="/adm-pagina/descuentos">Promociones</a>
+                    <a class="side-link" href="/adm-pagina/valoracion">Resenas</a>
+                    <a class="side-link" href="/reportes">Reportes</a>
+                </nav>
+            </div>
+            <div class="side-footer">
+                <a class="side-link" href="/settings">Configuracion tienda</a>
+                <div class="dark-row"><span>Modo oscuro</span><span class="fake-toggle" aria-hidden="true"></span></div>
+            </div>
+        </aside>
 
-        <div class="grid">
-            <section class="panel">
-                <div class="section">
-                    <h2>Reglas generales</h2>
-                    <div class="row" style="grid-template-columns:1fr 1fr 1fr;">
-                        <label><input id="enabled" type="checkbox"> Constructor de torta habilitado</label>
-                        <label><input id="show_prices" type="checkbox"> Mostrar precios al cliente</label>
-                        <label>Max. extras por pedido
-                            <input id="max_extra_items" type="number" min="1" max="20" step="1">
-                        </label>
-                    </div>
-                    <label>Max. imagenes referenciales
-                        <input id="max_reference_images" type="number" min="0" max="10" step="1">
+        <main class="admin-main">
+            <header class="admin-topbar">
+                <div class="top-left">
+                    <button type="button" class="icon-square" aria-label="Menu">Menu</button>
+                    <label class="admin-search" aria-label="Buscar en el panel">
+                        <span>Buscar</span>
+                        <input type="search" id="admin-catalog-search" placeholder="Buscar en el panel...">
                     </label>
                 </div>
+                <div class="top-right">
+                    <span class="icon-square bell" aria-label="Notificaciones">Avisos</span>
+                    <div class="admin-avatar">AD</div>
+                    <div class="admin-role"><strong>Administrador</strong><span>Super Admin</span></div>
+                </div>
+            </header>
 
-                <div class="section">
-                    <div class="actions">
-                        <h2 style="margin:0;flex:1;">Categorias de torta</h2>
-                        <button class="btn btn-out" type="button" id="add-category">Agregar categoria</button>
+            <div class="module-wrap">
+                <div class="breadcrumb"><span>Catalogo</span> <span>/</span> <strong>Tortas</strong></div>
+                <section class="module-hero">
+                    <div>
+                        <div class="module-title"><span class="title-icon">T</span><h1>Tortas</h1></div>
+                        <p class="module-subtitle">Gestiona tamanos, sabores, extras, toppers y categorias de tus tortas</p>
                     </div>
-                    <div class="list" id="list-categories"></div>
-                    <div class="muted">Ejemplo: Tortas Bizcocho, Tortas Panqueque.</div>
-                </div>
-
-                <div class="section">
-                    <div class="actions">
-                        <h2 style="margin:0;flex:1;">Tamanos base</h2>
-                        <button class="btn btn-out" type="button" id="add-size">Agregar tamano</button>
+                    <div class="quick-links">
+                        <a href="/ventas/admin-personalizacion">Personalizacion tienda</a>
+                        <a href="/ventas/admin-visualizador">Visualizador tienda</a>
+                        <a href="/ventas/admin-catalogo">Catalogo tienda</a>
+                        <a href="/tienda" target="_blank" rel="noopener">Abrir tienda</a>
                     </div>
-                    <div class="list" id="list-sizes"></div>
-                    <div class="muted">Ejemplo: 15 personas bizcocho, con maximo de sabores por tamano.</div>
-                </div>
+                </section>
 
-                <div class="section">
-                    <div class="actions">
-                        <h2 style="margin:0;flex:1;">Sabores</h2>
-                        <button class="btn btn-out" type="button" id="add-flavor">Agregar sabor</button>
+                <section class="metrics" aria-label="Resumen rapido de catalogo tortas">
+                    <article class="metric-card"><div><small>Tamanos activos</small><strong id="sum-sizes">0</strong><span>Todos los tamanos</span></div><div class="metric-icon metric-blue">TB</div></article>
+                    <article class="metric-card"><div><small>Sabores activos</small><strong id="sum-flavors">0</strong><span>Disponibles</span></div><div class="metric-icon metric-green">SA</div></article>
+                    <article class="metric-card"><div><small>Extras activos</small><strong id="sum-extras">0</strong><span>Disponibles</span></div><div class="metric-icon metric-purple">EX</div></article>
+                    <article class="metric-card"><div><small>Toppers activos</small><strong id="sum-toppers">0</strong><span>Disponibles</span></div><div class="metric-icon metric-orange">TP</div></article>
+                </section>
+
+                <nav class="torta-tabs" aria-label="Secciones catalogo torta">
+                    <a class="tab-btn active" href="#panel-sizes">Tamanos base</a>
+                    <a class="tab-btn" href="#panel-flavors">Sabores</a>
+                    <a class="tab-btn" href="#panel-extras">Extras</a>
+                    <a class="tab-btn" href="#panel-toppers">Toppers</a>
+                    <a class="tab-btn" href="#panel-categories">Categorias</a>
+                </nav>
+
+                <section class="dashboard-grid">
+                    <div class="left-stack">
+                        <section class="panel-card" id="panel-sizes">
+                            <div class="panel-head">
+                                <div><h2>Tamanos base</h2><p>Configura los tamanos disponibles, precios y limites de sabores por torta.</p></div>
+                                <button class="btn btn-main" type="button" id="add-size">+ Agregar tamano</button>
+                            </div>
+                            <div class="admin-table-head sizes"><span>Nombre</span><span>Precio</span><span>Categoria</span><span>Max. sabores</span><span>Activo</span><span></span></div>
+                            <div class="list" id="list-sizes"></div>
+                            <div class="muted">Mostrando tamanos configurados para el constructor de tortas.</div>
+                        </section>
+
+                        <section class="panel-card config-card" id="panel-rules">
+                            <div class="panel-head">
+                                <div><h2>Constructor de torta habilitado</h2><p>Permite a los clientes personalizar su torta eligiendo sabores y extras.</p></div>
+                                <span class="cat-chip">Activo</span>
+                            </div>
+                            <div class="rules-grid">
+                                <label class="rule-box"><input id="enabled" type="checkbox"> Constructor de torta habilitado</label>
+                                <label class="rule-box"><input id="show_prices" type="checkbox"> Mostrar precios al cliente</label>
+                                <label class="rule-box">Max. extras por pedido<input id="max_extra_items" type="number" min="1" max="20" step="1"></label>
+                                <label class="rule-box">Max. imagenes referenciales<input id="max_reference_images" type="number" min="0" max="10" step="1"></label>
+                            </div>
+                            <div class="muted">Precios visibles cliente: <strong id="sum-prices">Si</strong>. Si ocultas precios, el sistema igual calcula subtotal internamente para tu equipo.</div>
+                        </section>
+
+                        <section class="panel-card" id="panel-categories">
+                            <div class="panel-head">
+                                <div><h2>Categorias de torta</h2><p>Organiza familias, imagenes y reglas especiales por categoria.</p></div>
+                                <button class="btn btn-main" type="button" id="add-category">+ Agregar categoria</button>
+                            </div>
+                            <div class="list" id="list-categories"></div>
+                        </section>
                     </div>
-                    <div class="list" id="list-flavors"></div>
-                </div>
 
-                <div class="section">
+                    <aside class="right-stack">
+                        <section class="panel-card" id="panel-flavors">
+                            <div class="panel-head"><div><h2>Sabores</h2><p>Gestiona los sabores disponibles para todas las tortas.</p></div><button class="btn btn-main" type="button" id="add-flavor">+ Agregar sabor</button></div>
+                            <div class="admin-table-head simple"><span>Nombre</span><span>Precio</span><span></span><span>Activo</span><span></span></div>
+                            <div class="list" id="list-flavors"></div>
+                        </section>
+                        <section class="panel-card" id="panel-extras">
+                            <div class="panel-head"><div><h2>Extras (Rellenos)</h2><p>Gestiona los rellenos y coberturas adicionales.</p></div><button class="btn btn-main" type="button" id="add-extra">+ Agregar extra</button></div>
+                            <div class="admin-table-head extras"><span>Nombre</span><span>Precio</span><span>Max. cant.</span><span>Activo</span><span></span></div>
+                            <div class="list" id="list-extras"></div>
+                        </section>
+                        <section class="panel-card" id="panel-toppers">
+                            <div class="panel-head"><div><h2>Toppers</h2><p>Gestiona toppers y decoraciones disponibles.</p></div><button class="btn btn-main" type="button" id="add-topper">+ Agregar topper</button></div>
+                            <div class="admin-table-head simple"><span>Nombre</span><span>Precio</span><span></span><span>Activo</span><span></span></div>
+                            <div class="list" id="list-toppers"></div>
+                        </section>
+                    </aside>
+                </section>
+
+                <div class="save-bar">
+                    <div class="msg" id="msg"></div>
                     <div class="actions">
-                        <h2 style="margin:0;flex:1;">Extras</h2>
-                        <button class="btn btn-out" type="button" id="add-extra">Agregar extra</button>
+                        <button type="button" class="btn btn-alt" id="btn-reload">Recargar</button>
+                        <button type="button" class="btn btn-main" id="btn-save">Guardar catalogo torta</button>
                     </div>
-                    <div class="list" id="list-extras"></div>
                 </div>
-
-                <div class="section">
-                    <div class="actions">
-                        <h2 style="margin:0;flex:1;">Topper</h2>
-                        <button class="btn btn-out" type="button" id="add-topper">Agregar topper</button>
-                    </div>
-                    <div class="list" id="list-toppers"></div>
-                </div>
-
-                <div class="actions">
-                    <button type="button" class="btn btn-main" id="btn-save">Guardar catalogo torta</button>
-                    <button type="button" class="btn btn-alt" id="btn-reload">Recargar</button>
-                </div>
-                <div class="msg" id="msg"></div>
-            </section>
-
-            <aside class="panel">
-                <h2 style="margin:0;">Resumen rapido</h2>
-                <div class="summary">
-                    <div>Tamanos activos: <strong id="sum-sizes">0</strong></div>
-                    <div>Sabores activos: <strong id="sum-flavors">0</strong></div>
-                    <div>Extras activos: <strong id="sum-extras">0</strong></div>
-                    <div>Toppers activos: <strong id="sum-toppers">0</strong></div>
-                    <div>Precios visibles cliente: <strong id="sum-prices">Si</strong></div>
-                    <div class="muted">Si ocultas precios, el sistema igual calcula subtotal internamente para tu equipo.</div>
-                </div>
-            </aside>
-        </div>
-    </main>
+            </div>
+        </main>
+    </div>
     <div class="crop-modal" id="cat-crop-modal">
         <div class="crop-panel">
             <div class="crop-head">
@@ -604,6 +550,19 @@ function render() {
     bindListInputs("extras");
     bindListInputs("toppers");
     renderSummary();
+    applyAdminCatalogSearch();
+}
+
+function applyAdminCatalogSearch() {
+    const searchEl = document.getElementById("admin-catalog-search");
+    const q = String(searchEl?.value || "").trim().toLowerCase();
+    ["list-categories", "list-sizes", "list-flavors", "list-extras", "list-toppers"].forEach((listId) => {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        list.querySelectorAll(".row").forEach((row) => {
+            row.style.display = !q || row.textContent.toLowerCase().includes(q) ? "" : "none";
+        });
+    });
 }
 
 function bindListInputs(key) {
@@ -1183,6 +1142,13 @@ document.getElementById("add-extra").addEventListener("click", () => { state.ext
 document.getElementById("add-topper").addEventListener("click", () => { state.toppers.push(newItem({ nombre: "Nuevo topper", precio: 0, activo: true })); render(); });
 document.getElementById("btn-reload").addEventListener("click", load);
 document.getElementById("btn-save").addEventListener("click", save);
+document.getElementById("admin-catalog-search")?.addEventListener("input", applyAdminCatalogSearch);
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((x) => x.classList.remove("active"));
+        btn.classList.add("active");
+    });
+});
 load();
 </script>
 <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
