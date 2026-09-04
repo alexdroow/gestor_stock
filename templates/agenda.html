@@ -1337,31 +1337,47 @@
             font-weight: 700;
         }
         #modal-whatsapp-mensajes .modal {
-            width: min(94vw, 860px);
-            max-width: 860px;
-            max-height: 92vh;
+            width: min(96vw, 1120px);
+            max-width: 1120px;
+            max-height: 94vh;
         }
         #modal-whatsapp-mensajes .modal-body {
             overflow: auto;
+            padding: 20px 24px;
         }
         .whatsapp-editor-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 18px;
+            align-items: stretch;
         }
         .whatsapp-editor-card {
             border: 1px solid #e2e8f0;
             border-radius: 14px;
             background: #fff;
             padding: 14px;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
         }
         .whatsapp-editor-card h4 {
             color: #1f2937;
             font-size: 14px;
             margin-bottom: 8px;
         }
-        .whatsapp-editor-card textarea {
-            min-height: 320px;
+        #modal-whatsapp-mensajes .whatsapp-editor-card textarea {
+            width: 100%;
+            min-width: 0;
+            min-height: clamp(420px, 54vh, 620px);
+            padding: 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            box-sizing: border-box;
+            color: #1f2937;
+            flex: 1;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.45;
             resize: vertical;
         }
         .whatsapp-preview {
@@ -1372,7 +1388,7 @@
             font-size: 12px;
             line-height: 1.45;
             margin-top: 10px;
-            max-height: 220px;
+            max-height: 180px;
             overflow: auto;
             padding: 12px;
             white-space: pre-wrap;
@@ -1386,6 +1402,14 @@
             line-height: 1.5;
             margin-bottom: 14px;
             padding: 12px;
+        }
+        @media (max-width: 900px) {
+            .whatsapp-editor-grid {
+                grid-template-columns: 1fr;
+            }
+            #modal-whatsapp-mensajes .whatsapp-editor-card textarea {
+                min-height: 360px;
+            }
         }
 
         .pedido-ficha-dashboard {
