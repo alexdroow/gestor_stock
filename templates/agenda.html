@@ -4784,6 +4784,7 @@
             cargarReservasTiendaSeen();
             fechaSeleccionada = formatearFecha(new Date());
             cargarConfig();
+            cargarPlantillasWhatsAppAgenda();
             cargarEventos({ silent: true }); // Evita parpadeo al entrar a Agenda
             cargarNotasAgenda();
              
@@ -5618,8 +5619,12 @@
                 'PDF: {pdf_url}',
             ].join('\n')
         };
+        let agendaWhatsAppTemplates = null;
 
         function obtenerPlantillasWhatsAppAgenda() {
+            if (agendaWhatsAppTemplates && agendaWhatsAppTemplates.confirmacion && agendaWhatsAppTemplates.pdf) {
+                return { ...agendaWhatsAppTemplates };
+            }
             try {
                 const raw = localStorage.getItem(AGENDA_WHATSAPP_TEMPLATES_KEY);
                 const parsed = raw ? JSON.parse(raw) : {};
@@ -5629,6 +5634,24 @@
                 };
             } catch (_) {
                 return { ...AGENDA_WHATSAPP_DEFAULTS };
+            }
+        }
+
+        async function cargarPlantillasWhatsAppAgenda() {
+            try {
+                const response = await fetch('/api/agenda/whatsapp-mensajes');
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudieron cargar mensajes WhatsApp');
+                agendaWhatsAppTemplates = {
+                    confirmacion: String(data.templates?.confirmacion || AGENDA_WHATSAPP_DEFAULTS.confirmacion),
+                    pdf: String(data.templates?.pdf || AGENDA_WHATSAPP_DEFAULTS.pdf),
+                };
+                try {
+                    localStorage.setItem(AGENDA_WHATSAPP_TEMPLATES_KEY, JSON.stringify(agendaWhatsAppTemplates));
+                } catch (_) {}
+            } catch (error) {
+                agendaWhatsAppTemplates = obtenerPlantillasWhatsAppAgenda();
+                console.warn('Usando mensajes WhatsApp locales:', error);
             }
         }
 
@@ -5688,11 +5711,13 @@
                         inExtras = false;
                         return;
                     }
-                    if (inSabores && line.startsWith('-')) rellenosLista.push(line.replace(/^-+\s*/, '').trim());
-                    if (inExtras && line.startsWith('-')) extrasLista.push(line.replace(/^-+\s*/, '').trim());
+                    if (!rellenosLista.length && inSabores && line.startsWith('-')) rellenosLista.push(line.replace(/^-+\s*/, '').trim());
+                    if (!extrasLista.length && inExtras && line.startsWith('-')) extrasLista.push(line.replace(/^-+\s*/, '').trim());
                 });
             }
 
+            rellenosLista = Array.from(new Set(rellenosLista.map((x) => String(x || '').trim()).filter(Boolean)));
+            extrasLista = Array.from(new Set(extrasLista.map((x) => String(x || '').trim()).filter(Boolean)));
             const telefonoLinea = String(document.getElementById('evento-telefono')?.value || '').trim() || '-';
             return {
                 cliente: clienteRaw || '-',
@@ -5750,16 +5775,35 @@
             if (previewPdf && inputPdf) previewPdf.textContent = aplicarPlantillaWhatsAppAgenda(inputPdf.value, ctx);
         }
 
-        function guardarMensajesWhatsApp() {
+        async function guardarMensajesWhatsApp() {
             const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
             const inputPdf = document.getElementById('whatsapp-template-pdf');
             const data = {
                 confirmacion: String(inputConfirmacion?.value || '').trim() || AGENDA_WHATSAPP_DEFAULTS.confirmacion,
                 pdf: String(inputPdf?.value || '').trim() || AGENDA_WHATSAPP_DEFAULTS.pdf,
             };
-            localStorage.setItem(AGENDA_WHATSAPP_TEMPLATES_KEY, JSON.stringify(data));
-            cerrarEditorMensajesWhatsApp();
-            alert('Mensajes de WhatsApp guardados.');
+            try {
+                const response = await fetch('/api/agenda/whatsapp-mensajes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'No se pudieron guardar los mensajes');
+                }
+                agendaWhatsAppTemplates = {
+                    confirmacion: String(result.templates?.confirmacion || data.confirmacion),
+                    pdf: String(result.templates?.pdf || data.pdf),
+                };
+                try {
+                    localStorage.setItem(AGENDA_WHATSAPP_TEMPLATES_KEY, JSON.stringify(agendaWhatsAppTemplates));
+                } catch (_) {}
+                cerrarEditorMensajesWhatsApp();
+                alert('Mensajes de WhatsApp guardados globalmente.');
+            } catch (error) {
+                alert('[ERROR] ' + String(error.message || error));
+            }
         }
 
         function restaurarMensajesWhatsAppDefault() {

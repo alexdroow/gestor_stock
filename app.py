@@ -22204,6 +22204,141 @@ def api_agenda_pedidos_por_rango():
         return jsonify({'success': False, 'error': str(e), 'pedidos': []}), 500
 
 
+AGENDA_WHATSAPP_DEFAULTS = {
+    "confirmacion": "\n".join([
+        "{saludo}",
+        "Somos de Pasteleria Sucree, te informamos que tu pedido quedo agendado exitosamente.",
+        "Te dejo el resumen de tu pedido para que revises que toda la informacion este correcta:",
+        "",
+        "* Nombre: {cliente}",
+        "* Numero de telefono: {telefono}",
+        "* Informacion del pedido",
+        "-Tamano de torta: {tamano_torta}",
+        "-Rellenos:",
+        "{rellenos}",
+        "-Informacion extra:",
+        "{extras}",
+        "-Retiro o despacho: {modalidad_entrega}",
+        "-Hora de retiro o despacho: {hora_entrega}",
+        "-Total a pagar: {total}",
+        "",
+        "Para confirmar la reserva solicitamos un abono del *50%* del total el cual debe ser transferido a la siguiente cuenta",
+        "Datos de Transferencia",
+        "",
+        "*TOTAL ABONO {abono_50}*",
+        "",
+        "NUEVOS DATOS DE TRANSFERENCIA",
+        "(Si tienes registrada la cuenta \"Banco Santander\" debes anadir la nueva cuenta.)",
+        "",
+        "ALEXIS JAVIER GUTIERREZ SALGADO",
+        "18.121.947-5",
+        "Bci / Banco Credito e Inversiones / Mach",
+        "Cuenta Vista",
+        "777018121947",
+        "pasteleria.sucree@outlook.com",
+        "",
+        "Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.",
+        "*La boleta es enviada el dia de la entrega por este mismo medio en formato digital, si necesita en formato fisico lo puede solicitar antes de hacer el envio o de retirar*",
+    ]),
+    "pdf": "\n".join([
+        "Hola {cliente}, te compartimos la cotizacion de tu pedido.",
+        "Codigo pedido: {codigo_pedido}",
+        "Tipo: {tipo}",
+        "Fecha: {fecha} {hora_entrega}",
+        "PDF: {pdf_url}",
+    ]),
+}
+
+
+def _ensure_agenda_whatsapp_config(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agenda_whatsapp_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            mensaje_confirmacion TEXT NOT NULL,
+            mensaje_pdf TEXT NOT NULL,
+            actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO agenda_whatsapp_config (id, mensaje_confirmacion, mensaje_pdf, actualizado_en)
+        VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        (AGENDA_WHATSAPP_DEFAULTS["confirmacion"], AGENDA_WHATSAPP_DEFAULTS["pdf"]),
+    )
+
+
+def _obtener_agenda_whatsapp_templates():
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_agenda_whatsapp_config(cursor)
+        cursor.execute(
+            """
+            SELECT mensaje_confirmacion, mensaje_pdf
+            FROM agenda_whatsapp_config
+            WHERE id = 1
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        conn.commit()
+        if not row:
+            return dict(AGENDA_WHATSAPP_DEFAULTS)
+        return {
+            "confirmacion": str(row["mensaje_confirmacion"] or "").strip() or AGENDA_WHATSAPP_DEFAULTS["confirmacion"],
+            "pdf": str(row["mensaje_pdf"] or "").strip() or AGENDA_WHATSAPP_DEFAULTS["pdf"],
+        }
+    finally:
+        if conn:
+            conn.close()
+
+
+def _render_agenda_whatsapp_template(template, contexto):
+    def repl(match):
+        key = str(match.group(1) or "")
+        return str((contexto or {}).get(key, match.group(0)))
+
+    return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, str(template or ""))
+
+
+@app.route('/api/agenda/whatsapp-mensajes', methods=['GET', 'POST'])
+def api_agenda_whatsapp_mensajes():
+    conn = None
+    try:
+        if request.method == 'GET':
+            return jsonify({'success': True, 'templates': _obtener_agenda_whatsapp_templates()})
+
+        data = request.get_json(silent=True) or {}
+        confirmacion = str(data.get('confirmacion') or '').strip()[:6000] or AGENDA_WHATSAPP_DEFAULTS["confirmacion"]
+        pdf = str(data.get('pdf') or '').strip()[:3000] or AGENDA_WHATSAPP_DEFAULTS["pdf"]
+
+        conn = get_db()
+        cursor = conn.cursor()
+        _ensure_agenda_whatsapp_config(cursor)
+        cursor.execute(
+            """
+            UPDATE agenda_whatsapp_config
+            SET mensaje_confirmacion = ?, mensaje_pdf = ?, actualizado_en = CURRENT_TIMESTAMP
+            WHERE id = 1
+            """,
+            (confirmacion, pdf),
+        )
+        conn.commit()
+        crear_backup()
+        return jsonify({'success': True, 'templates': {'confirmacion': confirmacion, 'pdf': pdf}})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/agenda/evento/<int:id>/pdf', methods=['GET'])
 def api_agenda_evento_pdf(id):
     conn = None
@@ -22445,6 +22580,19 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
         codigo_txt = str(evento.get('codigo_pedido') or '').strip()
         fecha_txt = str(evento.get('fecha') or '-').strip()
         hora_txt = str(evento.get('hora_entrega') or evento.get('hora_inicio') or '-').strip()
+        if not mensaje_req:
+            mensaje_req = _render_agenda_whatsapp_template(
+                _obtener_agenda_whatsapp_templates().get("pdf") or AGENDA_WHATSAPP_DEFAULTS["pdf"],
+                {
+                    "cliente": cliente_txt,
+                    "saludo": f"Hola {cliente_txt}" if cliente_txt else "Hola",
+                    "codigo_pedido": codigo_txt or ('#' + str(evento_id)),
+                    "tipo": tipo_txt,
+                    "fecha": fecha_txt,
+                    "hora_entrega": hora_txt,
+                    "pdf_url": media_url,
+                },
+            )
         body = (
             f"Hola {cliente_txt}, te compartimos la cotizacion de tu pedido.\n"
             f"Codigo pedido: {codigo_txt or ('#' + str(evento_id))}\n"
