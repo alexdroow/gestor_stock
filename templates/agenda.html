@@ -397,6 +397,21 @@
             background: #fff7ed;
             border-color: #fb923c;
         }
+        .btn-rellenos-tool {
+            background: #fff7ed;
+            color: #7c2d12;
+            border: 1px solid #fdba74;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 8px 22px rgba(251, 146, 60, 0.12);
+        }
+        .btn-rellenos-tool:hover {
+            background: #ffedd5;
+            border-color: #f97316;
+            transform: translateY(-1px);
+        }
         .btn-draft-soft {
             background: #fff7ed;
             color: #9a3412;
@@ -1104,6 +1119,153 @@
 
         #modal-evento .modal-body {
             padding: 20px 24px 16px;
+        }
+
+        #modal-rellenos-mes .modal {
+            width: min(94vw, 940px);
+            max-width: 940px;
+            max-height: 92vh;
+        }
+        #modal-rellenos-mes .modal-body {
+            padding: 22px;
+            overflow: auto;
+            background:
+                radial-gradient(circle at top right, rgba(251, 146, 60, 0.10), transparent 34%),
+                #fffaf4;
+        }
+        .rellenos-mes-head {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 14px;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+        .rellenos-mes-title {
+            color: #3a281a;
+            font-size: 18px;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+        .rellenos-mes-subtitle {
+            color: #7c5f47;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .rellenos-mes-badge {
+            background: #ffedd5;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+            border-radius: 999px;
+            font-weight: 900;
+            padding: 8px 12px;
+            white-space: nowrap;
+        }
+        .rellenos-mes-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .relleno-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #fff;
+            border: 1px solid #f3d8bf;
+            border-radius: 999px;
+            color: #3a281a;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 8px 10px;
+            box-shadow: 0 8px 18px rgba(58, 40, 26, 0.06);
+        }
+        .relleno-chip-count {
+            background: #f97316;
+            color: #fff;
+            border-radius: 999px;
+            min-width: 24px;
+            padding: 3px 7px;
+            text-align: center;
+        }
+        .rellenos-mes-list {
+            display: grid;
+            gap: 12px;
+        }
+        .relleno-pedido-card {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #f0d5bd;
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 10px 28px rgba(58, 40, 26, 0.07);
+        }
+        .relleno-pedido-top {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+        .relleno-pedido-title {
+            color: #29170d;
+            font-weight: 900;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+        .relleno-pedido-meta {
+            color: #6b5a4d;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .relleno-countdown {
+            border-radius: 14px;
+            font-weight: 900;
+            padding: 8px 11px;
+            text-align: right;
+            min-width: 150px;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+        }
+        .relleno-countdown.pronto {
+            border-color: #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .relleno-countdown.urgente {
+            border-color: #fecaca;
+            background: #fff1f2;
+            color: #b91c1c;
+        }
+        .relleno-countdown small {
+            display: block;
+            color: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            opacity: 0.72;
+            margin-top: 2px;
+        }
+        .relleno-pedido-fillings {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .relleno-pill {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 10px;
+            color: #7c2d12;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 7px 9px;
+        }
+        .rellenos-empty {
+            border: 1px dashed #f3c49c;
+            background: #fff;
+            border-radius: 16px;
+            color: #7c5f47;
+            padding: 28px;
+            text-align: center;
+            font-weight: 700;
         }
 
         .pedido-ficha-dashboard {
@@ -2421,6 +2583,9 @@
                                 <button onclick="eliminarEventosPasados()" class="btn-danger-soft" title="Eliminar eventos anteriores al día actual">
                                     🗑 Limpiar pasados
                                 </button>
+                                <button onclick="abrirModalRellenosMes()" class="btn-rellenos-tool" title="Ver rellenos necesarios del mes">
+                                    Rellenos del mes
+                                </button>
                                 <button onclick="agendarTortaManual()" class="btn-torta-tool" title="Flujo dedicado para tomar pedidos de torta">
                                     &#127874; Agendar Tortas
                                 </button>
@@ -2896,6 +3061,32 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-rellenos-mes">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Rellenos del mes</h3>
+                <button onclick="cerrarModalRellenosMes()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="rellenos-mes-head">
+                    <div>
+                        <div class="rellenos-mes-title" id="rellenos-mes-titulo">Plan mensual de rellenos</div>
+                        <div class="rellenos-mes-subtitle">
+                            Regla aplicada: cada torta debe quedar rellenada 24 horas antes de su entrega.
+                        </div>
+                    </div>
+                    <div class="rellenos-mes-badge" id="rellenos-mes-total">0 pedidos</div>
+                </div>
+                <div class="rellenos-mes-summary" id="rellenos-mes-summary"></div>
+                <div class="rellenos-mes-list" id="rellenos-mes-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="renderizarRellenosMes()" class="btn btn-secondary">Actualizar</button>
+                <button onclick="cerrarModalRellenosMes()" class="btn btn-primary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-config">
         <div class="modal">
             <div class="modal-header">
@@ -3033,6 +3224,7 @@
         let geocodeRequestId = 0;
         let tortaDispoRequestId = 0;
         let tortaDispoDiasCache = [];
+        let rellenosMesTimer = null;
         let loadingTimer = null;
         let loadingVisible = false;
         let mapaEvento = {
@@ -4509,6 +4701,9 @@
                     renderizarBorradores();
                     renderizarEventosPasados();
                     renderizarBloqueosActivos();
+                    if (document.getElementById('modal-rellenos-mes')?.classList.contains('active')) {
+                        renderizarRellenosMes();
+                    }
                     verificarNotificaciones();
                     actualizarAlertaReservasPendientes();
                     detectarNuevasReservasTienda(Boolean(options && options.fromPolling));
@@ -5941,6 +6136,178 @@
             });
             if (!out.sabores.length) out.sabores = ['Sin rellenos'];
             return out;
+        }
+
+        function esPedidoTortaAgenda(evento) {
+            const tipo = String((evento && evento.tipo) || '').trim().toLowerCase();
+            const titulo = String((evento && evento.titulo) || '').trim().toLowerCase();
+            const detalle = String((evento && evento.ingredientes) || '').trim().toLowerCase();
+            return tipo === 'torta' || titulo.includes('torta') || detalle.includes('catalogo torta') || detalle.includes('builder json');
+        }
+
+        function limpiarNombreRellenoAgenda(nombre) {
+            return String(nombre || '')
+                .replace(/\s*\([^)]*\)\s*$/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function fechaLimiteRellenoAgenda(evento) {
+            const entrega = _fechaHoraEvento(evento);
+            if (!entrega) return null;
+            return new Date(entrega.getTime() - (24 * 60 * 60 * 1000));
+        }
+
+        function formatearFechaHoraAgenda(dt) {
+            if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return '-';
+            const fecha = `${String(dt.getDate()).padStart(2, '0')}-${String(dt.getMonth() + 1).padStart(2, '0')}-${dt.getFullYear()}`;
+            const hora = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+            return `${fecha} ${hora}`;
+        }
+
+        function textoCuentaRegresivaDesdeFecha(dt) {
+            if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return 'Sin fecha limite';
+            const diffMin = Math.floor((dt.getTime() - Date.now()) / 60000);
+            if (diffMin <= 0) return 'Rellenar ahora';
+            const dias = Math.floor(diffMin / 1440);
+            const horas = Math.floor((diffMin % 1440) / 60);
+            const mins = diffMin % 60;
+            if (dias > 0) return `Faltan ${dias}d ${horas}h`;
+            if (horas > 0) return `Faltan ${horas}h ${mins}m`;
+            return `Faltan ${mins} min`;
+        }
+
+        function claseLimiteRellenoAgenda(dt) {
+            if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return 'urgente';
+            const diffMin = Math.floor((dt.getTime() - Date.now()) / 60000);
+            if (diffMin <= 0 || diffMin <= 360) return 'urgente';
+            if (diffMin <= 1440) return 'pronto';
+            return '';
+        }
+
+        function obtenerPedidosRellenosMes() {
+            const base = fechaActual instanceof Date ? fechaActual : new Date();
+            const year = base.getFullYear();
+            const month = base.getMonth();
+            return eventos
+                .filter((evento) => {
+                    if (!evento || esEventoBorrador(evento) || !esPedidoTortaAgenda(evento)) return false;
+                    const fecha = parseFechaISO(evento.fecha);
+                    return fecha && fecha.getFullYear() === year && fecha.getMonth() === month;
+                })
+                .map((evento) => {
+                    const resumen = _resumenCatalogoTorta(evento);
+                    const rellenos = (resumen.sabores || [])
+                        .map(limpiarNombreRellenoAgenda)
+                        .filter((item) => item && item !== '-' && item.toLowerCase() !== 'sin rellenos');
+                    const limite = fechaLimiteRellenoAgenda(evento);
+                    return { evento, resumen, rellenos, limite };
+                })
+                .sort((a, b) => {
+                    const keyA = a.limite ? a.limite.getTime() : Number.MAX_SAFE_INTEGER;
+                    const keyB = b.limite ? b.limite.getTime() : Number.MAX_SAFE_INTEGER;
+                    return keyA - keyB;
+                });
+        }
+
+        function renderizarRellenosMes() {
+            const modal = document.getElementById('modal-rellenos-mes');
+            const titulo = document.getElementById('rellenos-mes-titulo');
+            const total = document.getElementById('rellenos-mes-total');
+            const summary = document.getElementById('rellenos-mes-summary');
+            const list = document.getElementById('rellenos-mes-list');
+            if (!summary || !list) return;
+
+            const base = fechaActual instanceof Date ? fechaActual : new Date();
+            const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+            const pedidos = obtenerPedidosRellenosMes();
+            const agregados = new Map();
+            pedidos.forEach((item) => {
+                item.rellenos.forEach((nombre) => agregados.set(nombre, (agregados.get(nombre) || 0) + 1));
+            });
+
+            if (titulo) titulo.textContent = `Rellenos programados para ${meses[base.getMonth()]} ${base.getFullYear()}`;
+            if (total) total.textContent = `${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'}`;
+
+            if (agregados.size) {
+                summary.innerHTML = Array.from(agregados.entries())
+                    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                    .map(([nombre, cantidad]) => `
+                        <span class="relleno-chip">
+                            <span>${escapeHtml(nombre)}</span>
+                            <span class="relleno-chip-count">${cantidad}</span>
+                        </span>
+                    `).join('');
+            } else {
+                summary.innerHTML = '<div class="rellenos-empty">No hay rellenos registrados para pedidos de torta en este mes.</div>';
+            }
+
+            if (!pedidos.length) {
+                list.innerHTML = '<div class="rellenos-empty">No hay tortas agendadas en el mes visible.</div>';
+            } else {
+                list.innerHTML = pedidos.map(({ evento, resumen, rellenos, limite }) => {
+                    const codigo = String(evento.codigo_pedido || evento.id || '-').trim() || '-';
+                    const cliente = String(evento.cliente || 'Sin cliente').trim() || 'Sin cliente';
+                    const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || '-';
+                    const rellenosHtml = rellenos.length
+                        ? rellenos.map((nombre) => `<span class="relleno-pill">${escapeHtml(nombre)}</span>`).join('')
+                        : '<span class="relleno-pill">Sin rellenos registrados</span>';
+                    return `
+                        <article class="relleno-pedido-card">
+                            <div class="relleno-pedido-top">
+                                <div>
+                                    <div class="relleno-pedido-title">${escapeHtml(resumen.tamano)} - ${escapeHtml(resumen.categoria)}</div>
+                                    <div class="relleno-pedido-meta">
+                                        Cliente: ${escapeHtml(cliente)} | Pedido ${escapeHtml(codigo)}<br>
+                                        Entrega: ${escapeHtml(formatearFechaLarga(String(evento.fecha || '')))} ${escapeHtml(hora)}<br>
+                                        Fecha limite relleno: ${escapeHtml(formatearFechaHoraAgenda(limite))}
+                                    </div>
+                                </div>
+                                <div class="relleno-countdown ${escapeHtml(claseLimiteRellenoAgenda(limite))}" data-relleno-limite="${limite ? limite.toISOString() : ''}">
+                                    ${escapeHtml(textoCuentaRegresivaDesdeFecha(limite))}
+                                    <small>24h antes de entrega</small>
+                                </div>
+                            </div>
+                            <div class="relleno-pedido-fillings">${rellenosHtml}</div>
+                        </article>
+                    `;
+                }).join('');
+            }
+
+            if (modal && modal.classList.contains('active')) iniciarTimerRellenosMes();
+        }
+
+        function actualizarTimersRellenosMes() {
+            document.querySelectorAll('[data-relleno-limite]').forEach((node) => {
+                const raw = node.getAttribute('data-relleno-limite') || '';
+                const dt = raw ? new Date(raw) : null;
+                node.classList.remove('pronto', 'urgente');
+                const clase = claseLimiteRellenoAgenda(dt);
+                if (clase) node.classList.add(clase);
+                node.innerHTML = `${escapeHtml(textoCuentaRegresivaDesdeFecha(dt))}<small>24h antes de entrega</small>`;
+            });
+        }
+
+        function iniciarTimerRellenosMes() {
+            if (rellenosMesTimer) clearInterval(rellenosMesTimer);
+            actualizarTimersRellenosMes();
+            rellenosMesTimer = setInterval(actualizarTimersRellenosMes, 30000);
+        }
+
+        function abrirModalRellenosMes() {
+            renderizarRellenosMes();
+            const modal = document.getElementById('modal-rellenos-mes');
+            if (modal) modal.classList.add('active');
+            iniciarTimerRellenosMes();
+        }
+
+        function cerrarModalRellenosMes() {
+            const modal = document.getElementById('modal-rellenos-mes');
+            if (modal) modal.classList.remove('active');
+            if (rellenosMesTimer) {
+                clearInterval(rellenosMesTimer);
+                rellenosMesTimer = null;
+            }
         }
 
         function construirResumenEventoHtml(evento) {
@@ -7387,6 +7754,10 @@
         document.querySelectorAll('.modal-overlay').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
+                    if (modal.id === 'modal-rellenos-mes') {
+                        cerrarModalRellenosMes();
+                        return;
+                    }
                     modal.classList.remove('active');
                 }
             });
@@ -7398,9 +7769,3 @@
 </body>
 </html>               
                 
-
-
-
-
-
-
