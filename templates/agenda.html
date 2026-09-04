@@ -844,6 +844,75 @@
             background: #d1fae5;
             color: #065f46;
         }
+        .dia-pedidos-head {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 14px;
+            color: #7c2d12;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.45;
+            margin-bottom: 14px;
+            padding: 12px 14px;
+        }
+        .dia-pedidos-list {
+            display: grid;
+            gap: 10px;
+        }
+        .dia-pedido-card {
+            align-items: center;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #f97316;
+            border-radius: 14px;
+            cursor: pointer;
+            display: grid;
+            gap: 12px;
+            grid-template-columns: 1fr auto;
+            padding: 12px 14px;
+            text-align: left;
+            transition: all 0.18s ease;
+            width: 100%;
+        }
+        .dia-pedido-card:hover {
+            border-color: #fdba74;
+            box-shadow: 0 12px 30px rgba(58, 40, 26, 0.10);
+            transform: translateY(-1px);
+        }
+        .dia-pedido-card.bloqueo {
+            border-left-color: #ef4444;
+        }
+        .dia-pedido-card.borrador {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+        .dia-pedido-title {
+            color: #1f2937;
+            font-size: 14px;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+        .dia-pedido-meta {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .dia-pedido-action {
+            background: linear-gradient(135deg, #ff8a00, #f97316);
+            border-radius: 999px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 900;
+            padding: 8px 12px;
+            white-space: nowrap;
+        }
+        .dia-pedidos-empty {
+            border: 1px dashed #cbd5e1;
+            border-radius: 14px;
+            color: #64748b;
+            padding: 20px;
+            text-align: center;
+        }
         .event-item-actions {
             display: flex;
             gap: 8px;
@@ -3057,6 +3126,24 @@
             </div>
             <div class="modal-footer">
                 <button onclick="irAEdicionDesdeResumen()" class="btn btn-success" id="btn-resumen-editar">Ir a ficha de edicion</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-pedidos-dia">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="pedidos-dia-titulo">Pedidos del dia</h3>
+                <button onclick="cerrarModalPedidosDia()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="dia-pedidos-head" id="pedidos-dia-resumen">
+                    Selecciona un pedido para abrir su ficha.
+                </div>
+                <div class="dia-pedidos-list" id="pedidos-dia-lista"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="cerrarModalPedidosDia()" class="btn btn-secondary">Cerrar</button>
             </div>
         </div>
     </div>
@@ -6052,9 +6139,92 @@
                     celda.appendChild(contenedor);
                 }
                 
-                celda.onclick = () => seleccionarDia(fechaStr);
+                celda.onclick = () => manejarClickDiaAgenda(fechaStr);
                 grid.appendChild(celda);
             }
+        }
+
+        function eventosSeleccionablesDia(fecha) {
+            return eventos
+                .filter((evento) => {
+                    if (!evento || evento.fecha !== fecha || esEventoBorrador(evento)) return false;
+                    return String(evento.tipo || '').trim().toLowerCase() !== 'bloqueo';
+                })
+                .sort((a, b) => {
+                    const minutosA = horaAMinutos(a.hora_entrega || a.hora_inicio, 0) || 0;
+                    const minutosB = horaAMinutos(b.hora_entrega || b.hora_inicio, 0) || 0;
+                    return minutosA - minutosB;
+                });
+        }
+
+        function manejarClickDiaAgenda(fecha) {
+            fechaSeleccionada = fecha;
+            eventoDetalleSeleccionadoId = null;
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+            const pedidosDia = eventosSeleccionablesDia(fecha);
+            if (pedidosDia.length) {
+                abrirModalPedidosDia(fecha, pedidosDia);
+            }
+        }
+
+        function abrirModalPedidosDia(fecha, pedidosDia = null) {
+            const modal = document.getElementById('modal-pedidos-dia');
+            const titulo = document.getElementById('pedidos-dia-titulo');
+            const resumen = document.getElementById('pedidos-dia-resumen');
+            const lista = document.getElementById('pedidos-dia-lista');
+            if (!modal || !lista) return;
+
+            const pedidos = Array.isArray(pedidosDia) ? pedidosDia : eventosSeleccionablesDia(fecha);
+            if (titulo) titulo.textContent = `Pedidos del ${formatearFechaLarga(fecha)}`;
+            if (resumen) {
+                resumen.textContent = pedidos.length
+                    ? `Hay ${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'} agendado${pedidos.length === 1 ? '' : 's'}. Selecciona uno para abrir la ficha.`
+                    : 'No hay pedidos agendados en este dia.';
+            }
+
+            if (!pedidos.length) {
+                lista.innerHTML = '<div class="dia-pedidos-empty">Este dia no tiene pedidos agendados.</div>';
+            } else {
+                lista.innerHTML = pedidos.map((evento) => {
+                    const id = Number(evento.id || 0);
+                    const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || 'Sin hora';
+                    const cliente = String(evento.cliente || 'Sin cliente').trim() || 'Sin cliente';
+                    const tituloPedido = String(evento.titulo || 'Pedido sin titulo').trim() || 'Pedido sin titulo';
+                    const codigo = String(evento.codigo_pedido || id || '-').trim() || '-';
+                    const total = Number(evento.total || 0);
+                    const abono = Number(evento.abono || 0);
+                    const saldo = Math.max(0, total - abono);
+                    const pago = total > 0
+                        ? (saldo <= 0 ? 'Pagado' : `Saldo ${formatoMonedaCLP(saldo)}`)
+                        : 'Sin total registrado';
+                    return `
+                        <button type="button" class="dia-pedido-card ${escapeHtml(claseCssEvento(evento))}" onclick="abrirFichaDesdePedidosDia(${id})">
+                            <span>
+                                <span class="dia-pedido-title">${escapeHtml(hora)} - ${escapeHtml(tituloPedido)}</span>
+                                <span class="dia-pedido-meta">
+                                    Cliente: ${escapeHtml(cliente)} | Pedido ${escapeHtml(codigo)} | ${escapeHtml(pago)}
+                                </span>
+                            </span>
+                            <span class="dia-pedido-action">Abrir ficha</span>
+                        </button>
+                    `;
+                }).join('');
+            }
+
+            modal.classList.add('active');
+        }
+
+        function cerrarModalPedidosDia() {
+            const modal = document.getElementById('modal-pedidos-dia');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function abrirFichaDesdePedidosDia(idEvento) {
+            const idNum = Number(idEvento || 0);
+            if (!idNum) return;
+            cerrarModalPedidosDia();
+            editarEvento(idNum);
         }
 
         function seleccionarEventoAgenda(fecha, eventoId, abrirModal = false, options = {}) {
@@ -7754,6 +7924,10 @@
         document.querySelectorAll('.modal-overlay').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
+                    if (modal.id === 'modal-pedidos-dia') {
+                        cerrarModalPedidosDia();
+                        return;
+                    }
                     if (modal.id === 'modal-rellenos-mes') {
                         cerrarModalRellenosMes();
                         return;
