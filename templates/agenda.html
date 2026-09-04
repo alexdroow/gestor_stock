@@ -3312,6 +3312,7 @@
         let tortaDispoRequestId = 0;
         let tortaDispoDiasCache = [];
         let rellenosMesTimer = null;
+        let agendaDiaClickTimer = null;
         let loadingTimer = null;
         let loadingVisible = false;
         let mapaEvento = {
@@ -6139,7 +6140,21 @@
                     celda.appendChild(contenedor);
                 }
                 
-                celda.onclick = () => manejarClickDiaAgenda(fechaStr);
+                celda.onclick = () => {
+                    if (agendaDiaClickTimer) clearTimeout(agendaDiaClickTimer);
+                    agendaDiaClickTimer = setTimeout(() => {
+                        agendaDiaClickTimer = null;
+                        manejarClickDiaAgenda(fechaStr);
+                    }, 220);
+                };
+                celda.ondblclick = (event) => {
+                    event.preventDefault();
+                    if (agendaDiaClickTimer) {
+                        clearTimeout(agendaDiaClickTimer);
+                        agendaDiaClickTimer = null;
+                    }
+                    abrirTortaManualDesdeDia(fechaStr);
+                };
                 grid.appendChild(celda);
             }
         }
@@ -6166,6 +6181,14 @@
             if (pedidosDia.length) {
                 abrirModalPedidosDia(fecha, pedidosDia);
             }
+        }
+
+        function abrirTortaManualDesdeDia(fecha) {
+            fechaSeleccionada = fecha;
+            eventoDetalleSeleccionadoId = null;
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+            agendarTortaManual(fecha);
         }
 
         function abrirModalPedidosDia(fecha, pedidosDia = null) {
@@ -7069,13 +7092,16 @@
             abrirModal();
         }
 
-        function agendarTortaManual() {
+        function agendarTortaManual(fechaSugerida = null) {
             nuevoEvento();
             modoAgendarTorta = true;
             modoAdminManualTorta = true;
             document.getElementById('modal-titulo').textContent = 'Agendar Torta Manual';
             document.getElementById('evento-tipo').value = 'torta';
             document.getElementById('evento-tipo').disabled = true;
+            if (fechaSugerida) {
+                document.getElementById('evento-fecha').value = fechaSugerida;
+            }
             document.getElementById('evento-titulo').value = 'Torta personalizada';
             mostrarBloqueTortaManual(true);
             cargarCatalogoTortaManual(true).finally(() => renderTortaBuilder());
