@@ -1336,6 +1336,57 @@
             text-align: center;
             font-weight: 700;
         }
+        #modal-whatsapp-mensajes .modal {
+            width: min(94vw, 860px);
+            max-width: 860px;
+            max-height: 92vh;
+        }
+        #modal-whatsapp-mensajes .modal-body {
+            overflow: auto;
+        }
+        .whatsapp-editor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .whatsapp-editor-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            background: #fff;
+            padding: 14px;
+        }
+        .whatsapp-editor-card h4 {
+            color: #1f2937;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .whatsapp-editor-card textarea {
+            min-height: 320px;
+            resize: vertical;
+        }
+        .whatsapp-preview {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            color: #14532d;
+            font-size: 12px;
+            line-height: 1.45;
+            margin-top: 10px;
+            max-height: 220px;
+            overflow: auto;
+            padding: 12px;
+            white-space: pre-wrap;
+        }
+        .whatsapp-vars {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 12px;
+            color: #7c2d12;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-bottom: 14px;
+            padding: 12px;
+        }
 
         .pedido-ficha-dashboard {
             display: none;
@@ -3040,6 +3091,7 @@
             <div class="modal-footer">
                 <button onclick="eliminarEvento()" class="btn btn-danger" id="btn-eliminar" style="display: none;">Eliminar</button>
                 <button onclick="cerrarModal()" class="btn btn-secondary">Cancelar</button>
+                <button onclick="abrirEditorMensajesWhatsApp()" class="btn btn-secondary" id="btn-editar-whatsapp-msg">Editar mensajes WhatsApp</button>
                 <button onclick="contactarClienteWhatsAppEvento()" class="btn btn-whatsapp" id="btn-whatsapp-cliente" style="display: none;">WhatsApp cliente</button>
                 <button onclick="enviarCotizacionWhatsAppCliente()" class="btn btn-whatsapp" id="btn-whatsapp-pdf" style="display: none;">WhatsApp + PDF</button>
                 <button onclick="generarPDF()" class="btn btn-pdf" id="btn-pdf" style="display: none;">&#128196; PDF</button>
@@ -3144,6 +3196,39 @@
             </div>
             <div class="modal-footer">
                 <button onclick="cerrarModalPedidosDia()" class="btn btn-secondary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-whatsapp-mensajes">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Editar mensajes WhatsApp</h3>
+                <button onclick="cerrarEditorMensajesWhatsApp()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="whatsapp-vars">
+                    Variables disponibles: {cliente}, {saludo}, {telefono}, {codigo_pedido}, {tipo}, {fecha},
+                    {hora_entrega}, {modalidad_entrega}, {tamano_torta}, {rellenos}, {extras}, {total},
+                    {abono_50}, {pdf_url}.
+                </div>
+                <div class="whatsapp-editor-grid">
+                    <div class="whatsapp-editor-card">
+                        <h4>Mensaje WhatsApp cliente</h4>
+                        <textarea id="whatsapp-template-confirmacion" oninput="actualizarPreviewMensajesWhatsApp()"></textarea>
+                        <div class="whatsapp-preview" id="whatsapp-preview-confirmacion"></div>
+                    </div>
+                    <div class="whatsapp-editor-card">
+                        <h4>Mensaje WhatsApp + PDF</h4>
+                        <textarea id="whatsapp-template-pdf" oninput="actualizarPreviewMensajesWhatsApp()"></textarea>
+                        <div class="whatsapp-preview" id="whatsapp-preview-pdf"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="restaurarMensajesWhatsAppDefault()" class="btn btn-secondary">Restaurar textos</button>
+                <button onclick="cerrarEditorMensajesWhatsApp()" class="btn btn-secondary">Cancelar</button>
+                <button onclick="guardarMensajesWhatsApp()" class="btn btn-success">Guardar mensajes</button>
             </div>
         </div>
     </div>
@@ -4457,6 +4542,7 @@
                             <div class="pedido-ficha-actions">
                                 <button type="button" class="pedido-ficha-action" onclick="contactarClienteWhatsAppEvento()">WhatsApp</button>
                                 <button type="button" class="pedido-ficha-action" onclick="enviarCotizacionWhatsAppCliente()">WhatsApp + PDF</button>
+                                <button type="button" class="pedido-ficha-action" onclick="abrirEditorMensajesWhatsApp()">Editar mensajes WhatsApp</button>
                                 <button type="button" class="pedido-ficha-action" onclick="generarPDF()">Ver PDF</button>
                                 <button type="button" class="pedido-ficha-action" onclick="navigator.clipboard && navigator.clipboard.writeText('${escapeHtml(tracking)}')">Copiar enlace</button>
                             </div>
@@ -5487,6 +5573,203 @@
             return '';
         }
 
+        const AGENDA_WHATSAPP_TEMPLATES_KEY = 'agenda_whatsapp_templates_v1';
+        const AGENDA_WHATSAPP_DEFAULTS = {
+            confirmacion: [
+                '{saludo}',
+                'Somos de Pasteleria Sucree, te informamos que tu pedido quedo agendado exitosamente.',
+                'Te dejo el resumen de tu pedido para que revises que toda la informacion este correcta:',
+                '',
+                '* Nombre: {cliente}',
+                '* Numero de telefono: {telefono}',
+                '* Informacion del pedido',
+                '-Tamano de torta: {tamano_torta}',
+                '-Rellenos:',
+                '{rellenos}',
+                '-Informacion extra:',
+                '{extras}',
+                '-Retiro o despacho: {modalidad_entrega}',
+                '-Hora de retiro o despacho: {hora_entrega}',
+                '-Total a pagar: {total}',
+                '',
+                'Para confirmar la reserva solicitamos un abono del *50%* del total el cual debe ser transferido a la siguiente cuenta',
+                'Datos de Transferencia',
+                '',
+                '*TOTAL ABONO {abono_50}*',
+                '',
+                'NUEVOS DATOS DE TRANSFERENCIA',
+                '(Si tienes registrada la cuenta "Banco Santander" debes anadir la nueva cuenta.)',
+                '',
+                'ALEXIS JAVIER GUTIERREZ SALGADO',
+                '18.121.947-5',
+                'Bci / Banco Credito e Inversiones / Mach',
+                'Cuenta Vista',
+                '777018121947',
+                'pasteleria.sucree@outlook.com',
+                '',
+                'Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.',
+                '*La boleta es enviada el dia de la entrega por este mismo medio en formato digital, si necesita en formato fisico lo puede solicitar antes de hacer el envio o de retirar*',
+            ].join('\n'),
+            pdf: [
+                'Hola {cliente}, te compartimos la cotizacion de tu pedido.',
+                'Codigo pedido: {codigo_pedido}',
+                'Tipo: {tipo}',
+                'Fecha: {fecha} {hora_entrega}',
+                'PDF: {pdf_url}',
+            ].join('\n')
+        };
+
+        function obtenerPlantillasWhatsAppAgenda() {
+            try {
+                const raw = localStorage.getItem(AGENDA_WHATSAPP_TEMPLATES_KEY);
+                const parsed = raw ? JSON.parse(raw) : {};
+                return {
+                    confirmacion: String(parsed.confirmacion || AGENDA_WHATSAPP_DEFAULTS.confirmacion),
+                    pdf: String(parsed.pdf || AGENDA_WHATSAPP_DEFAULTS.pdf),
+                };
+            } catch (_) {
+                return { ...AGENDA_WHATSAPP_DEFAULTS };
+            }
+        }
+
+        function obtenerContextoWhatsAppAgenda(extra = {}) {
+            const tipo = String((document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
+            const clienteRaw = (document.getElementById('evento-cliente')?.value || '').trim();
+            const total = Math.max(0, Number(document.getElementById('evento-total')?.value || 0));
+            const esEnvio = Boolean(document.getElementById('evento-envio')?.checked);
+            const modalidadEntrega = esEnvio ? 'Despacho' : 'Retiro en tienda';
+            const horaEntrega = (document.getElementById('evento-entrega')?.value || document.getElementById('evento-hora-inicio')?.value || '').trim();
+            const detalleRaw = String(document.getElementById('evento-ingredientes')?.value || '');
+            let tamanoTorta = '-';
+            let rellenosLista = [];
+            let extrasLista = [];
+
+            if (String(tipo) === 'torta') {
+                try {
+                    const dataTorta = obtenerDatosTortaManual();
+                    if (dataTorta?.size?.nombre) tamanoTorta = String(dataTorta.size.nombre);
+                    if (Array.isArray(dataTorta?.sabores) && dataTorta.sabores.length) {
+                        rellenosLista = dataTorta.sabores.map((s) => String((s && s.nombre) || '').trim()).filter(Boolean);
+                    }
+                    if (Array.isArray(dataTorta?.extras) && dataTorta.extras.length) {
+                        extrasLista = dataTorta.extras.map((e) => {
+                            const nombre = String((e && e.nombre) || '').trim();
+                            const qty = Math.max(1, Number((e && e.qty) || 1));
+                            return nombre ? `${nombre}${qty > 1 ? ` x${qty}` : ''}` : '';
+                        }).filter(Boolean);
+                    }
+                } catch (_) {}
+            }
+
+            if (tamanoTorta === '-' || !rellenosLista.length || !extrasLista.length) {
+                const lines = detalleRaw.replace(/\r\n?/g, '\n').split('\n').map((x) => String(x || '').trim());
+                let inSabores = false;
+                let inExtras = false;
+                lines.forEach((ln) => {
+                    const line = String(ln || '').trim();
+                    if (!line) return;
+                    const low = line.toLowerCase();
+                    if (low.startsWith('tamano:') || low.startsWith('tamaÃ±o:')) {
+                        tamanoTorta = line.split(':').slice(1).join(':').trim() || tamanoTorta;
+                        return;
+                    }
+                    if (low === 'sabores:') {
+                        inSabores = true;
+                        inExtras = false;
+                        return;
+                    }
+                    if (low === 'extras:') {
+                        inExtras = true;
+                        inSabores = false;
+                        return;
+                    }
+                    if (low === 'topper:' || line.startsWith('---')) {
+                        inSabores = false;
+                        inExtras = false;
+                        return;
+                    }
+                    if (inSabores && line.startsWith('-')) rellenosLista.push(line.replace(/^-+\s*/, '').trim());
+                    if (inExtras && line.startsWith('-')) extrasLista.push(line.replace(/^-+\s*/, '').trim());
+                });
+            }
+
+            const telefonoLinea = String(document.getElementById('evento-telefono')?.value || '').trim() || '-';
+            return {
+                cliente: clienteRaw || '-',
+                saludo: clienteRaw ? `Hola ${clienteRaw}` : 'Hola',
+                telefono: telefonoLinea,
+                codigo_pedido: String(document.getElementById('evento-codigo-pedido')?.value || (eventoEditando && eventoEditando.codigo_pedido) || (eventoEditando && eventoEditando.id) || '-').trim() || '-',
+                tipo: tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : 'Pedido',
+                fecha: String(document.getElementById('evento-fecha')?.value || '').trim() || '-',
+                hora_entrega: horaEntrega || '-',
+                modalidad_entrega: modalidadEntrega,
+                tamano_torta: tamanoTorta,
+                rellenos: rellenosLista.length ? rellenosLista.map((x) => `- ${x}`).join('\n') : '- Sin rellenos registrados',
+                extras: extrasLista.length ? extrasLista.map((x) => `- ${x}`).join('\n') : '- Sin extras',
+                total: formatoMonedaCLP(total),
+                abono_50: formatoMonedaCLP(Math.round(total * 0.5)),
+                pdf_url: String(extra.pdf_url || '{pdf_url}'),
+                ...extra,
+            };
+        }
+
+        function aplicarPlantillaWhatsAppAgenda(template, contexto) {
+            return String(template || '').replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => {
+                if (Object.prototype.hasOwnProperty.call(contexto, key)) return String(contexto[key]);
+                return match;
+            });
+        }
+
+        function construirMensajeWhatsAppAgenda(tipoMensaje, extra = {}) {
+            const plantillas = obtenerPlantillasWhatsAppAgenda();
+            const key = tipoMensaje === 'pdf' ? 'pdf' : 'confirmacion';
+            return aplicarPlantillaWhatsAppAgenda(plantillas[key], obtenerContextoWhatsAppAgenda(extra));
+        }
+
+        function abrirEditorMensajesWhatsApp() {
+            const plantillas = obtenerPlantillasWhatsAppAgenda();
+            const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
+            const inputPdf = document.getElementById('whatsapp-template-pdf');
+            if (inputConfirmacion) inputConfirmacion.value = plantillas.confirmacion;
+            if (inputPdf) inputPdf.value = plantillas.pdf;
+            actualizarPreviewMensajesWhatsApp();
+            document.getElementById('modal-whatsapp-mensajes')?.classList.add('active');
+        }
+
+        function cerrarEditorMensajesWhatsApp() {
+            document.getElementById('modal-whatsapp-mensajes')?.classList.remove('active');
+        }
+
+        function actualizarPreviewMensajesWhatsApp() {
+            const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
+            const inputPdf = document.getElementById('whatsapp-template-pdf');
+            const previewConfirmacion = document.getElementById('whatsapp-preview-confirmacion');
+            const previewPdf = document.getElementById('whatsapp-preview-pdf');
+            const ctx = obtenerContextoWhatsAppAgenda({ pdf_url: 'https://pasteleriasucree.cl/static/tienda_pedidos_pdf/ejemplo.pdf' });
+            if (previewConfirmacion && inputConfirmacion) previewConfirmacion.textContent = aplicarPlantillaWhatsAppAgenda(inputConfirmacion.value, ctx);
+            if (previewPdf && inputPdf) previewPdf.textContent = aplicarPlantillaWhatsAppAgenda(inputPdf.value, ctx);
+        }
+
+        function guardarMensajesWhatsApp() {
+            const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
+            const inputPdf = document.getElementById('whatsapp-template-pdf');
+            const data = {
+                confirmacion: String(inputConfirmacion?.value || '').trim() || AGENDA_WHATSAPP_DEFAULTS.confirmacion,
+                pdf: String(inputPdf?.value || '').trim() || AGENDA_WHATSAPP_DEFAULTS.pdf,
+            };
+            localStorage.setItem(AGENDA_WHATSAPP_TEMPLATES_KEY, JSON.stringify(data));
+            cerrarEditorMensajesWhatsApp();
+            alert('Mensajes de WhatsApp guardados.');
+        }
+
+        function restaurarMensajesWhatsAppDefault() {
+            const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
+            const inputPdf = document.getElementById('whatsapp-template-pdf');
+            if (inputConfirmacion) inputConfirmacion.value = AGENDA_WHATSAPP_DEFAULTS.confirmacion;
+            if (inputPdf) inputPdf.value = AGENDA_WHATSAPP_DEFAULTS.pdf;
+            actualizarPreviewMensajesWhatsApp();
+        }
+
         function actualizarBotonWhatsAppCliente() {
             const btn = document.getElementById('btn-whatsapp-cliente');
             const btnPdf = document.getElementById('btn-whatsapp-pdf');
@@ -5521,118 +5804,12 @@
         function contactarClienteWhatsAppEvento() {
             const tipo = String((document.getElementById('evento-tipo') || {}).value || '').trim().toLowerCase();
             if (tipo === 'bloqueo') return;
-            const clienteRaw = (document.getElementById('evento-cliente').value || '').trim();
             const telefono = normalizarTelefonoWhatsApp(document.getElementById('evento-telefono').value);
             if (!telefono) {
                 alert('Ingresa un telefono valido para contactar por WhatsApp.');
                 return;
             }
-            const saludo = clienteRaw ? `Hola ${clienteRaw}` : 'Hola';
-            const total = Math.max(0, Number(document.getElementById('evento-total')?.value || 0));
-            const abono50 = Math.round(total * 0.5);
-            const esEnvio = Boolean(document.getElementById('evento-envio')?.checked);
-            const modalidadEntrega = esEnvio ? 'Despacho' : 'Retiro en tienda';
-            const horaEntrega = (document.getElementById('evento-entrega')?.value || document.getElementById('evento-hora-inicio')?.value || '').trim();
-            const detalleRaw = String(document.getElementById('evento-ingredientes')?.value || '');
-
-            let tamanoTorta = '-';
-            let rellenosLista = [];
-            let extrasLista = [];
-            if (String(tipo) === 'torta') {
-                try {
-                    const dataTorta = obtenerDatosTortaManual();
-                    if (dataTorta?.size?.nombre) tamanoTorta = String(dataTorta.size.nombre);
-                    if (Array.isArray(dataTorta?.sabores) && dataTorta.sabores.length) {
-                        rellenosLista = dataTorta.sabores
-                            .map((s) => String((s && s.nombre) || '').trim())
-                            .filter(Boolean);
-                    }
-                    if (Array.isArray(dataTorta?.extras) && dataTorta.extras.length) {
-                        extrasLista = dataTorta.extras
-                            .map((e) => {
-                                const nombre = String((e && e.nombre) || '').trim();
-                                const qty = Math.max(1, Number((e && e.qty) || 1));
-                                return nombre ? `${nombre}${qty > 1 ? ` x${qty}` : ''}` : '';
-                            })
-                            .filter(Boolean);
-                    }
-                } catch (_) {}
-            }
-
-            if (tamanoTorta === '-' || !rellenosLista.length || !extrasLista.length) {
-                const lines = detalleRaw.replace(/\r\n?/g, '\n').split('\n').map((x) => String(x || '').trim());
-                let inSabores = false;
-                let inExtras = false;
-                lines.forEach((ln) => {
-                    const line = String(ln || '').trim();
-                    if (!line) return;
-                    const low = line.toLowerCase();
-                    if (low.startsWith('tamano:') || low.startsWith('tamaño:')) {
-                        tamanoTorta = line.split(':').slice(1).join(':').trim() || tamanoTorta;
-                        return;
-                    }
-                    if (low === 'sabores:') {
-                        inSabores = true;
-                        inExtras = false;
-                        return;
-                    }
-                    if (low === 'extras:') {
-                        inExtras = true;
-                        inSabores = false;
-                        return;
-                    }
-                    if (low === 'topper:' || line.startsWith('---')) {
-                        inSabores = false;
-                        inExtras = false;
-                        return;
-                    }
-                    if (inSabores && line.startsWith('-')) rellenosLista.push(line.replace(/^-+\s*/, '').trim());
-                    if (inExtras && line.startsWith('-')) extrasLista.push(line.replace(/^-+\s*/, '').trim());
-                });
-            }
-
-            const rellenosMsg = rellenosLista.length ? rellenosLista.map((x) => `- ${x}`).join('\n') : '- Sin rellenos registrados';
-            const extrasMsg = extrasLista.length ? extrasLista.map((x) => `- ${x}`).join('\n') : '- Sin extras';
-            const nombreLinea = clienteRaw || '-';
-            const telefonoLinea = String(document.getElementById('evento-telefono')?.value || '').trim() || '-';
-            const totalLinea = formatoMonedaCLP(total);
-            const abonoLinea = formatoMonedaCLP(abono50);
-
-            const mensaje = [
-                `${saludo}`,
-                'Somos de Pasteleria Sucree, te informamos que tu pedido quedo agendado exitosamente.',
-                'Te dejo el resumen de tu pedido para que revises que toda la informacion este correcta:',
-                '',
-                `* Nombre: ${nombreLinea}`,
-                `* Numero de telefono: ${telefonoLinea}`,
-                '* Informacion del pedido',
-                `-Tamano de torta: ${tamanoTorta}`,
-                '-Rellenos:',
-                rellenosMsg,
-                '-Informacion extra:',
-                extrasMsg,
-                `-Retiro o despacho: ${modalidadEntrega}`,
-                `-Hora de retiro o despacho: ${horaEntrega || '-'}`,
-                `-Total a pagar: ${totalLinea}`,
-                '',
-                'Para confirmar la reserva solicitamos un abono del *50%* del total el cual debe ser transferido a la siguiente cuenta',
-                'Datos de Transferencia',
-                '',
-                `*TOTAL ABONO ${abonoLinea}*`,
-                '',
-                'NUEVOS DATOS DE TRANSFERENCIA',
-                '(Si tienes registrada la cuenta "Banco Santander" debes anadir la nueva cuenta.)',
-                '',
-                'ALEXIS JAVIER GUTIERREZ SALGADO',
-                '18.121.947-5',
-                'Bci / Banco Credito e Inversiones / Mach',
-                'Cuenta Vista',
-                '777018121947',
-                'pasteleria.sucree@outlook.com',
-                '',
-                'Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.',
-                '*La boleta es enviada el dia de la entrega por este mismo medio en formato digital, si necesita en formato fisico lo puede solicitar antes de hacer el envio o de retirar*',
-            ].join('\n');
+            const mensaje = construirMensajeWhatsAppAgenda('confirmacion');
             const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank', 'noopener,noreferrer');
         }
@@ -5657,6 +5834,7 @@
                     body: JSON.stringify({
                         telefono: telefono,
                         cliente: document.getElementById('evento-cliente').value || '',
+                        mensaje: construirMensajeWhatsAppAgenda('pdf'),
                     }),
                 });
                 const data = await res.json();
@@ -7950,6 +8128,10 @@
         document.querySelectorAll('.modal-overlay').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
+                    if (modal.id === 'modal-whatsapp-mensajes') {
+                        cerrarEditorMensajesWhatsApp();
+                        return;
+                    }
                     if (modal.id === 'modal-pedidos-dia') {
                         cerrarModalPedidosDia();
                         return;

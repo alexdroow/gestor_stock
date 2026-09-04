@@ -22407,6 +22407,7 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
         data = request.get_json(silent=True) or {}
         telefono_req = str(data.get('telefono') or '').strip()
         cliente_req = str(data.get('cliente') or '').strip()
+        mensaje_req = str(data.get('mensaje') or '').strip()
 
         conn = get_db()
         cur = conn.cursor()
@@ -22451,6 +22452,10 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
             f"Fecha: {fecha_txt} {hora_txt}\n"
             "Adjunto PDF con el detalle y total."
         )
+        if mensaje_req:
+            body = mensaje_req.replace("{pdf_url}", media_url).strip()[:3000]
+            if media_url not in body:
+                body = f"{body}\nPDF: {media_url}".strip()[:3000]
 
         if _bool_env("GESTIONSTOCK_WHATSAPP_ENABLED", default=False) and _twilio_whatsapp_configurado() and destino_twilio:
             ok, err = _enviar_whatsapp_twilio(body, media_url=media_url, to_number=destino_twilio)
@@ -22463,6 +22468,8 @@ def api_agenda_evento_whatsapp_cliente_pdf(id):
             f"Codigo: {codigo_txt or ('#' + str(evento_id))}. Tipo: {tipo_txt}. Fecha: {fecha_txt} {hora_txt}. "
             f"PDF: {media_url}"
         )
+        if mensaje_req:
+            mensaje_manual = body
         whatsapp_url = f"https://wa.me/{destino_wa}?text={quote(mensaje_manual)}" if destino_wa else ""
         if not whatsapp_url:
             return jsonify({'success': False, 'error': 'No se pudo generar enlace WhatsApp para envio manual'}), 400
