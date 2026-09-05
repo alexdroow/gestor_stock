@@ -961,10 +961,24 @@
         .notif-item {
             padding: 12px;
             border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-radius: 10px;
+            transition: background .18s ease, box-shadow .18s ease, transform .18s ease;
         }
         
         .notif-item:last-child {
             border-bottom: none;
+        }
+
+        .notif-item.clickable {
+            cursor: pointer;
+        }
+
+        .notif-item.clickable:hover,
+        .notif-item.clickable:focus-visible {
+            background: rgba(255,255,255,0.42);
+            box-shadow: 0 8px 18px rgba(146,64,14,0.12);
+            transform: translateY(-1px);
+            outline: none;
         }
         
         .notif-when {
@@ -7840,7 +7854,9 @@
                     notificaciones.push({
                         urgente: minutosHasta < 180,
                         cuando: obtenerTextoTiempo(minutosHasta),
-                        texto: `${e.tipo === 'torta' ? '\uD83C\uDF82' : '\uD83D\uDCE6'} ${e.titulo} - ${e.cliente || 'Sin cliente'}`
+                        texto: `${e.tipo === 'torta' ? '\uD83C\uDF82' : '\uD83D\uDCE6'} ${e.titulo} - ${e.cliente || 'Sin cliente'}`,
+                        eventoId: Number(e.id || 0),
+                        accion: 'Ver pedido'
                     });
                 }
 
@@ -7874,13 +7890,19 @@
             card.style.display = 'block';
             card.className = `panel-card notif-card ${notificaciones.some(n => n.urgente) ? 'urgent' : ''}`;
             
-            lista.innerHTML = notificaciones.map(n => `
-                <div class="notif-item">
+            lista.innerHTML = notificaciones.map(n => {
+                const eventoId = Number(n.eventoId || 0);
+                const clickableAttrs = eventoId
+                    ? `role="button" tabindex="0" title="Abrir ficha del pedido" onclick="abrirEventoDesdeNotificacion(${eventoId})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirEventoDesdeNotificacion(${eventoId});}"`
+                    : '';
+                return `
+                <div class="notif-item ${eventoId ? 'clickable' : ''}" ${clickableAttrs}>
                     <div class="notif-when">${n.cuando}</div>
                     <div class="notif-text">${n.texto}</div>
-                    ${n.eventoId ? `<div class="notif-actions"><button class="btn-mini-outline" onclick="abrirEventoDesdeNotificacion(${Number(n.eventoId || 0)})">${escapeHtml(String(n.accion || 'Ver pedido'))}</button></div>` : ''}
+                    ${eventoId ? `<div class="notif-actions"><button class="btn-mini-outline" onclick="event.stopPropagation(); abrirEventoDesdeNotificacion(${eventoId})">${escapeHtml(String(n.accion || 'Ver pedido'))}</button></div>` : ''}
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
         
         function construirEventoDesdeFormularioParaPdf() {
