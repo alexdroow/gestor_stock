@@ -17861,9 +17861,29 @@
             return String(src || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
         }
 
+        function _desktopHeroRenderedProductImageSrc(productId) {
+            const id = Number(productId || 0);
+            if (!(id > 0)) return "";
+            const img = document.querySelector(`.item-card[data-product-id="${id}"] .item-img img`);
+            return String(img?.currentSrc || img?.src || img?.getAttribute?.("src") || "").trim();
+        }
+
+        function _desktopHeroImageStyle(p) {
+            const legacyPos = ["center", "top", "bottom"].includes(String(p?.foto_pos_tienda || "")) ? p.foto_pos_tienda : "center";
+            let posX = Number(p?.foto_pos_x_tienda ?? 50);
+            let posY = Number(p?.foto_pos_y_tienda ?? 50);
+            if (!Number.isFinite(posX)) posX = 50;
+            if (!Number.isFinite(posY)) posY = legacyPos === "top" ? 0 : legacyPos === "bottom" ? 100 : 50;
+            posX = Math.max(0, Math.min(100, posX));
+            posY = Math.max(0, Math.min(100, posY));
+            return `object-fit:contain;object-position:${posX}% ${posY}%;transform:none;transform-origin:${posX}% ${posY}%;display:block;`;
+        }
+
         function _desktopHeroApplyImage(p) {
-            const rawSrc = _productoImgSrc(p);
-            const src = _cacheBustUrl(rawSrc);
+            const productId = Number(p?.id || 0);
+            const renderedSrc = _desktopHeroRenderedProductImageSrc(productId);
+            const rawSrc = renderedSrc || _productoImgSrc(p);
+            const src = renderedSrc || _cacheBustUrl(rawSrc);
             if (tiendaHeroMediaEl) {
                 const posX = Math.max(0, Math.min(100, Number(p?.foto_pos_x_tienda ?? 50) || 50));
                 const posY = Math.max(0, Math.min(100, Number(p?.foto_pos_y_tienda ?? 50) || 50));
@@ -17879,7 +17899,7 @@
                 tiendaHeroImageEl.style.display = "none";
                 return;
             }
-            tiendaHeroImageEl.style.cssText = `${imgStyle(p)}display:block;`;
+            tiendaHeroImageEl.style.cssText = _desktopHeroImageStyle(p);
             tiendaHeroImageEl.onerror = () => {
                 tiendaHeroImageEl.style.display = "none";
             };
@@ -21162,7 +21182,6 @@
             _toggleMobileAgendaSummaryFab();
             const visibles = _storeSortedProducts(productos.filter((p) => productoFiltrado(p)));
             _storeSyncToolbar(visibles.length);
-            _desktopHeroStart(visibles);
 
             const destacados = visibles
                 .filter((p) => Boolean(p.destacado_tienda))
@@ -21197,6 +21216,7 @@
                     </div>
                 </section>
             `).join("");
+            _desktopHeroStart(visibles);
             _applyVisualTextOverrides(tiendaUiCfg.visual_text_overrides || []);
         }
 
