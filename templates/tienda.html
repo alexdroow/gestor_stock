@@ -13903,6 +13903,490 @@
             }
         }
 
+        /* SUCREE STORE DESKTOP 2026 - aislado: no aplica a mobile-ui ni agenda tortas */
+        body:not(.mobile-ui):not(.tienda-preview-agenda) {
+            --store-bg: #fffaf3;
+            --store-cream: #fff7ec;
+            --store-paper: rgba(255, 255, 255, .96);
+            --store-line: rgba(90, 52, 28, .16);
+            --store-text: #24150b;
+            --store-muted: #74655b;
+            --store-primary: #ef7d00;
+            --store-primary-dark: #c45b00;
+            --store-chocolate: #3a2013;
+            --store-shadow: 0 22px 54px rgba(74, 44, 23, .10);
+            --store-serif: Georgia, "Times New Roman", serif;
+            background:
+                radial-gradient(circle at 18% -10%, rgba(239, 125, 0, .12), transparent 280px),
+                linear-gradient(180deg, #fffdf9 0%, #fff8ef 44%, #fffaf4 100%) !important;
+            color: var(--store-text);
+        }
+
+        body.mobile-ui .desktop-store-ribbon,
+        body.tienda-preview-agenda .desktop-store-ribbon,
+        body.mobile-ui .desktop-cart-toggle,
+        body.tienda-preview-agenda .desktop-cart-toggle {
+            display: none !important;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-store-ribbon {
+            display: grid;
+            place-items: center;
+            min-height: 34px;
+            background: linear-gradient(90deg, #4a240d, #6b3515 50%, #4a240d);
+            color: #fff8ef;
+            font-weight: 850;
+            letter-spacing: .02em;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar {
+            top: 0;
+            min-height: 104px;
+            grid-template-columns: minmax(250px, 330px) minmax(360px, 1fr) minmax(260px, 460px) auto auto;
+            padding: 18px 54px;
+            gap: 28px;
+            border-bottom: 1px solid rgba(90, 52, 28, .13);
+            background: rgba(255, 253, 249, .95);
+            box-shadow: 0 10px 34px rgba(74, 44, 23, .07);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .brand-with-logo {
+            gap: 18px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .brand-home-link {
+            width: 72px;
+            height: 72px;
+            border-radius: 22px;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .brand-logo {
+            width: 72px;
+            height: 72px;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            padding: 0;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #brand-text {
+            max-width: 230px;
+            color: var(--store-chocolate);
+            font-family: var(--store-serif);
+            font-size: 0;
+            font-weight: 500;
+            letter-spacing: .18em;
+            line-height: 1;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #brand-text::before {
+            content: "SUCR\00C9E";
+            display: block;
+            font-size: 1.82rem;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #brand-text::after {
+            content: "PASTELERIA";
+            display: block;
+            margin-top: 10px;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: .38em;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-nav {
+            justify-content: center;
+            gap: 22px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-nav-btn {
+            padding: 8px 0;
+            border-radius: 0;
+            background: transparent;
+            color: var(--store-chocolate);
+            font-size: 1rem;
+            font-weight: 700;
+            border-bottom: 2px solid transparent;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-nav-btn:hover,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-nav-btn.active {
+            color: var(--store-primary-dark);
+            border-bottom-color: var(--store-primary);
+            transform: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-actions {
+            gap: 12px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .menu-quick-btn {
+            border: 0;
+            background: transparent;
+            padding: 10px 4px;
+            color: var(--store-chocolate);
+            font-size: 1rem;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #btn-registrar-cuenta,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #btn-cerrar-sesion {
+            display: none !important;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-cart-toggle {
+            min-width: 150px;
+            min-height: 48px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border: 1px solid rgba(196, 91, 0, .35);
+            border-radius: 12px;
+            background: #fffaf4;
+            color: var(--store-chocolate);
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-cart-toggle__icon {
+            font-size: 0;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-cart-toggle:hover,
+        body:not(.mobile-ui):not(.tienda-preview-agenda).desktop-cart-open .desktop-cart-toggle {
+            background: #fff4e2;
+            box-shadow: 0 14px 26px rgba(196, 91, 0, .12);
+            transform: translateY(-1px);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-cart-toggle__icon {
+            width: 20px;
+            height: 20px;
+            border: 2px solid currentColor;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-cart-toggle__icon::before {
+            content: "";
+            position: absolute;
+            left: 4px;
+            right: 4px;
+            top: -8px;
+            height: 9px;
+            border: 2px solid currentColor;
+            border-bottom: 0;
+            border-radius: 10px 10px 0 0;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #desktop-cart-count {
+            color: var(--store-primary-dark);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .layout {
+            max-width: 100%;
+            padding: 0 0 56px;
+            display: block;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .left-nav {
+            display: none !important;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .content {
+            display: grid;
+            gap: 28px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .search {
+            width: min(560px, calc(100vw - 120px));
+            margin: 0;
+            z-index: 2;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #search-input {
+            height: 46px;
+            border-radius: 10px;
+            background: rgba(255,255,255,.92);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-estado-banner {
+            position: absolute;
+            right: 270px;
+            top: 166px;
+            z-index: 3;
+            border: 0;
+            background: transparent;
+            color: #3f9b55;
+            padding: 0;
+            font-size: .98rem;
+            box-shadow: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-estado-banner::before {
+            content: "";
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 9px;
+            border-radius: 999px;
+            background: #3f9b55;
+            vertical-align: -1px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-estado-banner.cerrada {
+            color: #b91c1c;
+            background: transparent;
+            border: 0;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-estado-banner.cerrada::before {
+            background: #b91c1c;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-custom-banner {
+            max-width: 1380px;
+            margin: 0 auto;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero {
+            width: 100%;
+            min-height: 340px;
+            grid-template-columns: minmax(480px, 44%) minmax(0, 1fr);
+            border: 0;
+            border-radius: 0;
+            background:
+                linear-gradient(90deg, rgba(255,250,243,.98) 0%, rgba(255,250,243,.82) 42%, rgba(255,250,243,.10) 64%),
+                #f6eadc;
+            box-shadow: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-copy {
+            padding: 56px 34px 56px 72px;
+            gap: 18px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-badge {
+            display: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-title {
+            font-family: var(--store-serif);
+            font-size: clamp(3.2rem, 5vw, 5.6rem);
+            font-weight: 500;
+            letter-spacing: -.055em;
+            color: var(--store-chocolate);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-subtitle {
+            max-width: 480px;
+            color: #3f332c;
+            font-size: 1.38rem;
+            line-height: 1.42;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-cta {
+            min-height: 52px;
+            min-width: 210px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 24px;
+            border-radius: 7px;
+            font-size: 1rem;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-media {
+            min-height: 340px;
+            background:
+                radial-gradient(circle at 50% 50%, rgba(239,125,0,.12), transparent 38%),
+                #f8efe4;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-media img {
+            object-fit: cover;
+            transform: scale(1.02);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-hero-controls {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 2px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-hero-control {
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            border: 1px solid rgba(90, 52, 28, .18);
+            background: rgba(255,255,255,.78);
+            color: var(--store-chocolate);
+            cursor: pointer;
+            font-weight: 900;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-category-rail {
+            width: min(980px, calc(100vw - 120px));
+            margin: -8px auto 0;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-category-rail .topbar-nav-btn {
+            min-width: 120px;
+            min-height: 42px;
+            padding: 0 24px;
+            border: 1px solid rgba(90, 52, 28, .22);
+            border-radius: 999px;
+            background: #fffdf9;
+            box-shadow: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-category-rail .topbar-nav-btn.active,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-category-rail .topbar-nav-btn:hover {
+            border-color: var(--store-primary);
+            background: linear-gradient(135deg, var(--store-primary), var(--store-primary-dark));
+            color: #fff;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .section,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .store-products-toolbar {
+            width: min(1380px, calc(100vw - 120px));
+            margin: 0 auto;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            padding: 0;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #sec-ofertas.is-empty {
+            display: none !important;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .ofertas-head,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #sec-destacados h2,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) #categorias-wrap .section h2 {
+            margin-bottom: 20px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .section h2,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .ofertas-head h2 {
+            font-family: var(--store-serif);
+            font-size: 2rem;
+            font-weight: 500;
+            letter-spacing: -.04em;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .grid,
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .scroller {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 24px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .item-card {
+            border-radius: 14px;
+            border: 1px solid rgba(90, 52, 28, .17);
+            box-shadow: 0 16px 34px rgba(74, 44, 23, .10);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .item-card.hero-focus {
+            border-color: var(--store-primary);
+            box-shadow: 0 0 0 4px rgba(239, 125, 0, .18), 0 24px 46px rgba(74, 44, 23, .14);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .item-photo {
+            min-height: 220px;
+            aspect-ratio: 1.28;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .item-body {
+            padding: 18px 18px 20px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .item-name {
+            font-family: var(--store-serif);
+            font-size: 1.28rem;
+            font-weight: 700;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .item-desc.is-empty {
+            display: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .price-final {
+            color: #c65300;
+            font-size: 1.42rem;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .stock {
+            display: none;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .cake-card__action {
+            justify-self: end;
+            min-width: 136px;
+            border-radius: 8px;
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .cart-panel {
+            display: none;
+            position: fixed;
+            top: 148px;
+            right: 48px;
+            z-index: 1800;
+            width: min(390px, calc(100vw - 40px));
+            max-height: calc(100vh - 176px);
+            overflow-y: auto;
+            padding: 22px;
+            border-radius: 20px;
+            background: rgba(255, 253, 249, .98);
+            border: 1px solid rgba(90, 52, 28, .18);
+            box-shadow: 0 28px 70px rgba(36, 21, 11, .20);
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda).desktop-cart-open .cart-panel {
+            display: block;
+            animation: desktopCartIn .18s ease both;
+        }
+
+        @keyframes desktopCartIn {
+            from { opacity: 0; transform: translateY(-8px) scale(.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        body:not(.mobile-ui):not(.tienda-preview-agenda) .wa-fab {
+            right: 26px;
+            bottom: 24px;
+            width: 54px;
+            height: 54px;
+        }
+
+        @media (min-width: 900px) and (max-width: 1180px) {
+            body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar {
+                grid-template-columns: minmax(220px, 280px) minmax(280px, 1fr) minmax(220px, 320px) auto;
+                padding-left: 28px;
+                padding-right: 28px;
+            }
+
+            body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-actions {
+                display: none;
+            }
+
+            body:not(.mobile-ui):not(.tienda-preview-agenda) .grid,
+            body:not(.mobile-ui):not(.tienda-preview-agenda) .scroller {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
         body.tienda-preview-agenda #store-products-toolbar,
         body.tienda-preview-agenda #sec-ofertas,
         body.tienda-preview-agenda #sec-destacados,
@@ -14587,6 +15071,7 @@
     </script>
     <div class="beta-preview-ribbon">BETA ADMIN - no visible para clientes</div>
     <div id="tienda-admin-pill" class="admin-mode-pill">MODO ADMIN ACTIVO</div>
+    <div class="desktop-store-ribbon">Un momento dulce, a tu manera</div>
     <header class="topbar">
         <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()" aria-label="Abrir menu">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -14623,6 +15108,11 @@
             <button type="button" class="menu-quick-btn" id="btn-cuenta" style="display:none;">Mi cuenta</button>
             <button type="button" class="menu-quick-btn menu-logout-btn" id="btn-cerrar-sesion" style="display:none;">Cerrar sesion</button>
         </div>
+        <button type="button" class="desktop-cart-toggle" id="desktop-cart-toggle" aria-expanded="false" aria-controls="desktop-cart-panel">
+            <span class="desktop-cart-toggle__icon" aria-hidden="true">▢</span>
+            <span>Carrito</span>
+            <strong id="desktop-cart-count">0</strong>
+        </button>
     </header>
 
     <main class="layout">
@@ -14837,7 +15327,7 @@
             <div id="categorias-wrap"></div>
         </section>
 
-        <aside class="cart-panel">
+        <aside class="cart-panel" id="desktop-cart-panel">
             <h3 id="cart-title">Tu compra</h3>
             <div class="cart-list" id="cart-list"></div>
             <div class="cart-meta">
@@ -15405,6 +15895,8 @@
         const brandTextEl = document.getElementById("brand-text");
         const topbarNavEl = document.getElementById("topbar-nav");
         const searchInputEl = document.getElementById("search-input");
+        const desktopCartToggleEl = document.getElementById("desktop-cart-toggle");
+        const desktopCartCountEl = document.getElementById("desktop-cart-count");
         const menuTitleEl = document.getElementById("menu-title");
         const tiendaAdminPillEl = document.getElementById("tienda-admin-pill");
         const secOfertasTitleEl = document.getElementById("sec-ofertas-title");
@@ -15714,6 +16206,11 @@
         let checkoutDireccionPin = { lat: -33.510911, lng: -70.784909 };
         let checkoutShippingQuote = null;
         let checkoutShippingError = "";
+        let desktopHeroRecs = [];
+        let desktopHeroIndex = 0;
+        let desktopHeroTimer = null;
+        let desktopHeroPaused = false;
+        const desktopHeroTracked = new Set();
         let flowPagoHabilitado = false;
         let flowSimAdminEnabled = false;
         let tiendaAdminMode = false;
@@ -17329,6 +17826,129 @@
             return `<img src="${esc(src)}?v=${Date.now()}" alt="${esc(p.nombre)}" style="${imgStyle(p)}">`;
         }
 
+        function _productoImgSrc(p) {
+            const srcDirect = String(p?.foto_url || "").trim();
+            const rel = String(p?.foto || "").trim();
+            return srcDirect || (rel ? `/static/${rel}` : "");
+        }
+
+        function _desktopStoreEnabled() {
+            return !document.body.classList.contains("mobile-ui") && !document.body.classList.contains("tienda-preview-agenda");
+        }
+
+        function _desktopHeroEnsureControls() {
+            if (!tiendaHeroEl || tiendaHeroEl.querySelector(".desktop-hero-controls")) return;
+            const controls = document.createElement("div");
+            controls.className = "desktop-hero-controls";
+            controls.innerHTML = `
+                <button type="button" class="desktop-hero-control" data-hero-dir="-1" aria-label="Producto anterior">‹</button>
+                <button type="button" class="desktop-hero-control" data-hero-pause="1" aria-label="Pausar recomendaciones">Ⅱ</button>
+                <button type="button" class="desktop-hero-control" data-hero-dir="1" aria-label="Producto siguiente">›</button>
+            `;
+            tiendaHeroEl.querySelector(".tienda-hero-copy")?.appendChild(controls);
+            controls.querySelectorAll("[data-hero-dir]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const dir = Number(btn.getAttribute("data-hero-dir") || 1);
+                    _desktopHeroSet(desktopHeroIndex + dir, true);
+                });
+            });
+            controls.querySelector("[data-hero-pause]")?.addEventListener("click", (ev) => {
+                desktopHeroPaused = !desktopHeroPaused;
+                ev.currentTarget.textContent = desktopHeroPaused ? "▶" : "Ⅱ";
+                ev.currentTarget.setAttribute("aria-label", desktopHeroPaused ? "Reanudar recomendaciones" : "Pausar recomendaciones");
+            });
+            tiendaHeroEl.addEventListener("mouseenter", () => { desktopHeroPaused = true; });
+            tiendaHeroEl.addEventListener("mouseleave", () => { desktopHeroPaused = false; });
+            tiendaHeroEl.addEventListener("focusin", () => { desktopHeroPaused = true; });
+            tiendaHeroEl.addEventListener("focusout", () => { desktopHeroPaused = false; });
+        }
+
+        function _desktopHeroScore(p, idx = 0) {
+            const stock = Math.max(0, Number(p?.max_compra || 0));
+            const descuento = Math.max(0, Number(p?.descuento_tienda_pct || 0));
+            const destacado = Boolean(p?.destacado_tienda) ? 42 : 0;
+            const oferta = Math.min(18, descuento * .7);
+            const disponibilidad = Math.min(16, stock);
+            const frescuraOrden = Math.max(0, 12 - Math.max(0, Number(p?.orden_tienda || idx || 0)) * .2);
+            return destacado + oferta + disponibilidad + frescuraOrden;
+        }
+
+        function _desktopHeroBuildRecommendations(items) {
+            const list = Array.isArray(items) ? items : [];
+            return list
+                .filter((p) => Number(p?.id || 0) > 0)
+                .filter((p) => Math.max(0, Number(p?.max_compra || 0)) > 0)
+                .filter((p) => Boolean(_productoImgSrc(p)))
+                .map((p, idx) => ({ p, score: _desktopHeroScore(p, idx) }))
+                .sort((a, b) => b.score - a.score || String(a.p.nombre || "").localeCompare(String(b.p.nombre || ""), "es"))
+                .slice(0, 3)
+                .map((row) => row.p);
+        }
+
+        function _desktopHeroSet(index = 0, manual = false) {
+            if (!_desktopStoreEnabled() || !tiendaHeroEl) return;
+            const recs = Array.isArray(desktopHeroRecs) ? desktopHeroRecs : [];
+            const p = recs.length ? recs[((index % recs.length) + recs.length) % recs.length] : null;
+            desktopHeroIndex = recs.length ? recs.indexOf(p) : 0;
+            tiendaHeroEl.style.display = "grid";
+            if (!p) {
+                if (tiendaHeroTitleEl) tiendaHeroTitleEl.textContent = "Tu pausa mas dulce.";
+                if (tiendaHeroSubtitleEl) tiendaHeroSubtitleEl.textContent = "Descubre favoritos de Pasteleria Sucree y elige algo rico para compartir.";
+                if (tiendaHeroCtaEl) {
+                    tiendaHeroCtaEl.textContent = "Explorar productos";
+                    tiendaHeroCtaEl.href = "#sec-destacados";
+                    tiendaHeroCtaEl.onclick = null;
+                }
+                if (tiendaHeroImageEl) tiendaHeroImageEl.src = String(tiendaUiCfg.hero_image_url || "/static/watermark_logo_full_backup.png");
+                return;
+            }
+            const productId = Number(p.id || 0);
+            const cat = nombreCategoria(p);
+            if (tiendaHeroTitleEl) tiendaHeroTitleEl.textContent = String(p.nombre || "Favorito Sucree");
+            if (tiendaHeroSubtitleEl) {
+                const desc = String(p.descripcion_tienda || "").trim();
+                tiendaHeroSubtitleEl.textContent = desc || `Producto disponible en ${cat}. Ideal para una pausa dulce o para compartir.`;
+            }
+            if (tiendaHeroBadgeEl) tiendaHeroBadgeEl.textContent = Boolean(p.destacado_tienda) ? "De los mas pedidos" : "Recomendado hoy";
+            if (tiendaHeroImageEl) tiendaHeroImageEl.src = `${_productoImgSrc(p)}?v=${Date.now()}`;
+            if (tiendaHeroCtaEl) {
+                tiendaHeroCtaEl.textContent = "Ver producto";
+                tiendaHeroCtaEl.href = `#producto-${productId}`;
+                tiendaHeroCtaEl.onclick = (ev) => {
+                    ev.preventDefault();
+                    _trackTienda("banner_click", `/tienda/banner/${productId}`);
+                    const card = document.querySelector(`.item-card[data-product-id="${productId}"]`);
+                    if (card) {
+                        card.scrollIntoView({ behavior: "smooth", block: "center" });
+                        card.classList.add("hero-focus");
+                        window.setTimeout(() => card.classList.remove("hero-focus"), 1200);
+                    }
+                };
+            }
+            if (!desktopHeroTracked.has(productId)) {
+                desktopHeroTracked.add(productId);
+                _trackTienda(manual ? "banner_manual_view" : "banner_impression", `/tienda/banner/${productId}`);
+            }
+        }
+
+        function _desktopHeroStart(items) {
+            if (desktopHeroTimer) {
+                clearInterval(desktopHeroTimer);
+                desktopHeroTimer = null;
+            }
+            if (!_desktopStoreEnabled() || !tiendaHeroEl) return;
+            _desktopHeroEnsureControls();
+            desktopHeroRecs = _desktopHeroBuildRecommendations(items);
+            desktopHeroIndex = 0;
+            _desktopHeroSet(0);
+            const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (desktopHeroRecs.length > 1 && !reduceMotion) {
+                desktopHeroTimer = setInterval(() => {
+                    if (!desktopHeroPaused) _desktopHeroSet(desktopHeroIndex + 1);
+                }, 9000);
+            }
+        }
+
         function formatoAgotadoHasta(fechaIso) {
             const raw = String(fechaIso || "").trim();
             const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -17373,7 +17993,7 @@
                     </div>
                     <div class="item-body cake-card__body">
                         <h3 class="item-name cake-card__title">${esc(p.nombre)}</h3>
-                        <p class="item-desc cake-card__description">${esc(desc || "Sin descripcion")}</p>
+                        <p class="item-desc cake-card__description ${desc ? "" : "is-empty"}">${esc(desc || "Sin descripcion")}</p>
                         <div class="price-row">
                             <span class="price-final">${money.format(finalPrice)}</span>
                             ${hasDiscount ? `<span class="price-old">${money.format(oldPrice)}</span>` : ""}
@@ -17606,13 +18226,13 @@
             cerrarSesionCliente();
         }
 
-        function _trackTienda(evento = "heartbeat") {
+        function _trackTienda(evento = "heartbeat", pagina = "/tienda") {
             try {
                 const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
                 const payload = {
                     session_id: tiendaSessionId,
                     evento,
-                    pagina: "/tienda",
+                    pagina: String(pagina || "/tienda"),
                     carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
                     carrito_total: Math.max(0, Number(total || 0)),
                     cliente_registrado: Boolean(clienteRegistrado && clienteRegistrado.email),
@@ -20462,6 +21082,12 @@
             }
             _visualApplySectionOrderAndVisibility(agendaMode);
             if (agendaMode) {
+                if (desktopHeroTimer) {
+                    clearInterval(desktopHeroTimer);
+                    desktopHeroTimer = null;
+                }
+                if (tiendaHeroEl) tiendaHeroEl.style.display = "none";
+                toggleDesktopCart(false);
                 _renderAgendaDiaHora();
                 _actualizarDebugCatalogo("agenda");
                 _renderAgendaPastelResumen();
@@ -20479,6 +21105,7 @@
             _toggleMobileAgendaSummaryFab();
             const visibles = _storeSortedProducts(productos.filter((p) => productoFiltrado(p)));
             _storeSyncToolbar(visibles.length);
+            _desktopHeroStart(visibles);
 
             const destacados = visibles
                 .filter((p) => Boolean(p.destacado_tienda))
@@ -20491,6 +21118,7 @@
             const ofertas = visibles
                 .filter((p) => n(p.descuento_tienda_pct) > 0 && Math.max(0, Number(p.max_compra || 0)) > 0)
                 .sort((a, b) => n(b.descuento_tienda_pct) - n(a.descuento_tienda_pct));
+            if (secOfertasEl) secOfertasEl.classList.toggle("is-empty", ofertas.length === 0);
             ofertasListEl.innerHTML = ofertas.length
                 ? ofertas.map((p) => cardHtml(p)).join("")
                 : "<div>No hay ofertas activas.</div>";
@@ -20519,6 +21147,7 @@
             if (!carrito.length) {
                 cartListEl.innerHTML = `<div>${esc(carritoVacioTexto)}</div>`;
                 if (mobileCartListEl) mobileCartListEl.innerHTML = `<div>${esc(carritoVacioTexto)}</div>`;
+                if (desktopCartCountEl) desktopCartCountEl.textContent = "0";
                 subtotalMontoEl.textContent = money.format(0);
                 if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(0);
                 descuentoMontoEl.textContent = `-${money.format(0)}`;
@@ -20567,6 +21196,7 @@
             if (mobileCartCountEl) {
                 const count = carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0);
                 mobileCartCountEl.textContent = String(count);
+                if (desktopCartCountEl) desktopCartCountEl.textContent = String(count);
                 if (bookingHeaderCartCountEl) {
                     bookingHeaderCartCountEl.textContent = String(count);
                     bookingHeaderCartCountEl.style.display = count > 0 ? "inline-flex" : "none";
@@ -20574,6 +21204,15 @@
             }
             if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(total);
             _trackTienda("cart");
+        }
+
+        function toggleDesktopCart(forceOpen = null) {
+            if (!_desktopStoreEnabled() || !cartPanelEl) return;
+            const open = forceOpen === null
+                ? !document.body.classList.contains("desktop-cart-open")
+                : Boolean(forceOpen);
+            document.body.classList.toggle("desktop-cart-open", open);
+            if (desktopCartToggleEl) desktopCartToggleEl.setAttribute("aria-expanded", open ? "true" : "false");
         }
 
         function limpiarCuponAplicado() {
@@ -23258,6 +23897,19 @@
         document.getElementById("btn-checkout").addEventListener("click", checkout);
         document.getElementById("btn-clear-cart").addEventListener("click", () => window.vaciarCarrito());
         btnAplicarCuponEl.addEventListener("click", aplicarCupon);
+        desktopCartToggleEl?.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            toggleDesktopCart();
+        });
+        document.addEventListener("click", (ev) => {
+            if (!_desktopStoreEnabled() || !document.body.classList.contains("desktop-cart-open")) return;
+            const target = ev.target;
+            if (cartPanelEl?.contains(target) || desktopCartToggleEl?.contains(target)) return;
+            toggleDesktopCart(false);
+        });
+        document.addEventListener("keydown", (ev) => {
+            if (ev.key === "Escape") toggleDesktopCart(false);
+        });
         if (mobileBtnAplicarCuponEl) mobileBtnAplicarCuponEl.addEventListener("click", aplicarCupon);
         document.getElementById("mobile-btn-checkout")?.addEventListener("click", checkout);
         document.getElementById("mobile-btn-clear-cart")?.addEventListener("click", () => window.vaciarCarrito());
