@@ -1185,6 +1185,32 @@
         #modal-resumen-evento .modal-footer {
             padding: 16px 24px;
         }
+        .resumen-estado-select {
+            margin-top: 10px;
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 9px 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #1f2937;
+            background: #fff;
+        }
+        .resumen-estado-actions {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .resumen-estado-actions .btn-mini-outline {
+            padding: 7px 10px;
+        }
+        .resumen-pdf-action {
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            color: #9a3412;
+        }
 
         #modal-evento .modal-body {
             padding: 20px 24px 16px;
@@ -3201,6 +3227,8 @@
                 <div id="resumen-evento-contenido" class="form-hint">Selecciona un pedido para ver el resumen.</div>
             </div>
             <div class="modal-footer">
+                <button onclick="generarPdfDesdeResumen()" class="btn btn-pdf" id="btn-resumen-pdf">&#128196; Generar PDF</button>
+                <button onclick="guardarSeguimientoDesdeResumen()" class="btn btn-secondary" id="btn-resumen-estado">Guardar estado</button>
                 <button onclick="irAEdicionDesdeResumen()" class="btn btn-success" id="btn-resumen-editar">Ir a ficha de edicion</button>
             </div>
         </div>
@@ -6762,11 +6790,21 @@
             const seguimientoLabel = SEGUIMIENTO_ESTADOS_LABELS[seguimientoEstado] || 'Pendiente';
             const codigoPedido = String(evento.codigo_pedido || '').trim();
             const trackingLink = seguimientoUrlPedido(codigoPedido);
+            const opcionesSeguimiento = Object.entries(SEGUIMIENTO_ESTADOS_LABELS)
+                .map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === seguimientoEstado ? 'selected' : ''}>${escapeHtml(label)}</option>`)
+                .join('');
             return `
                 <div class="resumen-pedido-grid">
                     <div class="resumen-pedido-card">
                         <div class="resumen-pedido-label">Estado QR cliente</div>
                         <div class="resumen-pedido-value">${escapeHtml(seguimientoLabel)}</div>
+                        <select class="resumen-estado-select" id="resumen-seguimiento-estado">
+                            ${opcionesSeguimiento}
+                        </select>
+                        <div class="resumen-estado-actions">
+                            <button class="btn-mini-outline" type="button" onclick="guardarSeguimientoDesdeResumen(${Number(evento.id || 0)})">Actualizar estado</button>
+                            <button class="btn-mini-outline resumen-pdf-action" type="button" onclick="generarPdfDesdeResumen(${Number(evento.id || 0)})">Generar PDF</button>
+                        </div>
                         ${trackingLink ? `<a class="seguimiento-admin-link" href="${escapeHtml(trackingLink)}" target="_blank" rel="noopener noreferrer">Abrir vista cliente</a>` : ''}
                     </div>
                     <div class="resumen-pedido-card">
@@ -6817,6 +6855,68 @@
             if (!idNum) return;
             cerrarResumenEvento();
             editarEvento(idNum);
+        }
+
+        async function generarPdfDesdeResumen(idEvento = null) {
+            const idNum = Number(idEvento || eventoResumenActualId || 0);
+            if (!idNum) {
+                alert('No se pudo identificar el pedido para generar PDF.');
+                return;
+            }
+            try {
+                mostrarLoading(true);
+                const res = await fetch(`/api/agenda/evento/${idNum}/pdf`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success || !data.media_url) {
+                    throw new Error(data.error || 'No se pudo generar el PDF final.');
+                }
+                window.open(String(data.media_url), '_blank', 'noopener,noreferrer');
+            } catch (error) {
+                alert(error?.message || 'No se pudo generar el PDF final.');
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
+        async function guardarSeguimientoDesdeResumen(idEvento = null) {
+            const idNum = Number(idEvento || eventoResumenActualId || 0);
+            const select = document.getElementById('resumen-seguimiento-estado');
+            if (!idNum || !select) {
+                alert('No se pudo identificar el pedido o estado.');
+                return;
+            }
+            try {
+                mostrarLoading(true);
+                const response = await fetch(`/api/agenda/evento/${idNum}/seguimiento`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ estado: select.value })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar el seguimiento');
+                }
+                const idx = eventos.findIndex((e) => Number(e.id || 0) === idNum);
+                if (idx >= 0 && data.evento) eventos[idx] = data.evento;
+                if (eventoEditando && Number(eventoEditando.id || 0) === idNum) {
+                    eventoEditando = data.evento || eventoEditando;
+                    actualizarSeguimientoAdmin(eventoEditando);
+                    renderFichaPedidoEdicion(eventoEditando);
+                }
+                renderizarCalendario();
+                renderizarDetalleHorarioDia();
+                renderizarProximos();
+                renderizarBorradores();
+                if (data.evento) {
+                    const box = document.getElementById('resumen-evento-contenido');
+                    if (box) box.innerHTML = construirResumenEventoHtml(data.evento);
+                }
+                alert('Seguimiento actualizado. El cliente ya puede ver el nuevo estado.');
+            } catch (error) {
+                alert('[ERROR] ' + String(error.message || error));
+            } finally {
+                mostrarLoading(false);
+            }
         }
 
         function abrirEventoDesdeNotificacion(idEvento) {
