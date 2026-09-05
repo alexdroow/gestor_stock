@@ -2254,16 +2254,6 @@
             margin: 0;
             padding-left: 18px;
         }
-        .notif-actions {
-            margin-top: 8px;
-            display: flex;
-            justify-content: flex-end;
-        }
-        .notif-actions .btn-mini-outline {
-            padding: 5px 10px;
-            font-size: 12px;
-        }
-        
         .btn {
             padding: 10px 20px;
             border-radius: 8px;
@@ -6955,8 +6945,7 @@
                 urgente: true,
                 cuando: `Faltan ${mins} min`,
                 texto: `Entrega proxima: ${evento.titulo || 'Pedido'} - ${evento.cliente || 'Sin cliente'}`,
-                eventoId: Number(evento.id || 0),
-                accion: 'Ver pedido'
+                eventoId: Number(evento.id || 0)
             };
         }
 
@@ -7855,8 +7844,7 @@
                         urgente: minutosHasta < 180,
                         cuando: obtenerTextoTiempo(minutosHasta),
                         texto: `${e.tipo === 'torta' ? '\uD83C\uDF82' : '\uD83D\uDCE6'} ${e.titulo} - ${e.cliente || 'Sin cliente'}`,
-                        eventoId: Number(e.id || 0),
-                        accion: 'Ver pedido'
+                        eventoId: Number(e.id || 0)
                     });
                 }
 
@@ -7899,7 +7887,6 @@
                 <div class="notif-item ${eventoId ? 'clickable' : ''}" ${clickableAttrs}>
                     <div class="notif-when">${n.cuando}</div>
                     <div class="notif-text">${n.texto}</div>
-                    ${eventoId ? `<div class="notif-actions"><button class="btn-mini-outline" onclick="event.stopPropagation(); abrirEventoDesdeNotificacion(${eventoId})">${escapeHtml(String(n.accion || 'Ver pedido'))}</button></div>` : ''}
                 </div>
             `;
             }).join('');
