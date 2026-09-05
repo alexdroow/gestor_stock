@@ -17864,7 +17864,7 @@
         function _desktopHeroRenderedProductImageSrc(productId) {
             const id = Number(productId || 0);
             if (!(id > 0)) return "";
-            const img = document.querySelector(`.item-card[data-product-id="${id}"] .item-img img`);
+            const img = document.querySelector(`.item-card[data-product-id="${id}"] .item-photo img, .item-card[data-product-id="${id}"] .cake-card__media img`);
             return String(img?.currentSrc || img?.src || img?.getAttribute?.("src") || "").trim();
         }
 
