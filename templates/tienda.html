@@ -14118,14 +14118,15 @@
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-estado-banner {
-            position: absolute;
-            right: 270px;
-            top: 166px;
+            position: relative;
+            justify-self: end;
+            right: auto;
+            top: auto;
             z-index: 3;
             border: 0;
             background: transparent;
             color: #3f9b55;
-            padding: 0;
+            padding: 0 72px 0 0;
             font-size: .98rem;
             box-shadow: none;
         }
@@ -17698,9 +17699,7 @@
             tiendaEstadoMensaje = String(mensaje || "").trim();
             if (tiendaEstadoBannerEl) {
                 tiendaEstadoBannerEl.classList.toggle("cerrada", !tiendaAbierta);
-                tiendaEstadoBannerEl.textContent = tiendaAbierta
-                    ? (tiendaEstadoMensaje || "Tienda abierta.")
-                    : (tiendaEstadoMensaje || "Tienda cerrada. Puedes ver productos, pero no comprar por ahora.");
+                tiendaEstadoBannerEl.textContent = tiendaAbierta ? "Tienda abierta" : "Tienda cerrada";
             }
             const checkoutBtn = document.getElementById("btn-checkout");
             if (checkoutBtn) {
@@ -17842,7 +17841,10 @@
         function _productoImgSrc(p) {
             const srcDirect = String(p?.foto_url || "").trim();
             const rel = String(p?.foto || "").trim();
-            return srcDirect || (rel ? `/static/${rel}` : "");
+            if (srcDirect) return srcDirect;
+            if (!rel) return "";
+            if (/^(https?:)?\/\//i.test(rel) || rel.startsWith("/")) return rel;
+            return `/static/${rel}`;
         }
 
         function _desktopStoreEnabled() {
@@ -17923,7 +17925,10 @@
                 tiendaHeroSubtitleEl.textContent = desc || `Producto disponible en ${cat}. Ideal para una pausa dulce o para compartir.`;
             }
             if (tiendaHeroBadgeEl) tiendaHeroBadgeEl.textContent = Boolean(p.destacado_tienda) ? "De los mas pedidos" : "Recomendado hoy";
-            if (tiendaHeroImageEl) tiendaHeroImageEl.src = `${_productoImgSrc(p)}?v=${Date.now()}`;
+            if (tiendaHeroImageEl) {
+                tiendaHeroImageEl.src = `${_productoImgSrc(p)}?v=${Date.now()}`;
+                tiendaHeroImageEl.style.cssText = imgStyle(p);
+            }
             if (tiendaHeroCtaEl) {
                 tiendaHeroCtaEl.textContent = "Ver producto";
                 tiendaHeroCtaEl.href = `#producto-${productId}`;
