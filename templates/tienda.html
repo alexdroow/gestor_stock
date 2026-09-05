@@ -14210,8 +14210,12 @@
             place-items: center;
             padding: 20px 58px;
             background:
+                linear-gradient(90deg, rgba(248,239,228,.25), rgba(248,239,228,.78)),
                 radial-gradient(circle at 50% 50%, rgba(239,125,0,.14), transparent 42%),
                 #f8efe4;
+            background-repeat: no-repeat;
+            background-size: auto, auto, auto;
+            background-position: center;
             overflow: hidden;
         }
 
@@ -14222,8 +14226,8 @@
             object-position: center;
             transform: none;
             border-radius: 24px;
-            background: rgba(255,255,255,.55);
-            filter: drop-shadow(0 22px 34px rgba(68,39,20,.18));
+            background: rgba(255,255,255,.72);
+            box-shadow: 0 22px 44px rgba(68,39,20,.18);
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-hero-controls {
@@ -17847,6 +17851,44 @@
             return `/static/${rel}`;
         }
 
+        function _cacheBustUrl(src) {
+            const clean = String(src || "").trim();
+            if (!clean) return "";
+            return `${clean}${clean.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        }
+
+        function _cssUrl(src) {
+            return String(src || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        }
+
+        function _desktopHeroApplyImage(p) {
+            const rawSrc = _productoImgSrc(p);
+            const src = _cacheBustUrl(rawSrc);
+            if (tiendaHeroMediaEl) {
+                const posX = Math.max(0, Math.min(100, Number(p?.foto_pos_x_tienda ?? 50) || 50));
+                const posY = Math.max(0, Math.min(100, Number(p?.foto_pos_y_tienda ?? 50) || 50));
+                tiendaHeroMediaEl.style.backgroundImage = src
+                    ? `linear-gradient(90deg, rgba(248,239,228,.18), rgba(248,239,228,.56)), url("${_cssUrl(src)}")`
+                    : "";
+                tiendaHeroMediaEl.style.backgroundSize = src ? "cover, cover" : "";
+                tiendaHeroMediaEl.style.backgroundPosition = src ? `center, ${posX}% ${posY}%` : "";
+            }
+            if (!tiendaHeroImageEl) return;
+            if (!src) {
+                tiendaHeroImageEl.removeAttribute("src");
+                tiendaHeroImageEl.style.display = "none";
+                return;
+            }
+            tiendaHeroImageEl.style.cssText = `${imgStyle(p)}display:block;`;
+            tiendaHeroImageEl.onerror = () => {
+                tiendaHeroImageEl.style.display = "none";
+            };
+            tiendaHeroImageEl.onload = () => {
+                tiendaHeroImageEl.style.display = "block";
+            };
+            tiendaHeroImageEl.src = src;
+        }
+
         function _desktopStoreEnabled() {
             return !document.body.classList.contains("mobile-ui") && !document.body.classList.contains("tienda-preview-agenda");
         }
@@ -17914,7 +17956,7 @@
                     tiendaHeroCtaEl.href = "#sec-destacados";
                     tiendaHeroCtaEl.onclick = null;
                 }
-                if (tiendaHeroImageEl) tiendaHeroImageEl.src = String(tiendaUiCfg.hero_image_url || "/static/watermark_logo_full_backup.png");
+                _desktopHeroApplyImage({ foto_url: String(tiendaUiCfg.hero_image_url || "/static/watermark_logo_full_backup.png") });
                 return;
             }
             const productId = Number(p.id || 0);
@@ -17925,10 +17967,7 @@
                 tiendaHeroSubtitleEl.textContent = desc || `Producto disponible en ${cat}. Ideal para una pausa dulce o para compartir.`;
             }
             if (tiendaHeroBadgeEl) tiendaHeroBadgeEl.textContent = Boolean(p.destacado_tienda) ? "De los mas pedidos" : "Recomendado hoy";
-            if (tiendaHeroImageEl) {
-                tiendaHeroImageEl.src = `${_productoImgSrc(p)}?v=${Date.now()}`;
-                tiendaHeroImageEl.style.cssText = imgStyle(p);
-            }
+            _desktopHeroApplyImage(p);
             if (tiendaHeroCtaEl) {
                 tiendaHeroCtaEl.textContent = "Ver producto";
                 tiendaHeroCtaEl.href = `#producto-${productId}`;
