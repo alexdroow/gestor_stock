@@ -13941,10 +13941,10 @@
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar {
             top: 0;
-            min-height: 104px;
-            grid-template-columns: minmax(250px, 330px) minmax(360px, 1fr) minmax(260px, 460px) auto auto;
-            padding: 18px 54px;
-            gap: 28px;
+            min-height: 88px;
+            grid-template-columns: minmax(190px, 270px) minmax(0, 1fr) minmax(220px, 340px) auto auto;
+            padding: 14px 36px;
+            gap: 16px;
             border-bottom: 1px solid rgba(90, 52, 28, .13);
             background: rgba(255, 253, 249, .95);
             box-shadow: 0 10px 34px rgba(74, 44, 23, .07);
@@ -13983,9 +13983,9 @@
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) #brand-text::before {
-            content: "SUCR\00C9E";
+            content: "SUCR\00C9 E";
             display: block;
-            font-size: 1.82rem;
+            font-size: 1.56rem;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) #brand-text::after {
@@ -13993,14 +13993,14 @@
             display: block;
             margin-top: 10px;
             font-family: "Segoe UI", Tahoma, sans-serif;
-            font-size: .68rem;
+            font-size: .58rem;
             font-weight: 800;
             letter-spacing: .38em;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-nav {
             justify-content: center;
-            gap: 22px;
+            gap: 16px;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-nav-btn {
@@ -14008,9 +14008,10 @@
             border-radius: 0;
             background: transparent;
             color: var(--store-chocolate);
-            font-size: 1rem;
+            font-size: .9rem;
             font-weight: 700;
             border-bottom: 2px solid transparent;
+            white-space: nowrap;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-nav-btn:hover,
@@ -14029,7 +14030,8 @@
             background: transparent;
             padding: 10px 4px;
             color: var(--store-chocolate);
-            font-size: 1rem;
+            font-size: .9rem;
+            white-space: nowrap;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) #btn-registrar-cuenta,
@@ -14038,8 +14040,8 @@
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-cart-toggle {
-            min-width: 150px;
-            min-height: 48px;
+            min-width: 132px;
+            min-height: 42px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -14104,13 +14106,13 @@
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .search {
-            width: min(560px, calc(100vw - 120px));
+            width: min(340px, 100%);
             margin: 0;
             z-index: 2;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) #search-input {
-            height: 46px;
+            height: 42px;
             border-radius: 10px;
             background: rgba(255,255,255,.92);
         }
@@ -14156,8 +14158,8 @@
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero {
             width: 100%;
-            min-height: 340px;
-            grid-template-columns: minmax(480px, 44%) minmax(0, 1fr);
+            min-height: 272px;
+            grid-template-columns: minmax(390px, 40%) minmax(0, 1fr);
             border: 0;
             border-radius: 0;
             background:
@@ -14167,7 +14169,7 @@
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-copy {
-            padding: 56px 34px 56px 72px;
+            padding: 44px 30px 44px 64px;
             gap: 18px;
         }
 
@@ -14177,7 +14179,7 @@
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-title {
             font-family: var(--store-serif);
-            font-size: clamp(3.2rem, 5vw, 5.6rem);
+            font-size: clamp(2.55rem, 4vw, 4.45rem);
             font-weight: 500;
             letter-spacing: -.055em;
             color: var(--store-chocolate);
@@ -14186,13 +14188,13 @@
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-subtitle {
             max-width: 480px;
             color: #3f332c;
-            font-size: 1.38rem;
+            font-size: 1.12rem;
             line-height: 1.42;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-cta {
-            min-height: 52px;
-            min-width: 210px;
+            min-height: 44px;
+            min-width: 190px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -14202,15 +14204,25 @@
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-media {
-            min-height: 340px;
+            min-height: 272px;
+            display: grid;
+            place-items: center;
+            padding: 20px 58px;
             background:
-                radial-gradient(circle at 50% 50%, rgba(239,125,0,.12), transparent 38%),
+                radial-gradient(circle at 50% 50%, rgba(239,125,0,.14), transparent 42%),
                 #f8efe4;
+            overflow: hidden;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-media img {
-            object-fit: cover;
-            transform: scale(1.02);
+            width: min(520px, 86%);
+            height: min(228px, calc(100% - 18px));
+            object-fit: contain;
+            object-position: center;
+            transform: none;
+            border-radius: 24px;
+            background: rgba(255,255,255,.55);
+            filter: drop-shadow(0 22px 34px rgba(68,39,20,.18));
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .desktop-hero-controls {
@@ -14372,9 +14384,10 @@
 
         @media (min-width: 900px) and (max-width: 1180px) {
             body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar {
-                grid-template-columns: minmax(220px, 280px) minmax(280px, 1fr) minmax(220px, 320px) auto;
-                padding-left: 28px;
-                padding-right: 28px;
+                grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(180px, 280px) auto;
+                padding-left: 18px;
+                padding-right: 18px;
+                gap: 10px;
             }
 
             body:not(.mobile-ui):not(.tienda-preview-agenda) .topbar-actions {
