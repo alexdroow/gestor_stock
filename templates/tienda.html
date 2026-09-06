@@ -23055,20 +23055,7 @@
                 await _cotizarDespachoCheckoutDesdePin();
                 if (!checkoutShippingQuote) return msg("No se pudo cotizar despacho. Reintenta confirmar el pin.", true);
             }
-            const btnConfirm = document.getElementById("modal-checkout-confirm");
-            if (btnConfirm) {
-                btnConfirm.disabled = true;
-                btnConfirm.textContent = "Enviando...";
-            }
-            setCheckoutStatusMsg("Procesando compra...");
-            try {
-                return await enviarCheckoutCliente(checkoutClientePendiente);
-            } finally {
-                if (btnConfirm) {
-                    btnConfirm.disabled = false;
-                    btnConfirm.textContent = "Confirmar compra";
-                }
-            }
+            _abrirModalConfirmarTransferencia(checkoutClientePendiente);
         }
 
         async function enviarCheckoutCliente(datosCliente) {
@@ -23311,6 +23298,7 @@
                 if (window.AppUX && typeof window.AppUX.toastError === "function") {
                     window.AppUX.toastError(e.message || "Error procesando compra");
                 }
+                throw e;
             }
         }
 
@@ -23696,6 +23684,97 @@
             });
         }
 
+        function _abrirModalConfirmarTransferencia(datosCliente) {
+            const old = document.getElementById("transfer-checkout-overlay");
+            if (old) old.remove();
+            const totals = _checkoutCalcularTotales();
+            const totalTxt = money.format(Number(totals.total || 0));
+            const html = `
+                <div id="transfer-checkout-overlay" style="position:fixed;inset:0;z-index:100520;background:rgba(2,6,23,.62);display:flex;align-items:center;justify-content:center;padding:14px;">
+                    <div style="width:min(660px,96vw);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#fffaf3,#fff);border-radius:18px;border:1px solid #fed7aa;padding:16px;display:grid;gap:12px;box-shadow:0 24px 70px rgba(67,20,7,.30);">
+                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+                            <div>
+                                <div style="font-size:.78rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#c2410c;">Pago por transferencia</div>
+                                <h3 style="margin:3px 0 0;color:#431407;font-size:1.45rem;">Realiza la transferencia para confirmar tu pedido</h3>
+                            </div>
+                            <div style="border:1px solid #fdba74;background:#ffedd5;color:#9a3412;border-radius:14px;padding:8px 10px;text-align:right;font-weight:900;">
+                                <div style="font-size:.72rem;text-transform:uppercase;">Total</div>
+                                <div style="font-size:1.15rem;">${esc(totalTxt)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size:.92rem;color:#7c2d12;border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;padding:10px;">
+                            Copia los datos, realiza la transferencia y luego presiona <strong>Transferencia realizada</strong>. Enviaremos tu pedido al sistema y quedara a la espera de confirmacion.
+                        </div>
+                        <div style="display:grid;gap:8px;">
+                            ${TRANSFER_DATA_FIELDS.map((f) => `
+                                <div style="display:grid;grid-template-columns:minmax(104px,148px) 1fr auto;gap:8px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:9px 10px;background:#fff;">
+                                    <strong style="font-size:.86rem;color:#334155;">${f.label}</strong>
+                                    <span style="font-size:.92rem;color:#0f172a;word-break:break-word;">${esc(f.value)}</span>
+                                    <button type="button" data-copy-transfer-checkout="${esc(f.key)}" style="border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;border-radius:9px;padding:8px 10px;font-weight:800;cursor:pointer;">Copiar</button>
+                                </div>
+                            `).join("")}
+                        </div>
+                        <div id="transfer-checkout-msg" style="min-height:18px;font-size:.86rem;color:#166534;"></div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            <button type="button" id="transfer-checkout-copy-all" style="border:1px solid #f59e0b;background:#fff7ed;color:#9a3412;border-radius:10px;padding:10px 13px;font-weight:900;cursor:pointer;">Copiar todos los datos</button>
+                            <button type="button" id="transfer-checkout-cancel" style="border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:10px;padding:10px 13px;font-weight:900;cursor:pointer;">Cancelar</button>
+                            <button type="button" id="transfer-checkout-done" style="border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:10px;padding:10px 13px;font-weight:900;cursor:pointer;">Transferencia realizada</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML("beforeend", html);
+            const ov = document.getElementById("transfer-checkout-overlay");
+            const msg = document.getElementById("transfer-checkout-msg");
+            const btnDone = document.getElementById("transfer-checkout-done");
+            const showMsg = (t, err = false) => {
+                if (!msg) return;
+                msg.textContent = String(t || "");
+                msg.style.color = err ? "#b91c1c" : "#166534";
+            };
+            ov?.addEventListener("click", async (ev) => {
+                const btn = ev.target.closest("button");
+                if (!btn) return;
+                if (btn.id === "transfer-checkout-cancel") {
+                    ov.remove();
+                    setCheckoutStatusMsg("");
+                    return;
+                }
+                if (btn.id === "transfer-checkout-copy-all") {
+                    const ok = await _copyToClipboardSmart(`Total a transferir: ${totalTxt}\n${_transferDataAsBlockText()}`);
+                    showMsg(ok ? "Datos completos copiados." : "No se pudo copiar. Copia manualmente.", !ok);
+                    return;
+                }
+                const key = btn.getAttribute("data-copy-transfer-checkout");
+                if (key) {
+                    const field = TRANSFER_DATA_FIELDS.find((x) => String(x.key) === String(key));
+                    if (!field) return;
+                    const ok = await _copyToClipboardSmart(field.value);
+                    showMsg(ok ? `${field.label} copiado.` : `No se pudo copiar ${field.label}.`, !ok);
+                    return;
+                }
+                if (btn.id === "transfer-checkout-done") {
+                    const originalText = btnDone?.textContent || "Transferencia realizada";
+                    if (btnDone) {
+                        btnDone.disabled = true;
+                        btnDone.textContent = "Enviando pedido...";
+                    }
+                    setCheckoutStatusMsg("Registrando pedido con transferencia pendiente de confirmacion...");
+                    try {
+                        await enviarCheckoutCliente(datosCliente);
+                        ov.remove();
+                    } catch (e) {
+                        showMsg(String(e?.message || "No se pudo registrar el pedido"), true);
+                    } finally {
+                        if (btnDone && document.body.contains(btnDone)) {
+                            btnDone.disabled = false;
+                            btnDone.textContent = originalText;
+                        }
+                    }
+                }
+            });
+        }
+
         function _abrirModalSubirComprobanteTransferencia(pedidoLike) {
             const old = document.getElementById("transfer-proof-overlay");
             if (old) old.remove();
@@ -23787,17 +23866,22 @@
             const mode = String(options?.mode || "success").toLowerCase();
             const isSuccess = mode === "success";
             const isPending = mode === "pending";
+            const metodoPago = String(p?.metodo_pago || "").trim().toLowerCase();
+            const esTransferencia = ["transferencia", "efectivo"].includes(metodoPago);
+            const transferenciaPendiente = Boolean(isSuccess && esTransferencia);
             const titulo = isSuccess ? "Pedido recibido" : "Estado del pago";
             const chipLabel = isSuccess
-                ? `Pedido #${Number(p?.venta_id || 0) || "-"}`
+                ? (transferenciaPendiente ? "A la espera de confirmacion transferencia" : `Pedido #${Number(p?.venta_id || 0) || "-"}`)
                 : (isPending ? "Pago pendiente de confirmacion" : "Pago no concretado");
             const resumenTitulo = isSuccess
-                ? "Compra confirmada correctamente."
+                ? (transferenciaPendiente ? "Pedido ingresado correctamente." : "Compra confirmada correctamente.")
                 : (isPending
                     ? "Esperando la confirmacion del pago."
                     : "La compra no se concreto en Flow.");
             const resumenDetalle = isSuccess
-                ? `Guarda tu numero de pedido para seguimiento: #${Number(p?.venta_id || 0) || "-"}.`
+                ? (transferenciaPendiente
+                    ? `Tu pedido #${Number(p?.venta_id || 0) || "-"} quedo registrado y esta a la espera de confirmacion de transferencia.`
+                    : `Guarda tu numero de pedido para seguimiento: #${Number(p?.venta_id || 0) || "-"}.`)
                 : (isPending
                     ? "Flow esta procesando el pago, te informaremos cuando el pago llegue confirmado que tu pedido se esta preperando (puedes hacer refresh) para actualizar el estado de tu pedido."
                     : "Puedes reintentar el pago o elegir transferencia para completar tu pedido.");
@@ -23812,8 +23896,6 @@
             const wa = _buildWhatsappPedidoLink(p);
             const retryUrl = String(p?.flow_retry_url || "").trim();
             const items = Array.isArray(p?.items) ? p.items : [];
-            const metodoPago = String(p?.metodo_pago || "").trim().toLowerCase();
-            const esTransferencia = ["transferencia", "efectivo"].includes(metodoPago);
             const itemsHtml = items.map((it) => `
                 <div style="display:flex;justify-content:space-between;gap:8px;">
                     <span>${esc(String(it.nombre || ""))} x${Number(it.cantidad || 0)}</span>
