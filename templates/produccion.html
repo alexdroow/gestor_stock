@@ -208,6 +208,247 @@
             font-size: 13px;
         }
 
+        .page-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .costeo-modal .modal {
+            max-width: 1180px;
+            width: min(96vw, 1180px);
+            max-height: 90vh;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .costeo-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
+            gap: 0;
+            min-height: min(760px, 88vh);
+        }
+
+        .costeo-main {
+            padding: 28px;
+            overflow-y: auto;
+            background: #fff;
+        }
+
+        .costeo-summary {
+            padding: 28px;
+            background:
+                radial-gradient(circle at top right, rgba(249, 115, 22, .18), transparent 38%),
+                linear-gradient(180deg, #fff7ed 0%, #fff 100%);
+            border-left: 1px solid #fed7aa;
+            overflow-y: auto;
+        }
+
+        .costeo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .costeo-eyebrow {
+            color: var(--primary-dark);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .costeo-title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #431407;
+            margin: 0;
+        }
+
+        .costeo-subtitle {
+            margin-top: 6px;
+            color: #64748b;
+            line-height: 1.45;
+        }
+
+        .costeo-grid {
+            display: grid;
+            gap: 18px;
+        }
+
+        .costeo-card {
+            border: 1px solid #fed7aa;
+            border-radius: 18px;
+            background: #fffaf5;
+            padding: 18px;
+            box-shadow: 0 10px 24px rgba(67, 20, 7, .05);
+        }
+
+        .costeo-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .costeo-card-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: #431407;
+        }
+
+        .costeo-card-hint {
+            color: #78716c;
+            font-size: 12px;
+            margin-top: 3px;
+        }
+
+        .costeo-rows {
+            display: grid;
+            gap: 10px;
+        }
+
+        .costeo-row {
+            display: grid;
+            grid-template-columns: minmax(160px, 1fr) 130px 108px 38px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .costeo-row.costeo-row-simple {
+            grid-template-columns: minmax(160px, 1fr) 130px 38px;
+        }
+
+        .costeo-row input,
+        .costeo-row select,
+        .costeo-mini-grid input,
+        .costeo-mini-grid select,
+        .costeo-product-name {
+            width: 100%;
+            border: 1px solid #fed7aa;
+            border-radius: 12px;
+            padding: 11px 12px;
+            font-size: 14px;
+            background: #fff;
+            color: #431407;
+            font-family: inherit;
+        }
+
+        .costeo-tax-toggle {
+            min-height: 42px;
+            border: 1px solid #fed7aa;
+            border-radius: 12px;
+            background: #fff;
+            color: #92400e;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .costeo-tax-toggle.active {
+            background: #ecfdf5;
+            border-color: #86efac;
+            color: #166534;
+        }
+
+        .costeo-remove {
+            width: 38px;
+            height: 38px;
+            border: 0;
+            border-radius: 12px;
+            background: #fee2e2;
+            color: #991b1b;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .costeo-mini-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .costeo-mini-grid label {
+            display: grid;
+            gap: 6px;
+            color: #78716c;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .costeo-summary-card {
+            border: 1px solid rgba(217, 119, 6, .22);
+            border-radius: 20px;
+            background: rgba(255,255,255,.82);
+            padding: 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 14px 34px rgba(67, 20, 7, .08);
+        }
+
+        .costeo-total-label {
+            color: #92400e;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .costeo-total {
+            margin-top: 6px;
+            font-size: clamp(34px, 5vw, 52px);
+            line-height: 1;
+            font-weight: 900;
+            color: #c2410c;
+            letter-spacing: -.04em;
+        }
+
+        .costeo-detail {
+            display: grid;
+            gap: 9px;
+            margin-top: 16px;
+        }
+
+        .costeo-detail-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            color: #57534e;
+            font-size: 14px;
+        }
+
+        .costeo-detail-row strong {
+            color: #431407;
+            white-space: nowrap;
+        }
+
+        .costeo-alert {
+            border-radius: 16px;
+            padding: 12px 14px;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .costeo-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 6px 10px;
+            background: #ffedd5;
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
         .recetas-toolbar {
             display: flex;
             align-items: center;
@@ -1671,12 +1912,26 @@
             .sidebar { width: 240px; }
             .main-content { margin-left: 240px; max-width: calc(100% - 240px); padding: 24px; }
             .layout-grid { grid-template-columns: 1fr; }
+            .costeo-shell { grid-template-columns: 1fr; }
+            .costeo-summary { border-left: 0; border-top: 1px solid #fed7aa; }
+            .costeo-mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         
         @media (max-width: 768px) {
             .sidebar { transform: translateX(-100%); }
             .main-content { margin-left: 0; max-width: 100%; padding: 20px; }
             .recetas-grid { grid-template-columns: 1fr; }
+            .page-header { align-items: flex-start; flex-direction: column; gap: 16px; }
+            .page-actions { width: 100%; justify-content: stretch; }
+            .page-actions .btn { flex: 1; }
+            .costeo-main,
+            .costeo-summary { padding: 20px; }
+            .costeo-row,
+            .costeo-row.costeo-row-simple {
+                grid-template-columns: 1fr;
+            }
+            .costeo-remove,
+            .costeo-tax-toggle { width: 100%; }
             .ver-receta-head,
             .ver-receta-row {
                 grid-template-columns: minmax(0, 1fr) minmax(120px, 150px);
@@ -1718,9 +1973,14 @@
                     <h1 class="page-title">Producci&oacute;n</h1>
                     <p class="page-subtitle">Gestiona recetas y produce tus productos</p>
                 </div>
-                <button onclick="abrirModalReceta()" class="btn btn-primary">
-                    <span>+</span> Nueva Receta
-                </button>
+                <div class="page-actions">
+                    <button onclick="abrirModalCosteoProduccion()" class="btn btn-secondary">
+                        Costeo producci&oacute;n
+                    </button>
+                    <button onclick="abrirModalReceta()" class="btn btn-primary">
+                        <span>+</span> Nueva Receta
+                    </button>
+                </div>
             </div>
 
             <div class="layout-grid">
@@ -1951,6 +2211,137 @@
                 </div>
             </div>
         </main>
+
+    <!-- Modal Costeo Produccion -->
+    <div class="modal-overlay costeo-modal" id="modal-costeo-produccion">
+        <div class="modal">
+            <div class="costeo-shell">
+                <div class="costeo-main">
+                    <div class="costeo-header">
+                        <div>
+                            <div class="costeo-eyebrow">Calculadora de venta</div>
+                            <h3 class="costeo-title">Costeo producci&oacute;n</h3>
+                            <p class="costeo-subtitle">Cotiza productos nuevos sumando insumos, energia y costos externos. El precio final considera comision Uber 30% e IVA 19%.</p>
+                        </div>
+                        <button class="btn-close" onclick="cerrarModalCosteoProduccion()">&#215;</button>
+                    </div>
+
+                    <div class="costeo-grid">
+                        <div class="costeo-card">
+                            <div class="costeo-card-head">
+                                <div>
+                                    <div class="costeo-card-title">Producto a cotizar</div>
+                                    <div class="costeo-card-hint">Nombre opcional para identificar el calculo.</div>
+                                </div>
+                            </div>
+                            <input class="costeo-product-name" id="costeo-producto-nombre" type="text" placeholder="Ej: Cheesecake frutos rojos 8 porciones" oninput="actualizarCosteoProduccion()">
+                        </div>
+
+                        <div class="costeo-card">
+                            <div class="costeo-card-head">
+                                <div>
+                                    <div class="costeo-card-title">Items dentro de comision e IVA</div>
+                                    <div class="costeo-card-hint">Insumos que forman parte del precio base que venderas por Uber.</div>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="agregarItemCosteo('base')">+ Item</button>
+                            </div>
+                            <div class="costeo-rows" id="costeo-items-base"></div>
+                        </div>
+
+                        <div class="costeo-card">
+                            <div class="costeo-card-head">
+                                <div>
+                                    <div class="costeo-card-title">Items fuera de comision e IVA</div>
+                                    <div class="costeo-card-hint">Costos que quieres sumar aparte, sin aplicar comision Uber ni IVA final.</div>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="agregarItemCosteo('externo')">+ Item</button>
+                            </div>
+                            <div class="costeo-rows" id="costeo-items-externos"></div>
+                        </div>
+
+                        <div class="costeo-card">
+                            <div class="costeo-card-head">
+                                <div>
+                                    <div class="costeo-card-title">Luz de maquinaria</div>
+                                    <div class="costeo-card-hint">Calcula energia por potencia, tiempo de uso y valor kWh.</div>
+                                </div>
+                            </div>
+                            <div class="costeo-mini-grid">
+                                <label>
+                                    Potencia kW
+                                    <input id="costeo-luz-kw" type="number" min="0" step="0.01" value="0" oninput="actualizarCosteoProduccion()">
+                                </label>
+                                <label>
+                                    Horas
+                                    <input id="costeo-luz-horas" type="number" min="0" step="0.01" value="0" oninput="actualizarCosteoProduccion()">
+                                </label>
+                                <label>
+                                    Valor kWh
+                                    <input id="costeo-luz-kwh" type="number" min="0" step="1" value="0" oninput="actualizarCosteoProduccion()">
+                                </label>
+                                <label>
+                                    Aplicar a
+                                    <select id="costeo-luz-tipo" onchange="actualizarCosteoProduccion()">
+                                        <option value="base">Comision e IVA</option>
+                                        <option value="externo">Fuera de %</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="costeo-card">
+                            <div class="costeo-card-head">
+                                <div>
+                                    <div class="costeo-card-title">Gas opcional</div>
+                                    <div class="costeo-card-hint">Incluye gas si esta produccion lo requiere.</div>
+                                </div>
+                            </div>
+                            <div class="costeo-mini-grid">
+                                <label>
+                                    Costo gas
+                                    <input id="costeo-gas-costo" type="number" min="0" step="1" value="0" oninput="actualizarCosteoProduccion()">
+                                </label>
+                                <label>
+                                    Aplicar a
+                                    <select id="costeo-gas-tipo" onchange="actualizarCosteoProduccion()">
+                                        <option value="base">Comision e IVA</option>
+                                        <option value="externo">Fuera de %</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="costeo-summary">
+                    <div class="costeo-summary-card">
+                        <div class="costeo-total-label">Precio de venta sugerido</div>
+                        <div class="costeo-total" id="costeo-precio-final">$0</div>
+                        <div class="costeo-detail">
+                            <div class="costeo-detail-row"><span>Costos afectos al %</span><strong id="costeo-base-neto">$0</strong></div>
+                            <div class="costeo-detail-row"><span>IVA insumos incluidos</span><strong id="costeo-iva-insumos">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Subtotal base con IVA item</span><strong id="costeo-base-bruto">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Comision Uber 30%</span><strong id="costeo-comision">$0</strong></div>
+                            <div class="costeo-detail-row"><span>IVA venta 19%</span><strong id="costeo-iva-venta">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Costos fuera de %</span><strong id="costeo-externos">$0</strong></div>
+                        </div>
+                    </div>
+                    <div class="costeo-summary-card">
+                        <div class="costeo-total-label">Precio redondeado</div>
+                        <div class="costeo-total" id="costeo-precio-redondeado" style="font-size:38px;">$0</div>
+                        <div class="costeo-detail-row" style="margin-top:12px;"><span>Margen operativo despues de Uber e IVA</span><strong id="costeo-margen">$0</strong></div>
+                    </div>
+                    <div class="costeo-alert">
+                        Regla aplicada: los costos marcados como base se dividen por 0,70 para cubrir Uber 30% y luego se multiplica por 1,19 para IVA de venta. Los costos externos se suman al final sin porcentaje.
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="reiniciarCosteoProduccion()">Reiniciar</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="copiarResumenCosteo()">Copiar resumen</button>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal Nueva Receta -->
     <div class="modal-overlay" id="modal-receta">
@@ -2264,6 +2655,9 @@
         let agendaDetalleActual = null;
         let planSemanalCargando = false;
         let planSemanalRango = { desde: '', hasta: '' };
+        let costeoItemSeq = 0;
+        const COSTEO_IVA = 0.19;
+        const COSTEO_UBER = 0.30;
         const AGENDA_PRODUCCION_INICIAL = {{ (agenda_produccion_inicial or {"days": [], "resumen": {}, "fecha_desde": "", "fecha_hasta": ""})|tojson }};
         const PLAN_SEMANAL_INICIAL = {{ (plan_semanal_inicial or {"days": [], "resumen": {}})|tojson }};
 
@@ -2284,6 +2678,163 @@
         function formatoMonedaCLP(valor) {
             const num = Number(valor || 0);
             return '$' + Math.round(num).toLocaleString('es-CL');
+        }
+
+        function valorInputCosteo(id) {
+            const el = document.getElementById(id);
+            const val = Number(String(el?.value || '0').replace(',', '.'));
+            return Number.isFinite(val) && val > 0 ? val : 0;
+        }
+
+        function abrirModalCosteoProduccion() {
+            const modal = document.getElementById('modal-costeo-produccion');
+            if (!modal) return;
+            modal.classList.add('active');
+            if (!document.querySelector('#costeo-items-base .costeo-row')) {
+                agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0, iva: true });
+            }
+            if (!document.querySelector('#costeo-items-externos .costeo-row')) {
+                agregarItemCosteo('externo', { nombre: 'Packaging / despacho interno', valor: 0, iva: false });
+            }
+            actualizarCosteoProduccion();
+        }
+
+        function cerrarModalCosteoProduccion() {
+            const modal = document.getElementById('modal-costeo-produccion');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function agregarItemCosteo(tipo = 'base', data = {}) {
+            const cont = document.getElementById(tipo === 'externo' ? 'costeo-items-externos' : 'costeo-items-base');
+            if (!cont) return;
+            costeoItemSeq += 1;
+            const row = document.createElement('div');
+            row.className = tipo === 'externo' ? 'costeo-row costeo-row-simple' : 'costeo-row';
+            row.dataset.costeoTipo = tipo === 'externo' ? 'externo' : 'base';
+            row.innerHTML = tipo === 'externo'
+                ? `
+                    <input type="text" class="costeo-item-nombre" placeholder="Nombre del costo" value="${escapeHtml(data.nombre || '')}" oninput="actualizarCosteoProduccion()">
+                    <input type="number" class="costeo-item-valor" min="0" step="1" value="${Number(data.valor || 0)}" placeholder="$" oninput="actualizarCosteoProduccion()">
+                    <button type="button" class="costeo-remove" title="Quitar item" onclick="quitarItemCosteo(this)">x</button>
+                `
+                : `
+                    <input type="text" class="costeo-item-nombre" placeholder="Nombre del insumo" value="${escapeHtml(data.nombre || '')}" oninput="actualizarCosteoProduccion()">
+                    <input type="number" class="costeo-item-valor" min="0" step="1" value="${Number(data.valor || 0)}" placeholder="$" oninput="actualizarCosteoProduccion()">
+                    <button type="button" class="costeo-tax-toggle ${data.iva === false ? '' : 'active'}" data-iva="${data.iva === false ? '0' : '1'}" onclick="toggleIvaCosteo(this)">${data.iva === false ? 'Sin IVA' : 'Con IVA'}</button>
+                    <button type="button" class="costeo-remove" title="Quitar item" onclick="quitarItemCosteo(this)">x</button>
+                `;
+            cont.appendChild(row);
+            actualizarCosteoProduccion();
+        }
+
+        function quitarItemCosteo(btn) {
+            const row = btn?.closest?.('.costeo-row');
+            if (row) row.remove();
+            actualizarCosteoProduccion();
+        }
+
+        function toggleIvaCosteo(btn) {
+            if (!btn) return;
+            const activo = btn.dataset.iva !== '1';
+            btn.dataset.iva = activo ? '1' : '0';
+            btn.classList.toggle('active', activo);
+            btn.textContent = activo ? 'Con IVA' : 'Sin IVA';
+            actualizarCosteoProduccion();
+        }
+
+        function leerItemsCosteo(selector, incluyeIvaToggle = true) {
+            return Array.from(document.querySelectorAll(selector)).map((row) => {
+                const nombre = String(row.querySelector('.costeo-item-nombre')?.value || '').trim() || 'Item sin nombre';
+                const valor = Math.max(0, Number(String(row.querySelector('.costeo-item-valor')?.value || '0').replace(',', '.')) || 0);
+                const conIva = incluyeIvaToggle ? row.querySelector('.costeo-tax-toggle')?.dataset.iva === '1' : false;
+                const neto = conIva ? valor / (1 + COSTEO_IVA) : valor;
+                const iva = conIva ? valor - neto : 0;
+                return { nombre, valor, conIva, neto, iva };
+            });
+        }
+
+        function actualizarCosteoProduccion() {
+            const itemsBase = leerItemsCosteo('#costeo-items-base .costeo-row', true);
+            const itemsExternos = leerItemsCosteo('#costeo-items-externos .costeo-row', false);
+            const luzCosto = valorInputCosteo('costeo-luz-kw') * valorInputCosteo('costeo-luz-horas') * valorInputCosteo('costeo-luz-kwh');
+            const luzTipo = document.getElementById('costeo-luz-tipo')?.value === 'externo' ? 'externo' : 'base';
+            const gasCosto = valorInputCosteo('costeo-gas-costo');
+            const gasTipo = document.getElementById('costeo-gas-tipo')?.value === 'externo' ? 'externo' : 'base';
+
+            let baseBruto = itemsBase.reduce((acc, item) => acc + item.valor, 0);
+            let baseNeto = itemsBase.reduce((acc, item) => acc + item.neto, 0);
+            let ivaInsumos = itemsBase.reduce((acc, item) => acc + item.iva, 0);
+            let externos = itemsExternos.reduce((acc, item) => acc + item.valor, 0);
+
+            if (luzTipo === 'base') {
+                baseBruto += luzCosto;
+                baseNeto += luzCosto;
+            } else {
+                externos += luzCosto;
+            }
+            if (gasTipo === 'base') {
+                baseBruto += gasCosto;
+                baseNeto += gasCosto;
+            } else {
+                externos += gasCosto;
+            }
+
+            const precioAntesIvaVenta = baseBruto > 0 ? baseBruto / (1 - COSTEO_UBER) : 0;
+            const comision = Math.max(0, precioAntesIvaVenta * COSTEO_UBER);
+            const ivaVenta = Math.max(0, precioAntesIvaVenta * COSTEO_IVA);
+            const precioFinal = precioAntesIvaVenta * (1 + COSTEO_IVA) + externos;
+            const precioRedondeado = precioFinal > 0 ? Math.ceil(precioFinal / 100) * 100 : 0;
+            const margenOperativo = Math.max(0, precioRedondeado - externos - ivaVenta - comision - baseBruto);
+
+            const setTxt = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = formatoMonedaCLP(val);
+            };
+            setTxt('costeo-precio-final', precioFinal);
+            setTxt('costeo-precio-redondeado', precioRedondeado);
+            setTxt('costeo-base-neto', baseNeto);
+            setTxt('costeo-iva-insumos', ivaInsumos);
+            setTxt('costeo-base-bruto', baseBruto);
+            setTxt('costeo-comision', comision);
+            setTxt('costeo-iva-venta', ivaVenta);
+            setTxt('costeo-externos', externos);
+            setTxt('costeo-margen', margenOperativo);
+        }
+
+        function reiniciarCosteoProduccion() {
+            const nombre = document.getElementById('costeo-producto-nombre');
+            if (nombre) nombre.value = '';
+            const base = document.getElementById('costeo-items-base');
+            const externos = document.getElementById('costeo-items-externos');
+            if (base) base.innerHTML = '';
+            if (externos) externos.innerHTML = '';
+            ['costeo-luz-kw', 'costeo-luz-horas', 'costeo-luz-kwh', 'costeo-gas-costo'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.value = '0';
+            });
+            agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0, iva: true });
+            agregarItemCosteo('externo', { nombre: 'Packaging / despacho interno', valor: 0, iva: false });
+            actualizarCosteoProduccion();
+        }
+
+        function copiarResumenCosteo() {
+            actualizarCosteoProduccion();
+            const nombre = String(document.getElementById('costeo-producto-nombre')?.value || 'Producto sin nombre').trim();
+            const lineas = [
+                `Costeo produccion: ${nombre}`,
+                `Precio sugerido: ${document.getElementById('costeo-precio-final')?.textContent || '$0'}`,
+                `Precio redondeado: ${document.getElementById('costeo-precio-redondeado')?.textContent || '$0'}`,
+                `Base con IVA item: ${document.getElementById('costeo-base-bruto')?.textContent || '$0'}`,
+                `Comision Uber 30%: ${document.getElementById('costeo-comision')?.textContent || '$0'}`,
+                `IVA venta 19%: ${document.getElementById('costeo-iva-venta')?.textContent || '$0'}`,
+                `Costos fuera de %: ${document.getElementById('costeo-externos')?.textContent || '$0'}`
+            ];
+            const texto = lineas.join('\n');
+            if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(texto).then(() => alert('Resumen copiado.'));
+            } else {
+                prompt('Copia el resumen:', texto);
+            }
         }
 
         function formatearFechaHoraCorta(valor) {
@@ -3923,7 +4474,7 @@
                     badge.style.display = data.total > 0 ? 'inline-flex' : 'none';
                 });
 
-            ['modal-receta', 'modal-editar-receta', 'modal-producir', 'modal-ver-receta', 'modal-agendar-produccion', 'modal-agenda-detalle', 'modal-variacion-insumo'].forEach(id => {
+            ['modal-receta', 'modal-editar-receta', 'modal-producir', 'modal-ver-receta', 'modal-agendar-produccion', 'modal-agenda-detalle', 'modal-variacion-insumo', 'modal-costeo-produccion'].forEach(id => {
                 const modal = document.getElementById(id);
                 if (!modal) return;
                 modal.addEventListener('click', function(e) {
@@ -3935,6 +4486,7 @@
                     if (id === 'modal-agendar-produccion') cerrarModalAgendaProduccion();
                     if (id === 'modal-agenda-detalle') cerrarModalDetalleAgendaProduccion();
                     if (id === 'modal-variacion-insumo') cerrarModalVariacionInsumo();
+                    if (id === 'modal-costeo-produccion') cerrarModalCosteoProduccion();
                 });
             });
 
@@ -3958,6 +4510,11 @@
                 const modalVariacionInsumo = document.getElementById('modal-variacion-insumo');
                 if (modalVariacionInsumo && modalVariacionInsumo.classList.contains('active')) {
                     cerrarModalVariacionInsumo();
+                    return;
+                }
+                const modalCosteo = document.getElementById('modal-costeo-produccion');
+                if (modalCosteo && modalCosteo.classList.contains('active')) {
+                    cerrarModalCosteoProduccion();
                 }
             });
         });
