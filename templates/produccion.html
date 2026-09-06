@@ -2300,7 +2300,7 @@
                             <div class="costeo-card-head">
                                 <div>
                                     <div class="costeo-card-title">Items dentro de comision e IVA</div>
-                                    <div class="costeo-card-hint">Insumos que forman parte del precio base que venderas por Uber.</div>
+                                    <div class="costeo-card-hint">Ingresa el valor neto. Si marcas Con IVA, se suma 19% al item.</div>
                                 </div>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick="agregarItemCosteo('base')">+ Item</button>
                             </div>
@@ -2378,8 +2378,8 @@
                         <div class="costeo-total" id="costeo-precio-final">$0</div>
                         <div class="costeo-detail">
                             <div class="costeo-detail-row"><span>Costos afectos al %</span><strong id="costeo-base-neto">$0</strong></div>
-                            <div class="costeo-detail-row"><span>IVA insumos incluidos</span><strong id="costeo-iva-insumos">$0</strong></div>
-                            <div class="costeo-detail-row"><span>Subtotal base con IVA item</span><strong id="costeo-base-bruto">$0</strong></div>
+                            <div class="costeo-detail-row"><span>IVA agregado a items</span><strong id="costeo-iva-insumos">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Subtotal base bruto</span><strong id="costeo-base-bruto">$0</strong></div>
                             <div class="costeo-detail-row"><span>Comision Uber 30%</span><strong id="costeo-comision">$0</strong></div>
                             <div class="costeo-detail-row"><span>IVA venta 19%</span><strong id="costeo-iva-venta">$0</strong></div>
                             <div class="costeo-detail-row"><span>Costos fuera de %</span><strong id="costeo-externos">$0</strong></div>
@@ -2823,9 +2823,10 @@
                 const nombre = String(row.querySelector('.costeo-item-nombre')?.value || '').trim() || 'Item sin nombre';
                 const valor = Math.max(0, Number(String(row.querySelector('.costeo-item-valor')?.value || '0').replace(',', '.')) || 0);
                 const conIva = incluyeIvaToggle ? row.querySelector('.costeo-tax-toggle')?.dataset.iva === '1' : false;
-                const neto = conIva ? valor / (1 + COSTEO_IVA) : valor;
-                const iva = conIva ? valor - neto : 0;
-                return { nombre, valor, conIva, neto, iva };
+                const neto = valor;
+                const iva = conIva ? valor * COSTEO_IVA : 0;
+                const bruto = valor + iva;
+                return { nombre, valor, conIva, neto, iva, bruto };
             });
         }
 
@@ -2844,7 +2845,7 @@
             const gasCosto = valorInputCosteo('costeo-gas-costo');
             const gasTipo = document.getElementById('costeo-gas-tipo')?.value === 'externo' ? 'externo' : 'base';
 
-            let baseBruto = itemsBase.reduce((acc, item) => acc + item.valor, 0);
+            let baseBruto = itemsBase.reduce((acc, item) => acc + item.bruto, 0);
             let baseNeto = itemsBase.reduce((acc, item) => acc + item.neto, 0);
             let ivaInsumos = itemsBase.reduce((acc, item) => acc + item.iva, 0);
             let externos = itemsExternos.reduce((acc, item) => acc + item.valor, 0);
