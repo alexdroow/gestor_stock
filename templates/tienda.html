@@ -15841,7 +15841,7 @@
                             <span class="checkout-transfer-badge" id="checkout-transfer-benefit" style="display:none;">Descuento</span>
                         </span>
                     </label>
-                    <label class="checkout-pago-option" id="checkout-pago-flow-row">
+                    <label class="checkout-pago-option" id="checkout-pago-flow-row" style="display:none;">
                         <input type="radio" name="checkout-metodo-pago" id="checkout-pago-flow" value="flow">
                         <span class="checkout-pago-option-text">
                             <img class="checkout-pago-flow-icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAVFBMVEWSnjLe/wDb/wDc/wDf/wCPmjOMljSQnDPi/wCOmDTV9wueri3T9A3L6hSqviizyyPP7xHA2xyluCqHjzbI5hfE4RmhsiyYpi+KkzW61B+uxCbY+wZ+XLB+AAABAklEQVQ4je1RW5LDIAzDL2IgIUDTvHr/e66TdHd2pu0NqoEPI9mWjXNfvEA+Ml0IRkr+mDnfSxWJur2v0SUl0HUDGH8FnWV1dq5YKkFpAsiLBH80C7OEsUnW/VSskeot7ED9LU0U9xDumpL2t8r1EPjGNDQ3EYxZsfaak/IyEM/x7JkmRCTd0DoAJy9cNsJIhGAaM7IpIcU6M8YG7KXjx2Av1BPiwx8W9khx9RloMBv3XKhEqzY7Rr6mWnuwJYxAcVEkqzs+iLfgi5ZwThnYvJgAOVcm4mHdaTqofPFuYc7izKA5zLVm78SH57YugaIcUbMrhtdNt8X9T3jzFx+ZL/7wA3iTC0NFr/3RAAAAAElFTkSuQmCC" alt="Flow">
@@ -22077,20 +22077,21 @@
                 }
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
-                flowPagoHabilitado = Boolean(data.flow_enabled);
-                flowSimAdminEnabled = Boolean(data.admin_flow_sim_enabled);
+                flowPagoHabilitado = false;
+                flowSimAdminEnabled = false;
                 tiendaAdminMode = Boolean(data.admin_mode);
                 _adminSetPillVisible();
                 _adminBindProductGestures();
                 paymentPricingCfg = {
                     flow_enabled: flowPagoHabilitado,
-                    rate: Math.max(0, Number(data?.payment_pricing?.rate ?? 0.0319)),
-                    iva: Math.max(0, Number(data?.payment_pricing?.iva ?? 0.19)),
-                    fixed: Math.max(0, Number(data?.payment_pricing?.fixed ?? 0)),
+                    rate: 0,
+                    iva: 0,
+                    fixed: 0,
                 };
                 _refreshTransferBenefitBadge();
-                if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = flowPagoHabilitado ? "" : "none";
-                if (!flowPagoHabilitado && checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
+                if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = "none";
+                if (checkoutPagoFlowEl) checkoutPagoFlowEl.checked = false;
+                if (checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
                 _syncFlowSimUi();
                 renderCategoriasMenu();
                 renderSecciones();
@@ -22977,11 +22978,8 @@
             if (checkoutDireccionBuscarEl) {
                 checkoutDireccionBuscarEl.value = String(clienteRegistrado?.direccion_default || "").trim();
             }
-            if (flowPagoHabilitado && checkoutPagoFlowEl) {
-                checkoutPagoFlowEl.checked = true;
-            } else if (checkoutPagoTransferenciaEl) {
-                checkoutPagoTransferenciaEl.checked = true;
-            }
+            if (checkoutPagoFlowEl) checkoutPagoFlowEl.checked = false;
+            if (checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
             _syncFlowSimUi();
             const metodoPrecio = _metodoPagoCheckoutActual();
             const items = carrito.map((it) => ({
@@ -23114,10 +23112,7 @@
                 lat: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lat || 0) : null,
                 lng: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lng || 0) : null,
                 shipping_quote: entregaCheckout === "despacho" ? (checkoutShippingQuote || null) : null,
-                metodo_pago: (() => {
-                    if (metodoPagoActual === "flow") return "flow";
-                    return "transferencia";
-                })(),
+                metodo_pago: "transferencia",
             };
             if (metodoPagoActual === "flow" && flowSimAdminEnabled && checkoutFlowSimStatusEl) {
                 const simStatus = String(checkoutFlowSimStatusEl.value || "").trim().toLowerCase();

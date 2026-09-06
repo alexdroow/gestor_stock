@@ -2427,6 +2427,11 @@ def _flow_fee_cfg():
     return {"rate": rate, "iva": iva, "fixed": fixed}
 
 
+def _flow_checkout_public_enabled():
+    # Flow queda conservado internamente, pero no disponible para clientes por ahora.
+    return False
+
+
 def _flow_gross_from_net(net_amount, fee_cfg=None, apply_fixed=True):
     fee = fee_cfg or _flow_fee_cfg()
     net = max(0.0, float(net_amount or 0))
@@ -6149,12 +6154,14 @@ def api_tienda_productos():
                 "estado_tienda": estado,
                 "mensaje_post_pedido": str(config.get("mensaje_post_pedido") or "").strip(),
                 "personalizacion": _obtener_tienda_personalizacion(),
-                "flow_enabled": bool(_flow_cfg().get("enabled")),
+                "flow_enabled": bool(_flow_checkout_public_enabled() and _flow_cfg().get("enabled")),
                 "admin_flow_sim_enabled": bool(session.get(_ADMIN_SESSION_KEY)),
                 "admin_mode": bool(session.get(_ADMIN_SESSION_KEY)),
                 "payment_pricing": {
-                    "flow_enabled": bool(_flow_cfg().get("enabled")),
-                    **_flow_fee_cfg(),
+                    "flow_enabled": bool(_flow_checkout_public_enabled() and _flow_cfg().get("enabled")),
+                    "rate": 0,
+                    "iva": 0,
+                    "fixed": 0,
                 },
             }
         )
@@ -16457,13 +16464,16 @@ def api_tienda_checkout():
             return jsonify({'success': False, 'error': 'La tienda esta cerrada por el momento'}), 403
         data = request.get_json(silent=True) or {}
         flow_cfg = _flow_cfg()
+        flow_checkout_enabled = bool(_flow_checkout_public_enabled() and flow_cfg.get("enabled"))
         metodo_pago_preferido = str(data.get("metodo_pago") or "transferencia").strip().lower()
         if metodo_pago_preferido not in {"transferencia", "flow"}:
             metodo_pago_preferido = "transferencia"
+        if metodo_pago_preferido == "flow" and not flow_checkout_enabled:
+            metodo_pago_preferido = "transferencia"
         flow_sim_status = str(data.get("flow_simulation_status") or "").strip().lower()
         flow_sim_status = flow_sim_status if flow_sim_status in {"paid", "pending", "error"} else ""
-        flow_sim_enabled = bool(flow_sim_status and session.get(_ADMIN_SESSION_KEY))
-        if metodo_pago_preferido == "flow" and not bool(flow_cfg.get("enabled")):
+        flow_sim_enabled = bool(flow_sim_status and session.get(_ADMIN_SESSION_KEY) and flow_checkout_enabled)
+        if metodo_pago_preferido == "flow" and not flow_checkout_enabled:
             return jsonify({'success': False, 'error': 'La pasarela Flow no esta disponible en este momento'}), 400
         items_req = data.get('items') or []
         if not isinstance(items_req, list) or not items_req:
