@@ -455,6 +455,53 @@
             font-weight: 900;
         }
 
+        .costeo-saved-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 12px;
+            max-height: 230px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .costeo-saved-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: center;
+            border: 1px solid rgba(217, 119, 6, .18);
+            border-radius: 14px;
+            background: #fff;
+            padding: 10px;
+        }
+
+        .costeo-saved-name {
+            font-weight: 800;
+            color: #431407;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .costeo-saved-meta {
+            margin-top: 3px;
+            color: #78716c;
+            font-size: 12px;
+        }
+
+        .costeo-saved-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .costeo-status {
+            margin-top: 10px;
+            min-height: 18px;
+            color: #166534;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
         .recetas-toolbar {
             display: flex;
             align-items: center;
@@ -2233,6 +2280,7 @@
                             <div class="costeo-eyebrow">Calculadora de venta</div>
                             <h3 class="costeo-title">Costeo producci&oacute;n</h3>
                             <p class="costeo-subtitle">Cotiza productos nuevos sumando insumos, energia y costos externos. El precio final considera comision Uber 30% e IVA 19%.</p>
+                            <div class="costeo-status" id="costeo-status"></div>
                         </div>
                         <button class="btn-close" onclick="cerrarModalCosteoProduccion()">&#215;</button>
                     </div>
@@ -2347,7 +2395,21 @@
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="reiniciarCosteoProduccion()">Reiniciar</button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="guardarCosteoProduccion()">Guardar</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="guardarCosteoProduccion(true)">Guardar como nuevo</button>
                         <button type="button" class="btn btn-primary btn-sm" onclick="copiarResumenCosteo()">Copiar resumen</button>
+                    </div>
+                    <div class="costeo-summary-card" style="margin-top:16px;">
+                        <div class="costeo-card-head" style="margin-bottom:8px;">
+                            <div>
+                                <div class="costeo-card-title">Res&uacute;menes guardados</div>
+                                <div class="costeo-card-hint">Puedes abrir, editar o eliminar costeos anteriores.</div>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="cargarCosteosProduccion()">Actualizar</button>
+                        </div>
+                        <div class="costeo-saved-list" id="costeo-saved-list">
+                            <div class="costeo-card-hint">Cargando res&uacute;menes...</div>
+                        </div>
                     </div>
                 </aside>
             </div>
@@ -2667,6 +2729,8 @@
         let planSemanalCargando = false;
         let planSemanalRango = { desde: '', hasta: '' };
         let costeoItemSeq = 0;
+        let costeoActualId = null;
+        let costeosGuardados = [];
         const COSTEO_IVA = 0.19;
         const COSTEO_UBER = 0.30;
         const AGENDA_PRODUCCION_INICIAL = {{ (agenda_produccion_inicial or {"days": [], "resumen": {}, "fecha_desde": "", "fecha_hasta": ""})|tojson }};
@@ -2701,6 +2765,7 @@
             const modal = document.getElementById('modal-costeo-produccion');
             if (!modal) return;
             modal.classList.add('active');
+            cargarCosteosProduccion();
             if (!document.querySelector('#costeo-items-base .costeo-row')) {
                 agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0, iva: true });
             }
@@ -2764,7 +2829,14 @@
             });
         }
 
-        function actualizarCosteoProduccion() {
+        function setCosteoStatus(texto = '', error = false) {
+            const el = document.getElementById('costeo-status');
+            if (!el) return;
+            el.textContent = texto;
+            el.style.color = error ? '#b91c1c' : '#166534';
+        }
+
+        function leerResumenCosteo() {
             const itemsBase = leerItemsCosteo('#costeo-items-base .costeo-row', true);
             const itemsExternos = leerItemsCosteo('#costeo-items-externos .costeo-row', false);
             const luzCosto = valorInputCosteo('costeo-luz-kw') * valorInputCosteo('costeo-luz-horas') * valorInputCosteo('costeo-luz-kwh');
@@ -2797,22 +2869,105 @@
             const precioRedondeado = precioFinal > 0 ? Math.ceil(precioFinal / 100) * 100 : 0;
             const margenOperativo = Math.max(0, precioRedondeado - externos - ivaVenta - comision - baseBruto);
 
+            return {
+                itemsBase,
+                itemsExternos,
+                luz: {
+                    kw: valorInputCosteo('costeo-luz-kw'),
+                    horas: valorInputCosteo('costeo-luz-horas'),
+                    kwh: valorInputCosteo('costeo-luz-kwh'),
+                    costo: luzCosto,
+                    tipo: luzTipo,
+                },
+                gas: {
+                    costo: gasCosto,
+                    tipo: gasTipo,
+                },
+                resumen: {
+                    base_neto: baseNeto,
+                    iva_insumos: ivaInsumos,
+                    base_bruto: baseBruto,
+                    comision_uber: comision,
+                    iva_venta: ivaVenta,
+                    externos,
+                    precio_final: precioFinal,
+                    precio_redondeado: precioRedondeado,
+                    margen_operativo: margenOperativo,
+                },
+            };
+        }
+
+        function armarPayloadCosteo(forceNuevo = false) {
+            const nombre = String(document.getElementById('costeo-producto-nombre')?.value || '').trim() || 'Costeo sin nombre';
+            const data = leerResumenCosteo();
+            return {
+                id: forceNuevo ? null : costeoActualId,
+                nombre,
+                items_base: data.itemsBase.map(({ nombre, valor, conIva }) => ({ nombre, valor, conIva })),
+                items_externos: data.itemsExternos.map(({ nombre, valor }) => ({ nombre, valor })),
+                luz: data.luz,
+                gas: data.gas,
+                resumen: data.resumen,
+            };
+        }
+
+        function aplicarCosteoGuardado(costeo) {
+            const payload = costeo?.payload || costeo || {};
+            costeoActualId = Number(costeo?.id || payload.id || 0) || null;
+            const nombre = document.getElementById('costeo-producto-nombre');
+            if (nombre) nombre.value = String(payload.nombre || costeo?.nombre || '');
+            const base = document.getElementById('costeo-items-base');
+            const externos = document.getElementById('costeo-items-externos');
+            if (base) base.innerHTML = '';
+            if (externos) externos.innerHTML = '';
+            const itemsBase = Array.isArray(payload.items_base) ? payload.items_base : [];
+            const itemsExternos = Array.isArray(payload.items_externos) ? payload.items_externos : [];
+            (itemsBase.length ? itemsBase : [{ nombre: 'Insumos principales', valor: 0, conIva: true }]).forEach((item) => {
+                agregarItemCosteo('base', { nombre: item.nombre, valor: item.valor, iva: item.conIva !== false });
+            });
+            (itemsExternos.length ? itemsExternos : [{ nombre: 'Packaging / despacho interno', valor: 0 }]).forEach((item) => {
+                agregarItemCosteo('externo', { nombre: item.nombre, valor: item.valor, iva: false });
+            });
+            const luz = payload.luz || {};
+            const gas = payload.gas || {};
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.value = String(Number(val || 0));
+            };
+            setVal('costeo-luz-kw', luz.kw);
+            setVal('costeo-luz-horas', luz.horas);
+            setVal('costeo-luz-kwh', luz.kwh);
+            setVal('costeo-gas-costo', gas.costo);
+            const luzTipo = document.getElementById('costeo-luz-tipo');
+            const gasTipo = document.getElementById('costeo-gas-tipo');
+            if (luzTipo) luzTipo.value = luz.tipo === 'externo' ? 'externo' : 'base';
+            if (gasTipo) gasTipo.value = gas.tipo === 'externo' ? 'externo' : 'base';
+            actualizarCosteoProduccion();
+            setCosteoStatus(costeoActualId ? `Editando resumen #${costeoActualId}` : 'Nuevo resumen');
+        }
+
+        function actualizarCosteoProduccion() {
+            const data = leerResumenCosteo();
+            const resumen = data.resumen;
+
             const setTxt = (id, val) => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = formatoMonedaCLP(val);
             };
-            setTxt('costeo-precio-final', precioFinal);
-            setTxt('costeo-precio-redondeado', precioRedondeado);
-            setTxt('costeo-base-neto', baseNeto);
-            setTxt('costeo-iva-insumos', ivaInsumos);
-            setTxt('costeo-base-bruto', baseBruto);
-            setTxt('costeo-comision', comision);
-            setTxt('costeo-iva-venta', ivaVenta);
-            setTxt('costeo-externos', externos);
-            setTxt('costeo-margen', margenOperativo);
+            setTxt('costeo-precio-final', resumen.precio_final);
+            setTxt('costeo-precio-redondeado', resumen.precio_redondeado);
+            setTxt('costeo-base-neto', resumen.base_neto);
+            setTxt('costeo-iva-insumos', resumen.iva_insumos);
+            setTxt('costeo-base-bruto', resumen.base_bruto);
+            setTxt('costeo-comision', resumen.comision_uber);
+            setTxt('costeo-iva-venta', resumen.iva_venta);
+            setTxt('costeo-externos', resumen.externos);
+            setTxt('costeo-margen', resumen.margen_operativo);
+            return resumen;
         }
 
         function reiniciarCosteoProduccion() {
+            costeoActualId = null;
             const nombre = document.getElementById('costeo-producto-nombre');
             if (nombre) nombre.value = '';
             const base = document.getElementById('costeo-items-base');
@@ -2826,6 +2981,89 @@
             agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0, iva: true });
             agregarItemCosteo('externo', { nombre: 'Packaging / despacho interno', valor: 0, iva: false });
             actualizarCosteoProduccion();
+            setCosteoStatus('Nuevo resumen');
+        }
+
+        function renderCosteosProduccion(items = []) {
+            const list = document.getElementById('costeo-saved-list');
+            if (!list) return;
+            costeosGuardados = Array.isArray(items) ? items : [];
+            if (!costeosGuardados.length) {
+                list.innerHTML = '<div class="costeo-card-hint">Aun no hay resumenes guardados.</div>';
+                return;
+            }
+            list.innerHTML = costeosGuardados.map((item) => {
+                const fecha = String(item.actualizado || '').replace('T', ' ').slice(0, 16) || 'Sin fecha';
+                const total = formatoMonedaCLP(item.precio_redondeado || item.precio_final || 0);
+                return `
+                    <div class="costeo-saved-item">
+                        <div>
+                            <div class="costeo-saved-name">${escapeHtml(item.nombre || 'Costeo sin nombre')}</div>
+                            <div class="costeo-saved-meta">#${Number(item.id || 0)} · ${escapeHtml(fecha)} · ${escapeHtml(total)}</div>
+                        </div>
+                        <div class="costeo-saved-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="editarCosteoGuardado(${Number(item.id || 0)})">Editar</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="eliminarCosteoGuardado(${Number(item.id || 0)})">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function cargarCosteosProduccion() {
+            const list = document.getElementById('costeo-saved-list');
+            if (list) list.innerHTML = '<div class="costeo-card-hint">Cargando resumenes...</div>';
+            return fetch(`/api/produccion/costeos?_ts=${Date.now()}`, { headers: { Accept: 'application/json' } })
+                .then((r) => r.json())
+                .then((data) => {
+                    if (!data.success) throw new Error(data.error || 'No se pudieron cargar los costeos');
+                    renderCosteosProduccion(data.items || []);
+                })
+                .catch((error) => {
+                    if (list) list.innerHTML = `<div class="costeo-card-hint" style="color:#b91c1c;">${escapeHtml(error.message || 'No se pudieron cargar los resumenes.')}</div>`;
+                });
+        }
+
+        function editarCosteoGuardado(id) {
+            const item = costeosGuardados.find((row) => Number(row.id || 0) === Number(id || 0));
+            if (!item) return alert('No se encontro el resumen seleccionado.');
+            aplicarCosteoGuardado(item);
+        }
+
+        function guardarCosteoProduccion(forceNuevo = false) {
+            const payload = armarPayloadCosteo(forceNuevo);
+            setCosteoStatus('Guardando resumen...');
+            fetch('/api/produccion/costeos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({ costeo: payload }),
+            })
+                .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || !data.success) throw new Error(data.error || 'No se pudo guardar el resumen');
+                    costeoActualId = Number(data.id || 0) || null;
+                    renderCosteosProduccion(data.costeos || []);
+                    setCosteoStatus(costeoActualId ? `Resumen #${costeoActualId} guardado` : 'Resumen guardado');
+                })
+                .catch((error) => setCosteoStatus(error.message || 'No se pudo guardar el resumen', true));
+        }
+
+        function eliminarCosteoGuardado(id) {
+            const costeoId = Number(id || 0);
+            if (!costeoId) return;
+            if (!confirm('Eliminar este resumen de costeo?')) return;
+            fetch(`/api/produccion/costeos/${costeoId}`, {
+                method: 'DELETE',
+                headers: { Accept: 'application/json' },
+            })
+                .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || !data.success) throw new Error(data.error || 'No se pudo eliminar el resumen');
+                    if (costeoActualId === costeoId) reiniciarCosteoProduccion();
+                    renderCosteosProduccion(data.costeos || []);
+                    setCosteoStatus('Resumen eliminado');
+                })
+                .catch((error) => setCosteoStatus(error.message || 'No se pudo eliminar el resumen', true));
         }
 
         function copiarResumenCosteo() {

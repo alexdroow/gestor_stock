@@ -713,6 +713,19 @@ def init_db():
             '''
         )
         cursor.execute("INSERT OR IGNORE INTO calculadora_compras_draft (id, payload_json) VALUES (1, '')")
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS produccion_costeos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL DEFAULT 'Costeo sin nombre',
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                precio_final REAL DEFAULT 0,
+                precio_redondeado REAL DEFAULT 0,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
         # Migracion compatible: instalaciones antiguas pueden no tener metodo_pago.
         _ensure_column(conn, "ventas", "metodo_pago", "TEXT DEFAULT 'efectivo'")
 
@@ -9026,6 +9039,19 @@ def migrar_db():
         conn.execute("INSERT OR IGNORE INTO calculadora_compras_draft (id, payload_json) VALUES (1, '')")
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS produccion_costeos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL DEFAULT 'Costeo sin nombre',
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                precio_final REAL DEFAULT 0,
+                precio_redondeado REAL DEFAULT 0,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS insumo_precio_historial (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 insumo_id INTEGER NOT NULL,
@@ -13136,6 +13162,22 @@ def _ensure_calculadora_compras_draft_table(conn):
     conn.execute("INSERT OR IGNORE INTO calculadora_compras_draft (id, payload_json) VALUES (1, '')")
 
 
+def _ensure_produccion_costeos_table(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS produccion_costeos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL DEFAULT 'Costeo sin nombre',
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            precio_final REAL DEFAULT 0,
+            precio_redondeado REAL DEFAULT 0,
+            creado TEXT DEFAULT CURRENT_TIMESTAMP,
+            actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
 def obtener_calculadora_compras_draft():
     conn = get_db()
     cursor = conn.cursor()
@@ -13180,6 +13222,122 @@ def guardar_calculadora_compras_draft(items):
         )
         conn.commit()
         return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+
+def listar_produccion_costeos(limit=80):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        _ensure_produccion_costeos_table(conn)
+        try:
+            limit_int = int(limit or 80)
+        except (TypeError, ValueError):
+            limit_int = 80
+        limit_int = max(1, min(200, limit_int))
+        cursor.execute(
+            """
+            SELECT id, nombre, payload_json, precio_final, precio_redondeado, creado, actualizado
+            FROM produccion_costeos
+            ORDER BY datetime(actualizado) DESC, id DESC
+            LIMIT ?
+            """,
+            (limit_int,),
+        )
+        items = []
+        for row in cursor.fetchall():
+            payload = {}
+            raw = str(row["payload_json"] or "").strip()
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    payload = parsed if isinstance(parsed, dict) else {}
+                except Exception:
+                    payload = {}
+            items.append({
+                "id": int(row["id"] or 0),
+                "nombre": row["nombre"] or "Costeo sin nombre",
+                "payload": payload,
+                "precio_final": float(row["precio_final"] or 0),
+                "precio_redondeado": float(row["precio_redondeado"] or 0),
+                "creado": row["creado"],
+                "actualizado": row["actualizado"],
+            })
+        return {"success": True, "items": items}
+    except Exception as e:
+        return {"success": False, "error": str(e), "items": []}
+    finally:
+        conn.close()
+
+
+def guardar_produccion_costeo(payload):
+    if not isinstance(payload, dict):
+        return {"success": False, "error": "Formato invalido para costeo"}
+    nombre = str(payload.get("nombre") or "").strip() or "Costeo sin nombre"
+    nombre = nombre[:180]
+    resumen = payload.get("resumen") if isinstance(payload.get("resumen"), dict) else {}
+    precio_final = float(resumen.get("precio_final") or 0)
+    precio_redondeado = float(resumen.get("precio_redondeado") or 0)
+    costeo_id = payload.get("id")
+    try:
+        costeo_id = int(costeo_id or 0)
+    except (TypeError, ValueError):
+        costeo_id = 0
+    clean_payload = dict(payload)
+    clean_payload["nombre"] = nombre
+    clean_payload.pop("id", None)
+    payload_json = json.dumps(clean_payload, ensure_ascii=False)
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        _ensure_produccion_costeos_table(conn)
+        if costeo_id > 0:
+            cursor.execute(
+                """
+                UPDATE produccion_costeos
+                SET nombre = ?, payload_json = ?, precio_final = ?, precio_redondeado = ?, actualizado = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (nombre, payload_json, precio_final, precio_redondeado, costeo_id),
+            )
+            if cursor.rowcount == 0:
+                return {"success": False, "error": "Costeo no encontrado"}
+        else:
+            cursor.execute(
+                """
+                INSERT INTO produccion_costeos (nombre, payload_json, precio_final, precio_redondeado, creado, actualizado)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+                (nombre, payload_json, precio_final, precio_redondeado),
+            )
+            costeo_id = int(cursor.lastrowid or 0)
+        conn.commit()
+        return {"success": True, "id": costeo_id}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+
+def eliminar_produccion_costeo(costeo_id):
+    try:
+        costeo_id_int = int(costeo_id or 0)
+    except (TypeError, ValueError):
+        return {"success": False, "error": "ID invalido"}
+    if costeo_id_int <= 0:
+        return {"success": False, "error": "ID invalido"}
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        _ensure_produccion_costeos_table(conn)
+        cursor.execute("DELETE FROM produccion_costeos WHERE id = ?", (costeo_id_int,))
+        conn.commit()
+        return {"success": True, "deleted": cursor.rowcount > 0}
     except Exception as e:
         conn.rollback()
         return {"success": False, "error": str(e)}

@@ -340,6 +340,7 @@ from database import (
     marcar_compras_pendientes_completadas, previsualizar_finalizacion_compras_pendientes,
     finalizar_compras_pendientes_con_stock,
     obtener_calculadora_compras_draft, guardar_calculadora_compras_draft, limpiar_calculadora_compras_draft,
+    listar_produccion_costeos, guardar_produccion_costeo, eliminar_produccion_costeo,
     registrar_historial_cambio, listar_historial_cambios, eliminar_historial_cambio,
     descartar_insumos_masivo,
     obtener_evento_agenda_por_id, actualizar_estado_evento_agenda, actualizar_seguimiento_evento_agenda,
@@ -13377,6 +13378,47 @@ def api_confirmar_agendado_produccion(agendado_id):
         resultado['agendado_id'] = int(agendado_id or 0)
         resultado['cantidad_lotes'] = cantidad_lotes
         return jsonify(resultado)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+@app.route('/api/produccion/costeos', methods=['GET'])
+def api_produccion_costeos_listar():
+    try:
+        resultado = listar_produccion_costeos()
+        if resultado.get('success'):
+            resp = jsonify(resultado)
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            return resp
+        return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'items': []}), 500
+
+
+@app.route('/api/produccion/costeos', methods=['POST'])
+def api_produccion_costeos_guardar():
+    try:
+        data = request.get_json(silent=True) or {}
+        payload = data.get('costeo') if isinstance(data.get('costeo'), dict) else data
+        resultado = guardar_produccion_costeo(payload)
+        if resultado.get('success'):
+            resultado['costeos'] = listar_produccion_costeos().get('items', [])
+            return jsonify(resultado)
+        return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/produccion/costeos/<int:costeo_id>', methods=['DELETE'])
+def api_produccion_costeos_eliminar(costeo_id):
+    try:
+        resultado = eliminar_produccion_costeo(costeo_id)
+        if resultado.get('success'):
+            resultado['costeos'] = listar_produccion_costeos().get('items', [])
+            return jsonify(resultado)
+        return jsonify(resultado), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
