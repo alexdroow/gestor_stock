@@ -2300,7 +2300,7 @@
                             <div class="costeo-card-head">
                                 <div>
                                     <div class="costeo-card-title">Costos de fabricacion</div>
-                                    <div class="costeo-card-hint">Ingredientes, energia, gas, packaging y todo lo necesario para vender el producto. Por defecto cada item suma IVA.</div>
+                                    <div class="costeo-card-hint">Ingredientes, energia, gas, packaging y todo lo necesario para vender el producto. Ingresa el costo real que quieres recuperar.</div>
                                 </div>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick="agregarItemCosteo('base')">+ Item</button>
                             </div>
@@ -2327,10 +2327,6 @@
                                     Valor kWh ($)
                                     <input id="costeo-luz-kwh" type="number" min="0" step="1" value="0" oninput="actualizarCosteoProduccion()">
                                 </label>
-                                <label>
-                                    IVA luz
-                                    <button type="button" id="costeo-luz-iva" class="costeo-tax-toggle active" data-iva="1" onclick="toggleIvaCosteo(this)">Con IVA</button>
-                                </label>
                             </div>
                             <div class="costeo-card-hint" style="margin-top:10px;">
                                 Costo energia calculado: <strong id="costeo-luz-costo">$0</strong>
@@ -2349,10 +2345,6 @@
                                     Costo gas
                                     <input id="costeo-gas-costo" type="number" min="0" step="1" value="0" oninput="actualizarCosteoProduccion()">
                                 </label>
-                                <label>
-                                    IVA gas
-                                    <button type="button" id="costeo-gas-iva" class="costeo-tax-toggle active" data-iva="1" onclick="toggleIvaCosteo(this)">Con IVA</button>
-                                </label>
                             </div>
                         </div>
                     </div>
@@ -2363,8 +2355,6 @@
                         <div class="costeo-total-label">Precio de venta sugerido</div>
                         <div class="costeo-total" id="costeo-precio-final">$0</div>
                         <div class="costeo-detail">
-                            <div class="costeo-detail-row"><span>Total neto costos</span><strong id="costeo-base-neto">$0</strong></div>
-                            <div class="costeo-detail-row"><span>IVA agregado a costos</span><strong id="costeo-iva-insumos">$0</strong></div>
                             <div class="costeo-detail-row"><span>Costo fabricacion</span><strong id="costeo-base-bruto">$0</strong></div>
                             <div class="costeo-detail-row"><span>Utilidad deseada</span><strong id="costeo-externos">$0</strong></div>
                             <div class="costeo-detail-row"><span>Ingreso neto objetivo</span><strong id="costeo-ingreso-objetivo">$0</strong></div>
@@ -2776,7 +2766,6 @@
             row.innerHTML = `
                 <input type="text" class="costeo-item-nombre" placeholder="Nombre del costo" value="${escapeHtml(data.nombre || '')}" oninput="actualizarCosteoProduccion()">
                 <input type="number" class="costeo-item-valor" min="0" step="1" value="${Number(data.valor || 0)}" placeholder="$" oninput="actualizarCosteoProduccion()">
-                <button type="button" class="costeo-tax-toggle ${data.iva === false ? '' : 'active'}" data-iva="${data.iva === false ? '0' : '1'}" onclick="toggleIvaCosteo(this)">${data.iva === false ? 'Sin IVA' : 'Con IVA'}</button>
                 <button type="button" class="costeo-remove" title="Quitar item" onclick="quitarItemCosteo(this)">x</button>
             `;
             cont.appendChild(row);
@@ -2789,28 +2778,11 @@
             actualizarCosteoProduccion();
         }
 
-        function toggleIvaCosteo(btn) {
-            if (!btn) return;
-            const activo = btn.dataset.iva !== '1';
-            btn.dataset.iva = activo ? '1' : '0';
-            btn.classList.toggle('active', activo);
-            btn.textContent = activo ? 'Con IVA' : 'Sin IVA';
-            actualizarCosteoProduccion();
-        }
-
-        function costeoConIvaActivo(id) {
-            return document.getElementById(id)?.dataset.iva === '1';
-        }
-
-        function leerItemsCosteo(selector, incluyeIvaToggle = true) {
+        function leerItemsCosteo(selector) {
             return Array.from(document.querySelectorAll(selector)).map((row) => {
                 const nombre = String(row.querySelector('.costeo-item-nombre')?.value || '').trim() || 'Item sin nombre';
                 const valor = Math.max(0, Number(String(row.querySelector('.costeo-item-valor')?.value || '0').replace(',', '.')) || 0);
-                const conIva = incluyeIvaToggle ? row.querySelector('.costeo-tax-toggle')?.dataset.iva === '1' : false;
-                const neto = valor;
-                const iva = conIva ? valor * COSTEO_IVA : 0;
-                const bruto = valor + iva;
-                return { nombre, valor, conIva, neto, iva, bruto };
+                return { nombre, valor, neto: valor, iva: 0, bruto: valor };
             });
         }
 
@@ -2822,21 +2794,17 @@
         }
 
         function leerResumenCosteo() {
-            const itemsBase = leerItemsCosteo('#costeo-items-base .costeo-row', true);
+            const itemsBase = leerItemsCosteo('#costeo-items-base .costeo-row');
             const luzKw = valorInputCosteo('costeo-luz-kw');
             const luzMinutos = valorInputCosteo('costeo-luz-minutos');
             const luzKwh = valorInputCosteo('costeo-luz-kwh');
-            const luzConIva = costeoConIvaActivo('costeo-luz-iva');
             const luzNeto = luzKw * (luzMinutos / 60) * luzKwh;
-            const luzIva = luzConIva ? luzNeto * COSTEO_IVA : 0;
-            const luzCosto = luzNeto + luzIva;
-            const gasConIva = costeoConIvaActivo('costeo-gas-iva');
+            const luzCosto = luzNeto;
             const gasNeto = valorInputCosteo('costeo-gas-costo');
-            const gasIva = gasConIva ? gasNeto * COSTEO_IVA : 0;
-            const gasCosto = gasNeto + gasIva;
+            const gasCosto = gasNeto;
 
             const baseNeto = itemsBase.reduce((acc, item) => acc + item.neto, 0) + luzNeto + gasNeto;
-            const ivaInsumos = itemsBase.reduce((acc, item) => acc + item.iva, 0) + luzIva + gasIva;
+            const ivaInsumos = 0;
             const costoFabricacion = itemsBase.reduce((acc, item) => acc + item.bruto, 0) + luzCosto + gasCosto;
             const utilidadDeseada = costoFabricacion * COSTEO_UTILIDAD;
             const ingresoNetoObjetivo = costoFabricacion + utilidadDeseada;
@@ -2856,16 +2824,14 @@
                     minutos: luzMinutos,
                     horas: luzMinutos / 60,
                     kwh: luzKwh,
-                    conIva: luzConIva,
                     neto: luzNeto,
-                    iva: luzIva,
+                    iva: 0,
                     costo: luzCosto,
                     tipo: 'base',
                 },
                 gas: {
-                    conIva: gasConIva,
                     neto: gasNeto,
-                    iva: gasIva,
+                    iva: 0,
                     costo: gasCosto,
                     tipo: 'base',
                 },
@@ -2893,7 +2859,7 @@
             return {
                 id: forceNuevo ? null : costeoActualId,
                 nombre,
-                items_base: data.itemsBase.map(({ nombre, valor, conIva }) => ({ nombre, valor, conIva })),
+                items_base: data.itemsBase.map(({ nombre, valor }) => ({ nombre, valor })),
                 items_externos: [],
                 luz: data.luz,
                 gas: data.gas,
@@ -2910,12 +2876,12 @@
             if (base) base.innerHTML = '';
             const itemsBase = Array.isArray(payload.items_base) ? payload.items_base : [];
             const itemsExternos = Array.isArray(payload.items_externos) ? payload.items_externos : [];
-            const itemsFabricacion = [...itemsBase, ...itemsExternos.map((item) => ({ ...item, conIva: item.conIva !== false }))];
+            const itemsFabricacion = [...itemsBase, ...itemsExternos];
             (itemsFabricacion.length ? itemsFabricacion : [
-                { nombre: 'Insumos principales', valor: 0, conIva: true },
-                { nombre: 'Packaging / despacho interno', valor: 0, conIva: true },
+                { nombre: 'Insumos principales', valor: 0 },
+                { nombre: 'Packaging / despacho interno', valor: 0 },
             ]).forEach((item) => {
-                agregarItemCosteo('base', { nombre: item.nombre, valor: item.valor, iva: item.conIva !== false });
+                agregarItemCosteo('base', { nombre: item.nombre, valor: item.valor });
             });
             const luz = payload.luz || {};
             const gas = payload.gas || {};
@@ -2928,20 +2894,6 @@
             setVal('costeo-luz-minutos', minutosLuz);
             setVal('costeo-luz-kwh', luz.kwh);
             setVal('costeo-gas-costo', gas.neto ?? gas.costo);
-            const luzIvaBtn = document.getElementById('costeo-luz-iva');
-            const gasIvaBtn = document.getElementById('costeo-gas-iva');
-            if (luzIvaBtn) {
-                const activo = luz.conIva !== false;
-                luzIvaBtn.dataset.iva = activo ? '1' : '0';
-                luzIvaBtn.classList.toggle('active', activo);
-                luzIvaBtn.textContent = activo ? 'Con IVA' : 'Sin IVA';
-            }
-            if (gasIvaBtn) {
-                const activo = gas.conIva !== false;
-                gasIvaBtn.dataset.iva = activo ? '1' : '0';
-                gasIvaBtn.classList.toggle('active', activo);
-                gasIvaBtn.textContent = activo ? 'Con IVA' : 'Sin IVA';
-            }
             actualizarCosteoProduccion();
             setCosteoStatus(costeoActualId ? `Editando resumen #${costeoActualId}` : 'Nuevo resumen');
         }
@@ -2956,8 +2908,6 @@
             };
             setTxt('costeo-precio-final', resumen.precio_final);
             setTxt('costeo-precio-redondeado', resumen.precio_redondeado);
-            setTxt('costeo-base-neto', resumen.base_neto);
-            setTxt('costeo-iva-insumos', resumen.iva_insumos);
             setTxt('costeo-base-bruto', resumen.base_bruto);
             setTxt('costeo-comision', resumen.comision_uber);
             setTxt('costeo-iva-venta', resumen.iva_venta);
@@ -2978,15 +2928,8 @@
                 const el = document.getElementById(id);
                 if (el) el.value = '0';
             });
-            ['costeo-luz-iva', 'costeo-gas-iva'].forEach((id) => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.dataset.iva = '1';
-                el.classList.add('active');
-                el.textContent = 'Con IVA';
-            });
-            agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0, iva: true });
-            agregarItemCosteo('base', { nombre: 'Packaging / despacho interno', valor: 0, iva: true });
+            agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0 });
+            agregarItemCosteo('base', { nombre: 'Packaging / despacho interno', valor: 0 });
             actualizarCosteoProduccion();
             setCosteoStatus('Nuevo resumen');
         }
