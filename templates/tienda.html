@@ -3236,6 +3236,186 @@
         .mobile-cart-modal.active {
             display: flex;
         }
+        .mobile-offer-pop {
+            display: none;
+        }
+        body.mobile-ui .mobile-offer-pop {
+            position: fixed;
+            inset: 0;
+            z-index: 5400;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background:
+                radial-gradient(circle at 50% 18%, rgba(255, 237, 213, .96), rgba(67, 20, 7, .16) 42%, rgba(15, 23, 42, .58) 100%);
+            backdrop-filter: blur(10px);
+        }
+        body.mobile-ui .mobile-offer-pop.active {
+            display: flex;
+        }
+        body.mobile-ui .mobile-offer-card {
+            position: relative;
+            width: min(430px, 94vw);
+            max-height: min(760px, 92vh);
+            overflow: auto;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, .78);
+            background: linear-gradient(180deg, #fffaf3 0%, #fff7ed 50%, #fff 100%);
+            box-shadow: 0 30px 80px rgba(67, 20, 7, .35);
+            animation: mobileOfferPopIn .28s ease both;
+        }
+        body.mobile-ui .mobile-offer-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 3;
+            width: 38px;
+            height: 38px;
+            border: 1px solid rgba(124, 45, 18, .16);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .9);
+            color: #431407;
+            font-size: 1.35rem;
+            font-weight: 900;
+            box-shadow: 0 10px 26px rgba(67, 20, 7, .12);
+        }
+        body.mobile-ui .mobile-offer-media {
+            position: relative;
+            min-height: 230px;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 30%, #fed7aa, #fb923c 56%, #c2410c 100%);
+        }
+        body.mobile-ui .mobile-offer-media img {
+            width: 100%;
+            height: 260px;
+            display: block;
+            object-fit: cover;
+            object-position: center;
+            filter: saturate(1.06) contrast(1.02);
+        }
+        body.mobile-ui .mobile-offer-media::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0) 35%, rgba(255, 250, 243, .98) 100%);
+            pointer-events: none;
+        }
+        body.mobile-ui .mobile-offer-discount {
+            position: absolute;
+            left: 18px;
+            bottom: 18px;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 13px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #ea580c, #f97316);
+            color: #fff;
+            font-size: .94rem;
+            font-weight: 950;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+            box-shadow: 0 12px 30px rgba(234, 88, 12, .32);
+        }
+        body.mobile-ui .mobile-offer-body {
+            display: grid;
+            gap: 12px;
+            padding: 4px 20px 22px;
+            color: #431407;
+        }
+        body.mobile-ui .mobile-offer-kicker {
+            width: max-content;
+            max-width: 100%;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #ffedd5;
+            color: #9a3412;
+            font-size: .78rem;
+            font-weight: 950;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+        body.mobile-ui .mobile-offer-title {
+            margin: 0;
+            font-size: clamp(1.75rem, 8vw, 2.5rem);
+            line-height: .95;
+            color: #321407;
+        }
+        body.mobile-ui .mobile-offer-desc {
+            margin: 0;
+            color: #7c2d12;
+            font-size: 1rem;
+            line-height: 1.35;
+        }
+        body.mobile-ui .mobile-offer-prices {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        body.mobile-ui .mobile-offer-price {
+            color: #c2410c;
+            font-size: 2.1rem;
+            font-weight: 950;
+        }
+        body.mobile-ui .mobile-offer-old {
+            color: #9ca3af;
+            font-size: 1rem;
+            font-weight: 800;
+            text-decoration: line-through;
+        }
+        body.mobile-ui .mobile-offer-list {
+            display: flex;
+            gap: 7px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+        }
+        body.mobile-ui .mobile-offer-list span {
+            flex: 0 0 auto;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            border: 1px solid #fed7aa;
+            border-radius: 999px;
+            background: #fff;
+            color: #7c2d12;
+            padding: 7px 10px;
+            font-size: .82rem;
+            font-weight: 850;
+        }
+        body.mobile-ui .mobile-offer-actions {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+        body.mobile-ui .mobile-offer-add {
+            min-height: 52px;
+            border: 0;
+            border-radius: 17px;
+            background: linear-gradient(135deg, #fb923c, #ea580c);
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 950;
+            box-shadow: 0 14px 32px rgba(234, 88, 12, .28);
+        }
+        body.mobile-ui .mobile-offer-later {
+            border: 1px solid #fed7aa;
+            border-radius: 15px;
+            background: #fff;
+            color: #7c2d12;
+            min-height: 52px;
+            padding: 0 14px;
+            font-size: .92rem;
+            font-weight: 900;
+        }
+        @keyframes mobileOfferPopIn {
+            from { opacity: 0; transform: translateY(18px) scale(.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
         .mobile-cart-panel {
             width: 100%;
             max-width: 100vw;
@@ -15511,6 +15691,29 @@
             <div style="font-size:.76rem;color:#64748b;">Recibiras avisos aqui cuando lleguen mensajes nuevos de pasteleria.</div>
         </div>
     </div>
+    <div class="mobile-offer-pop" id="mobile-offer-pop" aria-hidden="true">
+        <section class="mobile-offer-card" role="dialog" aria-modal="true" aria-labelledby="mobile-offer-title">
+            <button type="button" class="mobile-offer-close" id="mobile-offer-close" aria-label="Cerrar oferta">&times;</button>
+            <div class="mobile-offer-media">
+                <img id="mobile-offer-img" alt="">
+                <span class="mobile-offer-discount" id="mobile-offer-discount">Oferta</span>
+            </div>
+            <div class="mobile-offer-body">
+                <span class="mobile-offer-kicker" id="mobile-offer-count">Oferta especial</span>
+                <h3 class="mobile-offer-title" id="mobile-offer-title">Hoy tenemos algo rico en oferta</h3>
+                <p class="mobile-offer-desc" id="mobile-offer-desc">Aprovecha esta promocion antes de que se agote.</p>
+                <div class="mobile-offer-prices">
+                    <strong class="mobile-offer-price" id="mobile-offer-price">$0</strong>
+                    <span class="mobile-offer-old" id="mobile-offer-old"></span>
+                </div>
+                <div class="mobile-offer-list" id="mobile-offer-list"></div>
+                <div class="mobile-offer-actions">
+                    <button type="button" class="mobile-offer-add" id="mobile-offer-add">Añadir al carrito</button>
+                    <button type="button" class="mobile-offer-later" id="mobile-offer-later">Cerrar</button>
+                </div>
+            </div>
+        </section>
+    </div>
 
     <div class="modal-overlay" id="modal-cuenta">
         <div class="modal" style="width:min(760px,96vw);">
@@ -16052,6 +16255,18 @@
         const mobileOrderMetaEl = document.getElementById("mobile-order-meta");
         const mobileOrderViewEl = document.getElementById("mobile-order-view");
         const mobileOrderChatEl = document.getElementById("mobile-order-chat");
+        const mobileOfferPopEl = document.getElementById("mobile-offer-pop");
+        const mobileOfferCloseEl = document.getElementById("mobile-offer-close");
+        const mobileOfferLaterEl = document.getElementById("mobile-offer-later");
+        const mobileOfferAddEl = document.getElementById("mobile-offer-add");
+        const mobileOfferImgEl = document.getElementById("mobile-offer-img");
+        const mobileOfferDiscountEl = document.getElementById("mobile-offer-discount");
+        const mobileOfferCountEl = document.getElementById("mobile-offer-count");
+        const mobileOfferTitleEl = document.getElementById("mobile-offer-title");
+        const mobileOfferDescEl = document.getElementById("mobile-offer-desc");
+        const mobileOfferPriceEl = document.getElementById("mobile-offer-price");
+        const mobileOfferOldEl = document.getElementById("mobile-offer-old");
+        const mobileOfferListEl = document.getElementById("mobile-offer-list");
         const pedidoChatToastEl = document.getElementById("pedido-chat-toast");
         const mobileCatsBubbleEl = document.getElementById("mobile-cats-bubble");
         const mobileCatsBubbleListEl = document.getElementById("mobile-cats-bubble-list");
@@ -16258,6 +16473,7 @@
         let desktopHeroTimer = null;
         let desktopHeroPaused = false;
         const desktopHeroTracked = new Set();
+        const MOBILE_OFFER_SESSION_KEY = "sucree_mobile_offer_seen";
         let flowPagoHabilitado = false;
         let flowSimAdminEnabled = false;
         let tiendaAdminMode = false;
@@ -16265,6 +16481,7 @@
         let adminLongPressTimer = null;
         let adminLongPressTriggered = false;
         let adminProductoEditando = null;
+        let mobileOfferProductId = null;
         let paymentPricingCfg = { flow_enabled: false, rate: 0.0319, iva: 0.19, fixed: 0 };
         let suppressInfoMsgUntil = 0;
         let pedidoEstadoPollTimer = null;
@@ -17893,6 +18110,114 @@
             if (!clean) return "";
             if (/^(data|blob):/i.test(clean)) return clean;
             return `${clean}${clean.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        }
+
+        function _mobileOfferAlreadySeen() {
+            try {
+                return sessionStorage.getItem(MOBILE_OFFER_SESSION_KEY) === "1";
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function _mobileOfferMarkSeen() {
+            try {
+                sessionStorage.setItem(MOBILE_OFFER_SESSION_KEY, "1");
+            } catch (_) {}
+        }
+
+        function _mobileOfferEnabled() {
+            return Boolean(
+                mobileOfferPopEl
+                && document.body.classList.contains("mobile-ui")
+                && !document.body.classList.contains("tienda-preview-agenda")
+                && categoriaActiva !== "AGENDA"
+            );
+        }
+
+        function _mobileOfferPick(ofertas) {
+            const list = Array.isArray(ofertas) ? ofertas : [];
+            return [...list]
+                .filter((p) => Number(p?.id || 0) > 0)
+                .sort((a, b) => {
+                    const img = Number(Boolean(_productoImgSrc(b))) - Number(Boolean(_productoImgSrc(a)));
+                    if (img) return img;
+                    const descuento = n(b?.descuento_tienda_pct) - n(a?.descuento_tienda_pct);
+                    if (descuento) return descuento;
+                    return Number(b?.max_compra || 0) - Number(a?.max_compra || 0);
+                })[0] || null;
+        }
+
+        function cerrarMobileOfferPopup() {
+            if (!mobileOfferPopEl) return;
+            mobileOfferPopEl.classList.remove("active");
+            mobileOfferPopEl.setAttribute("aria-hidden", "true");
+        }
+
+        function maybeShowMobileOfferPopup(ofertas) {
+            if (!_mobileOfferEnabled() || _mobileOfferAlreadySeen()) return;
+            const validOffers = (Array.isArray(ofertas) ? ofertas : [])
+                .filter((p) => n(p?.descuento_tienda_pct) > 0 && Math.max(0, Number(p?.max_compra || 0)) > 0);
+            if (!validOffers.length) return;
+            const p = _mobileOfferPick(validOffers);
+            if (!p) return;
+            const productId = Number(p.id || 0);
+            const oldPriceBase = n(p.precio_base);
+            const finalPriceBase = n(p.precio_final);
+            const oldPrice = flowPagoHabilitado ? _flowPriceFromBase(oldPriceBase) : oldPriceBase;
+            const finalPrice = flowPagoHabilitado ? _flowPriceFromBase(finalPriceBase) : finalPriceBase;
+            const descuento = Math.max(1, Math.round(n(p.descuento_tienda_pct)));
+            const imgSrc = _cacheBustUrl(_productoImgSrc(p));
+            mobileOfferProductId = productId;
+            if (mobileOfferImgEl) {
+                if (imgSrc) {
+                    mobileOfferImgEl.src = imgSrc;
+                    mobileOfferImgEl.alt = String(p.nombre || "Producto en oferta");
+                    mobileOfferImgEl.style.display = "block";
+                } else {
+                    mobileOfferImgEl.removeAttribute("src");
+                    mobileOfferImgEl.alt = "";
+                    mobileOfferImgEl.style.display = "none";
+                }
+            }
+            if (mobileOfferDiscountEl) mobileOfferDiscountEl.textContent = `-${descuento}% oferta`;
+            if (mobileOfferCountEl) {
+                mobileOfferCountEl.textContent = validOffers.length > 1
+                    ? `${validOffers.length} ofertas activas`
+                    : "Oferta activa";
+            }
+            if (mobileOfferTitleEl) mobileOfferTitleEl.textContent = String(p.nombre || "Oferta especial");
+            if (mobileOfferDescEl) {
+                const desc = String(p.descripcion_tienda || "").trim();
+                mobileOfferDescEl.textContent = desc || "Aprovecha este producto con descuento por tiempo limitado.";
+            }
+            if (mobileOfferPriceEl) mobileOfferPriceEl.textContent = money.format(finalPrice);
+            if (mobileOfferOldEl) {
+                mobileOfferOldEl.textContent = oldPrice > finalPrice ? money.format(oldPrice) : "";
+                mobileOfferOldEl.style.display = oldPrice > finalPrice ? "" : "none";
+            }
+            if (mobileOfferListEl) {
+                const otros = validOffers
+                    .filter((item) => Number(item.id || 0) !== productId)
+                    .slice(0, 3);
+                mobileOfferListEl.innerHTML = otros.length
+                    ? otros.map((item) => `<span title="${esc(item.nombre || "")}">${esc(item.nombre || "Oferta")}</span>`).join("")
+                    : "";
+                mobileOfferListEl.style.display = otros.length ? "flex" : "none";
+            }
+            mobileOfferPopEl.classList.add("active");
+            mobileOfferPopEl.setAttribute("aria-hidden", "false");
+            _mobileOfferMarkSeen();
+            _trackTienda("mobile_offer_modal", `/tienda/oferta/${productId}`);
+        }
+
+        function agregarMobileOfferAlCarrito() {
+            const productId = Number(mobileOfferProductId || 0);
+            if (productId > 0) {
+                agregar(productId);
+                _trackTienda("mobile_offer_add", `/tienda/oferta/${productId}`);
+            }
+            cerrarMobileOfferPopup();
         }
 
         function _cssUrl(src) {
@@ -21301,6 +21626,7 @@
             ofertasListEl.innerHTML = ofertas.length
                 ? ofertas.map((p) => cardHtml(p)).join("")
                 : "<div>No hay ofertas activas.</div>";
+            maybeShowMobileOfferPopup(ofertas);
 
             const porCategoria = {};
             visibles.forEach((p) => {
@@ -24089,6 +24415,7 @@
         });
         document.addEventListener("keydown", (ev) => {
             if (ev.key === "Escape") toggleDesktopCart(false);
+            if (ev.key === "Escape") cerrarMobileOfferPopup();
         });
         if (mobileBtnAplicarCuponEl) mobileBtnAplicarCuponEl.addEventListener("click", aplicarCupon);
         document.getElementById("mobile-btn-checkout")?.addEventListener("click", checkout);
@@ -24159,6 +24486,12 @@
         mobileOrderChatEl?.addEventListener("click", () => {
             _abrirModalPedidoChat();
             cerrarPedidoActivoMobile();
+        });
+        mobileOfferCloseEl?.addEventListener("click", cerrarMobileOfferPopup);
+        mobileOfferLaterEl?.addEventListener("click", cerrarMobileOfferPopup);
+        mobileOfferAddEl?.addEventListener("click", agregarMobileOfferAlCarrito);
+        mobileOfferPopEl?.addEventListener("click", (ev) => {
+            if (ev.target === mobileOfferPopEl) cerrarMobileOfferPopup();
         });
         pedidoChatCloseEl?.addEventListener("click", _cerrarModalPedidoChat);
         pedidoChatSendEl?.addEventListener("click", _enviarMensajePedidoChatCliente);
