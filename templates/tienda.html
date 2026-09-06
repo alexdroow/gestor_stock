@@ -14168,6 +14168,9 @@
                 #f6eadc;
             box-shadow: none;
             overflow: hidden;
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center right;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-hero-copy {
@@ -17869,12 +17872,20 @@
         }
 
         function _productoImgSrc(p) {
-            const srcDirect = String(p?.foto_url || "").trim();
-            const rel = String(p?.foto || "").trim();
+            const normalize = (value) => {
+                let clean = String(value || "").trim().replace(/\\/g, "/");
+                if (!clean) return "";
+                if (/^(data|blob):/i.test(clean)) return clean;
+                if (/^\/\//.test(clean)) return `${window.location.protocol}${clean}`;
+                if (/^https?:\/\//i.test(clean)) return clean;
+                if (clean.startsWith("/")) return encodeURI(clean);
+                if (clean.toLowerCase().startsWith("static/")) return encodeURI(`/${clean}`);
+                return encodeURI(`/static/${clean}`);
+            };
+            const srcDirect = normalize(p?.foto_url || p?.imagen_url || "");
+            const rel = normalize(p?.foto || "");
             if (srcDirect) return srcDirect;
-            if (!rel) return "";
-            if (/^(https?:)?\/\//i.test(rel) || rel.startsWith("/")) return rel;
-            return `/static/${rel}`;
+            return rel;
         }
 
         function _cacheBustUrl(src) {
@@ -17910,10 +17921,17 @@
             const productId = Number(p?.id || 0);
             const catalogSrc = _productoImgSrc(p);
             const renderedSrc = _desktopHeroRenderedProductImageSrc(productId);
-            const src = _cacheBustUrl(catalogSrc || renderedSrc);
+            const src = _cacheBustUrl(renderedSrc || catalogSrc);
+            const posX = Math.max(0, Math.min(100, Number(p?.foto_pos_x_tienda ?? 50) || 50));
+            const posY = Math.max(0, Math.min(100, Number(p?.foto_pos_y_tienda ?? 50) || 50));
+            if (tiendaHeroEl) {
+                tiendaHeroEl.style.backgroundImage = src
+                    ? `linear-gradient(90deg, rgba(255,250,243,.98) 0%, rgba(255,250,243,.88) 38%, rgba(255,250,243,.26) 58%, rgba(255,250,243,.08) 100%), url("${_cssUrl(src)}")`
+                    : "";
+                tiendaHeroEl.style.backgroundSize = src ? "cover, cover" : "";
+                tiendaHeroEl.style.backgroundPosition = src ? `center, ${posX}% ${posY}%` : "";
+            }
             if (tiendaHeroMediaEl) {
-                const posX = Math.max(0, Math.min(100, Number(p?.foto_pos_x_tienda ?? 50) || 50));
-                const posY = Math.max(0, Math.min(100, Number(p?.foto_pos_y_tienda ?? 50) || 50));
                 tiendaHeroMediaEl.style.backgroundImage = src
                     ? `linear-gradient(90deg, rgba(248,239,228,.18), rgba(248,239,228,.56)), url("${_cssUrl(src)}")`
                     : "";
@@ -18044,6 +18062,10 @@
             if (!p) {
                 if (tiendaHeroTitleEl) tiendaHeroTitleEl.textContent = "Tu pausa mas dulce.";
                 if (tiendaHeroSubtitleEl) tiendaHeroSubtitleEl.textContent = "Descubre favoritos de Pasteleria Sucree y elige algo rico para compartir.";
+                if (tiendaHeroBadgeEl) {
+                    tiendaHeroBadgeEl.textContent = "";
+                    tiendaHeroBadgeEl.style.display = "none";
+                }
                 if (tiendaHeroCtaEl) {
                     tiendaHeroCtaEl.textContent = "Explorar productos";
                     tiendaHeroCtaEl.href = "#sec-destacados";
@@ -18061,9 +18083,11 @@
                 tiendaHeroSubtitleEl.textContent = desc || `Producto disponible en ${cat}. Ideal para una pausa dulce o para compartir.`;
             }
             if (tiendaHeroBadgeEl) {
-                tiendaHeroBadgeEl.textContent = descuento > 0
+                const badge = descuento > 0
                     ? `Oferta activa -${Math.round(descuento)}%`
-                    : (Boolean(p.destacado_tienda) ? "De los mas pedidos" : "Recomendado segun la hora");
+                    : (Boolean(p.destacado_tienda) ? "De los mas pedidos" : "");
+                tiendaHeroBadgeEl.textContent = badge;
+                tiendaHeroBadgeEl.style.display = badge ? "inline-flex" : "none";
             }
             _desktopHeroApplyImage(p);
             if (tiendaHeroCtaEl) {
