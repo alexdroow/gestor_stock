@@ -2279,7 +2279,7 @@
                         <div>
                             <div class="costeo-eyebrow">Calculadora de venta</div>
                             <h3 class="costeo-title">Costeo producci&oacute;n</h3>
-                            <p class="costeo-subtitle">Cotiza productos nuevos sumando insumos, energia y costos externos. El precio final considera comision Uber 30% e IVA 19%.</p>
+                            <p class="costeo-subtitle">Cotiza productos nuevos sumando insumos, energia y costos externos. Regla: total afecto x2, luego +30% comision y finalmente +19% IVA.</p>
                             <div class="costeo-status" id="costeo-status"></div>
                         </div>
                         <button class="btn-close" onclick="cerrarModalCosteoProduccion()">&#215;</button>
@@ -2377,9 +2377,9 @@
                         <div class="costeo-total-label">Precio de venta sugerido</div>
                         <div class="costeo-total" id="costeo-precio-final">$0</div>
                         <div class="costeo-detail">
-                            <div class="costeo-detail-row"><span>Costos afectos al %</span><strong id="costeo-base-neto">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Total neto afecto</span><strong id="costeo-base-neto">$0</strong></div>
                             <div class="costeo-detail-row"><span>IVA agregado a items</span><strong id="costeo-iva-insumos">$0</strong></div>
-                            <div class="costeo-detail-row"><span>Subtotal base bruto</span><strong id="costeo-base-bruto">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Subtotal x2</span><strong id="costeo-base-bruto">$0</strong></div>
                             <div class="costeo-detail-row"><span>Comision Uber 30%</span><strong id="costeo-comision">$0</strong></div>
                             <div class="costeo-detail-row"><span>IVA venta 19%</span><strong id="costeo-iva-venta">$0</strong></div>
                             <div class="costeo-detail-row"><span>Costos fuera de %</span><strong id="costeo-externos">$0</strong></div>
@@ -2391,7 +2391,7 @@
                         <div class="costeo-detail-row" style="margin-top:12px;"><span>Margen operativo despues de Uber e IVA</span><strong id="costeo-margen">$0</strong></div>
                     </div>
                     <div class="costeo-alert">
-                        Regla aplicada: los costos marcados como base se dividen por 0,70 para cubrir Uber 30% y luego se multiplica por 1,19 para IVA de venta. Los costos externos se suman al final sin porcentaje.
+                        Regla aplicada: suma de items afectos, multiplicado x2, luego se agrega 30% de comision y finalmente 19% de IVA. Los costos externos se suman al final sin porcentaje.
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="reiniciarCosteoProduccion()">Reiniciar</button>
@@ -2863,12 +2863,14 @@
                 externos += gasCosto;
             }
 
-            const precioAntesIvaVenta = baseBruto > 0 ? baseBruto / (1 - COSTEO_UBER) : 0;
-            const comision = Math.max(0, precioAntesIvaVenta * COSTEO_UBER);
-            const ivaVenta = Math.max(0, precioAntesIvaVenta * COSTEO_IVA);
-            const precioFinal = precioAntesIvaVenta * (1 + COSTEO_IVA) + externos;
+            const totalAfecto = baseBruto;
+            const subtotalDoble = totalAfecto * 2;
+            const comision = Math.max(0, subtotalDoble * COSTEO_UBER);
+            const subtotalConComision = subtotalDoble + comision;
+            const ivaVenta = Math.max(0, subtotalConComision * COSTEO_IVA);
+            const precioFinal = subtotalConComision + ivaVenta + externos;
             const precioRedondeado = precioFinal > 0 ? Math.ceil(precioFinal / 100) * 100 : 0;
-            const margenOperativo = Math.max(0, precioRedondeado - externos - ivaVenta - comision - baseBruto);
+            const margenOperativo = Math.max(0, precioRedondeado - externos - ivaVenta - comision - totalAfecto);
 
             return {
                 itemsBase,
@@ -2887,7 +2889,10 @@
                 resumen: {
                     base_neto: baseNeto,
                     iva_insumos: ivaInsumos,
-                    base_bruto: baseBruto,
+                    base_afecta: totalAfecto,
+                    base_bruto: subtotalDoble,
+                    subtotal_x2: subtotalDoble,
+                    subtotal_con_comision: subtotalConComision,
                     comision_uber: comision,
                     iva_venta: ivaVenta,
                     externos,
@@ -3074,7 +3079,7 @@
                 `Costeo produccion: ${nombre}`,
                 `Precio sugerido: ${document.getElementById('costeo-precio-final')?.textContent || '$0'}`,
                 `Precio redondeado: ${document.getElementById('costeo-precio-redondeado')?.textContent || '$0'}`,
-                `Base con IVA item: ${document.getElementById('costeo-base-bruto')?.textContent || '$0'}`,
+                `Subtotal x2: ${document.getElementById('costeo-base-bruto')?.textContent || '$0'}`,
                 `Comision Uber 30%: ${document.getElementById('costeo-comision')?.textContent || '$0'}`,
                 `IVA venta 19%: ${document.getElementById('costeo-iva-venta')?.textContent || '$0'}`,
                 `Costos fuera de %: ${document.getElementById('costeo-externos')?.textContent || '$0'}`
