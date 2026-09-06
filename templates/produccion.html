@@ -2279,7 +2279,7 @@
                         <div>
                             <div class="costeo-eyebrow">Calculadora de venta</div>
                             <h3 class="costeo-title">Costeo producci&oacute;n</h3>
-                            <p class="costeo-subtitle">Cotiza productos nuevos sumando insumos, energia y costos externos. Regla: total afecto x2, luego +30% comision y finalmente +19% IVA.</p>
+                            <p class="costeo-subtitle">Cotiza productos para Uber Eats asegurando utilidad del 100% sobre el costo de fabricacion, cubriendo comision Uber 35,7% e IVA venta 19%.</p>
                             <div class="costeo-status" id="costeo-status"></div>
                         </div>
                         <button class="btn-close" onclick="cerrarModalCosteoProduccion()">&#215;</button>
@@ -2299,23 +2299,12 @@
                         <div class="costeo-card">
                             <div class="costeo-card-head">
                                 <div>
-                                    <div class="costeo-card-title">Items dentro de comision e IVA</div>
-                                    <div class="costeo-card-hint">Ingresa el valor neto. Si marcas Con IVA, se suma 19% al item.</div>
+                                    <div class="costeo-card-title">Costos de fabricacion</div>
+                                    <div class="costeo-card-hint">Ingredientes, energia, gas, packaging y todo lo necesario para vender el producto. Por defecto cada item suma IVA.</div>
                                 </div>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick="agregarItemCosteo('base')">+ Item</button>
                             </div>
                             <div class="costeo-rows" id="costeo-items-base"></div>
-                        </div>
-
-                        <div class="costeo-card">
-                            <div class="costeo-card-head">
-                                <div>
-                                    <div class="costeo-card-title">Items fuera de comision e IVA</div>
-                                    <div class="costeo-card-hint">Costos que quieres sumar aparte, sin aplicar comision Uber ni IVA final.</div>
-                                </div>
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="agregarItemCosteo('externo')">+ Item</button>
-                            </div>
-                            <div class="costeo-rows" id="costeo-items-externos"></div>
                         </div>
 
                         <div class="costeo-card">
@@ -2339,11 +2328,8 @@
                                     <input id="costeo-luz-kwh" type="number" min="0" step="1" value="0" oninput="actualizarCosteoProduccion()">
                                 </label>
                                 <label>
-                                    Aplicar a
-                                    <select id="costeo-luz-tipo" onchange="actualizarCosteoProduccion()">
-                                        <option value="base">Antes de x2, Uber e IVA</option>
-                                        <option value="externo">Fuera de %</option>
-                                    </select>
+                                    IVA luz
+                                    <button type="button" id="costeo-luz-iva" class="costeo-tax-toggle active" data-iva="1" onclick="toggleIvaCosteo(this)">Con IVA</button>
                                 </label>
                             </div>
                             <div class="costeo-card-hint" style="margin-top:10px;">
@@ -2364,11 +2350,8 @@
                                     <input id="costeo-gas-costo" type="number" min="0" step="1" value="0" oninput="actualizarCosteoProduccion()">
                                 </label>
                                 <label>
-                                    Aplicar a
-                                    <select id="costeo-gas-tipo" onchange="actualizarCosteoProduccion()">
-                                        <option value="base">Comision e IVA</option>
-                                        <option value="externo">Fuera de %</option>
-                                    </select>
+                                    IVA gas
+                                    <button type="button" id="costeo-gas-iva" class="costeo-tax-toggle active" data-iva="1" onclick="toggleIvaCosteo(this)">Con IVA</button>
                                 </label>
                             </div>
                         </div>
@@ -2380,21 +2363,22 @@
                         <div class="costeo-total-label">Precio de venta sugerido</div>
                         <div class="costeo-total" id="costeo-precio-final">$0</div>
                         <div class="costeo-detail">
-                            <div class="costeo-detail-row"><span>Total neto afecto</span><strong id="costeo-base-neto">$0</strong></div>
-                            <div class="costeo-detail-row"><span>IVA agregado a items</span><strong id="costeo-iva-insumos">$0</strong></div>
-                            <div class="costeo-detail-row"><span>Subtotal x2</span><strong id="costeo-base-bruto">$0</strong></div>
-                            <div class="costeo-detail-row"><span>Comision Uber 30%</span><strong id="costeo-comision">$0</strong></div>
-                            <div class="costeo-detail-row"><span>IVA venta 19%</span><strong id="costeo-iva-venta">$0</strong></div>
-                            <div class="costeo-detail-row"><span>Costos fuera de %</span><strong id="costeo-externos">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Total neto costos</span><strong id="costeo-base-neto">$0</strong></div>
+                            <div class="costeo-detail-row"><span>IVA agregado a costos</span><strong id="costeo-iva-insumos">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Costo fabricacion</span><strong id="costeo-base-bruto">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Utilidad deseada</span><strong id="costeo-externos">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Ingreso neto objetivo</span><strong id="costeo-ingreso-objetivo">$0</strong></div>
+                            <div class="costeo-detail-row"><span>Comision Uber 35,7%</span><strong id="costeo-comision">$0</strong></div>
+                            <div class="costeo-detail-row"><span>IVA venta SII 19%</span><strong id="costeo-iva-venta">$0</strong></div>
                         </div>
                     </div>
                     <div class="costeo-summary-card">
                         <div class="costeo-total-label">Precio redondeado</div>
                         <div class="costeo-total" id="costeo-precio-redondeado" style="font-size:38px;">$0</div>
-                        <div class="costeo-detail-row" style="margin-top:12px;"><span>Margen operativo despues de Uber e IVA</span><strong id="costeo-margen">$0</strong></div>
+                        <div class="costeo-detail-row" style="margin-top:12px;"><span>Ganancia despues de Uber e IVA</span><strong id="costeo-margen">$0</strong></div>
                     </div>
                     <div class="costeo-alert">
-                        Regla aplicada: suma de items afectos, multiplicado x2, luego se agrega 30% de comision y finalmente 19% de IVA. Los costos externos se suman al final sin porcentaje.
+                        Regla aplicada: costo de fabricacion + utilidad deseada del 100%. El precio publicado se calcula para que, descontando Uber 35,7% e IVA venta 19%, quede cubierto el costo y la utilidad.
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="reiniciarCosteoProduccion()">Reiniciar</button>
@@ -2735,7 +2719,8 @@
         let costeoActualId = null;
         let costeosGuardados = [];
         const COSTEO_IVA = 0.19;
-        const COSTEO_UBER = 0.30;
+        const COSTEO_UBER = 0.357;
+        const COSTEO_UTILIDAD = 1;
         const AGENDA_PRODUCCION_INICIAL = {{ (agenda_produccion_inicial or {"days": [], "resumen": {}, "fecha_desde": "", "fecha_hasta": ""})|tojson }};
         const PLAN_SEMANAL_INICIAL = {{ (plan_semanal_inicial or {"days": [], "resumen": {}})|tojson }};
 
@@ -2771,9 +2756,7 @@
             cargarCosteosProduccion();
             if (!document.querySelector('#costeo-items-base .costeo-row')) {
                 agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0, iva: true });
-            }
-            if (!document.querySelector('#costeo-items-externos .costeo-row')) {
-                agregarItemCosteo('externo', { nombre: 'Packaging / despacho interno', valor: 0, iva: false });
+                agregarItemCosteo('base', { nombre: 'Packaging / despacho interno', valor: 0, iva: true });
             }
             actualizarCosteoProduccion();
         }
@@ -2784,24 +2767,18 @@
         }
 
         function agregarItemCosteo(tipo = 'base', data = {}) {
-            const cont = document.getElementById(tipo === 'externo' ? 'costeo-items-externos' : 'costeo-items-base');
+            const cont = document.getElementById('costeo-items-base');
             if (!cont) return;
             costeoItemSeq += 1;
             const row = document.createElement('div');
-            row.className = tipo === 'externo' ? 'costeo-row costeo-row-simple' : 'costeo-row';
-            row.dataset.costeoTipo = tipo === 'externo' ? 'externo' : 'base';
-            row.innerHTML = tipo === 'externo'
-                ? `
-                    <input type="text" class="costeo-item-nombre" placeholder="Nombre del costo" value="${escapeHtml(data.nombre || '')}" oninput="actualizarCosteoProduccion()">
-                    <input type="number" class="costeo-item-valor" min="0" step="1" value="${Number(data.valor || 0)}" placeholder="$" oninput="actualizarCosteoProduccion()">
-                    <button type="button" class="costeo-remove" title="Quitar item" onclick="quitarItemCosteo(this)">x</button>
-                `
-                : `
-                    <input type="text" class="costeo-item-nombre" placeholder="Nombre del insumo" value="${escapeHtml(data.nombre || '')}" oninput="actualizarCosteoProduccion()">
-                    <input type="number" class="costeo-item-valor" min="0" step="1" value="${Number(data.valor || 0)}" placeholder="$" oninput="actualizarCosteoProduccion()">
-                    <button type="button" class="costeo-tax-toggle ${data.iva === false ? '' : 'active'}" data-iva="${data.iva === false ? '0' : '1'}" onclick="toggleIvaCosteo(this)">${data.iva === false ? 'Sin IVA' : 'Con IVA'}</button>
-                    <button type="button" class="costeo-remove" title="Quitar item" onclick="quitarItemCosteo(this)">x</button>
-                `;
+            row.className = 'costeo-row';
+            row.dataset.costeoTipo = 'base';
+            row.innerHTML = `
+                <input type="text" class="costeo-item-nombre" placeholder="Nombre del costo" value="${escapeHtml(data.nombre || '')}" oninput="actualizarCosteoProduccion()">
+                <input type="number" class="costeo-item-valor" min="0" step="1" value="${Number(data.valor || 0)}" placeholder="$" oninput="actualizarCosteoProduccion()">
+                <button type="button" class="costeo-tax-toggle ${data.iva === false ? '' : 'active'}" data-iva="${data.iva === false ? '0' : '1'}" onclick="toggleIvaCosteo(this)">${data.iva === false ? 'Sin IVA' : 'Con IVA'}</button>
+                <button type="button" class="costeo-remove" title="Quitar item" onclick="quitarItemCosteo(this)">x</button>
+            `;
             cont.appendChild(row);
             actualizarCosteoProduccion();
         }
@@ -2819,6 +2796,10 @@
             btn.classList.toggle('active', activo);
             btn.textContent = activo ? 'Con IVA' : 'Sin IVA';
             actualizarCosteoProduccion();
+        }
+
+        function costeoConIvaActivo(id) {
+            return document.getElementById(id)?.dataset.iva === '1';
         }
 
         function leerItemsCosteo(selector, incluyeIvaToggle = true) {
@@ -2842,70 +2823,66 @@
 
         function leerResumenCosteo() {
             const itemsBase = leerItemsCosteo('#costeo-items-base .costeo-row', true);
-            const itemsExternos = leerItemsCosteo('#costeo-items-externos .costeo-row', false);
             const luzKw = valorInputCosteo('costeo-luz-kw');
             const luzMinutos = valorInputCosteo('costeo-luz-minutos');
             const luzKwh = valorInputCosteo('costeo-luz-kwh');
-            const luzCosto = luzKw * (luzMinutos / 60) * luzKwh;
-            const luzTipo = document.getElementById('costeo-luz-tipo')?.value === 'externo' ? 'externo' : 'base';
-            const gasCosto = valorInputCosteo('costeo-gas-costo');
-            const gasTipo = document.getElementById('costeo-gas-tipo')?.value === 'externo' ? 'externo' : 'base';
+            const luzConIva = costeoConIvaActivo('costeo-luz-iva');
+            const luzNeto = luzKw * (luzMinutos / 60) * luzKwh;
+            const luzIva = luzConIva ? luzNeto * COSTEO_IVA : 0;
+            const luzCosto = luzNeto + luzIva;
+            const gasConIva = costeoConIvaActivo('costeo-gas-iva');
+            const gasNeto = valorInputCosteo('costeo-gas-costo');
+            const gasIva = gasConIva ? gasNeto * COSTEO_IVA : 0;
+            const gasCosto = gasNeto + gasIva;
 
-            let baseBruto = itemsBase.reduce((acc, item) => acc + item.bruto, 0);
-            let baseNeto = itemsBase.reduce((acc, item) => acc + item.neto, 0);
-            let ivaInsumos = itemsBase.reduce((acc, item) => acc + item.iva, 0);
-            let externos = itemsExternos.reduce((acc, item) => acc + item.valor, 0);
-
-            if (luzTipo === 'base') {
-                baseBruto += luzCosto;
-                baseNeto += luzCosto;
-            } else {
-                externos += luzCosto;
-            }
-            if (gasTipo === 'base') {
-                baseBruto += gasCosto;
-                baseNeto += gasCosto;
-            } else {
-                externos += gasCosto;
-            }
-
-            const totalAfecto = baseBruto;
-            const subtotalDoble = totalAfecto * 2;
-            const comision = Math.max(0, subtotalDoble * COSTEO_UBER);
-            const subtotalConComision = subtotalDoble + comision;
-            const ivaVenta = Math.max(0, subtotalConComision * COSTEO_IVA);
-            const precioFinal = subtotalConComision + ivaVenta + externos;
+            const baseNeto = itemsBase.reduce((acc, item) => acc + item.neto, 0) + luzNeto + gasNeto;
+            const ivaInsumos = itemsBase.reduce((acc, item) => acc + item.iva, 0) + luzIva + gasIva;
+            const costoFabricacion = itemsBase.reduce((acc, item) => acc + item.bruto, 0) + luzCosto + gasCosto;
+            const utilidadDeseada = costoFabricacion * COSTEO_UTILIDAD;
+            const ingresoNetoObjetivo = costoFabricacion + utilidadDeseada;
+            const tasaDescuentosVenta = COSTEO_UBER + COSTEO_IVA;
+            const precioFinal = ingresoNetoObjetivo > 0 ? ingresoNetoObjetivo / (1 - tasaDescuentosVenta) : 0;
             const precioRedondeado = precioFinal > 0 ? Math.ceil(precioFinal / 100) * 100 : 0;
-            const margenOperativo = Math.max(0, precioRedondeado - externos - ivaVenta - comision - totalAfecto);
+            const precioCalculoVenta = precioRedondeado || precioFinal;
+            const comision = Math.max(0, precioCalculoVenta * COSTEO_UBER);
+            const ivaVenta = Math.max(0, precioCalculoVenta * COSTEO_IVA);
+            const gananciaReal = Math.max(0, precioCalculoVenta - comision - ivaVenta - costoFabricacion);
 
             return {
                 itemsBase,
-                itemsExternos,
+                itemsExternos: [],
                 luz: {
                     kw: luzKw,
                     minutos: luzMinutos,
                     horas: luzMinutos / 60,
                     kwh: luzKwh,
+                    conIva: luzConIva,
+                    neto: luzNeto,
+                    iva: luzIva,
                     costo: luzCosto,
-                    tipo: luzTipo,
+                    tipo: 'base',
                 },
                 gas: {
+                    conIva: gasConIva,
+                    neto: gasNeto,
+                    iva: gasIva,
                     costo: gasCosto,
-                    tipo: gasTipo,
+                    tipo: 'base',
                 },
                 resumen: {
                     base_neto: baseNeto,
                     iva_insumos: ivaInsumos,
-                    base_afecta: totalAfecto,
-                    base_bruto: subtotalDoble,
-                    subtotal_x2: subtotalDoble,
-                    subtotal_con_comision: subtotalConComision,
+                    base_afecta: costoFabricacion,
+                    base_bruto: costoFabricacion,
+                    costo_fabricacion: costoFabricacion,
+                    utilidad_deseada: utilidadDeseada,
+                    ingreso_neto_objetivo: ingresoNetoObjetivo,
                     comision_uber: comision,
                     iva_venta: ivaVenta,
-                    externos,
+                    externos: 0,
                     precio_final: precioFinal,
                     precio_redondeado: precioRedondeado,
-                    margen_operativo: margenOperativo,
+                    margen_operativo: gananciaReal,
                 },
             };
         }
@@ -2917,7 +2894,7 @@
                 id: forceNuevo ? null : costeoActualId,
                 nombre,
                 items_base: data.itemsBase.map(({ nombre, valor, conIva }) => ({ nombre, valor, conIva })),
-                items_externos: data.itemsExternos.map(({ nombre, valor }) => ({ nombre, valor })),
+                items_externos: [],
                 luz: data.luz,
                 gas: data.gas,
                 resumen: data.resumen,
@@ -2930,16 +2907,15 @@
             const nombre = document.getElementById('costeo-producto-nombre');
             if (nombre) nombre.value = String(payload.nombre || costeo?.nombre || '');
             const base = document.getElementById('costeo-items-base');
-            const externos = document.getElementById('costeo-items-externos');
             if (base) base.innerHTML = '';
-            if (externos) externos.innerHTML = '';
             const itemsBase = Array.isArray(payload.items_base) ? payload.items_base : [];
             const itemsExternos = Array.isArray(payload.items_externos) ? payload.items_externos : [];
-            (itemsBase.length ? itemsBase : [{ nombre: 'Insumos principales', valor: 0, conIva: true }]).forEach((item) => {
+            const itemsFabricacion = [...itemsBase, ...itemsExternos.map((item) => ({ ...item, conIva: item.conIva !== false }))];
+            (itemsFabricacion.length ? itemsFabricacion : [
+                { nombre: 'Insumos principales', valor: 0, conIva: true },
+                { nombre: 'Packaging / despacho interno', valor: 0, conIva: true },
+            ]).forEach((item) => {
                 agregarItemCosteo('base', { nombre: item.nombre, valor: item.valor, iva: item.conIva !== false });
-            });
-            (itemsExternos.length ? itemsExternos : [{ nombre: 'Packaging / despacho interno', valor: 0 }]).forEach((item) => {
-                agregarItemCosteo('externo', { nombre: item.nombre, valor: item.valor, iva: false });
             });
             const luz = payload.luz || {};
             const gas = payload.gas || {};
@@ -2951,11 +2927,21 @@
             setVal('costeo-luz-kw', luz.kw);
             setVal('costeo-luz-minutos', minutosLuz);
             setVal('costeo-luz-kwh', luz.kwh);
-            setVal('costeo-gas-costo', gas.costo);
-            const luzTipo = document.getElementById('costeo-luz-tipo');
-            const gasTipo = document.getElementById('costeo-gas-tipo');
-            if (luzTipo) luzTipo.value = luz.tipo === 'externo' ? 'externo' : 'base';
-            if (gasTipo) gasTipo.value = gas.tipo === 'externo' ? 'externo' : 'base';
+            setVal('costeo-gas-costo', gas.neto ?? gas.costo);
+            const luzIvaBtn = document.getElementById('costeo-luz-iva');
+            const gasIvaBtn = document.getElementById('costeo-gas-iva');
+            if (luzIvaBtn) {
+                const activo = luz.conIva !== false;
+                luzIvaBtn.dataset.iva = activo ? '1' : '0';
+                luzIvaBtn.classList.toggle('active', activo);
+                luzIvaBtn.textContent = activo ? 'Con IVA' : 'Sin IVA';
+            }
+            if (gasIvaBtn) {
+                const activo = gas.conIva !== false;
+                gasIvaBtn.dataset.iva = activo ? '1' : '0';
+                gasIvaBtn.classList.toggle('active', activo);
+                gasIvaBtn.textContent = activo ? 'Con IVA' : 'Sin IVA';
+            }
             actualizarCosteoProduccion();
             setCosteoStatus(costeoActualId ? `Editando resumen #${costeoActualId}` : 'Nuevo resumen');
         }
@@ -2975,7 +2961,8 @@
             setTxt('costeo-base-bruto', resumen.base_bruto);
             setTxt('costeo-comision', resumen.comision_uber);
             setTxt('costeo-iva-venta', resumen.iva_venta);
-            setTxt('costeo-externos', resumen.externos);
+            setTxt('costeo-externos', resumen.utilidad_deseada);
+            setTxt('costeo-ingreso-objetivo', resumen.ingreso_neto_objetivo);
             setTxt('costeo-margen', resumen.margen_operativo);
             setTxt('costeo-luz-costo', data.luz.costo);
             return resumen;
@@ -2986,15 +2973,20 @@
             const nombre = document.getElementById('costeo-producto-nombre');
             if (nombre) nombre.value = '';
             const base = document.getElementById('costeo-items-base');
-            const externos = document.getElementById('costeo-items-externos');
             if (base) base.innerHTML = '';
-            if (externos) externos.innerHTML = '';
             ['costeo-luz-kw', 'costeo-luz-minutos', 'costeo-luz-kwh', 'costeo-gas-costo'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.value = '0';
             });
+            ['costeo-luz-iva', 'costeo-gas-iva'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.dataset.iva = '1';
+                el.classList.add('active');
+                el.textContent = 'Con IVA';
+            });
             agregarItemCosteo('base', { nombre: 'Insumos principales', valor: 0, iva: true });
-            agregarItemCosteo('externo', { nombre: 'Packaging / despacho interno', valor: 0, iva: false });
+            agregarItemCosteo('base', { nombre: 'Packaging / despacho interno', valor: 0, iva: true });
             actualizarCosteoProduccion();
             setCosteoStatus('Nuevo resumen');
         }
@@ -3088,10 +3080,11 @@
                 `Costeo produccion: ${nombre}`,
                 `Precio sugerido: ${document.getElementById('costeo-precio-final')?.textContent || '$0'}`,
                 `Precio redondeado: ${document.getElementById('costeo-precio-redondeado')?.textContent || '$0'}`,
-                `Subtotal x2: ${document.getElementById('costeo-base-bruto')?.textContent || '$0'}`,
-                `Comision Uber 30%: ${document.getElementById('costeo-comision')?.textContent || '$0'}`,
-                `IVA venta 19%: ${document.getElementById('costeo-iva-venta')?.textContent || '$0'}`,
-                `Costos fuera de %: ${document.getElementById('costeo-externos')?.textContent || '$0'}`
+                `Costo fabricacion: ${document.getElementById('costeo-base-bruto')?.textContent || '$0'}`,
+                `Utilidad deseada: ${document.getElementById('costeo-externos')?.textContent || '$0'}`,
+                `Ingreso neto objetivo: ${document.getElementById('costeo-ingreso-objetivo')?.textContent || '$0'}`,
+                `Comision Uber 35,7%: ${document.getElementById('costeo-comision')?.textContent || '$0'}`,
+                `IVA venta SII 19%: ${document.getElementById('costeo-iva-venta')?.textContent || '$0'}`
             ];
             const texto = lineas.join('\n');
             if (navigator.clipboard?.writeText) {
