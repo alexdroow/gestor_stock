@@ -1233,6 +1233,62 @@ def _seguimiento_agenda_label(estado):
     return "Pendiente"
 
 
+def _seguimiento_norm_text(value):
+    raw = str(value or "").strip().lower()
+    raw = unicodedata.normalize("NFKD", raw)
+    raw = "".join(ch for ch in raw if not unicodedata.combining(ch))
+    return re.sub(r"\s+", " ", raw)
+
+
+def _seguimiento_clean_catalog_item(value):
+    txt = str(value or "").strip().lstrip("-").strip()
+    txt = re.sub(r"\s*\(\$[\d\.\,]+\)\s*$", "", txt).strip()
+    return txt
+
+
+def _seguimiento_parse_catalogo(ingredientes):
+    data = {"categoria": "", "tamano": "", "sabores": [], "extras": [], "topper": "", "nota": ""}
+    lines = [str(ln or "").strip() for ln in str(ingredientes or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    lines = [ln for ln in lines if ln]
+    mode = ""
+    for raw in lines:
+        line = str(raw or "").strip()
+        low = _seguimiento_norm_text(line)
+        if low.startswith("categoria:"):
+            data["categoria"] = line.split(":", 1)[1].strip()
+            mode = ""
+            continue
+        if low.startswith("tamano:"):
+            data["tamano"] = line.split(":", 1)[1].strip()
+            mode = ""
+            continue
+        if low in {"sabores:", "rellenos:"}:
+            mode = "sabores"
+            continue
+        if low == "extras:":
+            mode = "extras"
+            continue
+        if low == "topper:":
+            mode = "topper"
+            continue
+        if low.startswith("nota catalogo:"):
+            data["nota"] = line.split(":", 1)[1].strip()
+            mode = ""
+            continue
+        if not line.startswith("-"):
+            continue
+        item = _seguimiento_clean_catalog_item(line)
+        if not item or item == "-":
+            continue
+        if mode == "sabores":
+            data["sabores"].append(item)
+        elif mode == "extras":
+            data["extras"].append(item)
+        elif mode == "topper" and not data["topper"]:
+            data["topper"] = item
+    return data
+
+
 def _seguimiento_agenda_payload(evento):
     ev = dict(evento or {})
     estado = str(ev.get("seguimiento_estado") or "pendiente").strip().lower() or "pendiente"
@@ -1244,13 +1300,29 @@ def _seguimiento_agenda_payload(evento):
     except ValueError:
         indice = 0
     cliente = str(ev.get("cliente") or "").strip()
+    catalogo = _seguimiento_parse_catalogo(ev.get("ingredientes"))
+    es_envio = bool(ev.get("es_envio"))
+    lugar = str(ev.get("direccion") or "").strip() if es_envio else "Sucree Pasteleria"
+    titulo = str(ev.get("titulo") or catalogo.get("categoria") or "Pedido Sucree").strip()
+    tamano = str(catalogo.get("tamano") or "").strip()
+    rellenos = [x for x in (catalogo.get("sabores") or []) if str(x or "").strip()]
+    extras = [x for x in (catalogo.get("extras") or []) if str(x or "").strip()]
     return {
         "codigo_pedido": str(ev.get("codigo_pedido") or "").strip(),
-        "titulo": str(ev.get("titulo") or "Pedido Sucree").strip(),
+        "titulo": titulo,
         "cliente": cliente.split()[0] if cliente else "",
         "fecha": str(ev.get("fecha") or "").strip(),
         "hora": str(ev.get("hora_entrega") or ev.get("hora_inicio") or "").strip(),
-        "modalidad": "Despacho" if bool(ev.get("es_envio")) else "Retiro en tienda",
+        "modalidad": "Despacho" if es_envio else "Retiro en tienda",
+        "modalidad_key": "despacho" if es_envio else "retiro",
+        "lugar": lugar,
+        "categoria": str(catalogo.get("categoria") or "").strip(),
+        "tamano": tamano,
+        "rellenos": rellenos,
+        "relleno_principal": rellenos[0] if rellenos else "",
+        "extras": extras,
+        "topper": str(catalogo.get("topper") or "").strip(),
+        "nota": str(catalogo.get("nota") or "").strip(),
         "estado": estado,
         "estado_label": _seguimiento_agenda_label(estado),
         "estado_actualizado": str(ev.get("seguimiento_actualizado") or ev.get("creado") or "").strip(),
