@@ -4054,8 +4054,9 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
 
     def _draw_section_title(x, y, title, icon=""):
         c.setFillColorRGB(*orange)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(x, y, icon)
+        c.setFont("Helvetica-Bold", 8.2)
+        if icon:
+            c.drawString(x, y, icon)
         c.setFillColorRGB(*text_dark)
         c.setFont("Helvetica-Bold", 8.2)
         c.drawString(x + (14 if icon else 0), y, str(title or "").upper())
@@ -4075,6 +4076,48 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             for n, ln in enumerate(_fit_lines(value, w - label_w - 18, "Helvetica", 7.1, max_lines=1)):
                 c.drawRightString(x + w - 10, yy - (n * 8), ln)
             yy -= row_h
+
+    def _draw_wrapped_text(x, y, text, w, font="Helvetica", size=7.2, leading=9, max_lines=3, color=None):
+        c.setFont(font, size)
+        if color:
+            c.setFillColorRGB(*color)
+        yy = y
+        for ln in _fit_lines(text, w, font, size, max_lines=max_lines):
+            c.drawString(x, yy, ln)
+            yy -= leading
+        return yy
+
+    def _draw_payment_summary(x, y, w, h):
+        _draw_round(x, y, w, h, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+        _draw_section_title(x + 14, y + h - 20, "Resumen de pago")
+        pay_rows = [
+            ("Productos", _fmt_money(subtotal_productos)),
+            ("Despacho", _fmt_money(despacho_total)),
+            ("Descuento", f"-{_fmt_money(descuento_total)}" if descuento_total else "$0"),
+            ("Abono", f"-{_fmt_money(abono)}" if abono else "$0"),
+        ]
+        row_y = y + h - 45
+        for label, value in pay_rows:
+            c.setFillColorRGB(*text_dark)
+            c.setFont("Helvetica-Bold", 8.0)
+            c.drawString(x + 16, row_y, label)
+            c.setFont("Helvetica", 8.8)
+            c.drawRightString(x + w - 16, row_y, value)
+            row_y -= 13
+        band_margin = 12
+        band_h = max(48, min(54, h - 100))
+        band_y = y + 10
+        _draw_round(x + band_margin, band_y, w - (band_margin * 2), band_h, radius=10, stroke=(0.94, 0.82, 0.66), fill=cream, lw=0.5)
+        center_x = x + w / 2
+        c.setFillColorRGB(*brown)
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawCentredString(center_x, band_y + band_h - 17, "TOTAL FINAL")
+        c.setFillColorRGB(*orange)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredString(center_x, band_y + band_h / 2 - 4, _fmt_money(saldo_final))
+        c.setFillColorRGB(*muted)
+        c.setFont("Helvetica", 7.2)
+        c.drawCentredString(center_x, band_y + 9, "Pedido pagado" if saldo_final <= 0.5 else "Saldo pendiente por pagar")
 
     def _draw_image_or_placeholder(x, y, w, h, url):
         img_path = _static_abs_from_url(url)
@@ -4111,6 +4154,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             c.setFont("Helvetica-Bold", 8)
             c.drawCentredString(x + size / 2, y + size / 2, "QR")
 
+    seguimiento_url = f"{_public_base_url()}/seguimiento/{quote(codigo_txt)}" if codigo_txt and codigo_txt != "-" else f"{PUBLIC_BASE_URL}/tienda/agendapedidos"
+
     # Fondo y marco general
     c.setFillColorRGB(*paper)
     c.rect(0, 0, width, height, stroke=0, fill=1)
@@ -4125,8 +4170,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         except Exception:
             pass
     c.setFillColorRGB(*brown)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(150, 742, "COMPROBANTE")
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(150, 740, "COMPROBANTE")
     c.setFillColorRGB(*orange)
     c.drawString(150, 718, "DE PEDIDO")
     c.setStrokeColorRGB(*orange)
@@ -4148,7 +4193,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(503.5, 726, estado_txt)
 
-    # Tarjeta hero del pedido
+    # Tarjeta principal del pedido
     _draw_round(42, 532, 511, 128, radius=13, stroke=brown, fill=brown, lw=0)
     _draw_image_or_placeholder(52, 543, 132, 106, imagen_url)
     c.setFillColorRGB(1, 1, 1)
@@ -4159,32 +4204,47 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.drawString(202, 600, _clip(subtitulo_pedido.upper(), 34))
     c.setFillColorRGB(0.96, 0.90, 0.80)
     c.setFont("Helvetica", 7.5)
-    c.drawString(202, 578, f"Modalidad: {modalidad_txt}")
-    c.drawString(202, 562, f"Entrega: {_fecha_larga(fecha_txt)}")
+    c.drawString(202, 578, f"Tamano: {tamano_txt}")
+    c.drawString(202, 562, f"Fecha: {_fecha_larga(fecha_txt)}")
     c.drawString(202, 546, f"Hora: {hora_txt}")
     c.setStrokeColorRGB(0.72, 0.55, 0.36)
     c.line(418, 548, 418, 626)
     c.setFillColorRGB(*orange)
     c.setFont("Helvetica-Bold", 7.8)
-    c.drawRightString(532, 586, "TOTAL DEL PEDIDO")
-    c.setFont("Helvetica-Bold", 24)
-    c.drawRightString(532, 558, _fmt_money(total_final))
+    c.drawRightString(532, 592, "TOTAL DEL PEDIDO")
+    c.setFont("Helvetica-Bold", 20)
+    c.drawRightString(532, 569, _fmt_money(total_final))
+    c.setFillColorRGB(0.96, 0.90, 0.80)
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawRightString(532, 550, f"Abono registrado: {_fmt_money(abono)}")
+    c.drawRightString(532, 538, f"Saldo pendiente: {_fmt_money(saldo_final)}")
+
+    # Franja destacada de retiro o entrega
+    _draw_round(42, 494, 511, 28, radius=9, stroke=(0.94, 0.82, 0.66), fill=cream, lw=0.5)
+    c.setFillColorRGB(*brown)
+    c.setFont("Helvetica-Bold", 8.2)
+    c.drawString(56, 507, "RETIRO / ENTREGA")
+    c.setFillColorRGB(*text_dark)
+    c.setFont("Helvetica-Bold", 8.6)
+    entrega_resumen = f"{_fecha_larga(fecha_txt)} - {hora_txt} - {modalidad_txt}"
+    c.drawString(168, 507, _clip(entrega_resumen, 58))
+    c.setFont("Helvetica", 7.4)
+    c.drawString(168, 497, _clip(direccion_txt, 72))
 
     # Datos cliente y entrega
-    _draw_round(42, 412, 248, 104, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
-    _draw_round(305, 412, 248, 104, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
-    _draw_section_title(56, 494, "Datos del cliente", "ID")
-    _draw_label_value(56, 472, "Cliente", cliente_txt, w=190)
-    _draw_label_value(56, 442, "Telefono", telefono_txt, w=190)
-    _draw_label_value(170, 442, "Referencia", referencia_cliente, w=95)
-    _draw_section_title(319, 494, "Detalles de entrega", "EN")
-    _draw_label_value(319, 472, "Modalidad", modalidad_txt, w=190)
-    _draw_label_value(319, 442, "Direccion", direccion_txt, w=205)
+    _draw_round(42, 390, 248, 90, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_round(305, 390, 248, 90, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 462, "Datos del cliente")
+    _draw_label_value(56, 443, "Cliente", cliente_txt, w=204)
+    _draw_label_value(56, 415, "Telefono", telefono_txt, w=92)
+    _draw_label_value(166, 415, "Referencia", referencia_cliente, w=100)
+    _draw_section_title(319, 462, "Detalles de entrega")
+    _draw_label_value(319, 443, "Modalidad", modalidad_txt, w=190)
+    _draw_label_value(319, 415, "Lugar", direccion_txt, w=205)
 
     # Resumen pedido y pago
-    _draw_round(42, 250, 300, 146, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
-    _draw_round(356, 250, 197, 146, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
-    _draw_section_title(56, 376, "Resumen del pedido", "PD")
+    _draw_round(42, 222, 300, 154, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 358, "Detalle del pedido")
     resumen_rows = [
         ("Categoria", categoria_txt),
         ("Tamano", tamano_txt),
@@ -4196,80 +4256,69 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         ("Nota", nota_catalogo),
         ("Referencias", f"{len(refs)} archivo(s)" if refs else "-"),
     ]
-    _draw_table(resumen_rows, 50, 260, 284, 104, label_w=82, max_rows=9)
-
-    _draw_section_title(370, 376, "Resumen de pago", "$ ")
-    pay_rows = [
-        ("Productos", _fmt_money(subtotal_productos)),
-        ("Despacho", _fmt_money(despacho_total)),
-        ("Descuento", f"-{_fmt_money(descuento_total)}" if descuento_total else "$0"),
-        ("Abono", f"-{_fmt_money(abono)}" if abono else "$0"),
-    ]
-    yy = 346
-    for label, value in pay_rows:
-        c.setFillColorRGB(*text_dark)
-        c.setFont("Helvetica-Bold", 8.2)
-        c.drawString(374, yy, label)
-        c.setFont("Helvetica", 9.2)
-        c.drawRightString(535, yy, value)
-        yy -= 18
-    c.setStrokeColorRGB(*border)
-    c.line(374, 278, 535, 278)
-    c.setFillColorRGB(*brown)
-    c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(455, 266, "TOTAL FINAL")
-    c.setFillColorRGB(*orange)
-    c.setFont("Helvetica-Bold", 19)
-    c.drawCentredString(455, 247, _fmt_money(saldo_final))
+    _draw_table(resumen_rows, 50, 233, 284, 110, label_w=82, max_rows=9)
+    _draw_payment_summary(356, 222, 197, 154)
 
     # Observaciones
-    _draw_round(42, 204, 511, 34, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
-    _draw_section_title(56, 222, "Observaciones", "NT")
+    _draw_round(42, 176, 511, 34, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 194, "Observaciones")
     obs = _safe_text(_section_value(["detalle", "nota catalogo"], "-"), "-")
     c.setFillColorRGB(*text_dark)
     c.setFont("Helvetica", 7.4)
-    c.drawString(154, 222, _clip(obs, 96))
+    c.drawString(154, 194, _clip(obs, 96))
 
-    # Terminos + QR
-    _draw_round(42, 91, 372, 98, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
-    _draw_section_title(56, 171, "Terminos y condiciones (resumen)", "OK")
+    # Seguimiento con boton y QR enlazados
+    _draw_round(42, 98, 511, 66, radius=10, stroke=brown, fill=brown, lw=0)
+    c.setFillColorRGB(1, 0.96, 0.88)
+    c.setFont("Helvetica-Bold", 10.2)
+    c.drawString(58, 142, "CONSULTA EL ESTADO DE TU PEDIDO")
+    c.setFont("Helvetica", 7.4)
+    c.drawString(58, 130, "Presiona el boton o escanea el QR con tu celular")
+    btn_x, btn_y, btn_w, btn_h = 58, 106, 154, 22
+    _draw_round(btn_x, btn_y, btn_w, btn_h, radius=8, stroke=orange, fill=orange, lw=0)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 8.4)
+    c.drawCentredString(btn_x + btn_w / 2 - 6, btn_y + 7, "Ver estado del pedido")
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(btn_x + btn_w - 20, btn_y + 7, ">")
+    qr_box_x, qr_box_y, qr_box_size = 472, 106, 46
+    _draw_round(qr_box_x - 7, qr_box_y - 7, qr_box_size + 14, qr_box_size + 14, radius=6, stroke=(1, 1, 1), fill=(1, 1, 1), lw=0)
+    _draw_qr(qr_box_x, qr_box_y, qr_box_size, seguimiento_url)
+    try:
+        c.linkURL(seguimiento_url, (btn_x, btn_y, btn_x + btn_w, btn_y + btn_h), relative=0, thickness=0)
+        c.linkURL(seguimiento_url, (qr_box_x - 7, qr_box_y - 7, qr_box_x + qr_box_size + 7, qr_box_y + qr_box_size + 7), relative=0, thickness=0)
+    except Exception:
+        pass
+
+    # Terminos
+    _draw_round(42, 49, 511, 38, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
+    _draw_section_title(56, 76, "Terminos y condiciones")
     terms = [
         "Una vez iniciado el proceso de elaboracion, el abono no es reembolsable.",
         "Las imagenes de referencia son orientativas; el producto final puede variar.",
         "Retiro en local. Si contratas despacho, se coordina mediante reparto externo.",
         "Al realizar el abono, el cliente declara conocer y aceptar estas condiciones.",
     ]
-    ty = 154
     for idx, term in enumerate(terms, start=1):
+        col = 0 if idx <= 2 else 1
+        base_x = 58 if col == 0 else 304
+        ty = 64 if idx in {1, 3} else 53
         c.setFillColorRGB(*orange)
-        c.circle(58, ty + 2, 5, stroke=0, fill=1)
+        c.circle(base_x, ty + 2, 3.8, stroke=0, fill=1)
         c.setFillColorRGB(1, 1, 1)
-        c.setFont("Helvetica-Bold", 6)
-        c.drawCentredString(58, ty, str(idx))
+        c.setFont("Helvetica-Bold", 5)
+        c.drawCentredString(base_x, ty + 0.2, str(idx))
         c.setFillColorRGB(*text_dark)
-        c.setFont("Helvetica", 7.1)
-        c.drawString(70, ty, _clip(term, 86))
-        ty -= 18
-    _draw_round(428, 91, 125, 98, radius=8, stroke=brown, fill=brown, lw=0)
-    c.setFillColorRGB(*orange)
-    c.setFont("Helvetica-Bold", 7)
-    c.drawCentredString(490.5, 170, "ESCANEA PARA VER")
-    c.drawCentredString(490.5, 160, "ESTADO DEL PEDIDO")
-    _draw_round(461, 104, 58, 52, radius=4, stroke=(1, 1, 1), fill=(1, 1, 1), lw=0)
-    seguimiento_url = f"{_public_base_url()}/seguimiento/{quote(codigo_txt)}" if codigo_txt and codigo_txt != "-" else f"{PUBLIC_BASE_URL}/tienda/agendapedidos"
-    _draw_qr(466, 109, 48, seguimiento_url)
-    try:
-        c.linkURL(seguimiento_url, (428, 91, 553, 189), relative=0, thickness=0)
-    except Exception:
-        pass
+        c.setFont("Helvetica", 6.0)
+        c.drawString(base_x + 10, ty, _clip(term, 58))
 
     # Pie de pagina
-    _draw_round(42, 42, 511, 34, radius=7, stroke=brown, fill=brown, lw=0)
+    _draw_round(42, 24, 511, 18, radius=7, stroke=brown, fill=brown, lw=0)
     c.setFillColorRGB(1, 0.96, 0.88)
-    c.setFont("Helvetica", 8)
-    c.drawString(66, 56, "Gracias por preferir Sucree Pasteleria")
-    c.drawCentredString(300, 56, "@sucreepasteleria")
-    c.drawRightString(530, 56, "+56 9 7191 8626")
+    c.setFont("Helvetica", 7.2)
+    c.drawString(66, 31, "Gracias por preferir Sucree Pasteleria")
+    c.drawCentredString(300, 31, "@sucreepasteleria")
+    c.drawRightString(530, 31, "+56 9 7191 8626")
 
     c.save()
     return filename
