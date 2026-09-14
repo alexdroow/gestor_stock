@@ -975,9 +975,14 @@
             border-radius: 18px;
             box-shadow: 0 18px 45px rgba(66, 43, 24, 0.08);
             overflow: hidden;
-            min-height: 620px;
+            min-height: auto;
             display: flex;
             flex-direction: column;
+        }
+
+        .agenda-detail-panel,
+        .agenda-detail-panel * {
+            min-width: 0;
         }
 
         .agenda-detail-empty {
@@ -992,34 +997,35 @@
         }
 
         .agenda-detail-head {
-            padding: 20px 22px 14px;
+            padding: 14px 16px 10px;
             border-bottom: 1px solid #edf0f3;
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 12px;
+            gap: 8px;
         }
 
         .agenda-detail-kicker {
             color: #667085;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 900;
-            margin-bottom: 14px;
+            margin-bottom: 8px;
         }
 
         .agenda-detail-name {
             color: #101828;
-            font-size: 22px;
+            font-size: 18px;
             font-weight: 900;
             line-height: 1.1;
+            overflow-wrap: anywhere;
         }
 
         .agenda-detail-code {
             color: #667085;
-            font-size: 13px;
-            margin-top: 5px;
+            font-size: 11px;
+            margin-top: 3px;
             font-weight: 700;
         }
 
@@ -1033,14 +1039,14 @@
         }
 
         .agenda-detail-body {
-            padding: 16px 22px;
-            overflow-y: auto;
-            max-height: calc(100vh - 250px);
+            padding: 10px 16px;
+            overflow: visible;
+            max-height: none;
         }
 
         .agenda-detail-section {
             border-bottom: 1px solid #edf0f3;
-            padding: 14px 0;
+            padding: 9px 0;
         }
 
         .agenda-detail-section:first-child { padding-top: 0; }
@@ -1049,32 +1055,32 @@
         .agenda-detail-title {
             color: #172033;
             font-weight: 900;
-            font-size: 14px;
-            margin-bottom: 10px;
+            font-size: 13px;
+            margin-bottom: 7px;
         }
 
         .agenda-progress {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-bottom: 12px;
+            gap: 4px;
+            margin-bottom: 8px;
         }
 
         .agenda-progress-step {
             color: #667085;
-            font-size: 11px;
+            font-size: 9px;
             font-weight: 800;
             text-align: center;
             position: relative;
         }
 
         .agenda-progress-dot {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             border-radius: 999px;
             border: 2px solid #cbd5e1;
             background: #fff;
-            margin: 0 auto 6px;
+            margin: 0 auto 4px;
         }
 
         .agenda-progress-step.active .agenda-progress-dot,
@@ -1085,12 +1091,12 @@
 
         .agenda-state-row {
             display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 10px;
+            grid-template-columns: 1fr;
+            gap: 7px;
         }
 
         .agenda-state-row select {
-            height: 42px;
+            height: 34px;
             border: 1px solid #d9e0e8;
             border-radius: 10px;
             padding: 0 12px;
@@ -1099,41 +1105,51 @@
             color: #172033;
         }
 
+        .agenda-state-row .btn-primary {
+            min-height: 34px;
+            padding: 7px 10px;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: none;
+        }
+
         .agenda-detail-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px 16px;
+            gap: 7px 12px;
             color: #475467;
-            font-size: 13px;
+            font-size: 11px;
         }
 
         .agenda-detail-grid strong {
             display: block;
             color: #172033;
-            font-size: 14px;
-            margin-bottom: 3px;
+            font-size: 12px;
+            margin-bottom: 2px;
+            overflow-wrap: anywhere;
         }
 
         .agenda-pay-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 8px;
             color: #475467;
-            font-size: 14px;
-            margin: 8px 0;
+            font-size: 12px;
+            margin: 5px 0;
         }
 
         .agenda-pay-row strong {
             color: #172033;
+            overflow-wrap: anywhere;
         }
 
         .agenda-balance-box {
-            margin-top: 10px;
+            margin-top: 7px;
             background: #fff3e0;
             color: #7c2d12;
             border-radius: 12px;
-            padding: 12px 14px;
+            padding: 9px 11px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -1142,18 +1158,17 @@
 
         .agenda-balance-box .amount {
             color: var(--sucree-orange);
-            font-size: 18px;
+            font-size: 15px;
         }
 
         .agenda-detail-actions {
-            position: sticky;
-            bottom: 0;
+            position: static;
             background: #fff;
-            padding: 14px 22px 18px;
+            padding: 10px 16px 12px;
             border-top: 1px solid #edf0f3;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 7px;
         }
 
         .agenda-detail-actions .primary {
@@ -1162,7 +1177,7 @@
 
         .agenda-detail-actions button,
         .agenda-detail-actions a {
-            min-height: 42px;
+            min-height: 34px;
             border-radius: 10px;
             border: 1px solid #d9e0e8;
             background: #fff;
@@ -1173,6 +1188,7 @@
             justify-content: center;
             align-items: center;
             text-decoration: none;
+            font-size: 12px;
         }
 
         .agenda-detail-actions .primary {
@@ -1182,9 +1198,9 @@
         }
 
         .agenda-quick-edit-hint {
-            margin-top: 10px;
+            margin-top: 6px;
             color: #98a2b3;
-            font-size: 11px;
+            font-size: 9px;
             font-weight: 700;
         }
 
@@ -1206,7 +1222,7 @@
             min-width: 0;
             border: 1px solid #fb923c;
             border-radius: 9px;
-            padding: 8px 10px;
+            padding: 6px 8px;
             color: #172033;
             font: inherit;
             font-weight: 800;
@@ -1216,39 +1232,10 @@
         }
 
         textarea.agenda-quick-input {
-            min-height: 86px;
+            min-height: 52px;
             resize: vertical;
             font-weight: 600;
             line-height: 1.35;
-        }
-
-        .agenda-quick-savebar {
-            display: none;
-            gap: 8px;
-            padding: 10px 22px;
-            border-top: 1px solid #fed7aa;
-            background: #fff7ed;
-        }
-
-        .agenda-quick-savebar.active {
-            display: flex;
-        }
-
-        .agenda-quick-savebar button {
-            flex: 1;
-            border-radius: 10px;
-            border: 1px solid #fdba74;
-            padding: 10px 12px;
-            font-weight: 900;
-            cursor: pointer;
-            background: #fff;
-            color: #7c2d12;
-        }
-
-        .agenda-quick-savebar .save {
-            background: #ea580c;
-            color: #fff;
-            border-color: #ea580c;
         }
 
         .panel-card {
@@ -4291,6 +4278,7 @@
         let agendaQuickEditId = null;
         let agendaQuickEditDraft = null;
         let agendaQuickEditDirty = false;
+        let agendaQuickSaving = false;
         let mapaEvento = {
             lat: null,
             lon: null,
@@ -7824,6 +7812,25 @@
             return evento[field];
         }
 
+        function actualizarNotaCatalogoAgenda(texto, nota) {
+            const cleanNota = String(nota || '').trim();
+            const raw = String(texto || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const lines = raw ? raw.split('\n') : [];
+            let replaced = false;
+            const out = lines.map((line) => {
+                if (String(line || '').trim().toLowerCase().startsWith('nota catalogo:')) {
+                    replaced = true;
+                    return `Nota catalogo: ${cleanNota || '-'}`;
+                }
+                return line;
+            });
+            if (!replaced) {
+                if (out.length && out[out.length - 1].trim() !== '') out.push('');
+                out.push(`Nota catalogo: ${cleanNota || '-'}`);
+            }
+            return out.join('\n').trim();
+        }
+
         function quickEditableAgenda(field, value, type = 'text', extra = {}) {
             const display = extra.display !== undefined ? extra.display : value;
             const attrs = [
@@ -7844,7 +7851,9 @@
             const field = String(node.getAttribute('data-qfield') || '').trim();
             const type = String(node.getAttribute('data-qtype') || 'text').trim();
             const multiline = node.getAttribute('data-qmultiline') === '1';
-            let value = String(valorCampoRapidoAgenda(draft, field) ?? node.getAttribute('data-qvalue') ?? '');
+            let value = field === 'observaciones'
+                ? String(node.getAttribute('data-qvalue') || '')
+                : String(valorCampoRapidoAgenda(draft, field) ?? node.getAttribute('data-qvalue') ?? '');
             let editor;
             if (type === 'select') {
                 editor = document.createElement('select');
@@ -7870,16 +7879,25 @@
             }
             editor.setAttribute('data-qfield', field);
             editor.addEventListener('input', () => actualizarDraftRapidoAgenda(field, editor.value));
-            editor.addEventListener('change', () => actualizarDraftRapidoAgenda(field, editor.value));
+            editor.addEventListener('change', () => {
+                actualizarDraftRapidoAgenda(field, editor.value);
+                if (type === 'select') guardarEdicionRapidaAgenda();
+            });
+            editor.addEventListener('blur', () => {
+                if (editor.dataset.cancelQuickSave === '1') return;
+                actualizarDraftRapidoAgenda(field, editor.value);
+                guardarEdicionRapidaAgenda();
+            });
             editor.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' && !multiline) {
                     event.preventDefault();
                     actualizarDraftRapidoAgenda(field, editor.value);
-                    renderizarPanelDetallePedido();
+                    guardarEdicionRapidaAgenda();
                 }
                 if (event.key === 'Escape') {
                     event.preventDefault();
-                    renderizarPanelDetallePedido();
+                    editor.dataset.cancelQuickSave = '1';
+                    cancelarEdicionRapidaAgenda();
                 }
             });
             node.replaceWith(editor);
@@ -7896,11 +7914,11 @@
                 agendaQuickEditDraft[field] = Math.max(0, Number(value || 0));
             } else if (field === 'observaciones') {
                 agendaQuickEditDraft.motivo = String(value || '').trim();
+                agendaQuickEditDraft.ingredientes = actualizarNotaCatalogoAgenda(agendaQuickEditDraft.ingredientes || '', value);
             } else {
                 agendaQuickEditDraft[field] = String(value || '').trim();
             }
             agendaQuickEditDirty = true;
-            document.getElementById('agenda-quick-savebar')?.classList.add('active');
         }
 
         function cancelarEdicionRapidaAgenda() {
@@ -7912,6 +7930,8 @@
 
         async function guardarEdicionRapidaAgenda() {
             if (!agendaQuickEditDraft || !agendaQuickEditDirty) return;
+            if (agendaQuickSaving) return;
+            agendaQuickSaving = true;
             const payload = {
                 ...agendaQuickEditDraft,
                 id: Number(agendaQuickEditDraft.id || agendaQuickEditId || 0),
@@ -7935,9 +7955,11 @@
                 codigo_pedido: agendaQuickEditDraft.codigo_pedido || '',
                 seguimiento_estado: normalizarEstadoSeguimientoAgenda(agendaQuickEditDraft.seguimiento_estado)
             };
-            if (!payload.id) return;
+            if (!payload.id) {
+                agendaQuickSaving = false;
+                return;
+            }
             try {
-                mostrarLoading(true);
                 const res = await fetch('/api/agenda/evento', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -7958,7 +7980,7 @@
             } catch (error) {
                 alert('[ERROR] ' + String(error.message || error));
             } finally {
-                mostrarLoading(false);
+                agendaQuickSaving = false;
             }
         }
 
@@ -8052,10 +8074,6 @@
                         <div class="agenda-detail-title">Observaciones</div>
                         <div style="color:#475467;line-height:1.45;">${quickEditableAgenda('observaciones', quickObs, 'text', { display: quickObs || obs || 'Sin observaciones', multiline: true })}</div>
                     </section>
-                </div>
-                <div class="agenda-quick-savebar ${agendaQuickEditDirty ? 'active' : ''}" id="agenda-quick-savebar">
-                    <button type="button" class="save" onclick="guardarEdicionRapidaAgenda()">Guardar cambios rapidos</button>
-                    <button type="button" onclick="cancelarEdicionRapidaAgenda()">Cancelar</button>
                 </div>
                 <div class="agenda-detail-actions">
                     <button type="button" class="primary" onclick="editarEvento(${Number(evento.id || 0)})">Editar pedido</button>
