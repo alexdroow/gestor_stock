@@ -7984,6 +7984,240 @@
             }
         }
 
+        function lineaTicket58(label, value) {
+            const v = String(value === null || value === undefined ? '' : value).trim();
+            if (!v || v === '-') return '';
+            return `
+                <div class="row">
+                    <span>${escapeHtml(label)}</span>
+                    <strong>${escapeHtml(v)}</strong>
+                </div>
+            `;
+        }
+
+        function bloqueListaTicket58(title, items) {
+            const list = (Array.isArray(items) ? items : [])
+                .map((item) => String(item || '').trim())
+                .filter((item) => item && item !== '-');
+            if (!list.length) return '';
+            return `
+                <section>
+                    <h2>${escapeHtml(title)}</h2>
+                    ${list.map((item) => `<div class="item">- ${escapeHtml(item)}</div>`).join('')}
+                </section>
+            `;
+        }
+
+        function construirHtmlImpresion58(evento) {
+            const detalle = detalleCatalogoCompletoAgenda(evento);
+            const codigo = String(evento.codigo_pedido || evento.id || '-').trim();
+            const fecha = formatearFechaLarga(String(evento.fecha || ''));
+            const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || '-';
+            const modalidad = textoModalidadAgenda(evento);
+            const lugar = agendaEsDespacho(evento) ? String(evento.direccion || '-') : 'Sucree Pasteleria';
+            const total = Number(evento.total || 0);
+            const abono = Number(evento.abono || 0);
+            const saldo = obtenerSaldoAgenda(evento);
+            const estado = labelEstadoOperativoAgenda(obtenerEstadoOperativoAgenda(evento));
+            const obs = String(evento.motivo || detalle.nota || '').trim();
+            const generado = new Date().toLocaleString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const html = `
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pedido ${escapeHtml(codigo)} - 58mm</title>
+<style>
+    @page { size: 58mm auto; margin: 3mm; }
+    * { box-sizing: border-box; }
+    html, body {
+        width: 58mm;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+        color: #111;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10.5px;
+        line-height: 1.25;
+    }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .ticket {
+        width: 52mm;
+        padding: 0;
+        margin: 0 auto;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .center { text-align: center; }
+    .brand {
+        font-size: 17px;
+        font-weight: 900;
+        letter-spacing: .3px;
+        margin: 0;
+    }
+    .sub {
+        font-size: 9px;
+        letter-spacing: 1.2px;
+        margin-top: 1px;
+        text-transform: uppercase;
+    }
+    .code {
+        border: 1px solid #111;
+        border-radius: 4px;
+        padding: 4px 3px;
+        margin: 6px 0;
+        text-align: center;
+        font-weight: 900;
+        font-size: 11px;
+    }
+    .sep {
+        border: 0;
+        border-top: 1px dashed #111;
+        margin: 6px 0;
+    }
+    h2 {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        margin: 6px 0 3px;
+        padding-bottom: 2px;
+        border-bottom: 1px solid #111;
+    }
+    .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 5px;
+        margin: 2px 0;
+    }
+    .row span {
+        color: #333;
+        flex: 0 0 19mm;
+    }
+    .row strong {
+        text-align: right;
+        flex: 1;
+        font-weight: 800;
+    }
+    .item {
+        margin: 2px 0;
+        padding-left: 1px;
+    }
+    .total-box {
+        border: 1px solid #111;
+        border-radius: 5px;
+        padding: 5px 4px;
+        margin-top: 5px;
+    }
+    .saldo {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 900;
+        margin-top: 4px;
+        padding-top: 4px;
+        border-top: 1px dashed #111;
+    }
+    .note {
+        white-space: pre-wrap;
+        margin-top: 3px;
+    }
+    .foot {
+        text-align: center;
+        font-size: 9px;
+        margin-top: 8px;
+    }
+    @media print {
+        .no-print { display: none !important; }
+        html, body { width: 58mm; }
+        .ticket { width: 52mm; }
+    }
+</style>
+</head>
+<body>
+<main class="ticket">
+    <div class="center">
+        <div class="brand">SUCR&Eacute;E</div>
+        <div class="sub">Pasteleria</div>
+        <div>Comprobante interno de pedido</div>
+    </div>
+    <div class="code">${escapeHtml(codigo)}</div>
+    ${lineaTicket58('Estado', estado)}
+    ${lineaTicket58('Cliente', evento.cliente || 'Sin cliente')}
+    ${lineaTicket58('Telefono', evento.telefono || '-')}
+    ${lineaTicket58('Emitido', generado)}
+    <hr class="sep">
+    <section>
+        <h2>Entrega</h2>
+        ${lineaTicket58('Fecha', fecha)}
+        ${lineaTicket58('Hora', hora)}
+        ${lineaTicket58('Modalidad', modalidad)}
+        ${lineaTicket58('Lugar', lugar)}
+    </section>
+    <section>
+        <h2>Producto</h2>
+        ${lineaTicket58('Tipo', detalle.categoria || evento.titulo || 'Pedido')}
+        ${lineaTicket58('Tamano', detalle.tamano || '-')}
+        ${lineaTicket58('Topper', detalle.topper || 'Sin topper')}
+    </section>
+    ${bloqueListaTicket58('Rellenos / Sabores', detalle.sabores)}
+    ${bloqueListaTicket58('Extras', detalle.extras)}
+    <section>
+        <h2>Pago</h2>
+        <div class="total-box">
+            ${lineaTicket58('Total', formatoMonedaCLP(total))}
+            ${lineaTicket58('Abono', formatoMonedaCLP(abono))}
+            <div class="saldo">
+                <span>${saldo > 0 ? 'Saldo pendiente' : 'Pedido pagado'}</span>
+                <strong>${escapeHtml(formatoMonedaCLP(saldo))}</strong>
+            </div>
+        </div>
+    </section>
+    <section>
+        <h2>Observaciones</h2>
+        <div class="note">${escapeHtml(obs || '-')}</div>
+    </section>
+    <hr class="sep">
+    <div class="foot">
+        Gracias por preferir Sucr&eacute;e Pasteleria<br>
+        +56 9 7191 8626
+    </div>
+</main>
+</body>
+</html>`;
+            return html;
+        }
+
+        function imprimirPedido58mm(idEvento = null) {
+            const idNum = Number(idEvento || agendaDetalleId || 0);
+            const eventoBase = eventos.find((e) => Number(e.id || 0) === idNum);
+            if (!eventoBase) {
+                alert('Selecciona un pedido para imprimir.');
+                return;
+            }
+            const evento = eventoVistaPanelAgenda(eventoBase);
+            const win = window.open('', '_blank', 'width=360,height=720');
+            if (!win) {
+                alert('No se pudo abrir la ventana de impresion. Revisa el bloqueo de ventanas emergentes.');
+                return;
+            }
+            win.document.open();
+            win.document.write(construirHtmlImpresion58(evento));
+            win.document.close();
+            setTimeout(() => {
+                try {
+                    win.focus();
+                    win.print();
+                } catch (_) {}
+            }, 350);
+        }
+
         function pasosSeguimientoAgenda(estado) {
             const orden = ['recepcionado', 'produccion', 'espera_envio', 'entregado'];
             const idx = Math.max(0, orden.indexOf(estado));
@@ -8011,7 +8245,6 @@
             const abono = Number(evento.abono || 0);
             const saldo = obtenerSaldoAgenda(evento);
             const codigo = String(evento.codigo_pedido || evento.id || '-').trim();
-            const tracking = seguimientoUrlPedido(codigo);
             const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || '-';
             const direccion = agendaEsDespacho(evento) ? String(evento.direccion || '-') : 'Sucree Pasteleria';
             const obs = String(detalle.nota || evento.motivo || evento.ingredientes || '').trim();
@@ -8078,7 +8311,7 @@
                 <div class="agenda-detail-actions">
                     <button type="button" class="primary" onclick="editarEvento(${Number(evento.id || 0)})">Editar pedido</button>
                     <button type="button" onclick="generarPdfDesdeResumen(${Number(evento.id || 0)})">Descargar PDF</button>
-                    ${tracking ? `<a href="${escapeHtml(tracking)}" target="_blank" rel="noopener noreferrer">Ver seguimiento</a>` : '<button type="button" disabled>Sin seguimiento</button>'}
+                    <button type="button" onclick="imprimirPedido58mm(${Number(evento.id || 0)})">Imprimir 58mm</button>
                 </div>
             `;
         }
