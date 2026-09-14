@@ -224,7 +224,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/asistente-sucree", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
     if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):
         return True
@@ -235,6 +235,8 @@ def _ruta_es_publica(path):
     if ruta.startswith("/api/valoracion/"):
         return True
     if ruta.startswith("/api/seguimiento/"):
+        return True
+    if ruta.startswith("/api/asistente/public"):
         return True
     return False
 
@@ -22278,6 +22280,628 @@ def api_costo_receta(id):
         return jsonify({'success': False, 'error': str(e)}), 500
     
    
+# ============================================================================
+# ASISTENTE IA SUCREE - Base controlada + acciones validadas
+# ============================================================================
+
+_ASISTENTE_PUBLIC_RATE = {}
+_ASISTENTE_PUBLIC_RATE_WINDOW = 60
+_ASISTENTE_PUBLIC_RATE_MAX = 30
+
+
+def _asistente_now():
+    return datetime.now(ZoneInfo("America/Santiago")).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _asistente_scope(internal=False):
+    return "internal" if internal else "public"
+
+
+def _asistente_actor(internal=False):
+    if internal:
+        return str(session.get(_ADMIN_USER_NAME_SESSION_KEY) or "admin").strip() or "admin"
+    return f"public:{_admin_client_ip()}"
+
+
+def _asistente_rate_limit_publico():
+    ip = _admin_client_ip()
+    now = time.time()
+    bucket = [t for t in _ASISTENTE_PUBLIC_RATE.get(ip, []) if now - float(t or 0) <= _ASISTENTE_PUBLIC_RATE_WINDOW]
+    if len(bucket) >= _ASISTENTE_PUBLIC_RATE_MAX:
+        _ASISTENTE_PUBLIC_RATE[ip] = bucket
+        return False
+    bucket.append(now)
+    _ASISTENTE_PUBLIC_RATE[ip] = bucket
+    return True
+
+
+def _ensure_asistente_tables(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS asistente_kb (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope TEXT NOT NULL DEFAULT 'public',
+            titulo TEXT NOT NULL,
+            contenido TEXT NOT NULL,
+            activo INTEGER NOT NULL DEFAULT 1,
+            creado_por TEXT,
+            actualizado_por TEXT,
+            creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+            actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS asistente_conversaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            actor TEXT,
+            mensaje TEXT,
+            respuesta TEXT,
+            draft_json TEXT,
+            creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS asistente_acciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope TEXT NOT NULL,
+            actor TEXT,
+            accion TEXT NOT NULL,
+            payload_json TEXT,
+            resultado_json TEXT,
+            success INTEGER NOT NULL DEFAULT 0,
+            creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    row = cursor.execute("SELECT COUNT(*) AS c FROM asistente_kb").fetchone()
+    if int((row["c"] if row else 0) or 0) <= 0:
+        defaults = [
+            ("public", "Pedidos de tortas", "Ayuda al cliente a elegir categoria, tamano, rellenos, extras, fecha, hora y modalidad. Antes de registrar, muestra un resumen y solicita confirmacion explicita."),
+            ("public", "Retiro y despacho", "El retiro en tienda se coordina por fecha y hora. Para despacho se debe confirmar una direccion valida; si no hay pin o coordenadas, deriva a atencion humana."),
+            ("public", "Pagos", "Los pedidos de torta pueden requerir abono y validacion del equipo. Una afirmacion del cliente no verifica pagos automaticamente."),
+            ("internal", "Uso interno", "El asistente interno puede consultar agenda, catalogo y crear borradores o pedidos cuando el usuario autenticado lo solicite y todos los datos esten completos."),
+            ("internal", "Seguridad", "No ejecutar consultas libres ni cambios fuera de herramientas validadas. Registrar acciones con usuario, payload y resultado."),
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO asistente_kb (scope, titulo, contenido, activo, creado_por, actualizado_por)
+            VALUES (?, ?, ?, 1, 'sistema', 'sistema')
+            """,
+            defaults,
+        )
+
+
+def _asistente_kb_list(scope="public", include_inactive=False):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        _ensure_asistente_tables(cur)
+        scopes = ["public"] if scope == "public" else ["public", "internal"]
+        q_marks = ",".join("?" for _ in scopes)
+        where = f"scope IN ({q_marks})"
+        params = list(scopes)
+        if not include_inactive:
+            where += " AND activo = 1"
+        rows = cur.execute(
+            f"""
+            SELECT id, scope, titulo, contenido, activo, creado_por, actualizado_por, creado_en, actualizado_en
+            FROM asistente_kb
+            WHERE {where}
+            ORDER BY scope, id DESC
+            """,
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def _asistente_log_conversacion(scope, session_id, actor, mensaje, respuesta, draft):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_asistente_tables(cur)
+        cur.execute(
+            """
+            INSERT INTO asistente_conversaciones (scope, session_id, actor, mensaje, respuesta, draft_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(scope or "public"),
+                str(session_id or "")[:120],
+                str(actor or "")[:120],
+                str(mensaje or "")[:4000],
+                str(respuesta or "")[:4000],
+                json.dumps(draft or {}, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _asistente_log_accion(scope, actor, accion, payload, resultado, success=False):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_asistente_tables(cur)
+        cur.execute(
+            """
+            INSERT INTO asistente_acciones (scope, actor, accion, payload_json, resultado_json, success)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(scope or "public"),
+                str(actor or "")[:120],
+                str(accion or "")[:120],
+                json.dumps(payload or {}, ensure_ascii=False)[:8000],
+                json.dumps(resultado or {}, ensure_ascii=False)[:8000],
+                1 if success else 0,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _asistente_norm(value):
+    txt = str(value or "").strip().lower()
+    txt = unicodedata.normalize("NFKD", txt)
+    txt = "".join(ch for ch in txt if not unicodedata.combining(ch))
+    return re.sub(r"\s+", " ", txt)
+
+
+def _asistente_catalogo_torta():
+    cfg = _obtener_tienda_personalizacion()
+    return _catalogo_torta_publico((cfg or {}).get("catalogo_torta") or {})
+
+
+def _asistente_find_by_text(items, text, aliases=None):
+    norm_text = _asistente_norm(text)
+    best = None
+    for item in (items or []):
+        nombre = _asistente_norm(item.get("nombre") or item.get("name") or item.get("id"))
+        iid = _asistente_norm(item.get("id"))
+        variants = [nombre, iid]
+        for extra in (aliases or {}).get(str(item.get("id") or ""), []) if isinstance(aliases, dict) else []:
+            variants.append(_asistente_norm(extra))
+        for variant in variants:
+            if variant and variant in norm_text:
+                if not best or len(variant) > len(_asistente_norm(best.get("nombre") or best.get("id"))):
+                    best = item
+    return best
+
+
+def _asistente_extraer_fecha(texto):
+    raw = str(texto or "")
+    low = _asistente_norm(raw)
+    now = datetime.now(ZoneInfo("America/Santiago"))
+    m = re.search(r"\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b", raw)
+    if m:
+        return f"{int(m.group(1)):04d}-{int(m.group(2)):02d}-{int(m.group(3)):02d}", None
+    m = re.search(r"\b(\d{1,2})[-/](\d{1,2})(?:[-/](\d{2,4}))?\b", raw)
+    if m:
+        year = int(m.group(3) or now.year)
+        if year < 100:
+            year += 2000
+        return f"{year:04d}-{int(m.group(2)):02d}-{int(m.group(1)):02d}", None
+    if "manana" in low:
+        return (now + timedelta(days=1)).strftime("%Y-%m-%d"), None
+    if "hoy" in low:
+        return now.strftime("%Y-%m-%d"), None
+    dias = {"lunes": 0, "martes": 1, "miercoles": 2, "jueves": 3, "viernes": 4, "sabado": 5, "domingo": 6}
+    for nombre, idx in dias.items():
+        if f"proximo {nombre}" in low or f"próximo {nombre}" in raw.lower():
+            return None, f"Necesito confirmar la fecha exacta para 'proximo {nombre}'. Indicamela como DD/MM o AAAA-MM-DD."
+        if nombre in low:
+            delta = (idx - now.weekday()) % 7
+            if delta == 0:
+                delta = 7
+            return (now + timedelta(days=delta)).strftime("%Y-%m-%d"), None
+    return None, None
+
+
+def _asistente_extraer_hora(texto):
+    raw = str(texto or "")
+    m = re.search(r"\b([01]?\d|2[0-3])[:\.h]([0-5]\d)\b", raw, re.I)
+    if m:
+        return f"{int(m.group(1)):02d}:{int(m.group(2)):02d}", None
+    m = re.search(r"\b(?:a las|para las|hora)\s+([01]?\d|2[0-3])\b", raw, re.I)
+    if m:
+        return f"{int(m.group(1)):02d}:00", None
+    low = _asistente_norm(raw)
+    if "tarde" in low or "manana" in low or "mediodia" in low:
+        return None, "Necesito una hora exacta para agendar, por ejemplo 18:00."
+    return None, None
+
+
+def _asistente_extraer_datos(texto, draft=None):
+    draft = dict(draft or {})
+    msg = str(texto or "")
+    catalogo = _asistente_catalogo_torta()
+    categoria = _asistente_find_by_text(catalogo.get("categorias"), msg)
+    size = _asistente_find_by_text(catalogo.get("sizes"), msg)
+    if not size:
+        personas_match = re.search(r"\b(\d{1,3})\s*(?:personas|pers|pax)\b", _asistente_norm(msg))
+        if personas_match:
+            needle = f"{int(personas_match.group(1))} personas"
+            for candidate in (catalogo.get("sizes") or []):
+                if needle in _asistente_norm(candidate.get("nombre")):
+                    size = candidate
+                    break
+    if categoria:
+        draft["categoria_id"] = str(categoria.get("id") or "")
+    if size:
+        draft["size_id"] = str(size.get("id") or "")
+        if not draft.get("categoria_id") and size.get("categoria_id"):
+            draft["categoria_id"] = str(size.get("categoria_id") or "")
+    sabor_ids = set(str(x or "") for x in (draft.get("sabor_ids") or []) if str(x or ""))
+    for sabor in (catalogo.get("sabores") or []):
+        if _asistente_find_by_text([sabor], msg):
+            sabor_ids.add(str(sabor.get("id") or ""))
+    if sabor_ids:
+        draft["sabor_ids"] = list(sabor_ids)
+    extra_items = {str(x.get("id")): int(x.get("qty") or 1) for x in (draft.get("extra_items") or []) if isinstance(x, dict) and str(x.get("id") or "")}
+    for extra in (catalogo.get("extras") or []):
+        if _asistente_find_by_text([extra], msg):
+            extra_items[str(extra.get("id") or "")] = max(1, int(extra_items.get(str(extra.get("id") or ""), 1)))
+    if extra_items:
+        draft["extra_items"] = [{"id": k, "qty": v} for k, v in extra_items.items() if k]
+    topper = _asistente_find_by_text(catalogo.get("toppers"), msg)
+    if topper:
+        draft["topper_id"] = str(topper.get("id") or "")
+    if "sin topper" in _asistente_norm(msg):
+        draft["topper_id"] = ""
+    fecha, fecha_warn = _asistente_extraer_fecha(msg)
+    hora, hora_warn = _asistente_extraer_hora(msg)
+    if fecha:
+        draft["fecha"] = fecha
+    if hora:
+        draft["hora_inicio"] = hora
+    email_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", msg, re.I)
+    if email_match:
+        draft["email"] = email_match.group(0).strip().lower()
+    tel_digits = re.sub(r"\D+", "", msg)
+    if len(tel_digits) >= 8:
+        draft["telefono"] = f"+569{tel_digits[-8:]}"
+    name_match = re.search(r"(?:para|cliente|nombre)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{3,80}?)(?:,|\.|\s+de\s+|\s+con\s+|\s+para\s+retirar|\s+retiro|\s+retira|\s+despacho|\s+el\s+|$)", msg, re.I)
+    if name_match:
+        nombre = re.sub(r"\s+", " ", name_match.group(1)).strip()
+        if len(nombre) >= 3:
+            draft["nombre"] = nombre
+    low = _asistente_norm(msg)
+    if "despacho" in low or "delivery" in low or "enviar" in low:
+        draft["entrega_tipo"] = "despacho"
+    if "retiro" in low or "retirar" in low or "tienda" in low:
+        draft["entrega_tipo"] = "retiro"
+    dir_match = re.search(r"(?:direccion|dirección|despacho en|enviar a)\s*:?\s*(.{8,180})", msg, re.I)
+    if dir_match:
+        draft["direccion"] = dir_match.group(1).strip()[:180]
+    warnings = [x for x in [fecha_warn, hora_warn] if x]
+    return draft, warnings
+
+
+def _asistente_payload_catalogo(draft):
+    return {
+        "categoria_id": str((draft or {}).get("categoria_id") or ""),
+        "size_id": str((draft or {}).get("size_id") or ""),
+        "sabor_ids": list((draft or {}).get("sabor_ids") or []),
+        "extra_items": list((draft or {}).get("extra_items") or []),
+        "topper_id": str((draft or {}).get("topper_id") or ""),
+        "referencia_urls": list((draft or {}).get("referencia_urls") or []),
+        "nota": str((draft or {}).get("nota") or ""),
+    }
+
+
+def _asistente_cotizar_draft(draft):
+    catalogo = _asistente_catalogo_torta()
+    if not bool(catalogo.get("enabled")):
+        raise ValueError("El catalogo de tortas no esta habilitado en este momento.")
+    return _validar_payload_catalogo_torta(_asistente_payload_catalogo(draft), catalogo)
+
+
+def _asistente_missing_fields(draft, cotizacion_ok=False):
+    faltan = []
+    if not (draft or {}).get("size_id"):
+        faltan.append("tamano")
+    if not (draft or {}).get("sabor_ids"):
+        faltan.append("relleno")
+    if not (draft or {}).get("fecha"):
+        faltan.append("fecha")
+    if not (draft or {}).get("hora_inicio"):
+        faltan.append("hora")
+    if not (draft or {}).get("entrega_tipo"):
+        faltan.append("retiro o despacho")
+    if not (draft or {}).get("nombre"):
+        faltan.append("nombre del cliente")
+    if not (draft or {}).get("email"):
+        faltan.append("correo")
+    if not (draft or {}).get("telefono"):
+        faltan.append("telefono")
+    if (draft or {}).get("entrega_tipo") == "despacho":
+        faltan.append("confirmacion de direccion con mapa (pendiente en asistente v1)")
+    return faltan
+
+
+def _fmt_clp(value):
+    try:
+        n = int(round(float(value or 0)))
+    except (TypeError, ValueError):
+        n = 0
+    return f"${n:,}".replace(",", ".")
+
+
+def _asistente_resumen(draft, cotizacion=None):
+    cot = cotizacion or None
+    if not cot:
+        try:
+            cot = _asistente_cotizar_draft(draft)
+        except Exception:
+            cot = None
+    partes = []
+    if cot:
+        categoria = (cot.get("categoria") or {}).get("nombre") or "Torta"
+        size = (cot.get("size") or {}).get("nombre") or "Tamano"
+        sabores = ", ".join((x.get("nombre") or "") for x in (cot.get("sabores") or []) if x.get("nombre")) or "-"
+        extras = ", ".join(f"{x.get('nombre')} x{int(x.get('qty') or 1)}" for x in (cot.get("extras") or [])) or "Sin extras"
+        topper = (cot.get("topper") or {}).get("nombre") if cot.get("topper") else "Sin topper"
+        partes.append(f"Producto: {categoria}")
+        partes.append(f"Tamano: {size}")
+        partes.append(f"Rellenos: {sabores}")
+        partes.append(f"Extras: {extras}")
+        partes.append(f"Topper: {topper}")
+        partes.append(f"Precio productos: {_fmt_clp(cot.get('subtotal') or 0)}")
+    partes.append(f"Cliente: {draft.get('nombre') or '-'}")
+    partes.append(f"Contacto: {draft.get('email') or '-'} / {draft.get('telefono') or '-'}")
+    partes.append(f"Entrega: {draft.get('entrega_tipo') or '-'}")
+    partes.append(f"Fecha y hora: {draft.get('fecha') or '-'} {draft.get('hora_inicio') or ''}".strip())
+    return "\n".join(partes)
+
+
+def _asistente_crear_reserva(draft):
+    payload = {
+        "tipo": "torta",
+        "fecha": draft.get("fecha"),
+        "hora_inicio": draft.get("hora_inicio"),
+        "nombre": draft.get("nombre"),
+        "email": draft.get("email"),
+        "telefono": draft.get("telefono"),
+        "detalle": str(draft.get("nota") or "Creado desde asistente Sucree")[:400],
+        "entrega_tipo": draft.get("entrega_tipo") or "retiro",
+        "direccion": draft.get("direccion") or "",
+        "direccion_confirmada": bool(draft.get("direccion_confirmada")),
+        "lat": draft.get("lat") or 0,
+        "lng": draft.get("lng") or 0,
+        "catalogo_torta": _asistente_payload_catalogo(draft),
+    }
+    with app.test_client() as client:
+        resp = client.post("/api/tienda/agenda/reservar", json=payload)
+        try:
+            data = resp.get_json() or {}
+        except Exception:
+            data = {"success": False, "error": resp.get_data(as_text=True)}
+    if not data.get("success"):
+        raise ValueError(str(data.get("error") or "No se pudo crear la reserva"))
+    reserva = data.get("reserva") or {}
+    pdf_url = ""
+    try:
+        with app.test_client() as client:
+            pdf_resp = client.post(
+                f"/api/tienda/agenda/reserva/{int(reserva.get('id') or 0)}/pdf",
+                json={"email": payload["email"], "telefono": payload["telefono"], "codigo_pedido": reserva.get("codigo_pedido")},
+            )
+            pdf_data = pdf_resp.get_json() or {}
+            if pdf_data.get("success"):
+                pdf_url = str(pdf_data.get("media_url") or "")
+    except Exception:
+        pdf_url = ""
+    if pdf_url:
+        reserva["pdf_url"] = pdf_url
+    codigo = str(reserva.get("codigo_pedido") or "")
+    if codigo:
+        reserva["seguimiento_url"] = f"{_public_base_url(request.url_root)}/seguimiento/{quote(codigo)}"
+    return reserva
+
+
+def _asistente_catalogo_respuesta():
+    cat = _asistente_catalogo_torta()
+    cats = ", ".join(x.get("nombre") or "" for x in (cat.get("categorias") or [])[:8]) or "sin categorias"
+    sizes = ", ".join(x.get("nombre") or "" for x in (cat.get("sizes") or [])[:8]) or "sin tamanos"
+    sabores = ", ".join(x.get("nombre") or "" for x in (cat.get("sabores") or [])[:12]) or "sin rellenos"
+    return f"Catalogo de tortas disponible:\nCategorias: {cats}.\nTamanos: {sizes}.\nRellenos: {sabores}. Puedes pedirme una cotizacion con fecha, hora y datos del cliente."
+
+
+def _asistente_chat(scope, data):
+    internal = scope == "internal"
+    session_id = str(data.get("session_id") or uuid.uuid4().hex)[:120]
+    actor = _asistente_actor(internal=internal)
+    msg = str(data.get("message") or "").strip()[:4000]
+    draft_in = data.get("draft") if isinstance(data.get("draft"), dict) else {}
+    confirm = bool(data.get("confirm")) or _asistente_norm(msg) in {"confirmo", "confirmar", "si confirmo", "crear pedido", "agendar pedido"}
+    draft, warnings = _asistente_extraer_datos(msg, draft_in)
+    low = _asistente_norm(msg)
+    action = None
+    cotizacion = None
+    if any(word in low for word in ["catalogo", "opciones", "rellenos", "tamanos", "sabores"]):
+        reply = _asistente_catalogo_respuesta()
+    else:
+        try:
+            if draft.get("size_id") and draft.get("sabor_ids"):
+                cotizacion = _asistente_cotizar_draft(draft)
+        except Exception as e:
+            reply = f"Hay una combinacion que debo corregir antes de cotizar: {e}"
+            return {"success": True, "reply": reply, "draft": draft, "session_id": session_id, "warnings": warnings}
+        faltan = _asistente_missing_fields(draft, cotizacion_ok=bool(cotizacion))
+        if warnings:
+            reply = " ".join(warnings)
+        elif confirm and not faltan and cotizacion:
+            try:
+                reserva = _asistente_crear_reserva(draft)
+                action = {"type": "created_order", "reserva": reserva}
+                reply = (
+                    "Pedido creado correctamente.\n"
+                    f"Codigo: {reserva.get('codigo_pedido') or reserva.get('id')}\n"
+                    f"Seguimiento: {reserva.get('seguimiento_url') or '-'}"
+                )
+                if reserva.get("pdf_url"):
+                    reply += f"\nComprobante: {reserva.get('pdf_url')}"
+                _asistente_log_accion(scope, actor, "crear_pedido_torta", draft, reserva, success=True)
+                draft = {}
+            except Exception as e:
+                reply = f"No pude crear el pedido todavia: {e}. Conserve el borrador para corregirlo y reintentar."
+                _asistente_log_accion(scope, actor, "crear_pedido_torta", draft, {"error": str(e)}, success=False)
+        elif cotizacion:
+            resumen = _asistente_resumen(draft, cotizacion)
+            if faltan:
+                reply = f"Ya tengo esta cotizacion preliminar:\n{resumen}\n\nPara continuar falta: {', '.join(faltan)}."
+            else:
+                reply = f"Resumen para confirmar:\n{resumen}\n\nSi todo esta correcto, responde 'confirmo' para registrar el pedido."
+        else:
+            kb = _asistente_kb_list(scope=scope, include_inactive=False)
+            intro = "Puedo ayudarte a agendar una torta usando el catalogo real de Sucree."
+            if internal:
+                intro = "Puedo ayudarte con agenda, catalogo y creacion de pedidos usando herramientas validadas."
+            kb_txt = " ".join(str(x.get("contenido") or "") for x in kb[:3])
+            reply = f"{intro}\n{kb_txt[:420]}\n\nCuéntame producto, tamano, relleno, fecha, hora y datos del cliente."
+    _asistente_log_conversacion(scope, session_id, actor, msg, reply, draft)
+    return {
+        "success": True,
+        "reply": reply,
+        "draft": draft,
+        "session_id": session_id,
+        "warnings": warnings,
+        "summary": _asistente_resumen(draft, cotizacion) if draft else "",
+        "action": action,
+        "provider_enabled": bool(os.environ.get("OPENAI_API_KEY")),
+        "provider_note": "OPENAI_API_KEY configurado; pendiente conectar LLM a estas herramientas." if os.environ.get("OPENAI_API_KEY") else "Sin proveedor IA configurado. Esta version usa extraccion deterministica segura.",
+    }
+
+
+@app.route('/asistente-sucree')
+def asistente_sucree_publico():
+    return render_template('asistente_sucree.html', modo='public')
+
+
+@app.route('/ventas/asistente')
+def asistente_sucree_interno():
+    return render_template('asistente_sucree.html', modo='internal')
+
+
+@app.route('/api/asistente/public/chat', methods=['POST'])
+def api_asistente_public_chat():
+    if not _asistente_rate_limit_publico():
+        return jsonify({"success": False, "error": "Demasiadas solicitudes. Intenta nuevamente en un minuto."}), 429
+    try:
+        return jsonify(_asistente_chat('public', request.get_json(silent=True) or {}))
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/asistente/internal/chat', methods=['POST'])
+def api_asistente_internal_chat():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    try:
+        return jsonify(_asistente_chat('internal', request.get_json(silent=True) or {}))
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/asistente/catalogo', methods=['GET'])
+def api_asistente_catalogo():
+    if not session.get(_ADMIN_SESSION_KEY) and not str(request.path or '').startswith('/api/asistente/public'):
+        pass
+    try:
+        return jsonify({"success": True, "catalogo": _asistente_catalogo_torta()})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/asistente/conocimiento', methods=['GET', 'POST'])
+def api_asistente_conocimiento():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        if request.method == 'GET':
+            return jsonify({"success": True, "items": _asistente_kb_list(scope='internal', include_inactive=True)})
+        data = request.get_json(silent=True) or {}
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_asistente_tables(cur)
+        actor = _asistente_actor(internal=True)
+        item_id = int(data.get("id") or 0)
+        scope = str(data.get("scope") or "public").strip().lower()
+        if scope not in {"public", "internal"}:
+            scope = "public"
+        titulo = str(data.get("titulo") or "").strip()[:160]
+        contenido = str(data.get("contenido") or "").strip()[:6000]
+        activo = 1 if bool(data.get("activo", True)) else 0
+        if not titulo or not contenido:
+            return jsonify({"success": False, "error": "Titulo y contenido son obligatorios"}), 400
+        if item_id > 0:
+            cur.execute(
+                """
+                UPDATE asistente_kb
+                SET scope=?, titulo=?, contenido=?, activo=?, actualizado_por=?, actualizado_en=CURRENT_TIMESTAMP
+                WHERE id=?
+                """,
+                (scope, titulo, contenido, activo, actor, item_id),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO asistente_kb (scope, titulo, contenido, activo, creado_por, actualizado_por)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (scope, titulo, contenido, activo, actor, actor),
+            )
+        conn.commit()
+        return jsonify({"success": True, "items": _asistente_kb_list(scope='internal', include_inactive=True)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/asistente/conocimiento/<int:item_id>', methods=['DELETE'])
+def api_asistente_conocimiento_delete(item_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_asistente_tables(cur)
+        cur.execute("DELETE FROM asistente_kb WHERE id=?", (int(item_id),))
+        conn.commit()
+        return jsonify({"success": True, "items": _asistente_kb_list(scope='internal', include_inactive=True)})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 # ============================================================================
 # API AGENDA - Persistencia en SQLite
 # ============================================================================
