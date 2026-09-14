@@ -1197,6 +1197,14 @@
             color: #fff;
         }
 
+        .agenda-detail-actions .whatsapp-ready,
+        .seguimiento-admin-ready {
+            background: #16a34a !important;
+            border-color: #16a34a !important;
+            color: #fff !important;
+            box-shadow: 0 10px 22px rgba(22, 163, 74, 0.18);
+        }
+
         .agenda-quick-edit-hint {
             margin-top: 6px;
             color: #98a2b3;
@@ -2513,6 +2521,11 @@
             align-items: end;
         }
 
+        .seguimiento-admin-ready {
+            margin-top: 10px;
+            width: 100%;
+        }
+
         .seguimiento-pill {
             display: inline-flex;
             align-items: center;
@@ -3747,7 +3760,7 @@
                     <div class="seguimiento-admin-grid">
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Estado del pedido</label>
-                            <select id="evento-seguimiento-estado">
+                            <select id="evento-seguimiento-estado" onchange="actualizarBotonListoWhatsAppAdmin(eventoEditando)">
                                 <option value="pendiente">Pendiente</option>
                                 <option value="recepcionado">Recepcionado</option>
                                 <option value="produccion">En produccion</option>
@@ -3758,6 +3771,9 @@
                         </div>
                         <button type="button" class="btn btn-success" onclick="guardarSeguimientoPedido()">Actualizar QR</button>
                     </div>
+                    <button type="button" class="btn seguimiento-admin-ready" id="btn-whatsapp-listo-admin" onclick="notificarPedidoListoWhatsApp(eventoEditando)" style="display:none;">
+                        Notificar por WhatsApp que esta listo
+                    </button>
                 </div>
 
                 <div class="form-group">
@@ -6987,6 +7003,7 @@
                     ? 'Guarda primero el evento para enviar PDF por WhatsApp'
                     : 'Enviar cotizacion PDF al cliente por WhatsApp';
             }
+            actualizarBotonListoWhatsAppAdmin(eventoEditando);
         }
 
         function contactarClienteWhatsAppEvento() {
@@ -7000,6 +7017,85 @@
             const mensaje = construirMensajeWhatsAppAgenda('confirmacion');
             const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
+        const AGENDA_DIRECCION_RETIRO_TIENDA = 'Pasaje Rubidio 1815, Maipu, Santiago';
+        const AGENDA_MAPS_RETIRO_TIENDA = 'https://www.google.com/maps/search/?api=1&query=Pasaje%20Rubidio%201815%2C%20Maipu%2C%20Santiago';
+
+        function construirMensajePedidoListoWhatsApp(evento) {
+            const ev = eventoVistaPanelAgenda(evento || eventoEditando || {});
+            const codigo = String(ev.codigo_pedido || ev.id || '').trim();
+            const cliente = String(ev.cliente || '').trim();
+            const titulo = String(ev.titulo || 'tu pedido').trim();
+            const fecha = formatearFechaLarga(String(ev.fecha || ''));
+            const hora = String(ev.hora_entrega || ev.hora_inicio || '').substring(0, 5);
+            const urlSeguimiento = seguimientoUrlPedido(codigo);
+            const partes = [];
+            partes.push(`Hola${cliente ? ` ${cliente}` : ''}, te escribimos de Pasteleria Sucree.`);
+            if (agendaEsDespacho(ev)) {
+                const direccionDespacho = String(ev.direccion || '').trim() || 'direccion registrada en tu pedido';
+                partes.push(`Tu pedido ${codigo ? `#${codigo} ` : ''}${titulo} ya esta listo para ser despachado.`);
+                partes.push(`Direccion de despacho registrada: ${direccionDespacho}.`);
+                partes.push('Por favor confirmame si esta direccion esta correcta para coordinar el envio.');
+            } else {
+                partes.push(`Tu pedido ${codigo ? `#${codigo} ` : ''}${titulo} ya esta listo para retiro en tienda.`);
+                partes.push(`Puedes retirarlo en: ${AGENDA_DIRECCION_RETIRO_TIENDA}.`);
+                partes.push(`Mapa: ${AGENDA_MAPS_RETIRO_TIENDA}`);
+            }
+            if (fecha || hora) partes.push(`Fecha/hora registrada: ${[fecha, hora].filter(Boolean).join(' - ')}.`);
+            if (urlSeguimiento) partes.push(`Puedes revisar el estado aqui: ${urlSeguimiento}`);
+            partes.push('Gracias por preferirnos.');
+            return partes.filter(Boolean).join('\n\n');
+        }
+
+        function puedeNotificarPedidoListoWhatsApp(evento, estadoOverride) {
+            const estado = normalizarEstadoSeguimientoAgenda(estadoOverride || (evento && evento.seguimiento_estado));
+            const telefono = normalizarTelefonoWhatsApp((evento && evento.telefono) || document.getElementById('evento-telefono')?.value || '');
+            return estado === 'espera_envio' && Boolean(telefono);
+        }
+
+        function actualizarBotonListoWhatsAppAdmin(evento) {
+            const btn = document.getElementById('btn-whatsapp-listo-admin');
+            if (!btn) return;
+            const select = document.getElementById('evento-seguimiento-estado');
+            const estado = normalizarEstadoSeguimientoAgenda(select?.value || (evento && evento.seguimiento_estado));
+            const telefono = normalizarTelefonoWhatsApp((evento && evento.telefono) || document.getElementById('evento-telefono')?.value || '');
+            const mostrar = estado === 'espera_envio';
+            btn.style.display = mostrar ? 'inline-flex' : 'none';
+            btn.disabled = !telefono;
+            btn.title = telefono
+                ? 'Enviar aviso de pedido listo por WhatsApp'
+                : 'El pedido necesita un telefono valido para notificar por WhatsApp';
+        }
+
+        function notificarPedidoListoWhatsApp(evento, estadoOverride) {
+            const ev = eventoVistaPanelAgenda(evento || eventoEditando || {});
+            const mismoEventoModal = eventoEditando && Number(eventoEditando.id || 0) === Number(ev.id || 0);
+            const estado = normalizarEstadoSeguimientoAgenda(
+                estadoOverride
+                || (mismoEventoModal ? document.getElementById('evento-seguimiento-estado')?.value : '')
+                || ev.seguimiento_estado
+            );
+            if (estado !== 'espera_envio') {
+                alert('Esta notificacion se habilita cuando el estado esta en A la espera de envio/retiro.');
+                return;
+            }
+            const telefono = normalizarTelefonoWhatsApp(ev.telefono || document.getElementById('evento-telefono')?.value || '');
+            if (!telefono) {
+                alert('El pedido no tiene un telefono valido para enviar WhatsApp.');
+                return;
+            }
+            const mensaje = construirMensajePedidoListoWhatsApp(ev);
+            window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`, '_blank', 'noopener,noreferrer');
+        }
+
+        function notificarPedidoListoWhatsAppPorId(idEvento) {
+            const ev = eventos.find((item) => Number(item.id || 0) === Number(idEvento || 0));
+            if (!ev) {
+                alert('No se encontro el pedido para notificar.');
+                return;
+            }
+            notificarPedidoListoWhatsApp(ev, ev.seguimiento_estado);
         }
 
         async function enviarCotizacionWhatsAppCliente() {
@@ -8250,6 +8346,9 @@
             const obs = String(detalle.nota || evento.motivo || evento.ingredientes || '').trim();
             const opciones = Object.entries(SEGUIMIENTO_ESTADOS_LABELS).map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === seguimiento ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
             const quickObs = String(evento.motivo || '').trim();
+            const botonListoWhatsApp = seguimiento === 'espera_envio'
+                ? `<button type="button" class="whatsapp-ready" onclick="notificarPedidoListoWhatsAppPorId(${Number(evento.id || 0)})">WhatsApp pedido listo</button>`
+                : '';
             panel.innerHTML = `
                 <div class="agenda-detail-head">
                     <div>
@@ -8310,6 +8409,7 @@
                 </div>
                 <div class="agenda-detail-actions">
                     <button type="button" class="primary" onclick="editarEvento(${Number(evento.id || 0)})">Editar pedido</button>
+                    ${botonListoWhatsApp}
                     <button type="button" onclick="generarPdfDesdeResumen(${Number(evento.id || 0)})">Descargar PDF</button>
                     <button type="button" onclick="imprimirPedido58mm(${Number(evento.id || 0)})">Imprimir 58mm</button>
                 </div>
@@ -9177,6 +9277,7 @@
             updated.innerHTML = codigo
                 ? `<span class="seguimiento-pill">${escapeHtml(SEGUIMIENTO_ESTADOS_LABELS[estado] || 'Pendiente')}</span>${fecha ? ` <span class="form-hint">Actualizado: ${escapeHtml(fecha)}</span>` : ''}`
                 : '<span class="form-hint">Guarda el pedido para generar codigo QR de seguimiento.</span>';
+            actualizarBotonListoWhatsAppAdmin(evento);
         }
 
         async function guardarSeguimientoPedido() {
@@ -9201,6 +9302,7 @@
                 if (idx >= 0 && data.evento) eventos[idx] = data.evento;
                 eventoEditando = data.evento || eventoEditando;
                 actualizarSeguimientoAdmin(eventoEditando);
+                actualizarBotonListoWhatsAppAdmin(eventoEditando);
                 renderFichaPedidoEdicion(eventoEditando);
                 renderizarCalendario();
                 renderizarPanelDetallePedido();
