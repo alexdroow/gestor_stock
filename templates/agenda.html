@@ -834,6 +834,8 @@
         }
 
         .agenda-order-card {
+            position: relative;
+            z-index: 0;
             border: 1px solid #dbe4ee;
             background: #fff;
             border-radius: 11px;
@@ -842,6 +844,82 @@
             cursor: pointer;
             color: #172033;
             box-shadow: 0 8px 18px rgba(16, 24, 40, 0.04);
+            isolation: isolate;
+            transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+
+        .agenda-order-card::before {
+            content: "";
+            position: absolute;
+            inset: -7px;
+            z-index: -1;
+            border-radius: 16px;
+            opacity: 0;
+            filter: blur(12px);
+            transition: opacity .2s ease;
+            pointer-events: none;
+        }
+
+        .agenda-order-card.urgency-safe::before {
+            opacity: .82;
+            background: rgba(34, 197, 94, .32);
+        }
+
+        .agenda-order-card.urgency-soon::before {
+            opacity: .9;
+            background: rgba(249, 115, 22, .42);
+            animation: agendaUrgencyFloat 2.7s ease-in-out infinite;
+        }
+
+        .agenda-order-card.urgency-critical::before {
+            opacity: 1;
+            background: rgba(239, 68, 68, .52);
+            animation: agendaUrgencyPulse 1.55s ease-in-out infinite;
+        }
+
+        .agenda-order-card.urgency-soon,
+        .agenda-order-card.urgency-critical {
+            animation: agendaUrgencyWiggle 1.8s ease-in-out infinite;
+            transform-origin: center;
+        }
+
+        .agenda-order-card.urgency-critical {
+            border-color: rgba(239, 68, 68, .65);
+        }
+
+        .agenda-order-card.urgency-soon {
+            border-color: rgba(249, 115, 22, .62);
+        }
+
+        .agenda-order-card.urgency-safe {
+            border-color: rgba(34, 197, 94, .38);
+        }
+
+        @keyframes agendaUrgencyWiggle {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            18% { transform: translateX(-1px) rotate(-.25deg); }
+            36% { transform: translateX(1px) rotate(.25deg); }
+            54% { transform: translateX(-.5px) rotate(-.15deg); }
+            72% { transform: translateX(.5px) rotate(.15deg); }
+        }
+
+        @keyframes agendaUrgencyPulse {
+            0%, 100% { opacity: .68; transform: scale(.98); }
+            50% { opacity: 1; transform: scale(1.03); }
+        }
+
+        @keyframes agendaUrgencyFloat {
+            0%, 100% { opacity: .58; transform: scale(.99); }
+            50% { opacity: .92; transform: scale(1.025); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .agenda-order-card.urgency-soon,
+            .agenda-order-card.urgency-critical,
+            .agenda-order-card.urgency-soon::before,
+            .agenda-order-card.urgency-critical::before {
+                animation: none;
+            }
         }
 
         .agenda-order-card:hover,
@@ -7644,8 +7722,9 @@
             const estado = obtenerEstadoOperativoAgenda(evento);
             const saldo = obtenerSaldoAgenda(evento);
             const selected = agendaDetalleId && Number(agendaDetalleId) === id;
+            const urgencyClass = claseUrgenciaPedidoAgenda(evento);
             return `
-                <button type="button" class="agenda-order-card ${selected ? 'selected' : ''}" onclick="abrirDetallePedidoAgenda(${id})" ondblclick="editarEvento(${id})">
+                <button type="button" class="agenda-order-card ${escapeHtml(urgencyClass)} ${selected ? 'selected' : ''}" onclick="abrirDetallePedidoAgenda(${id})" ondblclick="editarEvento(${id})">
                     <div class="agenda-order-time">${escapeHtml(hora)}</div>
                     <div class="agenda-order-name">${escapeHtml(cliente)}</div>
                     <div class="agenda-order-product">${escapeHtml(producto)}</div>
@@ -8471,6 +8550,25 @@
             if (!dt) return '';
             const diffMin = Math.floor((dt.getTime() - Date.now()) / 60000);
             return diffMin <= 30 && diffMin > 0 ? 'warning' : '';
+        }
+
+        function minutosRestantesEventoAgenda(evento) {
+            const dt = _fechaHoraEvento(evento);
+            if (!dt) return null;
+            return Math.floor((dt.getTime() - Date.now()) / 60000);
+        }
+
+        function claseUrgenciaPedidoAgenda(evento) {
+            if (!evento || String(evento.tipo || '').toLowerCase() === 'bloqueo') return '';
+            const estado = normalizarEstadoSeguimientoAgenda(evento.seguimiento_estado || evento.estado);
+            const operativo = obtenerEstadoOperativoAgenda(evento);
+            if (estado === 'entregado' || operativo === 'entregado' || operativo === 'cancelado') return '';
+            const diffMin = minutosRestantesEventoAgenda(evento);
+            if (diffMin == null || diffMin <= 0) return '';
+            if (diffMin <= 240) return 'urgency-critical';
+            if (diffMin <= 1440) return 'urgency-soon';
+            if (diffMin > 2880) return 'urgency-safe';
+            return '';
         }
 
         function _resumenCatalogoTorta(evento) {
