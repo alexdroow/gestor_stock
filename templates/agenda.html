@@ -8459,13 +8459,24 @@
             return '';
         }
 
+        function pedidoRellenoActivoAgenda(evento) {
+            if (!evento || esEventoBorrador(evento) || !esPedidoTortaAgenda(evento)) return false;
+            const estado = obtenerEstadoOperativoAgenda(evento);
+            if (['entregado', 'cancelado'].includes(estado)) return false;
+            const estadoBase = normalizarEstadoAgenda(evento.estado, 'pendiente');
+            if (['completado', 'cancelado'].includes(estadoBase)) return false;
+            const entrega = _fechaHoraEvento(evento);
+            if (!entrega) return true;
+            return entrega.getTime() > Date.now();
+        }
+
         function obtenerPedidosRellenosMes() {
             const base = fechaActual instanceof Date ? fechaActual : new Date();
             const year = base.getFullYear();
             const month = base.getMonth();
             return eventos
                 .filter((evento) => {
-                    if (!evento || esEventoBorrador(evento) || !esPedidoTortaAgenda(evento)) return false;
+                    if (!pedidoRellenoActivoAgenda(evento)) return false;
                     const fecha = parseFechaISO(evento.fecha);
                     return fecha && fecha.getFullYear() === year && fecha.getMonth() === month;
                 })
