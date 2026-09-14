@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agenda - Sucr&eacute;e Pasteler&iacute;a</title>
-    
-    <!-- Librerías para generar PDF -->
+
+    <!-- LibrerÃ­as para generar PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+
         :root {
             --primary: #f59e0b;
             --primary-dark: #d97706;
@@ -21,13 +21,19 @@
             --danger: #ef4444;
             --success: #10b981;
             --info: #3b82f6;
+            --sucree-bg: #FAF8F5;
+            --sucree-surface: #FFFFFF;
+            --sucree-text: #422B18;
+            --sucree-orange: #D97113;
+            --sucree-cream: #FFF3E0;
+            --sucree-border: #eadbcc;
         }
-        
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #f8fafc;
+            background: var(--sucree-bg);
             min-height: 100vh;
-            color: #0f172a;
+            color: var(--sucree-text);
         }
         html.launcher-compact {
             zoom: 0.86;
@@ -101,7 +107,7 @@
             min-width: 48px;
             text-align: center;
         }
-        
+
         .sidebar {
             width: 260px;
             background: white;
@@ -113,7 +119,7 @@
             height: 100vh;
             z-index: 100;
         }
-        
+
         .logo {
             display: flex;
             align-items: center;
@@ -122,7 +128,7 @@
             border-bottom: 1px solid #e2e8f0;
             margin-bottom: 24px;
         }
-        
+
         .logo-icon {
             width: 44px;
             height: 44px;
@@ -134,26 +140,26 @@
             font-size: 24px;
             box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
-        
+
         .logo-text {
             font-size: 20px;
             font-weight: 700;
             color: #0f172a;
         }
-        
-        .logo-text span { 
+
+        .logo-text span {
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        
+
         .nav-menu {
             display: flex;
             flex-direction: column;
             gap: 8px;
             flex: 1;
         }
-        
+
         .nav-item {
             display: flex;
             align-items: center;
@@ -165,18 +171,18 @@
             font-weight: 500;
             transition: all 0.2s ease;
         }
-        
+
         .nav-item:hover {
             background: #fff7ed;
             color: var(--primary-dark);
         }
-        
+
         .nav-item.active {
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
-        
+
         .nav-item .icon {
             font-size: 20px;
             width: 24px;
@@ -196,7 +202,7 @@
             justify-content: center;
             min-width: 28px;
         }
-        
+
         .sidebar-footer {
             padding-top: 24px;
             border-top: 1px solid #e2e8f0;
@@ -204,19 +210,20 @@
             color: #64748b;
             text-align: center;
         }
-        
+
         .main-content {
             flex: 1;
             margin-left: 260px;
             padding: 32px 40px;
             max-width: calc(100% - 260px);
         }
-        
+
         .page-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 24px;
+            gap: 18px;
         }
         .reserva-top-alert {
             display: none;
@@ -280,17 +287,71 @@
             opacity: .5;
             cursor: not-allowed;
         }
-        
+
         .page-title {
-            font-size: 32px;
-            font-weight: 700;
-            color: #0f172a;
+            font-size: 34px;
+            font-weight: 800;
+            color: var(--sucree-text);
+            letter-spacing: -0.04em;
         }
-        
+
+        .page-subtitle {
+            color: #667085;
+            font-size: 16px;
+            margin-top: 4px;
+        }
+
+        .agenda-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .agenda-more-wrap {
+            position: relative;
+        }
+
+        .agenda-more-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 8px);
+            width: 230px;
+            padding: 8px;
+            border: 1px solid var(--sucree-border);
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 18px 45px rgba(66, 43, 24, 0.14);
+            z-index: 50;
+            display: none;
+        }
+
+        .agenda-more-menu.active {
+            display: block;
+        }
+
+        .agenda-more-menu button {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            padding: 10px 12px;
+            text-align: left;
+            border-radius: 10px;
+            color: var(--sucree-text);
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .agenda-more-menu button:hover {
+            background: #fff7ed;
+            color: var(--sucree-orange);
+        }
+
         /* LAYOUT PRINCIPAL */
         .agenda-layout {
             display: grid;
-            grid-template-columns: 1fr 320px;
+            grid-template-columns: minmax(0, 1fr) 360px;
             gap: 24px;
             align-items: start;
         }
@@ -301,45 +362,49 @@
             gap: 18px;
             min-width: 0;
         }
-        
+
         /* CALENDARIO */
         .calendar-card {
             background: white;
             border-radius: 16px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--sucree-border);
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            min-height: 620px;
+            min-height: 610px;
+            box-shadow: 0 18px 45px rgba(66, 43, 24, 0.06);
         }
-        
+
         .calendar-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid #e2e8f0;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--sucree-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
         }
-        
+
         .calendar-nav {
             display: flex;
             align-items: center;
             gap: 16px;
         }
-        
+
         .calendar-nav h2 {
-            font-size: 20px;
-            font-weight: 600;
-            min-width: 200px;
-            text-align: center;
+            font-size: 17px;
+            font-weight: 800;
+            min-width: 230px;
+            text-align: left;
+            color: #172033;
         }
-        
+
         .btn-icon {
             width: 36px;
             height: 36px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--sucree-border);
             background: white;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 16px;
             display: flex;
@@ -347,24 +412,198 @@
             justify-content: center;
             transition: all 0.2s;
         }
-        
+
         .btn-icon:hover {
             background: #fff7ed;
             border-color: var(--primary);
         }
-        
+
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: linear-gradient(135deg, #f97316, #d95f02);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-weight: 800;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 8px;
+            box-shadow: 0 12px 25px rgba(217, 95, 2, 0.22);
         }
+
+        .agenda-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(130px, 1fr));
+            gap: 0;
+            background: #fff;
+            border: 1px solid var(--sucree-border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 14px 38px rgba(66, 43, 24, 0.05);
+        }
+
+        .agenda-kpi {
+            border: 0;
+            border-right: 1px solid #edf0f3;
+            background: transparent;
+            padding: 16px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-align: left;
+            cursor: pointer;
+            color: #475467;
+        }
+
+        .agenda-kpi:last-child { border-right: 0; }
+        .agenda-kpi:hover,
+        .agenda-kpi.active {
+            background: #fff8ec;
+        }
+
+        .agenda-kpi-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff3e0;
+            color: var(--sucree-orange);
+            font-weight: 900;
+            font-size: 18px;
+        }
+
+        .agenda-kpi-number {
+            display: block;
+            color: var(--sucree-text);
+            font-size: 24px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .agenda-kpi-label {
+            display: block;
+            font-size: 13px;
+            margin-top: 3px;
+        }
+
+        .agenda-alerts {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .agenda-alert-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid #fed7aa;
+            background: linear-gradient(90deg, #fff7ed, #fffbeb);
+            color: #7c2d12;
+            border-radius: 14px;
+            font-weight: 700;
+        }
+
+        .agenda-alert-item button {
+            border: 1px solid #fb923c;
+            background: #fff;
+            color: #c2410c;
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .agenda-toolbar {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) 140px 150px auto;
+            gap: 10px;
+            padding: 0 20px 18px;
+            align-items: center;
+        }
+
+        .agenda-search {
+            position: relative;
+        }
+
+        .agenda-search input,
+        .agenda-toolbar select {
+            width: 100%;
+            height: 42px;
+            border: 1px solid #d9e0e8;
+            border-radius: 10px;
+            background: #fff;
+            color: #172033;
+            padding: 0 12px;
+            font-weight: 600;
+        }
+
+        .agenda-search input {
+            padding-left: 38px;
+        }
+
+        .agenda-search::before {
+            content: "";
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #98a2b3;
+            border-radius: 50%;
+            transform: translateY(-55%);
+        }
+
+        .agenda-search::after {
+            content: "";
+            position: absolute;
+            left: 26px;
+            top: 26px;
+            width: 8px;
+            height: 2px;
+            background: #98a2b3;
+            transform: rotate(45deg);
+            border-radius: 3px;
+        }
+
+        .agenda-view-switch {
+            display: inline-flex;
+            background: #f3f6fa;
+            border: 1px solid #d9e0e8;
+            border-radius: 11px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .agenda-view-switch button {
+            border: 0;
+            background: transparent;
+            color: #475467;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .agenda-view-switch button.active {
+            background: #fff0d6;
+            color: #7c2d12;
+            box-shadow: 0 6px 16px rgba(66, 43, 24, 0.08);
+        }
+
+        .agenda-active-filter {
+            display: none;
+            padding: 0 20px 12px;
+            color: #7c2d12;
+            font-weight: 800;
+            font-size: 13px;
+        }
+
+        .agenda-active-filter.active { display: block; }
         .header-action-buttons {
             display: flex;
             gap: 8px;
@@ -421,7 +660,7 @@
             background: #ffedd5;
             border-color: #fb923c;
         }
-        
+
         .calendar-grid {
             flex: 1;
             display: grid;
@@ -429,7 +668,7 @@
             grid-template-rows: 40px repeat(6, 1fr);
             align-content: stretch;
         }
-        
+
         .calendar-day-header {
             padding: 12px;
             text-align: center;
@@ -440,7 +679,7 @@
             border-bottom: 1px solid #e2e8f0;
             background: #f8fafc;
         }
-        
+
         .calendar-day {
             border-right: 1px solid #e2e8f0;
             border-bottom: 1px solid #e2e8f0;
@@ -453,21 +692,21 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .calendar-day:hover:not(.blocked):not(.empty) {
             background: #fff7ed;
         }
-        
+
         .calendar-day.empty {
             background: #f8fafc;
             cursor: default;
         }
-        
+
         .calendar-day.blocked {
             background: #fee2e2;
             cursor: not-allowed;
         }
-        
+
         .calendar-day.blocked::after {
             content: '\26D4';
             position: absolute;
@@ -477,21 +716,21 @@
             font-size: 24px;
             opacity: 0.3;
         }
-        
+
         .calendar-day.today {
             background: #fef3c7;
         }
-        
+
         .calendar-day.selected {
             box-shadow: inset 0 0 0 2px var(--primary);
         }
-        
+
         .day-number {
             font-weight: 600;
             font-size: 14px;
             margin-bottom: 4px;
         }
-        
+
         .day-events {
             display: flex;
             flex-direction: column;
@@ -499,7 +738,7 @@
             max-height: calc(100% - 22px);
             overflow: hidden;
         }
-        
+
         .day-event {
             font-size: 11px;
             padding: 2px 6px;
@@ -511,17 +750,17 @@
             line-height: 14px;
             flex: 0 0 auto;
         }
-        
+
         .day-event.torta {
             background: #dbeafe;
             color: #1e40af;
         }
-        
+
         .day-event.pedido {
             background: #dcfce7;
             color: #166534;
         }
-        
+
         .day-event.bloqueo {
             background: #fee2e2;
             color: #991b1b;
@@ -531,21 +770,424 @@
             color: #9a3412;
             border: 1px solid #fdba74;
         }
-        
+
+        .agenda-week-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(130px, 1fr));
+            min-height: 520px;
+            border-top: 1px solid #e7edf5;
+        }
+
+        .agenda-week-day {
+            border-right: 1px solid #e7edf5;
+            min-width: 0;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .agenda-week-day:last-child { border-right: 0; }
+        .agenda-week-day.today { background: linear-gradient(180deg, #fff7df 0%, #fff 55%); }
+        .agenda-week-day.selected { box-shadow: inset 0 0 0 2px var(--sucree-orange); }
+
+        .agenda-week-head {
+            padding: 12px 12px 10px;
+            text-align: center;
+            color: #344054;
+            font-weight: 900;
+            border-bottom: 1px solid #e7edf5;
+            min-height: 82px;
+        }
+
+        .agenda-week-head small {
+            display: block;
+            font-size: 12px;
+            color: #667085;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .agenda-week-head strong {
+            display: block;
+            font-size: 19px;
+            margin-top: 3px;
+        }
+
+        .agenda-today-pill {
+            display: inline-flex;
+            margin-top: 6px;
+            background: #ea580c;
+            color: #fff;
+            border-radius: 999px;
+            padding: 3px 12px;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .agenda-week-list {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+            max-height: 465px;
+        }
+
+        .agenda-order-card {
+            border: 1px solid #dbe4ee;
+            background: #fff;
+            border-radius: 11px;
+            padding: 10px;
+            text-align: left;
+            cursor: pointer;
+            color: #172033;
+            box-shadow: 0 8px 18px rgba(16, 24, 40, 0.04);
+        }
+
+        .agenda-order-card:hover,
+        .agenda-order-card.selected {
+            border-color: var(--sucree-orange);
+            box-shadow: 0 12px 24px rgba(217, 95, 2, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .agenda-order-time {
+            font-size: 13px;
+            font-weight: 900;
+            color: #101828;
+            margin-bottom: 5px;
+        }
+
+        .agenda-order-name {
+            font-size: 14px;
+            font-weight: 900;
+            color: #172033;
+            line-height: 1.2;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .agenda-order-product {
+            color: #667085;
+            font-size: 12px;
+            margin-top: 4px;
+            line-height: 1.25;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .agenda-status-pill,
+        .agenda-delivery-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 5px 9px;
+            font-size: 11px;
+            font-weight: 900;
+            margin-top: 8px;
+        }
+
+        .agenda-status-pill {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .agenda-status-pill.produccion { background: #dbeafe; color: #1d4ed8; }
+        .agenda-status-pill.listo,
+        .agenda-status-pill.entregado { background: #dcfce7; color: #166534; }
+        .agenda-status-pill.pendiente,
+        .agenda-status-pill.borrador { background: #ffedd5; color: #9a3412; }
+        .agenda-status-pill.cancelado { background: #fee2e2; color: #991b1b; }
+
+        .agenda-delivery-pill {
+            color: #475467;
+            gap: 5px;
+            padding-left: 0;
+            background: transparent;
+        }
+
+        .agenda-card-balance {
+            color: #c2410c;
+            font-weight: 900;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .agenda-day-add {
+            border: 1px dashed #d7dee8;
+            background: #fff;
+            color: #475467;
+            border-radius: 11px;
+            min-height: 76px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .agenda-list-view {
+            padding: 0 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .agenda-list-row {
+            width: 100%;
+            border: 1px solid #e3e9f1;
+            background: #fff;
+            border-radius: 14px;
+            padding: 14px;
+            display: grid;
+            grid-template-columns: 130px minmax(180px, 1fr) 170px 130px 120px;
+            gap: 12px;
+            align-items: center;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .agenda-list-row:hover,
+        .agenda-list-row.selected {
+            border-color: var(--sucree-orange);
+            box-shadow: 0 10px 24px rgba(217, 95, 2, 0.11);
+        }
+
+        .agenda-empty-state {
+            padding: 38px 20px;
+            text-align: center;
+            color: #667085;
+            font-weight: 700;
+        }
+
         /* PANEL LATERAL */
         .side-panel {
             display: flex;
             flex-direction: column;
             gap: 16px;
+            position: sticky;
+            top: 18px;
         }
-        
+
+        .agenda-detail-panel {
+            background: #fff;
+            border: 1px solid var(--sucree-border);
+            border-radius: 18px;
+            box-shadow: 0 18px 45px rgba(66, 43, 24, 0.08);
+            overflow: hidden;
+            min-height: 620px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .agenda-detail-empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 28px;
+            color: #667085;
+            font-weight: 700;
+        }
+
+        .agenda-detail-head {
+            padding: 20px 22px 14px;
+            border-bottom: 1px solid #edf0f3;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .agenda-detail-kicker {
+            color: #667085;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-size: 11px;
+            font-weight: 900;
+            margin-bottom: 14px;
+        }
+
+        .agenda-detail-name {
+            color: #101828;
+            font-size: 22px;
+            font-weight: 900;
+            line-height: 1.1;
+        }
+
+        .agenda-detail-code {
+            color: #667085;
+            font-size: 13px;
+            margin-top: 5px;
+            font-weight: 700;
+        }
+
+        .agenda-detail-close {
+            border: 0;
+            background: transparent;
+            color: #667085;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .agenda-detail-body {
+            padding: 16px 22px;
+            overflow-y: auto;
+            max-height: calc(100vh - 250px);
+        }
+
+        .agenda-detail-section {
+            border-bottom: 1px solid #edf0f3;
+            padding: 14px 0;
+        }
+
+        .agenda-detail-section:first-child { padding-top: 0; }
+        .agenda-detail-section:last-child { border-bottom: 0; }
+
+        .agenda-detail-title {
+            color: #172033;
+            font-weight: 900;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .agenda-progress {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .agenda-progress-step {
+            color: #667085;
+            font-size: 11px;
+            font-weight: 800;
+            text-align: center;
+            position: relative;
+        }
+
+        .agenda-progress-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            border: 2px solid #cbd5e1;
+            background: #fff;
+            margin: 0 auto 6px;
+        }
+
+        .agenda-progress-step.active .agenda-progress-dot,
+        .agenda-progress-step.done .agenda-progress-dot {
+            border-color: var(--sucree-orange);
+            background: var(--sucree-orange);
+        }
+
+        .agenda-state-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+        }
+
+        .agenda-state-row select {
+            height: 42px;
+            border: 1px solid #d9e0e8;
+            border-radius: 10px;
+            padding: 0 12px;
+            font-weight: 800;
+            background: #fff;
+            color: #172033;
+        }
+
+        .agenda-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 16px;
+            color: #475467;
+            font-size: 13px;
+        }
+
+        .agenda-detail-grid strong {
+            display: block;
+            color: #172033;
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+
+        .agenda-pay-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #475467;
+            font-size: 14px;
+            margin: 8px 0;
+        }
+
+        .agenda-pay-row strong {
+            color: #172033;
+        }
+
+        .agenda-balance-box {
+            margin-top: 10px;
+            background: #fff3e0;
+            color: #7c2d12;
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 900;
+        }
+
+        .agenda-balance-box .amount {
+            color: var(--sucree-orange);
+            font-size: 18px;
+        }
+
+        .agenda-detail-actions {
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            padding: 14px 22px 18px;
+            border-top: 1px solid #edf0f3;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .agenda-detail-actions .primary {
+            grid-column: 1 / -1;
+        }
+
+        .agenda-detail-actions button,
+        .agenda-detail-actions a {
+            min-height: 42px;
+            border-radius: 10px;
+            border: 1px solid #d9e0e8;
+            background: #fff;
+            color: #344054;
+            font-weight: 900;
+            cursor: pointer;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .agenda-detail-actions .primary {
+            background: linear-gradient(135deg, #f97316, #d95f02);
+            border-color: #d95f02;
+            color: #fff;
+        }
+
         .panel-card {
             background: white;
             border-radius: 16px;
             border: 1px solid #e2e8f0;
             overflow: hidden;
         }
-        
+
         .panel-header {
             padding: 16px 20px;
             border-bottom: 1px solid #e2e8f0;
@@ -555,7 +1197,7 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .panel-body {
             padding: 16px;
             max-height: 300px;
@@ -776,7 +1418,7 @@
         .hours-unassigned strong {
             color: #0f172a;
         }
-        
+
         .event-item {
             padding: 12px;
             border-radius: 8px;
@@ -785,21 +1427,21 @@
             transition: all 0.2s;
             border-left: 3px solid transparent;
         }
-        
+
         .event-item:hover {
             background: #f8fafc;
         }
-        
+
         .event-item.torta {
             border-left-color: var(--info);
             background: #eff6ff;
         }
-        
+
         .event-item.pedido {
             border-left-color: var(--success);
             background: #f0fdf4;
         }
-        
+
         .event-item.bloqueo {
             border-left-color: var(--danger);
             background: #fef2f2;
@@ -808,24 +1450,24 @@
             border-left-color: #f97316;
             background: #fff7ed;
         }
-        
+
         .event-time {
             font-size: 12px;
             color: #64748b;
             font-weight: 600;
         }
-        
+
         .event-title {
             font-weight: 600;
             font-size: 14px;
             margin: 4px 0;
         }
-        
+
         .event-client {
             font-size: 12px;
             color: #64748b;
         }
-        
+
         .event-badge {
             display: inline-block;
             font-size: 10px;
@@ -834,12 +1476,12 @@
             margin-top: 4px;
             font-weight: 600;
         }
-        
+
         .event-badge.pendiente {
             background: #fef3c7;
             color: #92400e;
         }
-        
+
         .event-badge.pagado {
             background: #d1fae5;
             color: #065f46;
@@ -946,25 +1588,25 @@
             background: #f8fafc;
             border-color: #94a3b8;
         }
-        
+
         /* NOTIFICACIONES */
         .notif-card {
             background: linear-gradient(135deg, #fef3c7, #fde68a);
             border: 1px solid #fcd34d;
         }
-        
+
         .notif-card.urgent {
             background: linear-gradient(135deg, #fee2e2, #fecaca);
             border-color: #f87171;
         }
-        
+
         .notif-item {
             padding: 12px;
             border-bottom: 1px solid rgba(0,0,0,0.1);
             border-radius: 10px;
             transition: background .18s ease, box-shadow .18s ease, transform .18s ease;
         }
-        
+
         .notif-item:last-child {
             border-bottom: none;
         }
@@ -980,7 +1622,7 @@
             transform: translateY(-1px);
             outline: none;
         }
-        
+
         .notif-when {
             font-size: 11px;
             font-weight: 700;
@@ -988,11 +1630,11 @@
             color: #92400e;
             margin-bottom: 4px;
         }
-        
+
         .notif-card.urgent .notif-when {
             color: #991b1b;
         }
-        
+
         .notif-text {
             font-size: 13px;
             color: #78350f;
@@ -1145,7 +1787,7 @@
             background: #f8fafc;
             font-size: 13px;
         }
-        
+
         /* MODAL */
         .modal-overlay {
             position: fixed;
@@ -1157,11 +1799,11 @@
             justify-content: center;
             z-index: 1000;
         }
-        
+
         .modal-overlay.active {
             display: flex;
         }
-        
+
         .modal {
             background: white;
             border-radius: 16px;
@@ -1825,7 +2467,7 @@
             font-size: 12px;
             font-weight: 800;
         }
-        
+
         .modal-header {
             padding: 20px 24px;
             border-bottom: 1px solid #e2e8f0;
@@ -1833,12 +2475,12 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .modal-title {
             font-size: 18px;
             font-weight: 700;
         }
-        
+
         .modal-close {
             background: none;
             border: none;
@@ -1846,16 +2488,16 @@
             cursor: pointer;
             color: #64748b;
         }
-        
+
         .modal-body {
             padding: 24px;
             overflow-y: auto;
         }
-        
+
         .form-group {
             margin-bottom: 16px;
         }
-        
+
         .form-group label {
             display: block;
             font-size: 13px;
@@ -1863,7 +2505,7 @@
             color: #64748b;
             margin-bottom: 6px;
         }
-        
+
         .form-group input,
         .form-group select,
         .form-group textarea {
@@ -1874,7 +2516,7 @@
             font-size: 14px;
             font-family: inherit;
         }
-        
+
         .form-group input:focus,
         .form-group select:focus,
         .form-group textarea:focus {
@@ -1882,19 +2524,19 @@
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
         }
-        
+
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
         }
-        
+
         .form-hint {
             font-size: 12px;
             color: #64748b;
             margin-top: 4px;
         }
-        
+
         .checkbox-group {
             display: flex;
             align-items: center;
@@ -1904,7 +2546,7 @@
             border-radius: 8px;
             cursor: pointer;
         }
-        
+
         .checkbox-group input {
             width: auto;
         }
@@ -2115,21 +2757,21 @@
             margin-top: 8px;
             width: 100%;
         }
-        
+
         .money-display {
             background: #f0fdf4;
             padding: 16px;
             border-radius: 8px;
             text-align: center;
         }
-        
+
         .money-label {
             font-size: 12px;
             color: #166534;
             text-transform: uppercase;
             font-weight: 600;
         }
-        
+
         .money-value {
             font-size: 24px;
             font-weight: 700;
@@ -2187,7 +2829,7 @@
             margin: 0;
             padding: 8px 12px 10px;
         }
-        
+
         .modal-footer {
             padding: 16px 24px;
             border-top: 1px solid #e2e8f0;
@@ -2262,27 +2904,27 @@
             border: none;
             font-size: 14px;
         }
-        
+
         .btn-secondary {
             background: #f1f5f9;
             color: #0f172a;
         }
-        
+
         .btn-danger {
             background: #ef4444;
             color: white;
         }
-        
+
         .btn-success {
             background: var(--success);
             color: white;
         }
-        
+
         .btn-pdf {
             background: #3b82f6;
             color: white;
         }
-        
+
         /* CONFIGURACION */
         .config-row {
             display: flex;
@@ -2291,27 +2933,27 @@
             padding: 12px 0;
             border-bottom: 1px solid #e2e8f0;
         }
-        
+
         .config-row:last-child {
             border-bottom: none;
         }
-        
+
         .config-label {
             font-size: 14px;
         }
-        
+
         .config-value {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        
+
         /* MODO OSCURO */
         body.dark-mode {
             background: #0f172a;
             color: #f1f5f9;
         }
-        
+
         body.dark-mode .sidebar,
         body.dark-mode .calendar-card,
         body.dark-mode .panel-card,
@@ -2324,7 +2966,7 @@
             background: #1e293b;
             border-top-color: #334155;
         }
-        
+
         body.dark-mode .calendar-day-header,
         body.dark-mode .form-group input,
         body.dark-mode .form-group select,
@@ -2333,7 +2975,7 @@
             border-color: #475569;
             color: #f1f5f9;
         }
-        
+
         body.dark-mode .calendar-day.empty {
             background: #1e293b;
         }
@@ -2525,6 +3167,23 @@
             .agenda-layout {
                 grid-template-columns: 1fr;
             }
+            .side-panel {
+                position: static;
+            }
+            .agenda-detail-body {
+                max-height: none;
+            }
+            .agenda-week-grid {
+                overflow-x: auto;
+                grid-template-columns: repeat(7, minmax(170px, 1fr));
+            }
+            .agenda-toolbar {
+                grid-template-columns: 1fr 150px 150px;
+            }
+            .agenda-toolbar .btn {
+                grid-column: 1 / -1;
+                justify-content: center;
+            }
             .torta-dispo-days-grid,
             .torta-dispo-grid {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2532,6 +3191,69 @@
         }
 
         @media (max-width: 760px) {
+            .main-content {
+                margin-left: 0;
+                max-width: 100%;
+                padding: 18px 14px;
+            }
+            .page-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .agenda-header-actions {
+                justify-content: stretch;
+            }
+            .agenda-header-actions .btn-primary {
+                flex: 1;
+                justify-content: center;
+            }
+            .agenda-kpis {
+                grid-template-columns: 1fr 1fr;
+            }
+            .calendar-header {
+                align-items: stretch;
+            }
+            .calendar-nav {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .calendar-nav h2 {
+                min-width: 0;
+                flex: 1;
+                text-align: center;
+                font-size: 15px;
+            }
+            .agenda-view-switch {
+                width: 100%;
+            }
+            .agenda-view-switch button {
+                flex: 1;
+            }
+            .agenda-toolbar {
+                grid-template-columns: 1fr;
+                padding: 0 14px 14px;
+            }
+            .agenda-week-grid {
+                display: flex;
+                overflow-x: auto;
+                min-height: 480px;
+            }
+            .agenda-week-day {
+                min-width: 78vw;
+            }
+            .agenda-list-row {
+                grid-template-columns: 1fr;
+            }
+            .agenda-detail-grid,
+            .agenda-state-row {
+                grid-template-columns: 1fr;
+            }
+            .agenda-detail-actions {
+                grid-template-columns: 1fr;
+            }
+            .agenda-detail-actions .primary {
+                grid-column: auto;
+            }
             #modal-evento .modal {
                 width: 96vw;
                 max-height: 96vh;
@@ -2595,7 +3317,7 @@
                 grid-template-columns: 1fr 1fr;
             }
         }
-        
+
         #darkModeBtn {
             position: fixed;
             bottom: 24px;
@@ -2624,11 +3346,11 @@
             flex-direction: column;
             gap: 16px;
         }
-        
+
         .loading-overlay.active {
             display: flex;
         }
-        
+
         .spinner {
             width: 48px;
             height: 48px;
@@ -2637,7 +3359,7 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -2730,10 +3452,25 @@
             <div class="page-header">
                 <div>
                     <h1 class="page-title">Agenda</h1>
+                    <p class="page-subtitle">Organiza la producci&oacute;n y las entregas</p>
                 </div>
-                <button onclick="abrirConfig()" class="btn-icon" title="Configuración">&#9998;</button>
+                <div class="agenda-header-actions">
+                    <button onclick="agendarTortaManual()" class="btn-primary" title="Flujo dedicado para tomar pedidos de torta">
+                        + Agendar torta
+                    </button>
+                    <div class="agenda-more-wrap">
+                        <button onclick="toggleAgendaMoreMenu()" class="btn-icon" title="Mas acciones" aria-label="Mas acciones">...</button>
+                        <div class="agenda-more-menu" id="agenda-more-menu">
+                            <button type="button" onclick="abrirBuscadorPedidos(); cerrarAgendaMoreMenu();">Buscar pedido</button>
+                            <button type="button" onclick="abrirModalRellenosMes(); cerrarAgendaMoreMenu();">Rellenos del mes</button>
+                            <button type="button" onclick="nuevoEvento(); cerrarAgendaMoreMenu();">Nuevo evento</button>
+                            <button type="button" onclick="abrirConfig(); cerrarAgendaMoreMenu();">Configuracion</button>
+                            <button type="button" onclick="eliminarEventosPasados(); cerrarAgendaMoreMenu();">Limpiar pasados</button>
+                        </div>
+                    </div>
+                </div>
             </div>
-            
+
             <div class="reserva-top-alert" id="reserva-top-alert">
                 <span id="reserva-top-alert-text">Hay nuevas reservas por confirmar.</span>
                 <span class="actions">
@@ -2742,32 +3479,46 @@
             </div>
             <div class="agenda-layout">
                 <div class="agenda-main-column">
+                    <div class="agenda-kpis" id="agenda-kpis"></div>
+                    <div class="agenda-alerts" id="agenda-alerts"></div>
                     <!-- Calendario -->
                     <div class="calendar-card">
                         <div class="calendar-header">
                             <div class="calendar-nav">
                                 <button onclick="cambiarMes(-1)" class="btn-icon">&larr;</button>
                                 <h2 id="mes-actual">Noviembre 2025</h2>
-                                <button onclick="cambiarMes(1)" class="btn-icon">-></button>
+                                <button onclick="cambiarMes(1)" class="btn-icon">-&gt;</button>
+                                <button onclick="irAgendaHoy()" class="btn-icon" style="width:auto;padding:0 14px;">Hoy</button>
                             </div>
-                            <div class="header-action-buttons">
-                                <button onclick="abrirBuscadorPedidos()" class="btn btn-secondary" title="Buscar pedido por codigo">
-                                    &#128269; Buscar Pedido
-                                </button>
-                                <button onclick="eliminarEventosPasados()" class="btn-danger-soft" title="Eliminar eventos anteriores al día actual">
-                                    🗑 Limpiar pasados
-                                </button>
-                                <button onclick="abrirModalRellenosMes()" class="btn-rellenos-tool" title="Ver rellenos necesarios del mes">
-                                    Rellenos del mes
-                                </button>
-                                <button onclick="agendarTortaManual()" class="btn-torta-tool" title="Flujo dedicado para tomar pedidos de torta">
-                                    &#127874; Agendar Tortas
-                                </button>
-                                <button onclick="nuevoEvento()" class="btn-primary">
-                                    + Nuevo Evento
-                                </button>
+                            <div class="agenda-view-switch" id="agenda-view-switch">
+                                <button type="button" data-view="mes" onclick="cambiarVistaAgenda('mes')">Mes</button>
+                                <button type="button" data-view="semana" onclick="cambiarVistaAgenda('semana')">Semana</button>
+                                <button type="button" data-view="lista" onclick="cambiarVistaAgenda('lista')">Lista</button>
                             </div>
                         </div>
+                        <div class="agenda-toolbar">
+                            <div class="agenda-search">
+                                <input type="search" id="agenda-search-input" placeholder="Buscar cliente o pedido..." oninput="actualizarFiltrosAgenda()">
+                            </div>
+                            <select id="agenda-filter-estado" onchange="actualizarFiltrosAgenda()">
+                                <option value="">Estado</option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="recepcionado">Recepcionado</option>
+                                <option value="produccion">En produccion</option>
+                                <option value="espera_envio">Listo / retiro</option>
+                                <option value="despachado">Despachado</option>
+                                <option value="entregado">Entregado</option>
+                                <option value="borrador">Por confirmar</option>
+                                <option value="cancelado">Cancelado</option>
+                            </select>
+                            <select id="agenda-filter-entrega" onchange="actualizarFiltrosAgenda()">
+                                <option value="">Entrega</option>
+                                <option value="retiro">Retiro</option>
+                                <option value="despacho">Despacho</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary" onclick="limpiarFiltrosAgenda()">Limpiar filtros</button>
+                        </div>
+                        <div class="agenda-active-filter" id="agenda-active-filter"></div>
                         <div class="calendar-grid" id="calendario">
                             <!-- Se genera con JS -->
                         </div>
@@ -2797,16 +3548,21 @@
                             <button onclick="nuevaNotaAgenda()" class="btn-primary">+ Nueva nota</button>
                         </div>
                         <p class="notas-board-sub">
-                            Notas rápidas estilo tablero. Al completar, la nota se archiva automáticamente por 7 días.
+                            Notas rÃ¡pidas estilo tablero. Al completar, la nota se archiva automÃ¡ticamente por 7 dÃ­as.
                         </p>
                         <div id="notas-grid" class="notas-grid">
-                            <div class="nota-empty">Aún no hay notas. Crea la primera nota para organizar pendientes.</div>
+                            <div class="nota-empty">AÃºn no hay notas. Crea la primera nota para organizar pendientes.</div>
                         </div>
                     </section>
                 </div>
 
                 <!-- Panel Lateral -->
                 <div class="side-panel">
+                    <div class="agenda-detail-panel" id="agenda-detail-panel">
+                        <div class="agenda-detail-empty">
+                            Selecciona un pedido para ver su detalle, actualizar estado, descargar PDF o abrir seguimiento.
+                        </div>
+                    </div>
                     <!-- Notificaciones -->
                     <div class="panel-card notif-card" id="notificaciones-card" style="display: none;">
                         <div class="panel-header">
@@ -2816,7 +3572,7 @@
                         </div>
                     </div>
 
-                    <!-- Próximos Eventos -->
+                    <!-- PrÃ³ximos Eventos -->
                     <div class="panel-card">
                         <div class="panel-header">
                             &#128203; Pr&oacute;ximos Eventos
@@ -2839,7 +3595,7 @@
                     </div>
                     <div class="panel-card">
                         <div class="panel-header">
-                            🗂 Eventos pasados
+                            ðŸ—‚ Eventos pasados
                         </div>
                         <div class="panel-body" id="eventos-pasados">
                             <p style="color: #64748b; text-align: center; padding: 12px;">
@@ -2858,7 +3614,7 @@
                             </p>
                         </div>
                     </div>
-                    
+
                     <!-- Leyenda -->
                     <div class="panel-card">
                         <div class="panel-header">
@@ -2946,7 +3702,7 @@
                         <button type="button" class="btn btn-success" onclick="guardarSeguimientoPedido()">Actualizar QR</button>
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Tipo de Evento</label>
                     <select id="evento-tipo" onchange="cambiarTipo()">
@@ -2955,12 +3711,12 @@
                         <option value="bloqueo">&#9940; Bloquear D&iacute;a/Horario</option>
                     </select>
                 </div>
-                
+
                 <div class="form-group">
-                    <label>Título / Descripción</label>
-                    <input type="text" id="evento-titulo" placeholder="Ej: Torta de cumpleaños">
+                    <label>TÃ­tulo / DescripciÃ³n</label>
+                    <input type="text" id="evento-titulo" placeholder="Ej: Torta de cumpleaÃ±os">
                 </div>
-                
+
                 <div class="form-row" id="grupo-fecha-hora">
                     <div class="form-group">
                         <label>Fecha</label>
@@ -2971,7 +3727,7 @@
                         <input type="time" id="evento-hora-inicio">
                     </div>
                 </div>
-                
+
                 <div class="form-row" id="grupo-hora-fin">
                     <div class="form-group">
                         <label>Hora Fin (opcional)</label>
@@ -2989,10 +3745,10 @@
                     </div>
                     <div class="form-hint" id="agenda-torta-horarios-hint">Selecciona una fecha para cargar cupos.</div>
                     <div class="torta-dispo-days-grid" id="agenda-torta-dias-grid"></div>
-                    <div class="form-hint" id="agenda-torta-horas-hint">Selecciona un día para ver horas disponibles.</div>
+                    <div class="form-hint" id="agenda-torta-horas-hint">Selecciona un dÃ­a para ver horas disponibles.</div>
                     <div class="torta-dispo-grid" id="agenda-torta-horarios-grid"></div>
                 </div>
-                
+
                 <!-- Campos solo para tortas/pedidos -->
                 <div id="campos-cliente">
                     <div class="torta-manual-box" id="bloque-torta-manual" style="display:none;">
@@ -3073,36 +3829,36 @@
                             <input type="text" id="evento-cliente" placeholder="Nombre">
                         </div>
                         <div class="form-group">
-                            <label>Teléfono</label>
+                            <label>TelÃ©fono</label>
                             <input type="tel" id="evento-telefono" placeholder="300 123 4567">
                         </div>
                     </div>
-                    
+
                     <label class="checkbox-group">
                         <input type="checkbox" id="evento-envio" onchange="toggleEnvio()">
                         <span>&#128666; Es env&iacute;o a domicilio</span>
                     </label>
-                    
+
                     <div class="form-group" id="grupo-direccion" style="display: none;">
-                        <label>Dirección de Entrega</label>
-                        <input type="text" id="evento-direccion" placeholder="Calle, número, barrio">
+                        <label>DirecciÃ³n de Entrega</label>
+                        <input type="text" id="evento-direccion" placeholder="Calle, nÃºmero, barrio">
                         <div id="mapa-preview" class="map-preview" style="display: none;">
                             <div class="map-preview-head">
-                                <span id="mapa-status" class="map-status">Escribe una dirección para ver el mapa.</span>
+                                <span id="mapa-status" class="map-status">Escribe una direcciÃ³n para ver el mapa.</span>
                                 <a id="mapa-open-link" class="map-link" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">
                                     Abrir mapa ->
                                 </a>
                             </div>
-                            <iframe id="mapa-iframe" class="map-frame" title="Vista previa de dirección" loading="lazy"></iframe>
-                            <p class="form-hint">Vista referencial de calles cercanas según OpenStreetMap.</p>
+                            <iframe id="mapa-iframe" class="map-frame" title="Vista previa de direcciÃ³n" loading="lazy"></iframe>
+                            <p class="form-hint">Vista referencial de calles cercanas segÃºn OpenStreetMap.</p>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Ingredientes / Detalles</label>
-                        <textarea id="evento-ingredientes" rows="3" placeholder="Sabor, decoración, etc."></textarea>
+                        <textarea id="evento-ingredientes" rows="3" placeholder="Sabor, decoraciÃ³n, etc."></textarea>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label>Total ($)</label>
@@ -3113,24 +3869,24 @@
                             <input type="number" id="evento-abono" placeholder="0" onchange="calcularRestante()">
                         </div>
                     </div>
-                    
+
                     <div class="money-display">
                         <div class="money-label">Resta por pagar</div>
                         <div class="money-value" id="evento-restante">$0</div>
                     </div>
                 </div>
-                
+
                 <!-- Campos solo para bloqueos -->
                 <div id="campos-bloqueo" style="display: none;">
                     <div class="form-group">
                         <label>Motivo (opcional)</label>
-                        <input type="text" id="bloqueo-motivo" placeholder="Ej: Día de descanso">
+                        <input type="text" id="bloqueo-motivo" placeholder="Ej: DÃ­a de descanso">
                     </div>
                     <p class="form-hint">
                         &#128161; Deja "Hora Fin" vac&iacute;o para bloquear todo el d&iacute;a
                     </p>
                 </div>
-                
+
                 <div class="form-group" style="margin-top: 20px;">
                     <label>&#128276; Recordarme</label>
                     <select id="evento-alerta">
@@ -3138,7 +3894,7 @@
                         <option value="180">3 horas antes</option>
                         <option value="720">12 horas antes</option>
                         <option value="1440" selected>24 horas antes</option>
-                        <option value="2880">2 días antes</option>
+                        <option value="2880">2 dÃ­as antes</option>
                     </select>
                 </div>
             </div>
@@ -3202,7 +3958,7 @@
         </div>
     </div>
 
-    <!-- Modal Configuración -->
+    <!-- Modal ConfiguraciÃ³n -->
     <div class="modal-overlay" id="modal-ficha-pedido">
         <div class="modal">
             <div class="modal-header">
@@ -3318,14 +4074,14 @@
     <div class="modal-overlay" id="modal-config">
         <div class="modal">
             <div class="modal-header">
-                <h3 class="modal-title">Configuración de Agenda</h3>
+                <h3 class="modal-title">ConfiguraciÃ³n de Agenda</h3>
                 <button onclick="cerrarConfig()" class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="config-row">
                     <div>
                         <div class="config-label">Zona Horaria</div>
-                        <div class="form-hint">Ajusta automáticamente según tu ubicación</div>
+                        <div class="form-hint">Ajusta automÃ¡ticamente segÃºn tu ubicaciÃ³n</div>
                     </div>
                     <div class="config-value" id="zona-horaria">
                         Detectando...
@@ -3334,14 +4090,14 @@
                 <div class="config-row">
                     <div>
                         <div class="config-label">Alerta por defecto</div>
-                        <div class="form-hint">Tiempo de anticipación para nuevos eventos</div>
+                        <div class="form-hint">Tiempo de anticipaciÃ³n para nuevos eventos</div>
                     </div>
                     <select id="config-alerta-default" onchange="guardarConfig()">
                         <option value="60">1 hora</option>
                         <option value="180">3 horas</option>
                         <option value="720">12 horas</option>
                         <option value="1440" selected>24 horas</option>
-                        <option value="2880">2 días</option>
+                        <option value="2880">2 dÃ­as</option>
                     </select>
                 </div>
                 <div class="config-row">
@@ -3456,14 +4212,20 @@
         let agendaDiaClickTimer = null;
         let loadingTimer = null;
         let loadingVisible = false;
+        let agendaVista = 'semana';
+        let agendaFiltroRapido = '';
+        let agendaBusqueda = '';
+        let agendaFiltroEstado = '';
+        let agendaFiltroEntrega = '';
+        let agendaDetalleId = null;
         let mapaEvento = {
             lat: null,
             lon: null,
             direccionNormalizada: '',
             direccionOrigen: ''
         };
-        
-        // CONFIGURACIÓN
+
+        // CONFIGURACIÃ“N
         let config = {
             alertaDefault: 1440,
             horaInicio: '09:00',
@@ -3527,6 +4289,141 @@
         function formatoMonedaCLP(valor) {
             const n = Number(valor || 0);
             return `$${Math.max(0, n).toLocaleString('es-CL')}`;
+        }
+
+        function obtenerSaldoAgenda(evento) {
+            const total = Number((evento && evento.total) || 0);
+            const abono = Number((evento && evento.abono) || 0);
+            return Math.max(0, total - abono);
+        }
+
+        function obtenerEstadoOperativoAgenda(evento) {
+            if (esPedidoPendientePorConfirmar(evento)) return 'borrador';
+            const seguimiento = normalizarEstadoSeguimientoAgenda(evento && evento.seguimiento_estado);
+            const estadoBase = normalizarEstadoAgenda(evento && evento.estado, 'pendiente');
+            if (estadoBase === 'cancelado') return 'cancelado';
+            if (estadoBase === 'completado' && seguimiento === 'pendiente') return 'entregado';
+            return seguimiento || estadoBase;
+        }
+
+        function labelEstadoOperativoAgenda(estado) {
+            const labels = {
+                pendiente: 'Pendiente',
+                borrador: 'Por confirmar',
+                recepcionado: 'Recepcionado',
+                produccion: 'En preparacion',
+                espera_envio: 'Listo',
+                despachado: 'Despachado',
+                entregado: 'Entregado',
+                cancelado: 'Cancelado'
+            };
+            return labels[estado] || 'Pendiente';
+        }
+
+        function agendaEsDespacho(evento) {
+            return Boolean(evento && evento.es_envio);
+        }
+
+        function textoModalidadAgenda(evento) {
+            return agendaEsDespacho(evento) ? 'Despacho' : 'Retiro';
+        }
+
+        function inicioSemanaLunes(fecha) {
+            const base = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+            const dia = base.getDay();
+            const delta = dia === 0 ? -6 : 1 - dia;
+            base.setDate(base.getDate() + delta);
+            return base;
+        }
+
+        function sumarDiasAgenda(fecha, dias) {
+            const out = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+            out.setDate(out.getDate() + Number(dias || 0));
+            return out;
+        }
+
+        function rangoVisibleAgenda() {
+            if (agendaVista === 'semana') {
+                const inicio = inicioSemanaLunes(fechaActual);
+                const fin = sumarDiasAgenda(inicio, 6);
+                return { inicio, fin };
+            }
+            if (agendaVista === 'lista') {
+                const inicio = inicioSemanaLunes(fechaActual);
+                const fin = sumarDiasAgenda(inicio, 13);
+                return { inicio, fin };
+            }
+            return {
+                inicio: new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1),
+                fin: new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0)
+            };
+        }
+
+        function eventoDentroRangoAgenda(evento, rango) {
+            const fecha = parseFechaISO(evento && evento.fecha);
+            if (!fecha || !rango) return false;
+            const d = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()).getTime();
+            const i = new Date(rango.inicio.getFullYear(), rango.inicio.getMonth(), rango.inicio.getDate()).getTime();
+            const f = new Date(rango.fin.getFullYear(), rango.fin.getMonth(), rango.fin.getDate()).getTime();
+            return d >= i && d <= f;
+        }
+
+        function textoPeriodoAgenda() {
+            const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+            const r = rangoVisibleAgenda();
+            if (agendaVista === 'mes') {
+                return `${meses[fechaActual.getMonth()]} ${fechaActual.getFullYear()}`;
+            }
+            const inicio = `${r.inicio.getDate()} ${meses[r.inicio.getMonth()]}`;
+            const fin = `${r.fin.getDate()} ${meses[r.fin.getMonth()]} ${r.fin.getFullYear()}`;
+            return `${inicio} - ${fin}`;
+        }
+
+        function ordenarEventosAgenda(lista) {
+            return [...(lista || [])].sort((a, b) => {
+                const fa = String(a.fecha || '');
+                const fb = String(b.fecha || '');
+                if (fa !== fb) return fa.localeCompare(fb);
+                const ha = String(a.hora_entrega || a.hora_inicio || '');
+                const hb = String(b.hora_entrega || b.hora_inicio || '');
+                return ha.localeCompare(hb);
+            });
+        }
+
+        function eventosBaseAgenda() {
+            const rango = rangoVisibleAgenda();
+            return ordenarEventosAgenda(eventos.filter((ev) => {
+                if (!ev || String(ev.tipo || '').toLowerCase() === 'bloqueo') return false;
+                if (!eventoDentroRangoAgenda(ev, rango)) return false;
+                return true;
+            }));
+        }
+
+        function eventoPasaFiltrosAgenda(evento) {
+            const texto = agendaBusqueda;
+            if (texto) {
+                const hay = [
+                    evento.codigo_pedido,
+                    evento.cliente,
+                    evento.titulo,
+                    evento.telefono,
+                    evento.ingredientes
+                ].map((v) => String(v || '').toLowerCase()).join(' ');
+                if (!hay.includes(texto)) return false;
+            }
+            if (agendaFiltroEstado && obtenerEstadoOperativoAgenda(evento) !== agendaFiltroEstado) return false;
+            if (agendaFiltroEntrega) {
+                const entrega = agendaEsDespacho(evento) ? 'despacho' : 'retiro';
+                if (entrega !== agendaFiltroEntrega) return false;
+            }
+            if (agendaFiltroRapido === 'hoy' && evento.fecha !== formatearFecha(new Date())) return false;
+            if (agendaFiltroRapido === 'confirmar' && !esPedidoPendientePorConfirmar(evento)) return false;
+            if (agendaFiltroRapido === 'saldo' && obtenerSaldoAgenda(evento) <= 0) return false;
+            return true;
+        }
+
+        function eventosFiltradosAgenda() {
+            return eventosBaseAgenda().filter(eventoPasaFiltrosAgenda);
         }
 
         function normalizarEstadoAgenda(estado, defaultEstado = 'pendiente') {
@@ -3921,7 +4818,7 @@
             const grid = document.getElementById('agenda-torta-horarios-grid');
             tortaDispoDiasCache = [];
             if (hint) hint.textContent = 'Selecciona una fecha para cargar cupos.';
-            if (hintHoras) hintHoras.textContent = 'Selecciona un día para ver horas disponibles.';
+            if (hintHoras) hintHoras.textContent = 'Selecciona un dÃ­a para ver horas disponibles.';
             if (diasGrid) diasGrid.innerHTML = '';
             if (grid) grid.innerHTML = '';
         }
@@ -3998,8 +4895,8 @@
             boxHorarios.style.display = 'block';
 
             const requestId = ++tortaDispoRequestId;
-            hint.textContent = 'Consultando días y horarios disponibles...';
-            hintHoras.textContent = 'Selecciona un día para ver horas disponibles.';
+            hint.textContent = 'Consultando dÃ­as y horarios disponibles...';
+            hintHoras.textContent = 'Selecciona un dÃ­a para ver horas disponibles.';
             if (forzar) grid.innerHTML = '';
             try {
                 const categoriaId = valorCampo('torta-categoria');
@@ -4017,7 +4914,7 @@
                 const dias = Array.isArray(data.dias) ? data.dias : [];
                 tortaDispoDiasCache = dias;
                 if (!dias.length) {
-                    hint.textContent = 'No hay días disponibles en el rango configurado.';
+                    hint.textContent = 'No hay dÃ­as disponibles en el rango configurado.';
                     hintHoras.textContent = 'Sin horarios disponibles.';
                     renderizarDiasDisponiblesTorta([], '');
                     grid.innerHTML = '';
@@ -4031,12 +4928,12 @@
                     if (fecha) setCampo('evento-fecha', fecha);
                 }
                 renderizarDiasDisponiblesTorta(dias, fecha);
-                hint.textContent = 'Selecciona el día y luego una hora disponible.';
+                hint.textContent = 'Selecciona el dÃ­a y luego una hora disponible.';
 
                 const dia = dias.find(d => String(d.fecha || '') === fecha) || {};
                 const horas = Array.isArray(dia.horas) ? dia.horas : [];
                 if (!horas.length) {
-                    hintHoras.textContent = 'No hay horarios configurados para ese día.';
+                    hintHoras.textContent = 'No hay horarios configurados para ese dÃ­a.';
                     grid.innerHTML = '';
                     return;
                 }
@@ -4681,7 +5578,7 @@
             if (!contenedor) return;
 
             if (!Array.isArray(notaChecklistDraft) || !notaChecklistDraft.length) {
-                contenedor.innerHTML = '<div class="form-hint">Sin tareas aún.</div>';
+                contenedor.innerHTML = '<div class="form-hint">Sin tareas aÃºn.</div>';
                 return;
             }
 
@@ -4698,7 +5595,7 @@
                             class="nota-checklist-remove"
                             onclick="eliminarItemChecklistNota(${index})"
                             title="Eliminar tarea">
-                        ×
+                        Ã—
                     </button>
                 </div>
             `).join('');
@@ -4824,7 +5721,7 @@
                 year: 'numeric'
             });
         }
-        
+
         function applyDarkModePreference() {
             const isDark = localStorage.getItem('darkMode') === 'true';
             document.body.classList.toggle('dark-mode', isDark);
@@ -4832,7 +5729,137 @@
             if (btn) btn.textContent = isDark ? '\u2600' : '\uD83C\uDF19';
         }
 
-        // INICIALIZACIÓN
+        function toggleAgendaMoreMenu() {
+            document.getElementById('agenda-more-menu')?.classList.toggle('active');
+        }
+
+        function cerrarAgendaMoreMenu() {
+            document.getElementById('agenda-more-menu')?.classList.remove('active');
+        }
+
+        function actualizarVistaSwitchAgenda() {
+            document.querySelectorAll('#agenda-view-switch [data-view]').forEach((btn) => {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === agendaVista);
+            });
+        }
+
+        function cambiarVistaAgenda(vista) {
+            agendaVista = ['mes', 'semana', 'lista'].includes(vista) ? vista : 'semana';
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+        }
+
+        function irAgendaHoy() {
+            fechaActual = new Date();
+            fechaSeleccionada = formatearFecha(fechaActual);
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+        }
+
+        function actualizarFiltrosAgenda() {
+            agendaBusqueda = String(document.getElementById('agenda-search-input')?.value || '').trim().toLowerCase();
+            agendaFiltroEstado = String(document.getElementById('agenda-filter-estado')?.value || '').trim();
+            agendaFiltroEntrega = String(document.getElementById('agenda-filter-entrega')?.value || '').trim();
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+        }
+
+        function limpiarFiltrosAgenda() {
+            agendaBusqueda = '';
+            agendaFiltroEstado = '';
+            agendaFiltroEntrega = '';
+            agendaFiltroRapido = '';
+            const input = document.getElementById('agenda-search-input');
+            const estado = document.getElementById('agenda-filter-estado');
+            const entrega = document.getElementById('agenda-filter-entrega');
+            if (input) input.value = '';
+            if (estado) estado.value = '';
+            if (entrega) entrega.value = '';
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+        }
+
+        function aplicarFiltroRapidoAgenda(tipo) {
+            agendaFiltroRapido = agendaFiltroRapido === tipo ? '' : tipo;
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+        }
+
+        function renderizarFiltroActivoAgenda() {
+            const box = document.getElementById('agenda-active-filter');
+            if (!box) return;
+            const parts = [];
+            if (agendaFiltroRapido === 'hoy') parts.push('Pedidos para hoy');
+            if (agendaFiltroRapido === 'confirmar') parts.push('Pedidos por confirmar');
+            if (agendaFiltroRapido === 'saldo') parts.push('Pedidos con saldo pendiente');
+            if (agendaBusqueda) parts.push(`Busqueda: "${agendaBusqueda}"`);
+            if (agendaFiltroEstado) parts.push(`Estado: ${labelEstadoOperativoAgenda(agendaFiltroEstado)}`);
+            if (agendaFiltroEntrega) parts.push(`Entrega: ${agendaFiltroEntrega === 'despacho' ? 'Despacho' : 'Retiro'}`);
+            if (!parts.length) {
+                box.classList.remove('active');
+                box.innerHTML = '';
+                return;
+            }
+            box.classList.add('active');
+            box.innerHTML = `${escapeHtml(parts.join(' Â· '))} <button type="button" class="btn btn-secondary" style="margin-left:10px;padding:6px 10px;" onclick="limpiarFiltrosAgenda()">Quitar</button>`;
+        }
+
+        function renderizarKpisAgenda() {
+            const box = document.getElementById('agenda-kpis');
+            if (!box) return;
+            const base = eventosBaseAgenda();
+            const hoy = formatearFecha(new Date());
+            const periodoLabel = agendaVista === 'semana' ? 'Pedidos esta semana' : (agendaVista === 'mes' ? 'Pedidos este mes' : 'Pedidos del periodo');
+            const kpis = [
+                { key: '', icon: 'P', n: base.length, label: periodoLabel },
+                { key: 'hoy', icon: 'H', n: base.filter((ev) => ev.fecha === hoy).length, label: 'Para hoy' },
+                { key: 'confirmar', icon: '!', n: base.filter(esPedidoPendientePorConfirmar).length, label: 'Por confirmar' },
+                { key: 'saldo', icon: '$', n: base.filter((ev) => obtenerSaldoAgenda(ev) > 0).length, label: 'Saldos pendientes' },
+            ];
+            box.innerHTML = kpis.map((item) => `
+                <button type="button" class="agenda-kpi ${agendaFiltroRapido === item.key ? 'active' : ''}" onclick="aplicarFiltroRapidoAgenda('${escapeHtml(item.key)}')">
+                    <span class="agenda-kpi-icon">${escapeHtml(item.icon)}</span>
+                    <span>
+                        <span class="agenda-kpi-number">${item.n}</span>
+                        <span class="agenda-kpi-label">${escapeHtml(item.label)}</span>
+                    </span>
+                </button>
+            `).join('');
+        }
+
+        function renderizarAlertasAgenda() {
+            const box = document.getElementById('agenda-alerts');
+            if (!box) return;
+            const hoy = formatearFecha(new Date());
+            const ahora = new Date();
+            const candidatos = eventosBaseAgenda();
+            const alertas = [];
+            const incompleto = candidatos.find((ev) => ev.fecha === hoy && (!String(ev.cliente || '').trim() || !String(ev.telefono || '').trim()));
+            if (incompleto) alertas.push({ texto: 'Un pedido de hoy necesita datos del cliente', id: incompleto.id });
+            const confirmar = candidatos.find(esPedidoPendientePorConfirmar);
+            if (confirmar) alertas.push({ texto: 'Hay pedidos pendientes por confirmar', id: confirmar.id });
+            const vencido = candidatos.find((ev) => {
+                const dt = _fechaHoraEvento(ev);
+                return dt && dt.getTime() < ahora.getTime() && !['entregado', 'cancelado'].includes(obtenerEstadoOperativoAgenda(ev));
+            });
+            if (vencido) alertas.push({ texto: 'Un pedido ya paso su hora y sigue pendiente', id: vencido.id });
+            box.innerHTML = alertas.slice(0, 2).map((a) => `
+                <div class="agenda-alert-item">
+                    <span>${escapeHtml(a.texto)}</span>
+                    <button type="button" onclick="abrirDetallePedidoAgenda(${Number(a.id || 0)})">Revisar</button>
+                </div>
+            `).join('');
+        }
+
+        function renderizarAgendaShell() {
+            actualizarVistaSwitchAgenda();
+            renderizarKpisAgenda();
+            renderizarAlertasAgenda();
+            renderizarFiltroActivoAgenda();
+            renderizarPanelDetallePedido();
+        }
+
+        // INICIALIZACIÃ“N
         document.addEventListener('DOMContentLoaded', () => {
             applyDarkModePreference();
             inicializarBusquedaDireccion();
@@ -4843,7 +5870,7 @@
             cargarPlantillasWhatsAppAgenda();
             cargarEventos({ silent: true }); // Evita parpadeo al entrar a Agenda
             cargarNotasAgenda();
-             
+
             // Actualizar cada minuto
             setInterval(verificarNotificaciones, 60000);
             setInterval(actualizarContadoresAgenda, 30000);
@@ -4905,18 +5932,18 @@
                 applyDarkModePreference();
             }
         });
-        
+
         // ============================================================================
         // CARGAR EVENTOS DESDE LA BASE DE DATOS (REEMPLAZA localStorage)
         // ============================================================================
-        
+
         async function cargarEventos(options = {}) {
             const showLoading = !options || options.silent !== true;
             if (showLoading) mostrarLoading(true);
             try {
                 const response = await fetch('/api/agenda/eventos');
                 const data = await response.json();
-                
+
                 if (data.success) {
                     eventos = data.eventos.map(e => ({
                         ...e,
@@ -4945,19 +5972,19 @@
                     }
                 }
             } catch (error) {
-                console.error('Error de conexión:', error);
+                console.error('Error de conexiÃ³n:', error);
                 if (!options || options.silent !== true) {
-                    alert('Error de conexión al cargar eventos');
+                    alert('Error de conexiÃ³n al cargar eventos');
                 }
             } finally {
                 if (showLoading) mostrarLoading(false);
             }
         }
-        
+
         // ============================================================================
         // GUARDAR EVENTO EN BASE DE DATOS (REEMPLAZA localStorage)
         // ============================================================================
-        
+
         async function guardarEvento(modo = 'final') {
             if (guardandoEvento) return;
             const guardadoBorrador = String(modo || '').trim().toLowerCase() === 'borrador';
@@ -5128,19 +6155,19 @@
         // ============================================================================
         // ELIMINAR EVENTO DE BASE DE DATOS
         // ============================================================================
-        
+
         async function eliminarEvento() {
             if (!eventoEditando || !eventoEditando.id) return;
-            if (!confirm('¿Eliminar este evento permanentemente?')) return;
-            
+            if (!confirm('Â¿Eliminar este evento permanentemente?')) return;
+
             mostrarLoading(true);
             try {
                 const response = await fetch(`/api/agenda/evento/${eventoEditando.id}`, {
                     method: 'DELETE'
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     cerrarModal();
                     await cargarEventos(); // Recargar desde BD
@@ -5149,7 +6176,7 @@
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('[ERROR] Error de conexión al eliminar');
+                alert('[ERROR] Error de conexiÃ³n al eliminar');
             } finally {
                 mostrarLoading(false);
             }
@@ -5157,7 +6184,7 @@
 
         async function eliminarEventosPasados() {
             const hoy = formatearFecha(new Date());
-            if (!confirm(`¿Eliminar eventos anteriores al ${hoy}? Esta acción no se puede deshacer.`)) return;
+            if (!confirm(`Â¿Eliminar eventos anteriores al ${hoy}? Esta acciÃ³n no se puede deshacer.`)) return;
 
             mostrarLoading(true);
             try {
@@ -5171,18 +6198,18 @@
                     throw new Error(data.error || 'No se pudieron eliminar eventos pasados');
                 }
                 await cargarEventos();
-                alert(`✅ Limpieza completada. Eventos eliminados: ${Number(data.eliminados || 0)}.`);
+                alert(`âœ… Limpieza completada. Eventos eliminados: ${Number(data.eliminados || 0)}.`);
             } catch (error) {
                 alert('[ERROR] ' + String(error.message || error));
             } finally {
                 mostrarLoading(false);
             }
         }
-        
+
         // ============================================================================
         // RESTO DE FUNCIONES (sin cambios importantes)
         // ============================================================================
-        
+
         function cargarConfig() {
             const guardada = localStorage.getItem('agenda_config');
             if (guardada) {
@@ -5194,7 +6221,7 @@
             document.getElementById('zona-horaria').textContent = config.zonaHoraria;
             renderizarDetalleHorarioDia();
         }
-        
+
         function guardarConfig() {
             config.alertaDefault = parseInt(document.getElementById('config-alerta-default').value);
             config.horaInicio = document.getElementById('config-hora-inicio').value;
@@ -5245,7 +6272,7 @@
                 .filter(nota => (nota?.estado || 'activa') === 'activa');
 
             if (!visibles.length) {
-                grid.innerHTML = '<div class="nota-empty">No hay notas activas. Las completadas se archivan por 7 días.</div>';
+                grid.innerHTML = '<div class="nota-empty">No hay notas activas. Las completadas se archivan por 7 dÃ­as.</div>';
                 return;
             }
 
@@ -5380,7 +6407,7 @@
         async function eliminarNotaAgenda() {
             const id = document.getElementById('nota-id').value;
             if (!id) return;
-            if (!confirm('¿Eliminar esta nota?')) return;
+            if (!confirm('Â¿Eliminar esta nota?')) return;
 
             try {
                 const response = await fetch(`/api/agenda/nota/${id}`, { method: 'DELETE' });
@@ -5461,7 +6488,7 @@
                 alert('[ERROR] ' + error.message);
             }
         }
-        
+
         function mostrarLoading(mostrar) {
             const overlay = document.getElementById('loading');
             if (!overlay) return;
@@ -5748,7 +6775,7 @@
                     const line = String(ln || '').trim();
                     if (!line) return;
                     const low = line.toLowerCase();
-                    if (low.startsWith('tamano:') || low.startsWith('tamaÃ±o:')) {
+                    if (low.startsWith('tamano:') || low.startsWith('tamaÃƒÂ±o:')) {
                         tamanoTorta = line.split(':').slice(1).join(':').trim() || tamanoTorta;
                         return;
                     }
@@ -6150,7 +7177,7 @@
             }
         }
 
-        function limpiarMapaEstado(mensaje = 'Escribe una dirección para ver el mapa.', tipo = '') {
+        function limpiarMapaEstado(mensaje = 'Escribe una direcciÃ³n para ver el mapa.', tipo = '') {
             const statusEl = document.getElementById('mapa-status');
             const iframe = document.getElementById('mapa-iframe');
             const link = document.getElementById('mapa-open-link');
@@ -6210,7 +7237,7 @@
             }
             const blob = await response.blob();
             if (!blob || blob.size < 1000) {
-                throw new Error('Mapa vacío');
+                throw new Error('Mapa vacÃ­o');
             }
             return blobADataURL(blob);
         }
@@ -6220,7 +7247,7 @@
             const iframe = document.getElementById('mapa-iframe');
             const link = document.getElementById('mapa-open-link');
             if (statusEl) {
-                statusEl.textContent = nombreDireccion || 'Ubicación encontrada';
+                statusEl.textContent = nombreDireccion || 'UbicaciÃ³n encontrada';
                 statusEl.classList.remove('loading', 'error');
             }
             if (iframe) iframe.src = construirEmbedMapa(lat, lon);
@@ -6265,7 +7292,7 @@
             preview.style.display = 'block';
             const direccion = (input.value || '').trim();
             if (!direccion) {
-                limpiarMapaEstado('Escribe una dirección para ver el mapa.');
+                limpiarMapaEstado('Escribe una direcciÃ³n para ver el mapa.');
                 return;
             }
 
@@ -6277,7 +7304,7 @@
             const reqId = ++geocodeRequestId;
             const statusEl = document.getElementById('mapa-status');
             if (statusEl) {
-                statusEl.textContent = 'Buscando dirección...';
+                statusEl.textContent = 'Buscando direcciÃ³n...';
                 statusEl.classList.remove('error');
                 statusEl.classList.add('loading');
             }
@@ -6287,7 +7314,7 @@
                 if (reqId !== geocodeRequestId) return;
 
                 if (!resultado || !Number.isFinite(resultado.lat) || !Number.isFinite(resultado.lon)) {
-                    limpiarMapaEstado('No se encontró la dirección. Ajusta calle/número/comuna.', 'error');
+                    limpiarMapaEstado('No se encontrÃ³ la direcciÃ³n. Ajusta calle/nÃºmero/comuna.', 'error');
                     return;
                 }
 
@@ -6300,7 +7327,7 @@
                 renderizarMapa(resultado.lat, resultado.lon, resultado.nombre);
             } catch (error) {
                 if (reqId !== geocodeRequestId) return;
-                limpiarMapaEstado('Sin conexión al mapa. Revisa internet e inténtalo de nuevo.', 'error');
+                limpiarMapaEstado('Sin conexiÃ³n al mapa. Revisa internet e intÃ©ntalo de nuevo.', 'error');
             }
         }
 
@@ -6317,73 +7344,88 @@
                     direccionOrigen: evento.direccion
                 };
             } catch (error) {
-                // No interrumpir PDF si falla geocodificación
+                // No interrumpir PDF si falla geocodificaciÃ³n
             }
         }
-        
+
         // CALENDARIO
         function renderizarCalendario() {
+            renderizarAgendaShell();
+            if (agendaVista === 'semana') {
+                renderizarAgendaSemana();
+                return;
+            }
+            if (agendaVista === 'lista') {
+                renderizarAgendaLista();
+                return;
+            }
+            renderizarCalendarioMes();
+        }
+
+        function renderizarCalendarioMes() {
             const grid = document.getElementById('calendario');
             grid.innerHTML = '';
-            
-            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+            grid.className = 'calendar-grid';
+
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-            document.getElementById('mes-actual').textContent = 
+            document.getElementById('mes-actual').textContent =
                 `${meses[fechaActual.getMonth()]} ${fechaActual.getFullYear()}`;
-            
-            // Headers días
-            const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+            // Headers dÃ­as
+            const diasSemana = ['Dom', 'Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'];
             diasSemana.forEach(dia => {
                 const header = document.createElement('div');
                 header.className = 'calendar-day-header';
                 header.textContent = dia;
                 grid.appendChild(header);
             });
-            
-            // Días del mes
+
+            // DÃ­as del mes
             const primerDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
             const ultimoDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0);
             const hoy = new Date();
-            
-            // Espacios vacíos antes
+            const eventosVisiblesMes = eventosFiltradosAgenda();
+
+            // Espacios vacÃ­os antes
             for (let i = 0; i < primerDia.getDay(); i++) {
                 const empty = document.createElement('div');
                 empty.className = 'calendar-day empty';
                 grid.appendChild(empty);
             }
-            
-            // Días
+
+            // DÃ­as
             for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
                 const celda = document.createElement('div');
                 celda.className = 'calendar-day';
-                
+
                 const fechaCelda = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), dia);
                 const fechaStr = formatearFecha(fechaCelda);
                 if (fechaStr === fechaSeleccionada) {
                     celda.classList.add('selected');
                 }
-                
-                // ¿Es hoy?
-                if (dia === hoy.getDate() && fechaActual.getMonth() === hoy.getMonth() && 
+
+                // Â¿Es hoy?
+                if (dia === hoy.getDate() && fechaActual.getMonth() === hoy.getMonth() &&
                     fechaActual.getFullYear() === hoy.getFullYear()) {
                     celda.classList.add('today');
                 }
-                
-                // Buscar eventos del día
-                const eventosDia = eventos.filter(e => e.fecha === fechaStr);
+
+                // Buscar eventos del dÃ­a
+                const eventosDia = eventosVisiblesMes.filter(e => e.fecha === fechaStr);
                 const tieneBloqueo = eventosDia.some(e => e.tipo === 'bloqueo');
-                
+
                 if (tieneBloqueo) {
                     celda.classList.add('blocked');
                 }
-                
+
                 celda.innerHTML = `<div class="day-number">${dia}</div>`;
-                
+
                 // Mostrar eventos
                 if (eventosDia.length > 0) {
                     const contenedor = document.createElement('div');
                     contenedor.className = 'day-events';
-                    
+
                     eventosDia.slice(0, 3).forEach(ev => {
                         const span = document.createElement('span');
                         span.className = `day-event ${claseCssEvento(ev)}`;
@@ -6405,19 +7447,19 @@
                         };
                         contenedor.appendChild(span);
                     });
-                    
+
                     if (eventosDia.length > 3) {
                         const mas = document.createElement('span');
                         mas.className = 'day-event';
                         mas.style.background = '#e2e8f0';
                         mas.style.color = '#475569';
-                        mas.textContent = `+${eventosDia.length - 3} más`;
+                        mas.textContent = `+${eventosDia.length - 3} mÃ¡s`;
                         contenedor.appendChild(mas);
                     }
-                    
+
                     celda.appendChild(contenedor);
                 }
-                
+
                 celda.onclick = () => {
                     if (agendaDiaClickTimer) clearTimeout(agendaDiaClickTimer);
                     agendaDiaClickTimer = setTimeout(() => {
@@ -6435,6 +7477,87 @@
                 };
                 grid.appendChild(celda);
             }
+        }
+
+        function renderizarTarjetaPedidoAgenda(evento) {
+            const id = Number(evento.id || 0);
+            const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || 'Sin hora';
+            const cliente = String(evento.cliente || 'Sin cliente').trim() || 'Sin cliente';
+            const producto = String(evento.titulo || _resumenCatalogoTorta(evento).categoria || 'Pedido').trim() || 'Pedido';
+            const estado = obtenerEstadoOperativoAgenda(evento);
+            const saldo = obtenerSaldoAgenda(evento);
+            const selected = agendaDetalleId && Number(agendaDetalleId) === id;
+            return `
+                <button type="button" class="agenda-order-card ${selected ? 'selected' : ''}" onclick="abrirDetallePedidoAgenda(${id})" ondblclick="editarEvento(${id})">
+                    <div class="agenda-order-time">${escapeHtml(hora)}</div>
+                    <div class="agenda-order-name">${escapeHtml(cliente)}</div>
+                    <div class="agenda-order-product">${escapeHtml(producto)}</div>
+                    <span class="agenda-status-pill ${escapeHtml(estado)}">${escapeHtml(labelEstadoOperativoAgenda(estado))}</span>
+                    ${saldo > 0 ? `<div class="agenda-card-balance">${escapeHtml(formatoMonedaCLP(saldo))} pendiente</div>` : ''}
+                    <div class="agenda-delivery-pill">${agendaEsDespacho(evento) ? 'Despacho' : 'Retiro'}</div>
+                </button>
+            `;
+        }
+
+        function renderizarAgendaSemana() {
+            const grid = document.getElementById('calendario');
+            if (!grid) return;
+            grid.className = 'agenda-week-grid';
+            document.getElementById('mes-actual').textContent = textoPeriodoAgenda();
+            const inicio = inicioSemanaLunes(fechaActual);
+            const hoy = formatearFecha(new Date());
+            const visibles = eventosFiltradosAgenda();
+            const dias = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'];
+            grid.innerHTML = Array.from({ length: 7 }).map((_, idx) => {
+                const fecha = sumarDiasAgenda(inicio, idx);
+                const fechaStr = formatearFecha(fecha);
+                const pedidos = visibles.filter((ev) => ev.fecha === fechaStr);
+                const selected = fechaSeleccionada === fechaStr;
+                return `
+                    <section class="agenda-week-day ${fechaStr === hoy ? 'today' : ''} ${selected ? 'selected' : ''}" onclick="seleccionarDiaCalendario('${fechaStr}')">
+                        <header class="agenda-week-head">
+                            <small>${dias[idx]}</small>
+                            <strong>${fecha.getDate()}</strong>
+                            ${fechaStr === hoy ? '<span class="agenda-today-pill">HOY</span>' : ''}
+                        </header>
+                        <div class="agenda-week-list">
+                            ${pedidos.map(renderizarTarjetaPedidoAgenda).join('')}
+                            <button type="button" class="agenda-day-add" onclick="event.stopPropagation(); agendarTortaManual('${fechaStr}')">+ Agendar</button>
+                        </div>
+                    </section>
+                `;
+            }).join('');
+        }
+
+        function renderizarAgendaLista() {
+            const grid = document.getElementById('calendario');
+            if (!grid) return;
+            grid.className = 'agenda-list-view';
+            document.getElementById('mes-actual').textContent = textoPeriodoAgenda();
+            const lista = eventosFiltradosAgenda();
+            if (!lista.length) {
+                grid.innerHTML = '<div class="agenda-empty-state">No hay pedidos para el periodo o filtros seleccionados.</div>';
+                return;
+            }
+            grid.innerHTML = lista.map((evento) => {
+                const id = Number(evento.id || 0);
+                const estado = obtenerEstadoOperativoAgenda(evento);
+                const saldo = obtenerSaldoAgenda(evento);
+                const fecha = formatearFechaLarga(String(evento.fecha || ''));
+                const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || 'Sin hora';
+                const cliente = String(evento.cliente || 'Sin cliente').trim() || 'Sin cliente';
+                const producto = String(evento.titulo || _resumenCatalogoTorta(evento).categoria || 'Pedido').trim() || 'Pedido';
+                const selected = agendaDetalleId && Number(agendaDetalleId) === id;
+                return `
+                    <button type="button" class="agenda-list-row ${selected ? 'selected' : ''}" onclick="abrirDetallePedidoAgenda(${id})" ondblclick="editarEvento(${id})">
+                        <div><strong>${escapeHtml(hora)}</strong><br><span>${escapeHtml(fecha)}</span></div>
+                        <div><strong>${escapeHtml(cliente)}</strong><br><span>${escapeHtml(producto)}</span></div>
+                        <span class="agenda-status-pill ${escapeHtml(estado)}">${escapeHtml(labelEstadoOperativoAgenda(estado))}</span>
+                        <span>${escapeHtml(textoModalidadAgenda(evento))}</span>
+                        <strong>${saldo > 0 ? escapeHtml(formatoMonedaCLP(saldo)) : 'Pagado'}</strong>
+                    </button>
+                `;
+            }).join('');
         }
 
         function eventosSeleccionablesDia(fecha) {
@@ -6531,6 +7654,7 @@
         function seleccionarEventoAgenda(fecha, eventoId, abrirModal = false, options = {}) {
             fechaSeleccionada = fecha;
             eventoDetalleSeleccionadoId = Number(eventoId || 0) || null;
+            agendaDetalleId = eventoDetalleSeleccionadoId;
             renderizarCalendario();
             renderizarDetalleHorarioDia();
             if (!eventoDetalleSeleccionadoId) return;
@@ -6538,7 +7662,184 @@
                 editarEvento(eventoDetalleSeleccionadoId);
                 return;
             }
-            abrirResumenEvento(eventoDetalleSeleccionadoId);
+            abrirDetallePedidoAgenda(eventoDetalleSeleccionadoId);
+        }
+
+        function cerrarDetallePedidoAgenda() {
+            agendaDetalleId = null;
+            eventoDetalleSeleccionadoId = null;
+            renderizarCalendario();
+            renderizarPanelDetallePedido();
+        }
+
+        function abrirDetallePedidoAgenda(idEvento) {
+            const idNum = Number(idEvento || 0);
+            if (!idNum) return;
+            const evento = eventos.find((e) => Number(e.id || 0) === idNum);
+            if (!evento) return;
+            agendaDetalleId = idNum;
+            eventoDetalleSeleccionadoId = idNum;
+            fechaSeleccionada = evento.fecha || fechaSeleccionada;
+            renderizarCalendario();
+            renderizarDetalleHorarioDia();
+            renderizarPanelDetallePedido();
+        }
+
+        function detalleCatalogoCompletoAgenda(evento) {
+            const resumen = _resumenCatalogoTorta(evento);
+            const txt = String((evento && evento.ingredientes) || '');
+            const out = {
+                categoria: resumen.categoria || '-',
+                tamano: resumen.tamano || '-',
+                sabores: resumen.sabores || [],
+                extras: [],
+                topper: '',
+                nota: ''
+            };
+            const secciones = detalleEnSecciones(txt, 'Detalle pedido');
+            const catalogo = secciones.find((s) => String((s && s.titulo) || '').trim().toLowerCase() === 'catalogo torta');
+            const items = Array.isArray(catalogo && catalogo.items) ? catalogo.items : [];
+            let mode = '';
+            items.forEach((raw) => {
+                const line = String(raw || '').trim();
+                const low = line.toLowerCase();
+                if (!line) return;
+                if (low === 'extras:') { mode = 'extras'; return; }
+                if (low === 'sabores:') { mode = 'sabores'; return; }
+                if (low === 'topper:') { mode = 'topper'; return; }
+                if (low.startsWith('nota catalogo:')) { out.nota = line.split(':').slice(1).join(':').trim(); mode = ''; return; }
+                if (low.endsWith(':')) { mode = ''; return; }
+                if (line.startsWith('-')) {
+                    const val = line.replace(/^-+\s*/, '').trim();
+                    if (!val || val === '-') return;
+                    if (mode === 'extras') out.extras.push(val);
+                    if (mode === 'topper') out.topper = val;
+                }
+            });
+            return out;
+        }
+
+        function pasosSeguimientoAgenda(estado) {
+            const orden = ['recepcionado', 'produccion', 'espera_envio', 'entregado'];
+            const idx = Math.max(0, orden.indexOf(estado));
+            return orden.map((key, i) => ({
+                key,
+                label: key === 'recepcionado' ? 'Recibido' : (key === 'produccion' ? 'Preparacion' : (key === 'espera_envio' ? 'Listo' : 'Entregado')),
+                className: i < idx ? 'done' : (i === idx ? 'active' : '')
+            }));
+        }
+
+        function renderizarPanelDetallePedido() {
+            const panel = document.getElementById('agenda-detail-panel');
+            if (!panel) return;
+            const evento = eventos.find((e) => Number(e.id || 0) === Number(agendaDetalleId || 0));
+            if (!evento) {
+                panel.innerHTML = '<div class="agenda-detail-empty">Selecciona un pedido para ver su detalle, actualizar estado, descargar PDF o abrir seguimiento.</div>';
+                return;
+            }
+            const detalle = detalleCatalogoCompletoAgenda(evento);
+            const estado = obtenerEstadoOperativoAgenda(evento);
+            const seguimiento = normalizarEstadoSeguimientoAgenda(evento.seguimiento_estado || estado);
+            const total = Number(evento.total || 0);
+            const abono = Number(evento.abono || 0);
+            const saldo = obtenerSaldoAgenda(evento);
+            const codigo = String(evento.codigo_pedido || evento.id || '-').trim();
+            const tracking = seguimientoUrlPedido(codigo);
+            const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || '-';
+            const direccion = agendaEsDespacho(evento) ? String(evento.direccion || '-') : 'Sucree Pasteleria';
+            const obs = String(detalle.nota || evento.motivo || evento.ingredientes || '').trim();
+            const opciones = Object.entries(SEGUIMIENTO_ESTADOS_LABELS).map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === seguimiento ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+            panel.innerHTML = `
+                <div class="agenda-detail-head">
+                    <div>
+                        <div class="agenda-detail-kicker">Detalle del pedido</div>
+                        <div class="agenda-detail-name">${escapeHtml(evento.cliente || 'Sin cliente')}</div>
+                        <div class="agenda-detail-code">${escapeHtml(codigo)}</div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:10px;">
+                        <span class="agenda-status-pill ${escapeHtml(estado)}">${escapeHtml(labelEstadoOperativoAgenda(estado))}</span>
+                        <button type="button" class="agenda-detail-close" onclick="cerrarDetallePedidoAgenda()" aria-label="Cerrar detalle">&times;</button>
+                    </div>
+                </div>
+                <div class="agenda-detail-body">
+                    <section class="agenda-detail-section">
+                        <div class="agenda-detail-title">Estado del pedido</div>
+                        <div class="agenda-progress">
+                            ${pasosSeguimientoAgenda(seguimiento).map((step) => `
+                                <div class="agenda-progress-step ${escapeHtml(step.className)}">
+                                    <div class="agenda-progress-dot"></div>
+                                    ${escapeHtml(step.label)}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="agenda-state-row">
+                            <select id="agenda-panel-estado">${opciones}</select>
+                            <button type="button" class="btn-primary" onclick="actualizarEstadoDesdePanel(${Number(evento.id || 0)})">Actualizar estado</button>
+                        </div>
+                    </section>
+                    <section class="agenda-detail-section">
+                        <div class="agenda-detail-title">Entrega</div>
+                        <div class="agenda-detail-grid">
+                            <div><strong>${escapeHtml(formatearFechaLarga(String(evento.fecha || '')))}</strong>Fecha</div>
+                            <div><strong>${escapeHtml(hora)}</strong>Hora</div>
+                            <div><strong>${escapeHtml(textoModalidadAgenda(evento))}</strong>Modalidad</div>
+                            <div><strong>${escapeHtml(direccion)}</strong>Lugar</div>
+                        </div>
+                    </section>
+                    <section class="agenda-detail-section">
+                        <div class="agenda-detail-title">${escapeHtml(detalle.categoria || evento.titulo || 'Producto')}</div>
+                        <div class="agenda-detail-grid">
+                            <div><strong>${escapeHtml(detalle.tamano || '-')}</strong>Tamano</div>
+                            <div><strong>${escapeHtml((detalle.sabores || []).join(', ') || '-')}</strong>Rellenos</div>
+                            <div><strong>${escapeHtml((detalle.extras || []).join(', ') || '-')}</strong>Extras</div>
+                            <div><strong>${escapeHtml(detalle.topper || 'Sin topper')}</strong>Topper</div>
+                        </div>
+                    </section>
+                    <section class="agenda-detail-section">
+                        <div class="agenda-detail-title">Pago</div>
+                        <div class="agenda-pay-row"><span>Total del pedido</span><strong>${escapeHtml(formatoMonedaCLP(total))}</strong></div>
+                        <div class="agenda-pay-row"><span>Abono</span><strong>${escapeHtml(formatoMonedaCLP(abono))}</strong></div>
+                        <div class="agenda-balance-box"><span>${saldo > 0 ? 'Saldo pendiente' : 'Pagado'}</span><span class="amount">${escapeHtml(formatoMonedaCLP(saldo))}</span></div>
+                    </section>
+                    <section class="agenda-detail-section">
+                        <div class="agenda-detail-title">Observaciones</div>
+                        <div style="color:#475467;line-height:1.45;">${escapeHtml(obs || 'Sin observaciones')}</div>
+                    </section>
+                </div>
+                <div class="agenda-detail-actions">
+                    <button type="button" class="primary" onclick="editarEvento(${Number(evento.id || 0)})">Editar pedido</button>
+                    <button type="button" onclick="generarPdfDesdeResumen(${Number(evento.id || 0)})">Descargar PDF</button>
+                    ${tracking ? `<a href="${escapeHtml(tracking)}" target="_blank" rel="noopener noreferrer">Ver seguimiento</a>` : '<button type="button" disabled>Sin seguimiento</button>'}
+                </div>
+            `;
+        }
+
+        async function actualizarEstadoDesdePanel(idEvento) {
+            const idNum = Number(idEvento || 0);
+            const select = document.getElementById('agenda-panel-estado');
+            if (!idNum || !select) return;
+            try {
+                mostrarLoading(true);
+                const response = await fetch(`/api/agenda/evento/${idNum}/seguimiento`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ estado: select.value })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo actualizar el estado');
+                }
+                const idx = eventos.findIndex((e) => Number(e.id || 0) === idNum);
+                if (idx >= 0 && data.evento) eventos[idx] = data.evento;
+                agendaDetalleId = idNum;
+                renderizarCalendario();
+                renderizarDetalleHorarioDia();
+                renderizarPanelDetallePedido();
+            } catch (error) {
+                alert('[ERROR] ' + String(error.message || error));
+            } finally {
+                mostrarLoading(false);
+            }
         }
 
         function _fechaHoraEvento(evento) {
@@ -6909,6 +8210,7 @@
                 }
                 renderizarCalendario();
                 renderizarDetalleHorarioDia();
+                renderizarPanelDetallePedido();
                 renderizarProximos();
                 renderizarBorradores();
                 if (data.evento) {
@@ -6930,6 +8232,10 @@
         }
 
         function actualizarContadoresAgenda() {
+            renderizarKpisAgenda();
+            renderizarAlertasAgenda();
+            renderizarFiltroActivoAgenda();
+            renderizarPanelDetallePedido();
             renderizarProximos();
             renderizarBorradores();
             renderizarDetalleHorarioDia();
@@ -7036,7 +8342,7 @@
                                     <span class="hour-slot-event-title">${escapeHtml(evento.titulo || 'Sin t&iacute;tulo')}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px;">
-                                    <span class="hour-slot-event-time">${escapeHtml(horaTxt)}${esEventoBorrador(evento) ? ' · Borrador' : ''}</span>
+                                    <span class="hour-slot-event-time">${escapeHtml(horaTxt)}${esEventoBorrador(evento) ? ' Â· Borrador' : ''}</span>
                                     <button class="btn-hour" onclick="event.stopPropagation(); editarEvento(${eventoId})">Ficha</button>
                                 </div>
                                 ${seleccionado ? `
@@ -7044,7 +8350,7 @@
                                         <div><strong>Cliente:</strong> ${escapeHtml(clienteTxt)}</div>
                                         <div><strong>Telefono:</strong> ${escapeHtml(telefonoTxt)}</div>
                                         <div><strong>Entrega:</strong> ${escapeHtml(direccionTxt)}</div>
-                                        <div><strong>Total:</strong> ${escapeHtml(Number.isFinite(totalNum) ? ('$' + totalNum.toLocaleString()) : '$0')} · <strong>Saldo:</strong> ${escapeHtml('$' + saldoNum.toLocaleString())}</div>
+                                        <div><strong>Total:</strong> ${escapeHtml(Number.isFinite(totalNum) ? ('$' + totalNum.toLocaleString()) : '$0')} Â· <strong>Saldo:</strong> ${escapeHtml('$' + saldoNum.toLocaleString())}</div>
                                         ${detalleTxt ? `<div><strong>Detalle:</strong> ${escapeHtml(detalleTxt)}</div>` : ''}
                                     </div>
                                 ` : ''}
@@ -7056,7 +8362,7 @@
                         <div class="hour-slot-empty">Sin eventos en este tramo.</div>
                         <div>
                             <button class="btn-hour" onclick="seleccionarDia('${fechaSeleccionada}', '${minutosAHora(inicio)}')">+ Agendar ${minutosAHora(inicio)}</button>
-                            <button class="btn-hour" style="margin-left:6px;" onclick="bloquearTramoHorarioManual('${fechaSeleccionada}', '${minutosAHora(inicio)}', '${minutosAHora(fin)}')">⛔ Apagar tramo</button>
+                            <button class="btn-hour" style="margin-left:6px;" onclick="bloquearTramoHorarioManual('${fechaSeleccionada}', '${minutosAHora(inicio)}', '${minutosAHora(fin)}')">â›” Apagar tramo</button>
                         </div>
                     `;
                 }
@@ -7104,7 +8410,7 @@
                 alert('No se pudo identificar el tramo horario.');
                 return;
             }
-            const ok = confirm(`¿Apagar manualmente el tramo ${inicioTxt} - ${finTxt} del día ${fechaTxt}?\nSe bloqueará también para la tienda online.`);
+            const ok = confirm(`Â¿Apagar manualmente el tramo ${inicioTxt} - ${finTxt} del dÃ­a ${fechaTxt}?\nSe bloquearÃ¡ tambiÃ©n para la tienda online.`);
             if (!ok) return;
             const payload = {
                 tipo: 'bloqueo',
@@ -7155,7 +8461,7 @@
                 alert('No se pudo identificar el bloqueo del tramo.');
                 return;
             }
-            const ok = confirm(`¿Liberar el tramo ${inicioTxt} - ${finTxt} del día ${fechaTxt}?`);
+            const ok = confirm(`Â¿Liberar el tramo ${inicioTxt} - ${finTxt} del dÃ­a ${fechaTxt}?`);
             if (!ok) return;
             try {
                 mostrarLoading(true);
@@ -7173,19 +8479,24 @@
                 mostrarLoading(false);
             }
         }
-        
+
         function formatearFecha(fecha) {
             const anio = fecha.getFullYear();
             const mes = String(fecha.getMonth() + 1).padStart(2, '0');
             const dia = String(fecha.getDate()).padStart(2, '0');
             return `${anio}-${mes}-${dia}`;
         }
-        
+
         function cambiarMes(delta) {
-            fechaActual.setMonth(fechaActual.getMonth() + delta);
-            const seleccion = parseFechaISO(fechaSeleccionada);
-            if (!seleccion || seleccion.getFullYear() !== fechaActual.getFullYear() || seleccion.getMonth() !== fechaActual.getMonth()) {
-                fechaSeleccionada = formatearFecha(new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1));
+            if (agendaVista === 'mes') {
+                fechaActual.setMonth(fechaActual.getMonth() + delta);
+                const seleccion = parseFechaISO(fechaSeleccionada);
+                if (!seleccion || seleccion.getFullYear() !== fechaActual.getFullYear() || seleccion.getMonth() !== fechaActual.getMonth()) {
+                    fechaSeleccionada = formatearFecha(new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1));
+                }
+            } else {
+                fechaActual = sumarDiasAgenda(fechaActual, Number(delta || 0) * (agendaVista === 'lista' ? 14 : 7));
+                fechaSeleccionada = formatearFecha(fechaActual);
             }
             renderizarCalendario();
             renderizarDetalleHorarioDia();
@@ -7197,7 +8508,7 @@
             renderizarCalendario();
             renderizarDetalleHorarioDia();
         }
-        
+
         function seleccionarDia(fecha, horaInicioSugerida = null) {
             fechaSeleccionada = fecha;
             eventoDetalleSeleccionadoId = null;
@@ -7213,13 +8524,13 @@
             renderFichaPedidoEdicion(null);
             abrirModal();
         }
-        
+
         // MODALES
         function abrirModal() {
             document.getElementById('modal-evento').classList.add('active');
             actualizarBotonWhatsAppCliente();
         }
-        
+
         function cerrarModal() {
             document.getElementById('modal-evento').classList.remove('active');
             eventoEditando = null;
@@ -7239,7 +8550,7 @@
             actualizarAccionesGuardadoModal();
             renderFichaPedidoEdicion(null);
         }
-        
+
         function abrirConfig() {
             document.getElementById('modal-config').classList.add('active');
         }
@@ -7379,6 +8690,7 @@
                 actualizarSeguimientoAdmin(eventoEditando);
                 renderFichaPedidoEdicion(eventoEditando);
                 renderizarCalendario();
+                renderizarPanelDetallePedido();
                 renderizarProximos();
                 renderizarBorradores();
                 alert('Seguimiento actualizado. El QR ya muestra este estado al cliente.');
@@ -7456,12 +8768,12 @@
             cargarCatalogoTortaManual(true).finally(() => renderTortaBuilder());
             cambiarTipo();
         }
-        
+
         async function editarEvento(id) {
             const idNum = Number(id || 0);
             const evento = eventos.find(e => Number(e.id || 0) === idNum);
             if (!evento) return;
-            
+
             eventoEditando = evento;
             modoAgendarTorta = false;
             modoAdminManualTorta = false;
@@ -7506,7 +8818,7 @@
             } else {
                 mostrarBloqueTortaManual(false);
             }
-            
+
             calcularRestante();
             cambiarTipo();
             toggleEnvio();
@@ -7517,15 +8829,15 @@
             renderFichaPedidoEdicion(evento);
             abrirModal();
         }
-        
+
         function cambiarTipo() {
             const tipo = document.getElementById('evento-tipo').value;
             const esBloqueo = tipo === 'bloqueo';
-            
+
             document.getElementById('campos-cliente').style.display = esBloqueo ? 'none' : 'block';
             document.getElementById('campos-bloqueo').style.display = esBloqueo ? 'block' : 'none';
             document.getElementById('grupo-entrega').style.display = esBloqueo ? 'none' : 'block';
-            
+
             if (esBloqueo) {
                 document.getElementById('grupo-hora-inicio').style.display = 'block';
                 document.getElementById('grupo-hora-fin').style.display = 'block';
@@ -7544,7 +8856,7 @@
             actualizarBotonWhatsAppCliente();
             actualizarSeguimientoAdmin(eventoEditando);
         }
-        
+
         function toggleEnvio() {
             const esEnvio = document.getElementById('evento-envio').checked;
             const grupo = document.getElementById('grupo-direccion');
@@ -7562,7 +8874,7 @@
             actualizarMapaDesdeDireccion();
             if (eventoEditando && Number(eventoEditando.id || 0) > 0) renderFichaPedidoEdicion(eventoEditando);
         }
-        
+
         function calcularRestante() {
             const total = parseFloat(document.getElementById('evento-total').value) || 0;
             const abono = parseFloat(document.getElementById('evento-abono').value) || 0;
@@ -7572,13 +8884,13 @@
                 renderFichaPedidoEdicion(eventoEditando);
             }
         }
-        
-        // PRÓXIMOS EVENTOS
+
+        // PRÃ“XIMOS EVENTOS
         function renderizarProximos() {
             const contenedor = document.getElementById('proximos-eventos');
             const hoy = new Date();
             hoy.setHours(0, 0, 0, 0);
-            
+
             const proximos = eventos
                 .filter(e => {
                     const fechaEvento = parseFechaISO(e.fecha);
@@ -7596,26 +8908,26 @@
                     return keyA - keyB;
                 })
                 .slice(0, 5);
-            
+
             if (proximos.length === 0) {
                 contenedor.innerHTML = `
                     <p style="color: #64748b; text-align: center; padding: 20px;">
-                        No hay eventos próximos
+                        No hay eventos prÃ³ximos
                     </p>
                 `;
                 return;
             }
-            
+
             contenedor.innerHTML = proximos.map(e => {
                 const fecha = parseFechaISO(e.fecha);
-                const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+                const dias = ['Dom', 'Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'];
                 const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-                
+
                 const fechaStr = fecha
                     ? `${dias[fecha.getDay()]} ${fecha.getDate()} ${meses[fecha.getMonth()]}`
                     : (e.fecha || '-');
                 const horaStr = e.hora_inicio ? e.hora_inicio.substring(0, 5) : '';
-                
+
                 return `
                     <div class="event-item ${claseCssEvento(e)}" onclick="abrirResumenEvento(${e.id})" oncontextmenu="event.preventDefault(); editarEvento(${e.id});">
                         <div class="event-time">${fechaStr} ${horaStr}</div>
@@ -7656,7 +8968,7 @@
                 return;
             }
 
-            const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+            const dias = ['Dom', 'Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'];
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             contenedor.innerHTML = borradores.map(e => {
                 const fecha = parseFechaISO(e.fecha);
@@ -7720,7 +9032,7 @@
                 return;
             }
 
-            const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+            const dias = ['Dom', 'Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'];
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
             contenedor.innerHTML = pasados.map(e => {
@@ -7733,7 +9045,7 @@
                 return `
                     <div class="event-item ${claseCssEvento(e)}" style="cursor:default;" onclick="abrirResumenEvento(${Number(e.id || 0)})" oncontextmenu="event.preventDefault(); editarEvento(${Number(e.id || 0)});">
                         <div class="event-time">${fechaStr} ${horaStr}</div>
-                        <div class="event-title">${escapeHtml(e.titulo || 'Sin título')}</div>
+                        <div class="event-title">${escapeHtml(e.titulo || 'Sin tÃ­tulo')}</div>
                         <div class="event-client">${escapeHtml(e.cliente || 'Sin cliente')}</div>
                         <div class="event-item-actions">
                             <button class="btn-mini-outline" onclick="event.stopPropagation(); editarEvento(${Number(e.id || 0)})">Editar</button>
@@ -7747,7 +9059,7 @@
         async function eliminarEventoDirecto(id) {
             const idNum = Number(id || 0);
             if (!idNum) return;
-            if (!confirm('¿Eliminar este evento pasado?')) return;
+            if (!confirm('Â¿Eliminar este evento pasado?')) return;
 
             try {
                 mostrarLoading(true);
@@ -7783,8 +9095,8 @@
 
             container.innerHTML = bloqueos.map(b => {
                 const tramo = (b.hora_inicio || b.hora_fin)
-                    ? `${b.hora_inicio || '00:00'} - ${b.hora_fin || 'fin del día'}`
-                    : 'Día completo';
+                    ? `${b.hora_inicio || '00:00'} - ${b.hora_fin || 'fin del dÃ­a'}`
+                    : 'DÃ­a completo';
                 return `
                     <div class=\"event-item bloqueo\" style=\"margin-bottom:8px;\">
                         <div class=\"event-time\">${b.fecha}</div>
@@ -7800,7 +9112,7 @@
         }
 
         async function eliminarBloqueoDirecto(id) {
-            if (!confirm('¿Quitar este bloqueo?')) return;
+            if (!confirm('Â¿Quitar este bloqueo?')) return;
             try {
                 mostrarLoading(true);
                 const response = await fetch(`/api/agenda/evento/${id}`, { method: 'DELETE' });
@@ -7811,12 +9123,12 @@
                 }
                 await cargarEventos();
             } catch (error) {
-                alert('[ERROR] Error de conexión al eliminar bloqueo');
+                alert('[ERROR] Error de conexiÃ³n al eliminar bloqueo');
             } finally {
                 mostrarLoading(false);
             }
         }
-        
+
         // NOTIFICACIONES
         function verificarNotificaciones() {
             const ahora = new Date();
@@ -7825,11 +9137,11 @@
             const obtenerTextoTiempo = (minutosHasta) => {
                 const horas = Math.floor(minutosHasta / 60);
                 const minutos = Math.floor(minutosHasta % 60);
-                if (horas > 24) return `En ${Math.floor(horas / 24)} días`;
+                if (horas > 24) return `En ${Math.floor(horas / 24)} dÃ­as`;
                 if (horas > 0) return `En ${horas}h ${minutos}m`;
                 return `En ${Math.max(0, minutos)} minutos`;
             };
-             
+
             eventos.forEach(e => {
                 if (e.tipo === 'bloqueo') return;
                 const estado = normalizarEstadoAgenda(e.estado, 'pendiente');
@@ -7863,21 +9175,21 @@
                 notificaciones.push({
                     urgente: minutosHasta <= 45,
                     cuando: obtenerTextoTiempo(minutosHasta),
-                    texto: `\uD83D\uDCDD Nota: ${nota.titulo || 'Sin título'}`
+                    texto: `\uD83D\uDCDD Nota: ${nota.titulo || 'Sin tÃ­tulo'}`
                 });
             });
-             
+
             const card = document.getElementById('notificaciones-card');
             const lista = document.getElementById('notificaciones-list');
-            
+
             if (notificaciones.length === 0) {
                 card.style.display = 'none';
                 return;
             }
-            
+
             card.style.display = 'block';
             card.className = `panel-card notif-card ${notificaciones.some(n => n.urgente) ? 'urgent' : ''}`;
-            
+
             lista.innerHTML = notificaciones.map(n => {
                 const eventoId = Number(n.eventoId || 0);
                 const clickableAttrs = eventoId
@@ -7891,7 +9203,7 @@
             `;
             }).join('');
         }
-        
+
         function construirEventoDesdeFormularioParaPdf() {
             const toNumber = (value) => {
                 const n = parseFloat(value);
@@ -8126,13 +9438,13 @@
             doc.setTextColor(255, 255, 255);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(19);
-            doc.text('Sucrée Pastelería', margin + 4, y + 10.5);
+            doc.text('SucrÃ©e PastelerÃ­a', margin + 4, y + 10.5);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(11);
             doc.text('Comprobante de Pedido', margin + 4, y + 17.5);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(12);
-            doc.text(safe(e.titulo, 'Pedido sin título'), margin + 4, y + 25);
+            doc.text(safe(e.titulo, 'Pedido sin tÃ­tulo'), margin + 4, y + 25);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
             doc.text('Generado: ' + new Date().toLocaleString('es-CL'), margin + 4, y + 30);
@@ -8143,7 +9455,7 @@
             doc.text((e.tipo || 'evento').toString().toUpperCase(), margin + contentWidth - 4, y + 10, { align: 'right' });
             y += 39;
 
-            // Tarjeta resumen rápida
+            // Tarjeta resumen rÃ¡pida
             const total = Number(e.total || 0);
             const abono = Number(e.abono || 0);
             const resumenPago = extraerResumenPagoDesdeDetalle(e.ingredientes, total);
@@ -8162,7 +9474,7 @@
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
             doc.setTextColor(...colors.muted);
-            doc.text(`Modalidad: ${e.es_envio ? 'Envío a domicilio' : 'Retiro en local'}`, margin + 4, y + 12);
+            doc.text(`Modalidad: ${e.es_envio ? 'EnvÃ­o a domicilio' : 'Retiro en local'}`, margin + 4, y + 12);
             doc.setTextColor(...colors.successText);
             if (descuentoAplicado > 0) {
                 const totalSinTxt = money(totalSinDescuento);
@@ -8189,17 +9501,17 @@
             drawSectionTitle('Datos del Cliente');
             drawField('Codigo Pedido', e.codigo_pedido || '-');
             drawField('Cliente', e.cliente);
-            drawField('Teléfono', e.telefono);
+            drawField('TelÃ©fono', e.telefono);
 
             if (e.es_envio) {
-                drawSectionTitle('Entrega y Ubicación');
-                drawField('Dirección informada por cliente', e.direccion);
+                drawSectionTitle('Entrega y UbicaciÃ³n');
+                drawField('DirecciÃ³n informada por cliente', e.direccion);
                 if (mapaEvento.lat && mapaEvento.lon) {
                     drawField('Coordenadas', `${mapaEvento.lat.toFixed(6)}, ${mapaEvento.lon.toFixed(6)}`);
-                    drawField('Dirección georeferenciada', mapaEvento.direccionNormalizada || e.direccion || '-');
+                    drawField('DirecciÃ³n georeferenciada', mapaEvento.direccionNormalizada || e.direccion || '-');
                     drawLink('Mapa de referencia (OpenStreetMap)', construirLinkMapa(mapaEvento.lat, mapaEvento.lon));
                 } else if (e.direccion) {
-                    drawLink('Mapa de referencia (búsqueda)', `https://www.openstreetmap.org/search?query=${encodeURIComponent(e.direccion)}`);
+                    drawLink('Mapa de referencia (bÃºsqueda)', `https://www.openstreetmap.org/search?query=${encodeURIComponent(e.direccion)}`);
                 }
 
                 if (mapaImagenDataURL) {
@@ -8223,11 +9535,11 @@
                     y += 78;
                 }
             } else {
-                drawField('Entrega', 'Retiro en local Sucrée');
+                drawField('Entrega', 'Retiro en local SucrÃ©e');
             }
 
             drawSectionTitle('Detalle del Pedido');
-            drawField('Descripción', e.titulo);
+            drawField('DescripciÃ³n', e.titulo);
             drawDetalleSecciones('Ingredientes / Detalles', e.ingredientes);
 
             drawSectionTitle('Resumen de Pago');
@@ -8284,14 +9596,14 @@
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(8.5);
             doc.setTextColor(...colors.muted);
-            doc.text('Documento de confirmación para cliente. Verifica datos antes de enviar.', margin, pageHeight - 10.5);
-            doc.text('Sucrée Pastelería', margin + contentWidth, pageHeight - 10.5, { align: 'right' });
+            doc.text('Documento de confirmaciÃ³n para cliente. Verifica datos antes de enviar.', margin, pageHeight - 10.5);
+            doc.text('SucrÃ©e PastelerÃ­a', margin + contentWidth, pageHeight - 10.5, { align: 'right' });
 
             const baseNombre = limpiarNombreArchivo(e.titulo || e.cliente || 'evento');
             const baseFecha = limpiarNombreArchivo(e.fecha || new Date().toISOString().slice(0, 10));
             doc.save(`orden_${baseNombre}_${baseFecha}.pdf`);
         }
-        
+
         // MODO OSCURO
         function toggleDarkMode() {
             const isDark = !document.body.classList.contains('dark-mode');
@@ -8300,7 +9612,7 @@
             const btn = document.getElementById('darkModeBtn');
             if (btn) btn.textContent = isDark ? '\u2600' : '\uD83C\uDF19';
         }
-        
+
         // Cerrar modales al hacer click fuera
         document.querySelectorAll('.modal-overlay').forEach(modal => {
             modal.addEventListener('click', (e) => {
@@ -8326,5 +9638,5 @@
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
 <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
 </body>
-</html>               
-                
+</html>
+
