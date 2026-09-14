@@ -1181,6 +1181,76 @@
             color: #fff;
         }
 
+        .agenda-quick-edit-hint {
+            margin-top: 10px;
+            color: #98a2b3;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .agenda-quick-value {
+            border-radius: 7px;
+            padding: 2px 4px;
+            margin: -2px -4px;
+            cursor: text;
+            transition: background .15s ease, box-shadow .15s ease;
+        }
+
+        .agenda-quick-value:hover {
+            background: #fff7ed;
+            box-shadow: inset 0 0 0 1px #fed7aa;
+        }
+
+        .agenda-quick-input {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid #fb923c;
+            border-radius: 9px;
+            padding: 8px 10px;
+            color: #172033;
+            font: inherit;
+            font-weight: 800;
+            background: #fff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(251, 146, 60, .14);
+        }
+
+        textarea.agenda-quick-input {
+            min-height: 86px;
+            resize: vertical;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .agenda-quick-savebar {
+            display: none;
+            gap: 8px;
+            padding: 10px 22px;
+            border-top: 1px solid #fed7aa;
+            background: #fff7ed;
+        }
+
+        .agenda-quick-savebar.active {
+            display: flex;
+        }
+
+        .agenda-quick-savebar button {
+            flex: 1;
+            border-radius: 10px;
+            border: 1px solid #fdba74;
+            padding: 10px 12px;
+            font-weight: 900;
+            cursor: pointer;
+            background: #fff;
+            color: #7c2d12;
+        }
+
+        .agenda-quick-savebar .save {
+            background: #ea580c;
+            color: #fff;
+            border-color: #ea580c;
+        }
+
         .panel-card {
             background: white;
             border-radius: 16px;
@@ -4218,6 +4288,9 @@
         let agendaFiltroEstado = '';
         let agendaFiltroEntrega = '';
         let agendaDetalleId = null;
+        let agendaQuickEditId = null;
+        let agendaQuickEditDraft = null;
+        let agendaQuickEditDirty = false;
         let mapaEvento = {
             lat: null,
             lon: null,
@@ -7719,6 +7792,176 @@
             return out;
         }
 
+        function asegurarDraftEdicionRapidaAgenda(evento) {
+            if (!evento) return null;
+            const id = Number(evento.id || 0);
+            if (!agendaQuickEditDraft || Number(agendaQuickEditId || 0) !== id || !agendaQuickEditDirty) {
+                agendaQuickEditId = id;
+                agendaQuickEditDraft = {
+                    ...evento,
+                    es_envio: Boolean(evento.es_envio),
+                    total: Number(evento.total || 0),
+                    abono: Number(evento.abono || 0),
+                    motivo: evento.motivo || ''
+                };
+                agendaQuickEditDirty = false;
+            }
+            return agendaQuickEditDraft;
+        }
+
+        function eventoVistaPanelAgenda(evento) {
+            if (!evento) return null;
+            if (agendaQuickEditDraft && Number(agendaQuickEditId || 0) === Number(evento.id || 0)) {
+                return { ...evento, ...agendaQuickEditDraft };
+            }
+            return evento;
+        }
+
+        function valorCampoRapidoAgenda(evento, field) {
+            if (!evento) return '';
+            if (field === 'modalidad') return evento.es_envio ? 'despacho' : 'retiro';
+            if (field === 'observaciones') return String(evento.motivo || '').trim() || String(evento.ingredientes || '').trim();
+            return evento[field];
+        }
+
+        function quickEditableAgenda(field, value, type = 'text', extra = {}) {
+            const display = extra.display !== undefined ? extra.display : value;
+            const attrs = [
+                `data-qfield="${escapeHtml(field)}"`,
+                `data-qtype="${escapeHtml(type)}"`,
+                `data-qvalue="${escapeHtml(value === undefined || value === null ? '' : value)}"`,
+                `ondblclick="iniciarEdicionRapidaAgenda(this)"`
+            ];
+            if (extra.options) attrs.push(`data-qoptions="${escapeHtml(JSON.stringify(extra.options))}"`);
+            if (extra.multiline) attrs.push('data-qmultiline="1"');
+            return `<span class="agenda-quick-value" ${attrs.join(' ')} title="Doble click para editar">${escapeHtml(display || '-')}</span>`;
+        }
+
+        function iniciarEdicionRapidaAgenda(node) {
+            const eventoBase = eventos.find((e) => Number(e.id || 0) === Number(agendaDetalleId || 0));
+            const draft = asegurarDraftEdicionRapidaAgenda(eventoBase);
+            if (!node || !draft) return;
+            const field = String(node.getAttribute('data-qfield') || '').trim();
+            const type = String(node.getAttribute('data-qtype') || 'text').trim();
+            const multiline = node.getAttribute('data-qmultiline') === '1';
+            let value = String(valorCampoRapidoAgenda(draft, field) ?? node.getAttribute('data-qvalue') ?? '');
+            let editor;
+            if (type === 'select') {
+                editor = document.createElement('select');
+                editor.className = 'agenda-quick-input';
+                let options = [];
+                try { options = JSON.parse(node.getAttribute('data-qoptions') || '[]'); } catch (_) {}
+                options.forEach((opt) => {
+                    const option = document.createElement('option');
+                    option.value = String(opt.value ?? '');
+                    option.textContent = String(opt.label ?? opt.value ?? '');
+                    if (option.value === value) option.selected = true;
+                    editor.appendChild(option);
+                });
+            } else if (multiline) {
+                editor = document.createElement('textarea');
+                editor.className = 'agenda-quick-input';
+                editor.value = value;
+            } else {
+                editor = document.createElement('input');
+                editor.className = 'agenda-quick-input';
+                editor.type = type || 'text';
+                editor.value = value;
+            }
+            editor.setAttribute('data-qfield', field);
+            editor.addEventListener('input', () => actualizarDraftRapidoAgenda(field, editor.value));
+            editor.addEventListener('change', () => actualizarDraftRapidoAgenda(field, editor.value));
+            editor.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !multiline) {
+                    event.preventDefault();
+                    actualizarDraftRapidoAgenda(field, editor.value);
+                    renderizarPanelDetallePedido();
+                }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    renderizarPanelDetallePedido();
+                }
+            });
+            node.replaceWith(editor);
+            editor.focus();
+            if (editor.select) editor.select();
+        }
+
+        function actualizarDraftRapidoAgenda(field, value) {
+            if (!agendaQuickEditDraft) return;
+            if (field === 'modalidad') {
+                agendaQuickEditDraft.es_envio = String(value || '') === 'despacho';
+                if (!agendaQuickEditDraft.es_envio) agendaQuickEditDraft.direccion = '';
+            } else if (field === 'total' || field === 'abono') {
+                agendaQuickEditDraft[field] = Math.max(0, Number(value || 0));
+            } else if (field === 'observaciones') {
+                agendaQuickEditDraft.motivo = String(value || '').trim();
+            } else {
+                agendaQuickEditDraft[field] = String(value || '').trim();
+            }
+            agendaQuickEditDirty = true;
+            document.getElementById('agenda-quick-savebar')?.classList.add('active');
+        }
+
+        function cancelarEdicionRapidaAgenda() {
+            agendaQuickEditDraft = null;
+            agendaQuickEditId = null;
+            agendaQuickEditDirty = false;
+            renderizarPanelDetallePedido();
+        }
+
+        async function guardarEdicionRapidaAgenda() {
+            if (!agendaQuickEditDraft || !agendaQuickEditDirty) return;
+            const payload = {
+                ...agendaQuickEditDraft,
+                id: Number(agendaQuickEditDraft.id || agendaQuickEditId || 0),
+                tipo: agendaQuickEditDraft.tipo || 'torta',
+                titulo: agendaQuickEditDraft.titulo || 'Pedido',
+                fecha: agendaQuickEditDraft.fecha || formatearFecha(new Date()),
+                hora_inicio: agendaQuickEditDraft.hora_inicio || agendaQuickEditDraft.hora_entrega || '00:00',
+                hora_entrega: agendaQuickEditDraft.hora_entrega || agendaQuickEditDraft.hora_inicio || '',
+                hora_fin: agendaQuickEditDraft.hora_fin || '',
+                cliente: agendaQuickEditDraft.cliente || '',
+                telefono: agendaQuickEditDraft.telefono || '',
+                es_envio: Boolean(agendaQuickEditDraft.es_envio),
+                direccion: Boolean(agendaQuickEditDraft.es_envio) ? (agendaQuickEditDraft.direccion || '') : '',
+                ingredientes: agendaQuickEditDraft.ingredientes || '',
+                total: Number(agendaQuickEditDraft.total || 0),
+                abono: Number(agendaQuickEditDraft.abono || 0),
+                motivo: agendaQuickEditDraft.motivo || '',
+                alerta_minutos: Number(agendaQuickEditDraft.alerta_minutos || 1440),
+                estado: agendaQuickEditDraft.estado || 'pendiente',
+                codigo_operacion: agendaQuickEditDraft.codigo_operacion || '',
+                codigo_pedido: agendaQuickEditDraft.codigo_pedido || '',
+                seguimiento_estado: normalizarEstadoSeguimientoAgenda(agendaQuickEditDraft.seguimiento_estado)
+            };
+            if (!payload.id) return;
+            try {
+                mostrarLoading(true);
+                const res = await fetch('/api/agenda/evento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo guardar la edicion rapida.');
+                }
+                const keepId = payload.id;
+                agendaQuickEditDraft = null;
+                agendaQuickEditId = null;
+                agendaQuickEditDirty = false;
+                agendaDetalleId = keepId;
+                eventoDetalleSeleccionadoId = keepId;
+                await cargarEventos({ silent: true });
+                renderizarPanelDetallePedido();
+            } catch (error) {
+                alert('[ERROR] ' + String(error.message || error));
+            } finally {
+                mostrarLoading(false);
+            }
+        }
+
         function pasosSeguimientoAgenda(estado) {
             const orden = ['recepcionado', 'produccion', 'espera_envio', 'entregado'];
             const idx = Math.max(0, orden.indexOf(estado));
@@ -7732,11 +7975,13 @@
         function renderizarPanelDetallePedido() {
             const panel = document.getElementById('agenda-detail-panel');
             if (!panel) return;
-            const evento = eventos.find((e) => Number(e.id || 0) === Number(agendaDetalleId || 0));
-            if (!evento) {
+            const eventoBase = eventos.find((e) => Number(e.id || 0) === Number(agendaDetalleId || 0));
+            if (!eventoBase) {
                 panel.innerHTML = '<div class="agenda-detail-empty">Selecciona un pedido para ver su detalle, actualizar estado, descargar PDF o abrir seguimiento.</div>';
                 return;
             }
+            asegurarDraftEdicionRapidaAgenda(eventoBase);
+            const evento = eventoVistaPanelAgenda(eventoBase);
             const detalle = detalleCatalogoCompletoAgenda(evento);
             const estado = obtenerEstadoOperativoAgenda(evento);
             const seguimiento = normalizarEstadoSeguimientoAgenda(evento.seguimiento_estado || estado);
@@ -7749,12 +7994,14 @@
             const direccion = agendaEsDespacho(evento) ? String(evento.direccion || '-') : 'Sucree Pasteleria';
             const obs = String(detalle.nota || evento.motivo || evento.ingredientes || '').trim();
             const opciones = Object.entries(SEGUIMIENTO_ESTADOS_LABELS).map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === seguimiento ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+            const quickObs = String(evento.motivo || '').trim();
             panel.innerHTML = `
                 <div class="agenda-detail-head">
                     <div>
                         <div class="agenda-detail-kicker">Detalle del pedido</div>
-                        <div class="agenda-detail-name">${escapeHtml(evento.cliente || 'Sin cliente')}</div>
+                        <div class="agenda-detail-name">${quickEditableAgenda('cliente', evento.cliente || '', 'text', { display: evento.cliente || 'Sin cliente' })}</div>
                         <div class="agenda-detail-code">${escapeHtml(codigo)}</div>
+                        <div class="agenda-quick-edit-hint">Doble click sobre la informacion para editar rapido.</div>
                     </div>
                     <div style="display:flex;align-items:flex-start;gap:10px;">
                         <span class="agenda-status-pill ${escapeHtml(estado)}">${escapeHtml(labelEstadoOperativoAgenda(estado))}</span>
@@ -7780,14 +8027,14 @@
                     <section class="agenda-detail-section">
                         <div class="agenda-detail-title">Entrega</div>
                         <div class="agenda-detail-grid">
-                            <div><strong>${escapeHtml(formatearFechaLarga(String(evento.fecha || '')))}</strong>Fecha</div>
-                            <div><strong>${escapeHtml(hora)}</strong>Hora</div>
-                            <div><strong>${escapeHtml(textoModalidadAgenda(evento))}</strong>Modalidad</div>
-                            <div><strong>${escapeHtml(direccion)}</strong>Lugar</div>
+                            <div><strong>${quickEditableAgenda('fecha', evento.fecha || '', 'date', { display: formatearFechaLarga(String(evento.fecha || '')) })}</strong>Fecha</div>
+                            <div><strong>${quickEditableAgenda('hora_entrega', String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5), 'time', { display: hora })}</strong>Hora</div>
+                            <div><strong>${quickEditableAgenda('modalidad', agendaEsDespacho(evento) ? 'despacho' : 'retiro', 'select', { display: textoModalidadAgenda(evento), options: [{ value: 'retiro', label: 'Retiro' }, { value: 'despacho', label: 'Despacho' }] })}</strong>Modalidad</div>
+                            <div><strong>${quickEditableAgenda('direccion', evento.direccion || '', 'text', { display: direccion })}</strong>Lugar</div>
                         </div>
                     </section>
                     <section class="agenda-detail-section">
-                        <div class="agenda-detail-title">${escapeHtml(detalle.categoria || evento.titulo || 'Producto')}</div>
+                        <div class="agenda-detail-title">${quickEditableAgenda('titulo', evento.titulo || '', 'text', { display: detalle.categoria || evento.titulo || 'Producto' })}</div>
                         <div class="agenda-detail-grid">
                             <div><strong>${escapeHtml(detalle.tamano || '-')}</strong>Tamano</div>
                             <div><strong>${escapeHtml((detalle.sabores || []).join(', ') || '-')}</strong>Rellenos</div>
@@ -7797,14 +8044,18 @@
                     </section>
                     <section class="agenda-detail-section">
                         <div class="agenda-detail-title">Pago</div>
-                        <div class="agenda-pay-row"><span>Total del pedido</span><strong>${escapeHtml(formatoMonedaCLP(total))}</strong></div>
-                        <div class="agenda-pay-row"><span>Abono</span><strong>${escapeHtml(formatoMonedaCLP(abono))}</strong></div>
+                        <div class="agenda-pay-row"><span>Total del pedido</span><strong>${quickEditableAgenda('total', total, 'number', { display: formatoMonedaCLP(total) })}</strong></div>
+                        <div class="agenda-pay-row"><span>Abono</span><strong>${quickEditableAgenda('abono', abono, 'number', { display: formatoMonedaCLP(abono) })}</strong></div>
                         <div class="agenda-balance-box"><span>${saldo > 0 ? 'Saldo pendiente' : 'Pagado'}</span><span class="amount">${escapeHtml(formatoMonedaCLP(saldo))}</span></div>
                     </section>
                     <section class="agenda-detail-section">
                         <div class="agenda-detail-title">Observaciones</div>
-                        <div style="color:#475467;line-height:1.45;">${escapeHtml(obs || 'Sin observaciones')}</div>
+                        <div style="color:#475467;line-height:1.45;">${quickEditableAgenda('observaciones', quickObs, 'text', { display: quickObs || obs || 'Sin observaciones', multiline: true })}</div>
                     </section>
+                </div>
+                <div class="agenda-quick-savebar ${agendaQuickEditDirty ? 'active' : ''}" id="agenda-quick-savebar">
+                    <button type="button" class="save" onclick="guardarEdicionRapidaAgenda()">Guardar cambios rapidos</button>
+                    <button type="button" onclick="cancelarEdicionRapidaAgenda()">Cancelar</button>
                 </div>
                 <div class="agenda-detail-actions">
                     <button type="button" class="primary" onclick="editarEvento(${Number(evento.id || 0)})">Editar pedido</button>
