@@ -986,7 +986,7 @@ def registrar_asistente_sucree(app, deps):
 
     def cliente_estado_texto(draft):
         if draft.get("cliente_registrado_por_asistente"):
-            return "Cliente registrado con los datos entregados. Continuo con la cotizacion."
+            return "Perfecto, ya tengo tus datos de contacto para continuar con la cotizacion."
         if draft.get("email") and draft.get("cliente_encontrado") is True:
             datos = []
             if draft.get("nombre"):
@@ -995,22 +995,20 @@ def registrar_asistente_sucree(app, deps):
                 datos.append("telefono")
             if draft.get("direccion"):
                 datos.append("direccion")
-            return "Cliente encontrado por correo. Complete automaticamente: %s." % (", ".join(datos) if datos else "datos disponibles")
+            return "Con ese correo pude completar: %s. Revisa que este correcto antes de enviar." % (", ".join(datos) if datos else "datos disponibles")
         if draft.get("email") and draft.get("cliente_encontrado") is False:
             if not draft.get("nombre") or not draft.get("telefono"):
-                return "No encontre ese correo en la base de clientes. Necesito nombre y telefono para continuar."
+                return "Necesito tu nombre y telefono para continuar con la solicitud."
             if draft.get("entrega_tipo") == "despacho" and not draft.get("direccion"):
-                return "No encontre ese correo en la base de clientes. Ya tengo nombre y telefono; para despacho necesito la direccion."
-            return "No encontre ese correo en la base de clientes. Usare los datos que ingresaste para esta cotizacion."
+                return "Ya tengo nombre y telefono; para despacho necesito la direccion completa."
+            return "Usare los datos que ingresaste para preparar esta cotizacion."
         return ""
 
     def diagnostico_catalogo_invalido(draft, catalogo, err=""):
         categoria = find_categoria(catalogo, draft.get("categoria_id") or "")
         sizes = rows_categoria(catalogo, "sizes", categoria) if categoria else list(catalogo.get("sizes") or [])
         sabores = rows_categoria(catalogo, "sabores", categoria) if categoria else list(catalogo.get("sabores") or [])
-        parts = ["Hay un dato de la torta que no calza con el catalogo activo."]
-        if err:
-            parts.append("Detalle interno: %s" % str(err).strip())
+        parts = ["Necesito ajustar un dato de la torta para que coincida con las opciones disponibles."]
         if categoria:
             parts.append("Estoy revisando el tipo: %s." % (categoria.get("nombre") or "torta"))
         else:
@@ -1215,7 +1213,7 @@ def registrar_asistente_sucree(app, deps):
         if not guardado.get("success"):
             return {
                 "ok": False,
-                "reply": "No pude dejar la cotizacion en agenda aun: %s" % (guardado.get("error") or "error desconocido"),
+                "reply": "No pude registrar la solicitud en este momento. Tus datos siguen guardados en esta conversacion; intenta nuevamente o habla con el equipo.",
                 "error": guardado.get("error"),
             }
         codigo = str(guardado.get("codigo_pedido") or draft.get("cotizacion_codigo") or "").strip()
@@ -1460,7 +1458,7 @@ def registrar_asistente_sucree(app, deps):
                 reply = "\n".join([
                     "Ya tengo la base de la torta, pero antes de continuar necesito el correo del cliente.",
                     "",
-                    "Con ese correo revisare si ya existe en la base de datos para completar nombre, telefono y direccion si estan guardados.",
+                    "Con ese correo revisare si puedo completar tus datos de contacto automaticamente.",
                     "",
                     "Por favor escribe el correo para seguir con la cotizacion.",
                 ])
@@ -1493,7 +1491,7 @@ def registrar_asistente_sucree(app, deps):
         if meaningful:
             reply = "Voy ordenando la informacion."
             if err:
-                reply += " %s." % err
+                reply += " Necesito que revisemos una opcion del catalogo para continuar."
             if faltan:
                 reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             if draft.get("fecha") and not draft.get("hora_inicio"):
@@ -1503,7 +1501,7 @@ def registrar_asistente_sucree(app, deps):
             return {"reply": reply, "draft": draft}
         registrar_desconocida(msg, {"draft": draft})
         return {
-            "reply": "No entendi bien eso todavia. Lo deje registrado para que el equipo lo revise y pueda aprender esa respuesta.\n\nSi quieres, puedes escribir:\n- Agendar torta\n- Ver catalogo y precios\n- Horas disponibles",
+            "reply": "No estoy seguro de haber entendido. Puedes contarme de otra forma que necesitas o elegir una de estas opciones:\n- Agendar torta\n- Ver catalogo y precios\n- Horas disponibles\n- Hablar con el equipo",
             "draft": draft,
             "unknown": True,
         }
