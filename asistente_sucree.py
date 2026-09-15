@@ -37,6 +37,7 @@ def registrar_asistente_sucree(app, deps):
     topper_requiere_96h = deps.get("_topper_requiere_96h")
     seguimiento_payload = deps.get("_seguimiento_agenda_payload")
     seguimiento_label = deps.get("_seguimiento_agenda_label")
+    upsert_cliente_tienda = deps.get("_upsert_cliente_tienda_cursor")
     public_base_url = str(deps.get("PUBLIC_BASE_URL") or "https://pasteleriasucree.cl").rstrip("/")
     whatsapp_pasteleria = "56964330546"
 
@@ -172,6 +173,106 @@ def registrar_asistente_sucree(app, deps):
             return dict(row) if row else None
         except Exception:
             return None
+        finally:
+            if conn:
+                conn.close()
+
+    def registrar_cliente_desde_draft(draft):
+        draft = dict(draft or {})
+        email = normalizar_email(draft.get("email"))
+        telefono = normalizar_telefono(draft.get("telefono"))
+        nombre = str(draft.get("nombre") or "").strip()[:80]
+        direccion = str(draft.get("direccion") or "").strip()[:240]
+        if not email or not telefono or len(nombre) < 2:
+            return draft
+        if draft.get("entrega_tipo") == "despacho" and not direccion:
+            return draft
+        if draft.get("cliente_id") and draft.get("cliente_encontrado") is True:
+            return draft
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("BEGIN IMMEDIATE")
+            cliente = None
+            if callable(upsert_cliente_tienda):
+                try:
+                    cliente = upsert_cliente_tienda(
+                        cur,
+                        nombre=nombre,
+                        email=email,
+                        telefono=telefono,
+                        email_confirmado=0,
+                        direccion_default=direccion,
+                    )
+                except Exception:
+                    cliente = None
+            if not cliente:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS tienda_clientes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nombre TEXT DEFAULT '',
+                        email TEXT NOT NULL,
+                        telefono TEXT NOT NULL,
+                        activo INTEGER NOT NULL DEFAULT 1,
+                        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                        actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                        ultimo_login TEXT,
+                        direccion_default TEXT,
+                        direccion_lat REAL,
+                        direccion_lng REAL,
+                        UNIQUE(email, telefono)
+                    )
+                    """
+                )
+                for ddl in [
+                    "ALTER TABLE tienda_clientes ADD COLUMN direccion_default TEXT",
+                    "ALTER TABLE tienda_clientes ADD COLUMN direccion_lat REAL",
+                    "ALTER TABLE tienda_clientes ADD COLUMN direccion_lng REAL",
+                    "ALTER TABLE tienda_clientes ADD COLUMN ultimo_login TEXT",
+                ]:
+                    try:
+                        cur.execute(ddl)
+                    except Exception:
+                        pass
+                cur.execute(
+                    """
+                    INSERT INTO tienda_clientes (
+                        nombre, email, telefono, direccion_default, activo, actualizado_en, ultimo_login
+                    )
+                    VALUES (?, ?, ?, NULLIF(?, ''), 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT(email, telefono) DO UPDATE SET
+                        nombre = excluded.nombre,
+                        direccion_default = COALESCE(excluded.direccion_default, tienda_clientes.direccion_default),
+                        activo = 1,
+                        actualizado_en = CURRENT_TIMESTAMP,
+                        ultimo_login = CURRENT_TIMESTAMP
+                    """,
+                    (nombre, email, telefono, direccion),
+                )
+                cur.execute(
+                    """
+                    SELECT id, nombre, email, telefono, direccion_default, direccion_lat, direccion_lng
+                    FROM tienda_clientes
+                    WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
+                      AND TRIM(telefono) = TRIM(?)
+                    LIMIT 1
+                    """,
+                    (email, telefono),
+                )
+                row = cur.fetchone()
+                cliente = dict(row) if row else None
+            conn.commit()
+            if cliente:
+                draft = aplicar_cliente_draft(draft, cliente)
+            draft["cliente_encontrado"] = True
+            draft["cliente_registrado_por_asistente"] = True
+            return draft
+        except Exception:
+            if conn:
+                conn.rollback()
+            return draft
         finally:
             if conn:
                 conn.close()
@@ -574,6 +675,56 @@ def registrar_asistente_sucree(app, deps):
             return "retiro"
         return ""
 
+    def limpiar_nombre_cliente(valor):
+        nombre = re.sub(r"\s+", " ", str(valor or "")).strip(" .,-:;")[:80]
+        nombre = re.split(r"\b(?:telefono|tel[eé]fono|fono|celular|whatsapp|correo|email|mail|direccion|direcci[oó]n|despacho)\b", nombre, flags=re.I)[0].strip(" .,-:;")
+        if len(nombre) < 2 or re.search(r"\d|@", nombre) or len(nombre.split()) > 6:
+            return ""
+        return nombre
+
+    def parse_nombre_cliente(texto, draft=None):
+        raw = str(texto or "").strip()
+        patrones = [
+            r"\b(?:nombre|cliente)\s*(?:es|:|-)?\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{2,80})",
+            r"\b(?:soy|me llamo|mi nombre es)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{2,80})",
+        ]
+        for patron in patrones:
+            m = re.search(patron, raw, flags=re.I)
+            if m:
+                nombre = limpiar_nombre_cliente(m.group(1))
+                if nombre:
+                    return nombre
+        draft = dict(draft or {})
+        if draft.get("email") and draft.get("cliente_encontrado") is False and not draft.get("nombre"):
+            if not parse_fecha(raw) and not parse_hora(raw) and "@" not in raw and not normalizar_telefono(raw):
+                low = norm(raw)
+                bloqueadas = ["catalogo", "horas", "disponible", "bizcocho", "panqueque", "relleno", "topper", "despacho", "retiro", "direccion", "precio"]
+                if not any(x in low for x in bloqueadas):
+                    return limpiar_nombre_cliente(raw)
+        return ""
+
+    def parse_direccion_cliente(texto, draft=None):
+        raw = str(texto or "").strip()
+        patrones = [
+            r"\b(?:direccion|direcci[oó]n|domicilio)\s*(?:es|:|-)?\s+(.+)",
+            r"\b(?:despacho|delivery|enviar|envio|env[ií]o)\s+(?:a|en|para)?\s*(.+)",
+        ]
+        for patron in patrones:
+            m = re.search(patron, raw, flags=re.I)
+            if m:
+                direccion = re.split(r"\b(?:telefono|tel[eé]fono|fono|celular|whatsapp|correo|email|mail|nombre|cliente)\b", m.group(1), flags=re.I)[0]
+                direccion = re.sub(r"\s+", " ", direccion).strip(" .,-:;")[:240]
+                if len(direccion) >= 6:
+                    return direccion
+        draft = dict(draft or {})
+        if draft.get("entrega_tipo") == "despacho" and not draft.get("direccion"):
+            if not parse_fecha(raw) and not parse_hora(raw) and "@" not in raw and not normalizar_telefono(raw):
+                low = norm(raw)
+                pistas = ["calle", "pasaje", "avenida", "av ", "villa", "depto", "departamento", "casa", "maipu", "santiago"]
+                if len(raw) >= 8 and (re.search(r"\d", raw) or any(x in low for x in pistas)):
+                    return re.sub(r"\s+", " ", raw).strip(" .,-:;")[:240]
+        return ""
+
     def actualizar_draft(draft, mensaje, catalogo):
         draft = dict(draft or {})
         texto = str(mensaje or "")
@@ -581,6 +732,8 @@ def registrar_asistente_sucree(app, deps):
         hora = parse_hora(texto)
         email, telefono = parse_contacto(texto)
         entrega = detectar_entrega(texto)
+        nombre_detectado = parse_nombre_cliente(texto, draft)
+        direccion_detectada = parse_direccion_cliente(texto, draft)
         if fecha:
             draft["fecha"] = fecha
         if hora:
@@ -599,12 +752,10 @@ def registrar_asistente_sucree(app, deps):
             draft["entrega_confirmada"] = True
         if not draft.get("entrega_tipo"):
             draft["entrega_tipo"] = "retiro"
-        m = re.search(r"\b(?:cliente|nombre|soy|me llamo)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{2,80})", texto, flags=re.I)
-        if m:
-            nombre = re.sub(r"\s+", " ", m.group(1)).strip(" .,-")[:80]
-            nombre = re.split(r"\b(?:telefono|fono|correo|email|mail)\b", nombre, flags=re.I)[0].strip(" .,-")
-            if len(nombre) >= 2:
-                draft["nombre"] = nombre
+        if nombre_detectado:
+            draft["nombre"] = nombre_detectado
+        if direccion_detectada:
+            draft["direccion"] = direccion_detectada
         size = None
         m = re.search(r"\b(\d{1,3})\s*(?:personas|pers|pax)\b", norm(texto))
         if m:
@@ -834,6 +985,8 @@ def registrar_asistente_sucree(app, deps):
         ])
 
     def cliente_estado_texto(draft):
+        if draft.get("cliente_registrado_por_asistente"):
+            return "Cliente registrado con los datos entregados. Continuo con la cotizacion."
         if draft.get("email") and draft.get("cliente_encontrado") is True:
             datos = []
             if draft.get("nombre"):
@@ -846,6 +999,8 @@ def registrar_asistente_sucree(app, deps):
         if draft.get("email") and draft.get("cliente_encontrado") is False:
             if not draft.get("nombre") or not draft.get("telefono"):
                 return "No encontre ese correo en la base de clientes. Necesito nombre y telefono para continuar."
+            if draft.get("entrega_tipo") == "despacho" and not draft.get("direccion"):
+                return "No encontre ese correo en la base de clientes. Ya tengo nombre y telefono; para despacho necesito la direccion."
             return "No encontre ese correo en la base de clientes. Usare los datos que ingresaste para esta cotizacion."
         return ""
 
@@ -1154,6 +1309,7 @@ def registrar_asistente_sucree(app, deps):
         msg = str(message or "").strip()
         nmsg = norm(msg)
         draft = actualizar_draft(draft or {}, msg, catalogo)
+        draft = registrar_cliente_desde_draft(draft)
         resumen, err = cotizar(draft, catalogo)
         faltan = faltantes(draft, resumen)
 
