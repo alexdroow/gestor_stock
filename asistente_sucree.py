@@ -1509,7 +1509,7 @@ def registrar_asistente_sucree(app, deps):
         if not texto_norm:
             return False
         saludos = {"hola", "buenas", "buenos dias", "buen dia", "buenas tardes", "buenas noches", "holi", "hello"}
-        palabras_accion = ["agendar", "reservar", "cotizar", "precio", "catalogo", "torta", "horas", "pedido", "seguimiento"]
+        palabras_accion = ["agendar", "reservar", "cotizar", "precio", "catalogo", "catálogo", "torta", "pastel", "queque", "horas", "pedido", "seguimiento", "necesito", "quiero", "encargar", "comprar", "pax", "personas"]
         return tiene_palabra(texto_norm, saludos) and not any(x in texto_norm for x in palabras_accion)
 
     def es_agradecimiento(texto_norm):
@@ -1520,30 +1520,148 @@ def registrar_asistente_sucree(app, deps):
         despedidas = ["adios", "chao", "chau", "hasta luego", "nos vemos", "bye", "me despido"]
         return any(x == texto_norm or x in texto_norm for x in despedidas) and len(texto_norm.split()) <= 5
 
+    def detectar_campo_edicion(texto_norm):
+        t = str(texto_norm or "").strip()
+        if not t:
+            return ""
+        mapas = [
+            ("fecha", ["fecha", "dia", "cambiar fecha", "modificar fecha", "otra fecha"]),
+            ("hora", ["hora", "horario", "cambiar hora", "modificar hora", "otra hora"]),
+            ("relleno", ["relleno", "rellenos", "sabor", "sabores", "manjar", "crema", "frambuesa", "lucuma", "mango"]),
+            ("tamano", ["tamano", "tamaño", "personas", "pax", "cantidad", "porciones"]),
+            ("tipo", ["tipo", "bizcocho", "panqueque", "mil hojas", "milhojas", "tradicional"]),
+            ("topper", ["topper", "sin topper", "adorno", "decoracion", "placa"]),
+            ("extras", ["extra", "extras", "nuez", "ganache", "chips", "fruta"]),
+            ("nombre", ["nombre", "cliente", "persona", "contacto"]),
+            ("telefono", ["telefono", "teléfono", "fono", "celular", "whatsapp", "numero", "número"]),
+            ("correo", ["correo", "email", "mail"]),
+            ("entrega", ["entrega", "retiro", "despacho", "delivery", "modalidad"]),
+            ("direccion", ["direccion", "dirección", "domicilio", "ubicacion", "ubicación"]),
+        ]
+        for campo, palabras in mapas:
+            if any(p in t for p in palabras):
+                return campo
+        return ""
+
+    def prompt_edicion(campo):
+        mensajes = {
+            "fecha": "Claro. Indícame la nueva fecha, por ejemplo: 20 de septiembre.",
+            "hora": "Claro. Indícame la nueva hora, por ejemplo: 18:00.",
+            "relleno": "Claro. Indícame el nuevo relleno o sabor que quieres usar.",
+            "tamano": "Claro. Indícame el nuevo tamaño, por ejemplo: 15 personas.",
+            "tipo": "Claro. Indícame el tipo de torta: bizcocho, panqueque o mil hojas.",
+            "topper": "Claro. Indícame si quieres topper o sin topper.",
+            "extras": "Claro. Indícame qué extra quieres agregar o quitar.",
+            "nombre": "Claro. Escríbeme el nombre correcto del cliente.",
+            "telefono": "Claro. Escríbeme el teléfono correcto.",
+            "correo": "Claro. Escríbeme el correo correcto.",
+            "entrega": "Claro. Indícame si será retiro en tienda o despacho.",
+            "direccion": "Claro. Escríbeme la dirección completa de despacho.",
+        }
+        return mensajes.get(campo, "Claro. Indícame qué dato quieres modificar.")
+
+    def limpiar_dato_para_edicion(draft, campo):
+        draft = dict(draft or {})
+        if campo in {"fecha", "hora"}:
+            if campo == "fecha":
+                draft.pop("fecha", None)
+            if campo == "hora":
+                draft.pop("hora_inicio", None)
+            draft.pop("cotizacion_evento_id", None)
+            draft.pop("cotizacion_codigo", None)
+            draft.pop("cotizacion_pdf_url", None)
+        elif campo in {"relleno", "tipo", "tamano", "extras", "topper"}:
+            if campo == "relleno":
+                draft["sabor_ids"] = []
+            if campo == "tipo":
+                draft.pop("categoria_id", None)
+                draft.pop("size_id", None)
+                draft.pop("personas", None)
+                draft["sabor_ids"] = []
+            if campo == "tamano":
+                draft.pop("size_id", None)
+                draft.pop("personas", None)
+                draft.pop("tamano_invalido", None)
+                draft.pop("tamano_invalido_categoria_id", None)
+            if campo == "extras":
+                draft["extras"] = []
+            if campo == "topper":
+                draft.pop("topper_id", None)
+            draft.pop("cotizacion_evento_id", None)
+            draft.pop("cotizacion_codigo", None)
+            draft.pop("cotizacion_pdf_url", None)
+        elif campo in {"nombre", "telefono", "correo", "direccion", "entrega"}:
+            if campo == "nombre":
+                draft.pop("nombre", None)
+            if campo == "telefono":
+                draft.pop("telefono", None)
+            if campo == "correo":
+                draft.pop("email", None)
+                draft.pop("cliente_encontrado", None)
+            if campo == "direccion":
+                draft.pop("direccion", None)
+                draft["entrega_tipo"] = "despacho"
+                draft["entrega_confirmada"] = True
+            if campo == "entrega":
+                draft.pop("entrega_confirmada", None)
+            draft.pop("cotizacion_evento_id", None)
+            draft.pop("cotizacion_codigo", None)
+            draft.pop("cotizacion_pdf_url", None)
+        return draft
+
+    def cambios_relevantes_entrada(prev, nuevo):
+        keys = [
+            "fecha", "hora_inicio", "email", "telefono", "nombre", "direccion", "entrega_tipo",
+            "entrega_confirmada", "categoria_id", "size_id", "personas", "topper_id", "tamano_invalido",
+        ]
+        for key in keys:
+            if prev.get(key) != nuevo.get(key):
+                return True
+        for key in ["sabor_ids", "extras"]:
+            if list(prev.get(key) or []) != list(nuevo.get(key) or []):
+                return True
+        return False
+
+    def respuesta_no_entendida(draft=None):
+        return "No entendí ese dato con seguridad. Para evitar dejar una cotización incorrecta, dime qué quieres hacer: cambiar fecha, cambiar relleno, ver catálogo, revisar horas disponibles o hablar con el equipo."
+
+    def es_edicion_corta(texto_norm, campo):
+        t = str(texto_norm or "").strip()
+        if not t or not campo:
+            return False
+        if len(t.split()) <= 3 and not parse_fecha(t) and not parse_hora(t) and not re.search(r"\d{1,3}\s*(?:persona|personas|pax)", t):
+            return True
+        return any(t == x for x in [
+            "cambiar " + campo, "modificar " + campo, "editar " + campo, "corregir " + campo,
+        ])
+
     def inferir_intenciones(texto_norm, draft=None):
         draft = dict(draft or {})
         tiene_fecha = bool(parse_fecha(texto_norm))
         tiene_hora = bool(parse_hora(texto_norm))
         tiene_personas = bool(re.search(r"\b\d{1,3}\s*(?:persona|personas|pers|pax)\b", texto_norm))
         palabras_torta = [
-            "torta", "tortas", "pastel", "pasteles", "bizcocho", "panqueque", "mil hojas", "milhojas",
-            "tradicional", "relleno", "rellenos", "manjar", "topper", "personas", "persona", "pax",
+            "torta", "tortas", "pastel", "pasteles", "queque", "bizcocho", "bizcochuelo", "panqueque",
+            "mil hojas", "milhojas", "mil hoja", "tradicional", "relleno", "rellenos", "sabor", "sabores",
+            "manjar", "crema", "ganache", "lucuma", "lúcuma", "frambuesa", "mango", "topper", "personas",
+            "persona", "pax", "porciones", "porcion", "porción",
         ]
         palabras_agenda = [
-            "agendar", "agenda", "reservar", "reserva", "encargar", "encargo", "pedir", "pedido",
-            "cotizar", "cotizacion", "cotizacion", "quiero", "necesito", "busco", "me gustaria", "comprar",
-            "hacer una torta", "preparar una torta", "solicitar",
+            "agendar", "agenda", "reservar", "reserva", "apartar", "guardar hora", "tomar hora", "encargar",
+            "encargo", "pedir", "pedido", "ordenar", "cotizar", "cotizacion", "cotización", "presupuesto",
+            "quiero", "quisiera", "necesito", "busco", "me gustaria", "me gustaría", "comprar", "hacer una torta",
+            "preparar una torta", "solicitar", "crear solicitud", "hacer solicitud",
         ]
-        palabras_catalogo = ["catalogo", "precio", "precios", "vale", "valor", "cuanto", "opciones", "tipos", "sabores", "rellenos", "tamanos", "tamano"]
-        palabras_horas = ["hora", "horas", "horario", "horarios", "disponible", "disponibles", "cupos", "cupo", "agenda", "cuando puedo"]
+        palabras_catalogo = ["catalogo", "catálogo", "carta", "menu", "menú", "precio", "precios", "vale", "valor", "cuanto", "cuánto", "opciones", "tipos", "sabores", "rellenos", "tamanos", "tamaños", "tamano", "tamaño"]
+        palabras_horas = ["hora", "horas", "horario", "horarios", "disponible", "disponibles", "disponibilidad", "cupos", "cupo", "agenda", "cuando puedo", "cuándo puedo", "fecha disponible", "hay hora", "tienen hora"]
         texto_torta = any(x in texto_norm for x in palabras_torta)
         accion_directa = any(x in texto_norm for x in ["agendar", "reservar", "hacer pedido", "crear pedido", "encargar", "cotizar", "cotizacion"])
         agendar = accion_directa or (any(x in texto_norm for x in palabras_agenda) and (texto_torta or tiene_personas or tiene_fecha or tiene_hora))
         agendar = agendar or (texto_torta and (tiene_personas or tiene_fecha or tiene_hora or draft.get("size_id") or draft.get("personas")))
         catalogo = any(x in texto_norm for x in palabras_catalogo) or ("tradicional" in texto_norm and texto_torta and not tiene_fecha and not tiene_hora)
         disponibilidad = any(x in texto_norm for x in palabras_horas) and (tiene_fecha or tiene_hora or "disponible" in texto_norm or "cupos" in texto_norm or "horario" in texto_norm)
-        confirmar = any(x in texto_norm for x in ["confirmar", "enviar solicitud", "enviar", "registrar", "crear pedido", "hacer pedido", "reservar ahora"])
-        consulta = any(x in texto_norm for x in ["ayuda", "menu", "que puedes hacer", "como funciona", "consulta", "consultas"])
+        confirmar = any(x in texto_norm for x in ["confirmar", "si confirmo", "sí confirmo", "esta bien", "está bien", "ok enviar", "enviar solicitud", "enviar", "registrar", "crear pedido", "hacer pedido", "reservar ahora", "listo enviar", "todo correcto"])
+        consulta = any(x in texto_norm for x in ["ayuda", "menu", "menú", "que puedes hacer", "qué puedes hacer", "como funciona", "cómo funciona", "consulta", "consultas", "opciones de ayuda"])
         return {
             "agendar": bool(agendar),
             "catalogo": bool(catalogo),
@@ -1586,7 +1704,42 @@ def registrar_asistente_sucree(app, deps):
         catalogo = cargar_catalogo()
         msg = str(message or "").strip()
         nmsg = norm(msg)
-        draft = actualizar_draft(draft or {}, msg, catalogo)
+        draft_inicial = dict(draft or {})
+
+        if draft_inicial.get("cotizacion_finalizada"):
+            return {
+                "reply": "La cotización ya fue enviada y el PDF quedó disponible en esta conversación. Si necesitas otro pedido o una nueva cotización, inicia una nueva conversación.",
+                "draft": draft_inicial,
+                "type": "conversation_closed",
+                "closed": True,
+            }
+
+        resumen_pre, err_pre = cotizar(draft_inicial, catalogo)
+        faltan_pre = faltantes(draft_inicial, resumen_pre, catalogo, err_pre)
+        campo_edicion = detectar_campo_edicion(nmsg)
+        if resumen_pre and not faltan_pre and campo_edicion and es_edicion_corta(nmsg, campo_edicion):
+            draft_edit = limpiar_dato_para_edicion(draft_inicial, campo_edicion)
+            draft_edit["editando_campo"] = campo_edicion
+            return {
+                "reply": prompt_edicion(campo_edicion),
+                "draft": draft_edit,
+                "type": "edit_prompt",
+                "suggestions": sugerencias_faltantes(faltantes(draft_edit, None, catalogo, "")) or [],
+            }
+
+        campo_pendiente = str(draft_inicial.get("editando_campo") or "").strip()
+        base_para_actualizar = limpiar_dato_para_edicion(draft_inicial, campo_pendiente) if campo_pendiente else draft_inicial
+        base_para_actualizar.pop("editando_campo", None)
+        draft = actualizar_draft(base_para_actualizar, msg, catalogo)
+        cambio_detectado = cambios_relevantes_entrada(base_para_actualizar, draft)
+        if campo_pendiente and not cambio_detectado:
+            draft["editando_campo"] = campo_pendiente
+            return {
+                "reply": prompt_edicion(campo_pendiente),
+                "draft": draft,
+                "type": "edit_prompt",
+                "suggestions": sugerencias_faltantes(faltantes(draft, None, catalogo, "")) or [],
+            }
         draft = registrar_cliente_desde_draft(draft)
         resumen, err = cotizar(draft, catalogo)
         faltan = faltantes(draft, resumen, catalogo, err)
@@ -1706,7 +1859,7 @@ def registrar_asistente_sucree(app, deps):
                 reply += "\n\n" + detalle
             return {"reply": reply, "draft": draft, "suggestions": sugerencias_faltantes(faltan) or sugerencias_catalogo(catalogo)}
 
-        confirmar = any(x in nmsg for x in ["confirmar", "confirmar reserva", "enviar solicitud", "enviar cotizacion", "registrar solicitud", "reservar ahora"])
+        confirmar = (nmsg.strip() in {"si", "s?", "ok", "okay", "dale", "correcto"}) or any(x in nmsg for x in ["confirmar", "confirmo", "confirmar reserva", "si confirmo", "s? confirmo", "esta bien", "est? bien", "todo bien", "enviar solicitud", "enviar cotizacion", "registrar solicitud", "reservar ahora"])
         if confirmar:
             resumen_confirm, err_confirm = cotizar(draft, catalogo)
             faltan_confirm = faltantes(draft, resumen_confirm, catalogo, err_confirm)
@@ -1725,6 +1878,8 @@ def registrar_asistente_sucree(app, deps):
                 reply = resumen_texto(draft, resumen_confirm) + "\n\n" + cierre.get("reply", "")
             else:
                 reply = cierre.get("reply", "No pude registrar la solicitud en este momento.")
+            if cierre.get("ok"):
+                draft["cotizacion_finalizada"] = True
             return {
                 "reply": reply,
                 "draft": draft,
@@ -1735,7 +1890,17 @@ def registrar_asistente_sucree(app, deps):
                 "suggestions": cierre.get("suggestions") or [],
                 "whatsapp_url": cierre.get("whatsapp_url") or "",
                 "error": cierre.get("error"),
+                "closed": bool(cierre.get("ok")),
             }
+        if not cambio_detectado and not any([agendar_intent, consulta_intent, catalogo_intent, disponibilidad_intent]):
+            registrar_desconocida(msg, {"draft": draft, "motivo": "sin_cambios_relevantes"})
+            return {
+                "reply": respuesta_no_entendida(draft),
+                "draft": draft,
+                "unknown": True,
+                "suggestions": ["Cambiar fecha", "Cambiar relleno", "Ver catalogo y precios", "Horas disponibles", "Hablar con el equipo"],
+            }
+
         if resumen:
             if faltan:
                 detalle = respuesta_faltantes_contextual(draft, faltan, catalogo)
@@ -1774,8 +1939,8 @@ def registrar_asistente_sucree(app, deps):
             cliente_msg = cliente_estado_texto(draft)
             if cliente_msg:
                 reply += "\n\n" + cliente_msg
-            reply += "\n\nYa tengo toda la informacion minima. Revisa el resumen y, si esta correcto, presiona Enviar solicitud."
-            return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": ["Enviar solicitud", "Cambiar fecha", "Editar torta"]}
+            reply += "\n\nYa tengo toda la información mínima. Revisa el resumen. Si quieres modificar algo, puedes escribir solo: nombre, fecha, hora, relleno, tamaño, topper, entrega, dirección, teléfono o correo. Si está correcto, presiona Enviar solicitud."
+            return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": ["Enviar solicitud", "Fecha", "Relleno", "Nombre", "Hora", "Tamaño"]}
         meaningful = any(draft.get(k) for k in ["fecha", "hora_inicio", "email", "telefono", "nombre", "size_id", "sabor_ids", "personas", "categoria_id"])
         if meaningful:
             reply = "Voy ordenando la informacion."
@@ -1790,7 +1955,7 @@ def registrar_asistente_sucree(app, deps):
             return {"reply": reply, "draft": draft}
         registrar_desconocida(msg, {"draft": draft})
         return {
-            "reply": "No estoy seguro de haber entendido. Puedes contarme de otra forma que necesitas o elegir una de estas opciones:\n- Agendar torta\n- Ver catalogo y precios\n- Horas disponibles\n- Hablar con el equipo",
+            "reply": respuesta_no_entendida(draft),
             "draft": draft,
             "unknown": True,
         }
