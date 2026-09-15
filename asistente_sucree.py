@@ -1,6 +1,8 @@
+import hashlib
 import json
 import re
 import unicodedata
+import uuid
 from datetime import datetime, timedelta
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -76,6 +78,12 @@ def registrar_asistente_sucree(app, deps):
             return 0.0
         return float(len(q & t)) / float(max(1, min(len(q), len(t))))
 
+    def ensure_column(cur, table, column, ddl):
+        cur.execute("PRAGMA table_info(%s)" % table)
+        cols = {str(r[1]) for r in cur.fetchall()}
+        if column not in cols:
+            cur.execute("ALTER TABLE %s ADD COLUMN %s" % (table, ddl))
+
     def ensure_tables(cur):
         cur.execute(
             """
@@ -89,6 +97,14 @@ def registrar_asistente_sucree(app, deps):
             )
             """
         )
+        for column, ddl in [
+            ("keywords", "keywords TEXT"),
+            ("categoria", "categoria TEXT DEFAULT 'general'"),
+            ("ejemplos_json", "ejemplos_json TEXT"),
+            ("uso_count", "uso_count INTEGER DEFAULT 0"),
+            ("ultimo_uso", "ultimo_uso TEXT"),
+        ]:
+            ensure_column(cur, "asistente_kb", column, ddl)
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS asistente_unknown (
@@ -102,6 +118,72 @@ def registrar_asistente_sucree(app, deps):
             )
             """
         )
+        for column, ddl in [
+            ("pregunta_norm", "pregunta_norm TEXT"),
+            ("conversation_id", "conversation_id TEXT"),
+            ("respuesta_actual", "respuesta_actual TEXT"),
+            ("tipo_evento", "tipo_evento TEXT DEFAULT 'no_entendido'"),
+            ("intent_json", "intent_json TEXT"),
+            ("confianza", "confianza REAL DEFAULT 0"),
+            ("veces", "veces INTEGER DEFAULT 1"),
+            ("prioridad", "prioridad TEXT DEFAULT 'normal'"),
+        ]:
+            ensure_column(cur, "asistente_unknown", column, ddl)
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS asistente_conversaciones (
+                conversation_id TEXT PRIMARY KEY,
+                canal TEXT DEFAULT 'web',
+                estado TEXT DEFAULT 'activa',
+                mensajes_total INTEGER DEFAULT 0,
+                desconocidas_total INTEGER DEFAULT 0,
+                ultimo_tipo TEXT,
+                resumen_json TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS asistente_mensajes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id TEXT,
+                pregunta TEXT,
+                respuesta TEXT,
+                tipo_respuesta TEXT,
+                entendido INTEGER DEFAULT 1,
+                confianza REAL DEFAULT 1,
+                intent_json TEXT,
+                draft_json TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_asistente_unknown_norm ON asistente_unknown(pregunta_norm, estado)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_asistente_mensajes_conv ON asistente_mensajes(conversation_id, id)")
+
+    def crear_conversation_id():
+        return "ASC-%s" % uuid.uuid4().hex[:18].upper()
+
+    def fingerprint_text(texto):
+        base = slug(texto)
+        return hashlib.sha1(base.encode("utf-8", errors="ignore")).hexdigest()[:20] if base else ""
+
+    def confidence_from_output(out, intent=None):
+        out = dict(out or {})
+        tipo = str(out.get("type") or "").strip()
+        if out.get("unknown"):
+            return 0.08
+        if tipo == "invalid_catalog_option":
+            return 0.82
+        if out.get("quote"):
+            return 0.95
+        if tipo in {"knowledge", "tracking", "tracking_email", "conversation_closed"}:
+            return 0.92
+        if intent and any(intent.get(k) for k in ["agendar", "catalogo", "disponibilidad", "consulta", "confirmar"]):
+            return 0.76
+        return 0.58
 
     def registrar_desconocida(pregunta, contexto=None):
         conn = None
@@ -109,14 +191,45 @@ def registrar_asistente_sucree(app, deps):
             pregunta = str(pregunta or "").strip()[:700]
             if not pregunta:
                 return
+            contexto = contexto or {}
             conn = get_db()
             cur = conn.cursor()
             ensure_tables(cur)
-            ctx = json.dumps(contexto or {}, ensure_ascii=False)[:4000]
-            cur.execute(
-                "INSERT INTO asistente_unknown (pregunta, contexto_json, estado) VALUES (?, ?, 'pendiente')",
-                (pregunta, ctx),
-            )
+            pnorm = fingerprint_text(pregunta)
+            ctx = json.dumps(contexto, ensure_ascii=False)[:6000]
+            conversation_id = str(contexto.get("conversation_id") or "").strip()[:80]
+            respuesta_actual = str(contexto.get("respuesta_actual") or "").strip()[:2500]
+            tipo_evento = str(contexto.get("motivo") or contexto.get("tipo_evento") or "no_entendido").strip()[:80]
+            intent_json = json.dumps(contexto.get("intent") or {}, ensure_ascii=False)[:3000]
+            confianza = float(contexto.get("confianza") or 0)
+            row = None
+            if pnorm:
+                cur.execute(
+                    "SELECT id, veces FROM asistente_unknown WHERE pregunta_norm = ? AND estado IN ('pendiente','revisar') ORDER BY id DESC LIMIT 1",
+                    (pnorm,),
+                )
+                row = cur.fetchone()
+            if row:
+                cur.execute(
+                    """
+                    UPDATE asistente_unknown
+                    SET veces = COALESCE(veces, 1) + 1,
+                        contexto_json = ?, conversation_id = COALESCE(NULLIF(?, ''), conversation_id),
+                        respuesta_actual = COALESCE(NULLIF(?, ''), respuesta_actual),
+                        tipo_evento = ?, intent_json = ?, confianza = ?, actualizado_en = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (ctx, conversation_id, respuesta_actual, tipo_evento, intent_json, confianza, int(row["id"])),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO asistente_unknown
+                    (pregunta, pregunta_norm, contexto_json, estado, conversation_id, respuesta_actual, tipo_evento, intent_json, confianza, veces, prioridad)
+                    VALUES (?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, 1, ?)
+                    """,
+                    (pregunta, pnorm, ctx, conversation_id, respuesta_actual, tipo_evento, intent_json, confianza, "alta" if confianza < 0.25 else "normal"),
+                )
             conn.commit()
         except Exception:
             if conn:
@@ -132,16 +245,41 @@ def registrar_asistente_sucree(app, deps):
             cur = conn.cursor()
             ensure_tables(cur)
             cur.execute(
-                "SELECT pregunta, respuesta FROM asistente_kb WHERE COALESCE(activo, 1) = 1 ORDER BY actualizado_en DESC, id DESC LIMIT 200"
+                """
+                SELECT id, pregunta, respuesta, keywords, categoria, uso_count
+                FROM asistente_kb
+                WHERE COALESCE(activo, 1) = 1
+                ORDER BY actualizado_en DESC, id DESC
+                LIMIT 350
+                """
             )
+            msg_norm = slug(mensaje)
+            msg_words = set(msg_norm.split())
             best = None
             best_score = 0.0
             for row in cur.fetchall():
-                score = ratio(mensaje, row["pregunta"])
+                pregunta_score = ratio(mensaje, row["pregunta"])
+                keywords = [slug(x) for x in re.split(r"[,;\n]+", str(row["keywords"] or "")) if slug(x)]
+                keyword_score = 0.0
+                for kw in keywords:
+                    kw_words = set(kw.split())
+                    if kw and kw in msg_norm:
+                        keyword_score = max(keyword_score, 1.0)
+                    elif kw_words:
+                        keyword_score = max(keyword_score, len(msg_words & kw_words) / max(1, len(kw_words)))
+                score = max(pregunta_score, keyword_score)
                 if score > best_score:
                     best_score = score
                     best = row
             if best and best_score >= 0.55:
+                try:
+                    cur.execute(
+                        "UPDATE asistente_kb SET uso_count = COALESCE(uso_count, 0) + 1, ultimo_uso = CURRENT_TIMESTAMP WHERE id = ?",
+                        (int(best["id"]),),
+                    )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
                 return str(best["respuesta"] or "").strip()
         except Exception:
             pass
@@ -149,6 +287,159 @@ def registrar_asistente_sucree(app, deps):
             if conn:
                 conn.close()
         return ""
+
+    def registrar_interaccion_asistente(conversation_id, pregunta, out, draft_entrada=None, user_agent=""):
+        conn = None
+        try:
+            conversation_id = str(conversation_id or "").strip()[:80] or crear_conversation_id()
+            pregunta = str(pregunta or "").strip()[:1200]
+            out = dict(out or {})
+            draft_salida = out.get("draft") if isinstance(out.get("draft"), dict) else {}
+            intent = inferir_intenciones(norm(pregunta), draft_entrada or {}) if pregunta else {}
+            confianza = confidence_from_output(out, intent)
+            entendido = 0 if out.get("unknown") else 1
+            tipo = str(out.get("type") or ("unknown" if out.get("unknown") else "reply")).strip()[:80]
+            respuesta = str(out.get("reply") or "").strip()[:4000]
+            estado_conv = "cerrada" if out.get("closed") else "activa"
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            cur.execute(
+                """
+                INSERT INTO asistente_conversaciones
+                (conversation_id, canal, estado, mensajes_total, desconocidas_total, ultimo_tipo, resumen_json)
+                VALUES (?, 'web', ?, 0, 0, ?, ?)
+                ON CONFLICT(conversation_id) DO UPDATE SET
+                    estado = excluded.estado,
+                    ultimo_tipo = excluded.ultimo_tipo,
+                    resumen_json = excluded.resumen_json,
+                    actualizado_en = CURRENT_TIMESTAMP
+                """,
+                (conversation_id, estado_conv, tipo, json.dumps({"draft": draft_salida, "user_agent": str(user_agent or "")[:300]}, ensure_ascii=False)[:7000]),
+            )
+            cur.execute(
+                """
+                INSERT INTO asistente_mensajes
+                (conversation_id, pregunta, respuesta, tipo_respuesta, entendido, confianza, intent_json, draft_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    conversation_id,
+                    pregunta,
+                    respuesta,
+                    tipo,
+                    entendido,
+                    confianza,
+                    json.dumps(intent, ensure_ascii=False)[:3000],
+                    json.dumps(draft_salida, ensure_ascii=False)[:7000],
+                ),
+            )
+            cur.execute(
+                """
+                UPDATE asistente_conversaciones
+                SET mensajes_total = COALESCE(mensajes_total, 0) + 1,
+                    desconocidas_total = COALESCE(desconocidas_total, 0) + ?,
+                    actualizado_en = CURRENT_TIMESTAMP
+                WHERE conversation_id = ?
+                """,
+                (0 if entendido else 1, conversation_id),
+            )
+            conn.commit()
+            if not entendido:
+                registrar_desconocida(pregunta, {
+                    "conversation_id": conversation_id,
+                    "draft": draft_salida,
+                    "draft_entrada": draft_entrada or {},
+                    "intent": intent,
+                    "respuesta_actual": respuesta,
+                    "motivo": "no_entendido",
+                    "confianza": confianza,
+                })
+            return conversation_id
+        except Exception:
+            if conn:
+                conn.rollback()
+            return conversation_id
+        finally:
+            if conn:
+                conn.close()
+
+
+    def merge_drafts_conservador(base, nuevo):
+        merged = dict(base or {})
+        nuevo = dict(nuevo or {})
+        for key, value in nuevo.items():
+            if value is None or value == "" or value == []:
+                continue
+            if key in {"sabor_ids", "extra_items", "extras", "incompatibilidades"}:
+                if value:
+                    merged[key] = value
+                continue
+            merged[key] = value
+        return merged
+
+    def recuperar_draft_conversacion(conversation_id):
+        conn = None
+        try:
+            cid = str(conversation_id or "").strip()[:80]
+            if not cid:
+                return {}
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            cur.execute(
+                """
+                SELECT draft_json
+                FROM asistente_mensajes
+                WHERE conversation_id = ? AND draft_json IS NOT NULL AND TRIM(draft_json) <> ''
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (cid,),
+            )
+            row = cur.fetchone()
+            if row:
+                try:
+                    data = json.loads(row["draft_json"] or "{}")
+                    return data if isinstance(data, dict) else {}
+                except Exception:
+                    return {}
+            cur.execute("SELECT resumen_json FROM asistente_conversaciones WHERE conversation_id = ? LIMIT 1", (cid,))
+            row = cur.fetchone()
+            if row:
+                try:
+                    data = json.loads(row["resumen_json"] or "{}")
+                    draft = data.get("draft") if isinstance(data, dict) else {}
+                    return draft if isinstance(draft, dict) else {}
+                except Exception:
+                    return {}
+        except Exception:
+            return {}
+        finally:
+            if conn:
+                conn.close()
+        return {}
+
+    def reconciliar_draft_catalogo(draft, catalogo):
+        draft = dict(draft or {})
+        categoria = find_categoria(catalogo, draft.get("categoria_id") or draft.get("tamano_invalido_categoria_id") or "")
+        personas = draft.get("personas") or draft.get("tamano_invalido")
+        if categoria and personas and not draft.get("size_id"):
+            candidatos = sizes_por_personas(catalogo, personas, categoria)
+            if len(candidatos) == 1:
+                draft["size_id"] = str(candidatos[0].get("id") or "")
+                draft.pop("tamano_invalido", None)
+                draft.pop("tamano_invalido_categoria_id", None)
+                draft = clear_incompatibilidades(draft, {"tama?o", "tamano"})
+        if draft.get("sabor_ids"):
+            categoria = find_categoria(catalogo, draft.get("categoria_id") or "")
+            if categoria:
+                validos = {str(x.get("id") or "") for x in rows_categoria(catalogo, "sabores", categoria)}
+                if validos:
+                    filtrados = [sid for sid in (draft.get("sabor_ids") or []) if str(sid) in validos]
+                    if filtrados:
+                        draft["sabor_ids"] = filtrados[:3]
+        return draft
 
     def buscar_cliente_por_email(email):
         conn = None
@@ -842,6 +1133,7 @@ def registrar_asistente_sucree(app, deps):
     def limpiar_nombre_cliente(valor):
         nombre = re.sub(r"\s+", " ", str(valor or "")).strip(" .,-:;")[:80]
         nombre = re.split(r"\b(?:telefono|tel[eé]fono|fono|celular|whatsapp|correo|email|mail|direccion|direcci[oó]n|despacho)\b", nombre, flags=re.I)[0].strip(" .,-:;")
+        nombre = re.sub(r"\b(?:y\s+mi|mi|y)\s*$", "", nombre, flags=re.I).strip(" .,-:;")
         if len(nombre) < 2 or re.search(r"\d|@", nombre) or len(nombre.split()) > 6:
             return ""
         return nombre
@@ -951,8 +1243,9 @@ def registrar_asistente_sucree(app, deps):
                     draft = add_incompatibilidad(draft, "tamaño", "%s personas" % personas)
                 elif len(candidatos_globales) == 1:
                     size = candidatos_globales[0]
-        if not size and not m and not draft.get("personas"):
-            size = match_row(texto, catalogo.get("sizes") or [], min_score=0.55)
+        # No elegir un tama?o por similitud si el cliente no indic? personas o un tama?o expl?cito.
+        if not size and not m and not draft.get("personas") and any(x in texto_norm for x in ["persona", "personas", "pax", "tamano", "tama?o"]):
+            size = match_row(texto, catalogo.get("sizes") or [], min_score=0.70)
         if size:
             draft["size_id"] = str(size.get("id") or "")
             draft.pop("tamano_invalido", None)
@@ -1269,19 +1562,37 @@ def registrar_asistente_sucree(app, deps):
         categoria = find_categoria(catalogo, draft.get("categoria_id") or "")
         sizes = rows_categoria(catalogo, "sizes", categoria) if categoria else list(catalogo.get("sizes") or [])
         sabores = rows_categoria(catalogo, "sabores", categoria) if categoria else list(catalogo.get("sabores") or [])
-        parts = ["Necesito ajustar un dato de la torta para que coincida con las opciones disponibles."]
+        parts = ["Ya tengo tamaño y relleno, pero esa combinación no coincide con una opción válida del catálogo."]
         if categoria:
             parts.append("Estoy revisando el tipo: %s." % (categoria.get("nombre") or "torta"))
         else:
             parts.append("Necesito confirmar primero el tipo de torta, por ejemplo: bizcocho, panqueque o mil hojas.")
+        if err:
+            parts.append("Detalle interno: %s" % str(err)[:180])
         if sizes:
-            parts.append("Tamanos disponibles para elegir:")
-            parts.append(list_lines(sizes[:8], lambda s: str(s.get("nombre") or "Tamano"), "sin tamanos cargados"))
+            parts.append("Tamaños disponibles para ese tipo:")
+            parts.append(list_lines(sizes[:8], lambda size: str(size.get("nombre") or "Tamaño"), "sin tamaños cargados"))
         if sabores:
             parts.append("Rellenos disponibles para ese tipo:")
-            parts.append(list_lines(sabores[:10], lambda s: str(s.get("nombre") or "Relleno"), "sin rellenos cargados"))
-        parts.append("Escribeme el dato corregido en una frase. Ejemplo: 25 personas bizcocho con manjar.")
+            parts.append(list_lines(sabores[:10], lambda sabor: str(sabor.get("nombre") or "Relleno"), "sin rellenos cargados"))
+        parts.append("Para corregirlo, escribe solo el dato que quieres cambiar, por ejemplo: tamaño o relleno.")
         return "\n".join([p for p in parts if p])
+
+    def es_faltante_diagnostico(item):
+        txt = str(item or "")
+        return "\n" in txt or txt.startswith("Ya tengo tamaño") or txt.startswith("Necesito ajustar")
+
+    def faltantes_simples(faltan):
+        return [x for x in (faltan or []) if not es_faltante_diagnostico(x)]
+
+    def faltantes_diagnosticos(faltan):
+        return [x for x in (faltan or []) if es_faltante_diagnostico(x)]
+
+    def texto_faltantes_destacado(faltan):
+        simples = faltantes_simples(faltan)
+        if not simples:
+            return ""
+        return "Para continuar falta:\n%s" % "\n".join("- " + str(x) for x in simples)
 
     def faltantes(draft, resumen, catalogo=None, err=""):
         out = []
@@ -1839,7 +2150,10 @@ def registrar_asistente_sucree(app, deps):
         for key, msg in prioridad:
             if key in faltan:
                 return msg
-        return "Para continuar falta:\n%s" % "\n".join("- " + str(x) for x in faltan)
+        diagnosticos = faltantes_diagnosticos(faltan)
+        if diagnosticos:
+            return "\n\n".join(str(x) for x in diagnosticos)
+        return texto_faltantes_destacado(faltan)
 
     def chat_logic(message, draft):
         catalogo = cargar_catalogo()
@@ -1872,6 +2186,7 @@ def registrar_asistente_sucree(app, deps):
         base_para_actualizar = limpiar_dato_para_edicion(draft_inicial, campo_pendiente) if campo_pendiente else draft_inicial
         base_para_actualizar.pop("editando_campo", None)
         draft = actualizar_draft(base_para_actualizar, msg, catalogo)
+        draft = reconciliar_draft_catalogo(draft, catalogo)
         cambio_detectado = cambios_relevantes_entrada(base_para_actualizar, draft)
         if campo_pendiente and not cambio_detectado:
             draft["editando_campo"] = campo_pendiente
@@ -2096,7 +2411,12 @@ def registrar_asistente_sucree(app, deps):
             if err:
                 reply += " Necesito que revisemos una opcion del catalogo para continuar."
             if faltan:
-                reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
+                destacado = texto_faltantes_destacado(faltan)
+                diagnosticos = faltantes_diagnosticos(faltan)
+                if destacado:
+                    reply += "\n\n" + destacado
+                if diagnosticos:
+                    reply += "\n\n" + "\n\n".join(str(x) for x in diagnosticos)
             if draft.get("fecha") and not draft.get("hora_inicio"):
                 reply += "\n\n" + respuesta_disponibilidad(draft, catalogo=catalogo, limite=5)
             elif hora_elegida_disponible(draft, catalogo):
@@ -2119,48 +2439,203 @@ def registrar_asistente_sucree(app, deps):
 
     @app.route("/api/asistente/public/chat", methods=["POST"])
     def api_asistente_public_chat():
+        data = request.get_json(silent=True) or {}
+        msg = str(data.get("message") or "").strip()[:1200]
+        draft = data.get("draft") if isinstance(data.get("draft"), dict) else {}
+        conversation_id = str(data.get("conversation_id") or draft.get("conversation_id") or "").strip()[:80]
+        if not conversation_id:
+            conversation_id = crear_conversation_id()
+        draft_recuperado = recuperar_draft_conversacion(conversation_id)
+        draft = merge_drafts_conservador(draft_recuperado, draft)
+        draft["conversation_id"] = conversation_id
         try:
-            data = request.get_json(silent=True) or {}
-            msg = str(data.get("message") or "").strip()[:1200]
-            draft = data.get("draft") if isinstance(data.get("draft"), dict) else {}
+            draft_entrada = dict(draft or {})
             out = chat_logic(msg, draft)
+            out_draft = out.get("draft") if isinstance(out.get("draft"), dict) else {}
+            out_draft["conversation_id"] = conversation_id
+            out["draft"] = out_draft
             if "suggestions" not in out or out.get("suggestions") is None:
                 out["suggestions"] = sugerencias_desde_respuesta(out.get("reply"))
-            payload = {"success": True}
+            registrar_interaccion_asistente(
+                conversation_id,
+                msg,
+                out,
+                draft_entrada=draft_entrada,
+                user_agent=request.headers.get("User-Agent", ""),
+            )
+            payload = {"success": True, "conversation_id": conversation_id}
             payload.update(out)
             return jsonify(payload)
         except Exception as exc:
-            registrar_desconocida(str((request.get_json(silent=True) or {}).get("message") or ""), {"error": str(exc)})
-            return jsonify({"success": False, "error": "El asistente tuvo un problema temporal. Intentalo nuevamente."}), 500
+            registrar_desconocida(msg, {"error": str(exc), "conversation_id": conversation_id, "motivo": "exception"})
+            return jsonify({"success": False, "conversation_id": conversation_id, "error": "El asistente tuvo un problema temporal. Intentalo nuevamente."}), 500
 
     @app.route("/api/asistente/admin/pendientes", methods=["GET", "POST"])
     def api_asistente_admin_pendientes():
         conn = None
+
+        def parse_json(raw, fallback):
+            try:
+                return json.loads(raw) if raw else fallback
+            except Exception:
+                return fallback
+
         try:
             conn = get_db()
             cur = conn.cursor()
             ensure_tables(cur)
             if request.method == "POST":
                 data = request.get_json(silent=True) or {}
+                action = str(data.get("action") or "save").strip().lower()
+                unknown_id = int(data.get("id") or 0)
+                if action in {"ignore", "ignorar"}:
+                    if unknown_id <= 0:
+                        return jsonify({"success": False, "error": "Falta el ID de la pregunta"}), 400
+                    cur.execute(
+                        "UPDATE asistente_unknown SET estado = 'ignorado', actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                        (unknown_id,),
+                    )
+                    conn.commit()
+                    return jsonify({"success": True})
+                if action in {"reopen", "reabrir"}:
+                    if unknown_id <= 0:
+                        return jsonify({"success": False, "error": "Falta el ID de la pregunta"}), 400
+                    cur.execute(
+                        "UPDATE asistente_unknown SET estado = 'pendiente', actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                        (unknown_id,),
+                    )
+                    conn.commit()
+                    return jsonify({"success": True})
+
                 pregunta = str(data.get("pregunta") or "").strip()[:700]
                 respuesta = str(data.get("respuesta") or "").strip()[:2500]
-                unknown_id = int(data.get("id") or 0)
+                keywords = str(data.get("keywords") or "").strip()[:1200]
+                categoria = str(data.get("categoria") or "general").strip()[:80] or "general"
                 if not pregunta or not respuesta:
                     return jsonify({"success": False, "error": "Pregunta y respuesta son obligatorias"}), 400
-                cur.execute("INSERT INTO asistente_kb (pregunta, respuesta, activo) VALUES (?, ?, 1)", (pregunta, respuesta))
+                ejemplos = [pregunta]
+                for item in re.split(r"[,;\n]+", keywords):
+                    item = str(item or "").strip()
+                    if item and item not in ejemplos:
+                        ejemplos.append(item)
+                cur.execute(
+                    """
+                    INSERT INTO asistente_kb (pregunta, respuesta, keywords, categoria, ejemplos_json, activo)
+                    VALUES (?, ?, ?, ?, ?, 1)
+                    """,
+                    (pregunta, respuesta, keywords, categoria, json.dumps(ejemplos[:20], ensure_ascii=False)),
+                )
                 if unknown_id > 0:
                     cur.execute(
-                        "UPDATE asistente_unknown SET estado = 'resuelto', respuesta_sugerida = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                        """
+                        UPDATE asistente_unknown
+                        SET estado = 'resuelto', respuesta_sugerida = ?, actualizado_en = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
                         (respuesta, unknown_id),
                     )
                 conn.commit()
                 return jsonify({"success": True})
-            cur.execute("SELECT id, pregunta, contexto_json, estado, creado_en FROM asistente_unknown ORDER BY id DESC LIMIT 100")
-            rows = [dict(r) for r in cur.fetchall()]
-            return jsonify({"success": True, "pendientes": rows})
+
+            cur.execute(
+                """
+                SELECT id, pregunta, contexto_json, estado, respuesta_sugerida, creado_en, actualizado_en,
+                       pregunta_norm, conversation_id, respuesta_actual, tipo_evento, intent_json,
+                       confianza, veces, prioridad
+                FROM asistente_unknown
+                ORDER BY CASE estado WHEN 'pendiente' THEN 0 WHEN 'revisar' THEN 1 WHEN 'resuelto' THEN 2 ELSE 3 END,
+                         COALESCE(veces, 1) DESC, id DESC
+                LIMIT 160
+                """
+            )
+            pendientes = []
+            for r in cur.fetchall():
+                row = dict(r)
+                row["contexto"] = parse_json(row.get("contexto_json"), {})
+                row["intent"] = parse_json(row.get("intent_json"), {})
+                pendientes.append(row)
+
+            cur.execute(
+                """
+                SELECT id, pregunta, respuesta, keywords, categoria, activo, uso_count, ultimo_uso, creado_en, actualizado_en
+                FROM asistente_kb
+                ORDER BY COALESCE(activo, 1) DESC, actualizado_en DESC, id DESC
+                LIMIT 120
+                """
+            )
+            kb_rows = [dict(r) for r in cur.fetchall()]
+
+            cur.execute(
+                """
+                SELECT conversation_id, canal, estado, mensajes_total, desconocidas_total, ultimo_tipo, creado_en, actualizado_en
+                FROM asistente_conversaciones
+                ORDER BY actualizado_en DESC
+                LIMIT 80
+                """
+            )
+            conversaciones = [dict(r) for r in cur.fetchall()]
+
+            cur.execute("SELECT COUNT(*) AS c FROM asistente_unknown WHERE estado IN ('pendiente','revisar')")
+            pendientes_count = int((cur.fetchone() or {"c": 0})["c"] or 0)
+            cur.execute("SELECT COUNT(*) AS c FROM asistente_conversaciones")
+            conversaciones_count = int((cur.fetchone() or {"c": 0})["c"] or 0)
+            cur.execute("SELECT COUNT(*) AS c FROM asistente_mensajes")
+            mensajes_count = int((cur.fetchone() or {"c": 0})["c"] or 0)
+            cur.execute("SELECT COUNT(*) AS c FROM asistente_kb WHERE COALESCE(activo, 1) = 1")
+            kb_count = int((cur.fetchone() or {"c": 0})["c"] or 0)
+
+            return jsonify({
+                "success": True,
+                "pendientes": pendientes,
+                "kb": kb_rows,
+                "conversaciones": conversaciones,
+                "stats": {
+                    "pendientes": pendientes_count,
+                    "conversaciones": conversaciones_count,
+                    "mensajes": mensajes_count,
+                    "respuestas": kb_count,
+                },
+            })
         except Exception as exc:
             if conn:
                 conn.rollback()
+            return jsonify({"success": False, "error": str(exc)}), 500
+        finally:
+            if conn:
+                conn.close()
+
+    @app.route("/api/asistente/admin/conversaciones/<conversation_id>", methods=["GET"])
+    def api_asistente_admin_conversacion(conversation_id):
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            cid = str(conversation_id or "").strip()[:80]
+            cur.execute(
+                """
+                SELECT id, pregunta, respuesta, tipo_respuesta, entendido, confianza, intent_json, draft_json, creado_en
+                FROM asistente_mensajes
+                WHERE conversation_id = ?
+                ORDER BY id ASC
+                LIMIT 300
+                """,
+                (cid,),
+            )
+            rows = []
+            for r in cur.fetchall():
+                row = dict(r)
+                try:
+                    row["intent"] = json.loads(row.get("intent_json") or "{}")
+                except Exception:
+                    row["intent"] = {}
+                try:
+                    row["draft"] = json.loads(row.get("draft_json") or "{}")
+                except Exception:
+                    row["draft"] = {}
+                rows.append(row)
+            return jsonify({"success": True, "conversation_id": cid, "mensajes": rows})
+        except Exception as exc:
             return jsonify({"success": False, "error": str(exc)}), 500
         finally:
             if conn:
