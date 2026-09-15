@@ -39,6 +39,13 @@ def registrar_asistente_sucree(app, deps):
             n = 0
         return ("$%s" % format(n, ",")).replace(",", ".")
 
+    def fmt_fecha(fecha):
+        raw = str(fecha or "").strip()
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").strftime("%d-%m-%Y")
+        except Exception:
+            return raw or "-"
+
     def norm(texto):
         raw = str(texto or "").strip().lower()
         raw = unicodedata.normalize("NFKD", raw)
@@ -152,6 +159,77 @@ def registrar_asistente_sucree(app, deps):
                 best_score = score
                 best = row
         return best if best and best_score >= min_score else None
+
+    def find_categoria(catalogo, categoria_id):
+        cid = str(categoria_id or "").strip().lower()
+        for cat in catalogo.get("categorias") or []:
+            if str(cat.get("id") or "").strip().lower() == cid:
+                return cat
+        return None
+
+    def rows_categoria(catalogo, key, categoria):
+        rows = list(catalogo.get(key) or [])
+        if not categoria:
+            return rows
+        cid = str(categoria.get("id") or "").strip().lower()
+        if key == "sizes":
+            return [r for r in rows if str(r.get("categoria_id") or "").strip().lower() == cid]
+        id_key = {"sabores": "sabores_ids", "extras": "extras_ids", "toppers": "toppers_ids"}.get(key)
+        if id_key and bool(categoria.get("use_category_ingredients")):
+            allowed = {str(x or "").strip().lower() for x in (categoria.get(id_key) or []) if str(x or "").strip()}
+            return [r for r in rows if str(r.get("id") or "").strip().lower() in allowed]
+        return rows
+
+    def list_lines(rows, label_func, empty_text):
+        out = []
+        for row in rows or []:
+            label = label_func(row)
+            if label:
+                out.append("- " + label)
+        return "\n".join(out) if out else "- " + empty_text
+
+    def disponibilidad_texto(items):
+        if not items:
+            return "No encontre cupos disponibles en los proximos dias."
+        lines = ["Estas son algunas fechas con horas tentativas:"]
+        for item in items:
+            lines.append("")
+            lines.append("- %s" % fmt_fecha(item.get("fecha")))
+            for hora in item.get("horas") or []:
+                lines.append("  - %s" % hora)
+        return "\n".join(lines)
+
+    def guia_agendar_texto(catalogo, draft=None):
+        draft = dict(draft or {})
+        categorias = catalogo.get("categorias") or []
+        lines = [
+            "Perfecto, te ayudo a agendar una torta.",
+            "",
+            "Para avanzar necesito estos datos:",
+            "- Tipo de torta",
+            "- Tamano o cantidad de personas",
+            "- Relleno/sabor",
+            "- Fecha",
+            "- Hora",
+            "- Nombre",
+            "- Telefono",
+            "- Correo",
+            "- Retiro o despacho",
+            "",
+            "Tipos disponibles:",
+        ]
+        lines.append(list_lines(categorias, lambda c: str(c.get("nombre") or ""), "sin tipos cargados"))
+        if draft.get("fecha"):
+            horas = horas_disponibles(draft.get("fecha"), limite=6)
+            if horas:
+                lines.extend(["", "Horas tentativas para %s:" % fmt_fecha(draft.get("fecha"))])
+                lines.extend(["- " + h for h in horas])
+        lines.extend([
+            "",
+            "Puedes escribirlo en una sola frase. Ejemplo:",
+            "Quiero torta bizcocho 25 personas, manjar, sin topper, para el 19 de septiembre a las 19 hrs, soy Ana, +569..., correo@ejemplo.cl",
+        ])
+        return "\n".join(lines)
 
     def parse_fecha(texto):
         txt = norm(texto)
@@ -326,6 +404,7 @@ def registrar_asistente_sucree(app, deps):
         topper_txt = str(topper.get("nombre") or "Sin topper")
         return "\n".join([
             "Ya tengo esta cotizacion preliminar:",
+            "",
             "Producto: %s" % (str(categoria.get("nombre") or "Torta").strip() or "Torta"),
             "Tamano: %s" % (size.get("nombre") or "-"),
             "Rellenos: %s" % (sabores or "-"),
@@ -335,7 +414,8 @@ def registrar_asistente_sucree(app, deps):
             "Cliente: %s" % (draft.get("nombre") or "-"),
             "Contacto: %s / %s" % (draft.get("telefono") or "-", draft.get("email") or "-"),
             "Entrega: %s" % ("despacho" if draft.get("entrega_tipo") == "despacho" else "retiro"),
-            "Fecha y hora: %s %s" % (draft.get("fecha") or "-", draft.get("hora_inicio") or "-"),
+            "Fecha: %s" % fmt_fecha(draft.get("fecha")),
+            "Hora: %s" % (draft.get("hora_inicio") or "-"),
         ])
 
     def faltantes(draft, resumen):
@@ -419,26 +499,43 @@ def registrar_asistente_sucree(app, deps):
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
-    def catalogo_texto(catalogo):
-        sizes = []
-        for s in (catalogo.get("sizes") or [])[:8]:
-            sizes.append("%s (%s)" % (s.get("nombre") or "Tamano", fmt_clp(s.get("precio") or 0)))
-        sabores = [str(s.get("nombre") or "") for s in (catalogo.get("sabores") or [])[:12] if s]
-        extras = [str(s.get("nombre") or "") for s in (catalogo.get("extras") or [])[:8] if s]
-        toppers = [str(s.get("nombre") or "") for s in (catalogo.get("toppers") or [])[:8] if s]
-        return (
-            "Puedo ayudarte con tortas de agenda.\n"
-            "Tamanos disponibles: %s.\n"
-            "Rellenos: %s.\n"
-            "Extras: %s.\n"
-            "Toppers: %s.\n"
-            "Dime algo como: quiero una torta bizcocho 25 personas, manjar, sin topper, para el 19 de septiembre a las 19 hrs."
-        ) % (
-            "; ".join(sizes) or "sin tamanos cargados",
-            ", ".join(sabores) or "sin rellenos cargados",
-            ", ".join(extras) or "sin extras cargados",
-            ", ".join(toppers) or "sin toppers cargados",
-        )
+    def catalogo_texto(catalogo, categoria_id=""):
+        categoria = find_categoria(catalogo, categoria_id)
+        if not categoria:
+            lines = [
+                "Primero elige el tipo de torta que quieres revisar:",
+                "",
+                list_lines(catalogo.get("categorias") or [], lambda c: str(c.get("nombre") or ""), "sin tipos cargados"),
+                "",
+                "Escribe, por ejemplo:",
+                "- Catalogo bizcocho",
+                "- Catalogo panqueque",
+                "- Catalogo mil hojas",
+            ]
+            return "\n".join(lines)
+
+        sizes = rows_categoria(catalogo, "sizes", categoria)
+        sabores = rows_categoria(catalogo, "sabores", categoria)
+        extras = rows_categoria(catalogo, "extras", categoria)
+        toppers = rows_categoria(catalogo, "toppers", categoria)
+        lines = [
+            "Catalogo para %s" % (categoria.get("nombre") or "torta"),
+            "",
+            "Tamanos y precios:",
+            list_lines(sizes, lambda s: "%s - %s" % (s.get("nombre") or "Tamano", fmt_clp(s.get("precio") or 0)), "sin tamanos cargados"),
+            "",
+            "Rellenos disponibles:",
+            list_lines(sabores, lambda s: "%s%s" % (s.get("nombre") or "", (" - " + fmt_clp(s.get("precio") or 0)) if float(s.get("precio") or 0) > 0 else ""), "sin rellenos cargados"),
+            "",
+            "Extras disponibles:",
+            list_lines(extras, lambda e: "%s - %s" % (e.get("nombre") or "", fmt_clp(e.get("precio") or 0)), "sin extras cargados"),
+            "",
+            "Toppers disponibles:",
+            list_lines(toppers, lambda t: "%s - %s" % (t.get("nombre") or "", fmt_clp(t.get("precio") or 0)), "sin toppers cargados"),
+            "",
+            "Para cotizar, dime tamano, relleno, topper, fecha y hora.",
+        ]
+        return "\n".join(lines)
 
     def chat_logic(message, draft):
         catalogo = cargar_catalogo()
@@ -453,6 +550,54 @@ def registrar_asistente_sucree(app, deps):
         kb = buscar_kb(msg)
         if kb:
             return {"reply": kb, "draft": draft, "type": "knowledge"}
+        agendar_intent = any(x in nmsg for x in ["agendar", "reservar", "hacer pedido", "crear pedido", "pedir torta", "agendar torta", "quiero una torta"])
+        consulta_intent = any(x in nmsg for x in ["consulta", "consultas", "ayuda", "que puedes hacer", "como funciona", "menu"])
+        catalogo_intent = any(x in nmsg for x in ["catalogo", "opciones", "precios", "precio", "sabores", "rellenos", "tamanos", "tamaños", "tamano"])
+        disponibilidad_intent = any(x in nmsg for x in ["hora disponible", "horas disponibles", "disponibilidad", "agenda", "cuando puedo", "fecha disponible", "horarios"])
+
+        if consulta_intent:
+            return {
+                "reply": "\n".join([
+                    "Puedo ayudarte con estas opciones:",
+                    "",
+                    "- Agendar torta",
+                    "- Ver catalogo y precios",
+                    "- Revisar horas disponibles",
+                    "- Ordenar una cotizacion con datos desordenados",
+                    "- Confirmar una reserva cuando falten cero datos",
+                    "",
+                    "Escribe una de esas opciones o cuentame que torta necesitas.",
+                ]),
+                "draft": draft,
+            }
+
+        if catalogo_intent:
+            reply = catalogo_texto(catalogo, categoria_id=draft.get("categoria_id") or "")
+            if resumen:
+                reply += "\n\n" + resumen_texto(draft, resumen)
+            return {"reply": reply, "draft": draft, "quote": resumen}
+
+        if disponibilidad_intent and not agendar_intent:
+            if draft.get("fecha"):
+                horas = horas_disponibles(draft.get("fecha"), limite=10)
+                if horas:
+                    reply = "\n".join(
+                        ["Horas tentativas para %s:" % fmt_fecha(draft.get("fecha")), ""]
+                        + ["- " + h for h in horas]
+                        + ["", "Dime cual prefieres."]
+                    )
+                else:
+                    reply = "Para %s no veo cupos disponibles.\n\nPuedo revisar otra fecha si me indicas una." % fmt_fecha(draft.get("fecha"))
+            else:
+                reply = disponibilidad_texto(proximas_fechas())
+            return {"reply": reply, "draft": draft}
+
+        if agendar_intent and faltan:
+            reply = guia_agendar_texto(catalogo, draft)
+            if resumen:
+                reply += "\n\n" + resumen_texto(draft, resumen)
+                reply += "\n\nPara continuar falta:\n" + "\n".join("- " + x for x in faltan)
+            return {"reply": reply, "draft": draft, "quote": resumen}
         if any(x in nmsg for x in ["catalogo", "opciones", "precios", "precio", "sabores", "rellenos", "tamanos", "tamaños"]):
             reply = catalogo_texto(catalogo)
             if resumen:
@@ -491,9 +636,12 @@ def registrar_asistente_sucree(app, deps):
             if draft.get("fecha"):
                 horas = horas_disponibles(draft.get("fecha"), limite=6)
                 if horas:
-                    reply += "\n\nHoras tentativas disponibles para esa fecha: %s." % ", ".join(horas)
+                    reply += "\n\nHoras tentativas disponibles para %s:\n%s" % (
+                        fmt_fecha(draft.get("fecha")),
+                        "\n".join("- " + h for h in horas),
+                    )
             if faltan:
-                reply += "\n\nPara continuar falta: %s." % ", ".join(faltan)
+                reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             else:
                 reply += "\n\nTengo todo para solicitar la reserva. Escribe 'confirmar reserva' para registrarla."
             return {"reply": reply, "draft": draft, "quote": resumen}
@@ -503,15 +651,18 @@ def registrar_asistente_sucree(app, deps):
             if err:
                 reply += " %s." % err
             if faltan:
-                reply += " Para continuar falta: %s." % ", ".join(faltan)
+                reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             if draft.get("fecha"):
                 horas = horas_disponibles(draft.get("fecha"), limite=5)
                 if horas:
-                    reply += " Horas tentativas para %s: %s." % (draft.get("fecha"), ", ".join(horas))
+                    reply += "\n\nHoras tentativas para %s:\n%s" % (
+                        fmt_fecha(draft.get("fecha")),
+                        "\n".join("- " + h for h in horas),
+                    )
             return {"reply": reply, "draft": draft}
         registrar_desconocida(msg, {"draft": draft})
         return {
-            "reply": "No entendi bien eso todavia. Lo deje registrado para que el equipo lo revise y pueda aprender esa respuesta. Si quieres, dime tipo de torta, tamano, relleno, fecha y hora.",
+            "reply": "No entendi bien eso todavia. Lo deje registrado para que el equipo lo revise y pueda aprender esa respuesta.\n\nSi quieres, puedes escribir:\n- Agendar torta\n- Ver catalogo y precios\n- Horas disponibles",
             "draft": draft,
             "unknown": True,
         }
