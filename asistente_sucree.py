@@ -333,6 +333,8 @@ def registrar_asistente_sucree(app, deps):
             return "telefono"
         if re.search(r"\b\d{1,3}\s*(?:persona|personas|pers|pax)\b", texto):
             return "tamano"
+        if re.search(r"\b(?:quiero|necesito|busco|dame|quisiera)\s+(?:\d+\s+)?(?:torta|tortita|tortitas|pastel|pastelito|pastelitos|queque|quequito|quequitos)\b", texto):
+            return "agendar"
         if out.get("type") == "invalid_catalog_option":
             return "catalogo_invalido"
         if intent.get("disponibilidad"):
@@ -2313,7 +2315,7 @@ def registrar_asistente_sucree(app, deps):
         tiene_hora = bool(parse_hora(texto_norm))
         tiene_personas = bool(re.search(r"\b\d{1,3}\s*(?:persona|personas|pers|pax)\b", texto_norm))
         palabras_torta = [
-            "torta", "tortas", "pastel", "pasteles", "queque", "bizcocho", "bizcochuelo", "panqueque",
+            "torta", "tortas", "tortita", "tortitas", "tortaza", "pastel", "pasteles", "pastelito", "pastelitos", "queque", "quequito", "bizcocho", "bizcochuelo", "panqueque",
             "mil hojas", "milhojas", "mil hoja", "tradicional", "relleno", "rellenos", "sabor", "sabores",
             "manjar", "crema", "ganache", "lucuma", "lúcuma", "frambuesa", "mango", "topper", "personas",
             "persona", "pax", "porciones", "porcion", "porción",
@@ -2327,8 +2329,9 @@ def registrar_asistente_sucree(app, deps):
         palabras_catalogo = ["catalogo", "catálogo", "carta", "menu", "menú", "precio", "precios", "vale", "valor", "cuanto", "cuánto", "opciones", "tipos", "sabores", "rellenos", "tamanos", "tamaños", "tamano", "tamaño"]
         palabras_horas = ["hora", "horas", "horario", "horarios", "disponible", "disponibles", "disponibilidad", "cupos", "cupo", "agenda", "cuando puedo", "cuándo puedo", "fecha disponible", "hay hora", "tienen hora"]
         texto_torta = any(x in texto_norm for x in palabras_torta)
-        accion_directa = any(x in texto_norm for x in ["agendar", "reservar", "hacer pedido", "crear pedido", "encargar", "cotizar", "cotizacion"])
-        agendar = accion_directa or (any(x in texto_norm for x in palabras_agenda) and (texto_torta or tiene_personas or tiene_fecha or tiene_hora))
+        accion_directa = any(x in texto_norm for x in ["agendar", "reservar", "hacer pedido", "crear pedido", "encargar", "cotizar", "cotizacion", "cotizaci?n"])
+        pedido_simple_torta = bool(re.search(r"\b(?:quiero|necesito|busco|dame|quisiera|me\s+gustaria|me\s+gustar?a)\s+(?:\d+\s+)?(?:torta|tortita|tortitas|pastel|pastelito|pastelitos|queque|quequito|quequitos)\b", texto_norm))
+        agendar = accion_directa or pedido_simple_torta or (any(x in texto_norm for x in palabras_agenda) and (texto_torta or tiene_personas or tiene_fecha or tiene_hora))
         agendar = agendar or (texto_torta and (tiene_personas or tiene_fecha or tiene_hora or draft.get("size_id") or draft.get("personas")))
         catalogo = any(x in texto_norm for x in palabras_catalogo) or ("tradicional" in texto_norm and texto_torta and not tiene_fecha and not tiene_hora)
         disponibilidad = any(x in texto_norm for x in palabras_horas) and (tiene_fecha or tiene_hora or "disponible" in texto_norm or "cupos" in texto_norm or "horario" in texto_norm)
@@ -2359,10 +2362,10 @@ def registrar_asistente_sucree(app, deps):
             categorias = list_lines(catalogo.get("categorias") or [], lambda c: str(c.get("nombre") or ""), "sin tipos cargados")
             return "Tengo la cantidad de personas. Para avanzar necesito que elijas el tipo de torta:\n%s\n\nPuedes escribir, por ejemplo: bizcocho 15 personas con manjar." % categorias
         prioridad = [
-            ("tamano de torta", "¿Para cuantas personas necesitas la torta?"),
-            ("relleno/sabor", "¿Que relleno o sabor quieres?"),
-            ("fecha", "¿Para que fecha la necesitas?"),
-            ("hora", "¿A que hora te acomoda el retiro o despacho?"),
+            ("tamano de torta", "¿Para cuántas personas necesitas la torta?"),
+            ("relleno/sabor", "¿Qué relleno o sabor quieres?"),
+            ("fecha", "¿Para qué fecha la necesitas?"),
+            ("hora", "¿A qué hora te acomoda el retiro o despacho?"),
             ("correo", "Falta tu correo para continuar."),
             ("nombre", "Falta tu nombre para continuar."),
             ("telefono", "Falta tu telefono para continuar."),
