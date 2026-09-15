@@ -819,29 +819,47 @@ def registrar_asistente_sucree(app, deps):
         if direccion_detectada:
             draft["direccion"] = direccion_detectada
         categoria = detectar_categoria_catalogo(texto, catalogo) or match_row(texto, catalogo.get("categorias") or [], min_score=0.55)
+        categoria_para_tamano = categoria or find_categoria(catalogo, draft.get("categoria_id") or "")
         size = None
         m = re.search(r"\b(\d{1,3})\s*(?:persona|personas|pers|pax)\b", norm(texto))
         if m:
             personas = int(m.group(1))
             draft["personas"] = personas
-            if categoria:
+            draft.pop("tamano_invalido", None)
+            draft.pop("tamano_invalido_categoria_id", None)
+            if categoria_para_tamano:
                 candidatos = []
-                for row in rows_categoria(catalogo, "sizes", categoria):
+                for row in rows_categoria(catalogo, "sizes", categoria_para_tamano):
                     nombre_size = norm(row.get("nombre") or "")
                     if re.search(r"\b%s\b" % re.escape(str(personas)), nombre_size):
                         candidatos.append(row)
                 if len(candidatos) == 1:
                     size = candidatos[0]
-                else:
-                    size = match_row(m.group(1) + " personas", rows_categoria(catalogo, "sizes", categoria), min_score=0.25)
-        if not size and not (m and not categoria):
+                if not size:
+                    draft["tamano_invalido"] = personas
+                    draft["tamano_invalido_categoria_id"] = str(categoria_para_tamano.get("id") or "")
+        if not size and not m and not draft.get("personas"):
             size = match_row(texto, catalogo.get("sizes") or [], min_score=0.55)
         if size:
             draft["size_id"] = str(size.get("id") or "")
+            draft.pop("tamano_invalido", None)
+            draft.pop("tamano_invalido_categoria_id", None)
             if size.get("categoria_id"):
                 draft["categoria_id"] = str(size.get("categoria_id") or "")
         if categoria:
             draft["categoria_id"] = str(categoria.get("id") or "")
+        if categoria and draft.get("personas") and not draft.get("size_id") and not draft.get("tamano_invalido"):
+            personas = int(draft.get("personas") or 0)
+            candidatos = []
+            for row in rows_categoria(catalogo, "sizes", categoria):
+                nombre_size = norm(row.get("nombre") or "")
+                if re.search(r"\b%s\b" % re.escape(str(personas)), nombre_size):
+                    candidatos.append(row)
+            if len(candidatos) == 1:
+                draft["size_id"] = str(candidatos[0].get("id") or "")
+            else:
+                draft["tamano_invalido"] = personas
+                draft["tamano_invalido_categoria_id"] = str(categoria.get("id") or "")
         actuales = list(draft.get("sabor_ids") or [])
         texto_key = keyword_slug(texto)
         encontrados = []
@@ -1077,6 +1095,39 @@ def registrar_asistente_sucree(app, deps):
             return "Usare los datos que ingresaste para preparar esta cotizacion."
         return ""
 
+    def opciones_tamano_para_draft(draft, catalogo):
+        categoria = find_categoria(catalogo, draft.get("categoria_id") or draft.get("tamano_invalido_categoria_id") or "")
+        sizes = rows_categoria(catalogo, "sizes", categoria) if categoria else list(catalogo.get("sizes") or [])
+        return categoria, sizes
+
+    def respuesta_tamano_invalido(draft, catalogo):
+        personas = str(draft.get("tamano_invalido") or draft.get("personas") or "").strip()
+        categoria, sizes = opciones_tamano_para_draft(draft, catalogo or {})
+        lines = []
+        if personas:
+            lines.append("No tengo una torta de %s personas cargada en el catálogo." % personas)
+        else:
+            lines.append("Ese tamaño no está cargado en el catálogo.")
+        if categoria:
+            lines.append("Para %s, estas son las opciones disponibles:" % (categoria.get("nombre") or "ese tipo de torta"))
+        else:
+            lines.append("Estas son las opciones disponibles:")
+        lines.append(list_lines(sizes[:10], lambda s: "%s - %s" % (s.get("nombre") or "Tamaño", fmt_clp(s.get("precio") or 0)), "sin tamaños cargados"))
+        lines.extend([
+            "",
+            "Para continuar, elige uno de esos tamaños o indícanos otra opción del catálogo.",
+        ])
+        return "\n".join(lines)
+
+    def sugerencias_tamano_invalido(draft, catalogo):
+        _, sizes = opciones_tamano_para_draft(draft, catalogo or {})
+        out = []
+        for row in sizes[:6]:
+            nombre = str(row.get("nombre") or "").strip()
+            if nombre:
+                out.append(nombre)
+        return out or ["Ver catalogo y precios"]
+
     def diagnostico_catalogo_invalido(draft, catalogo, err=""):
         categoria = find_categoria(catalogo, draft.get("categoria_id") or "")
         sizes = rows_categoria(catalogo, "sizes", categoria) if categoria else list(catalogo.get("sizes") or [])
@@ -1100,7 +1151,9 @@ def registrar_asistente_sucree(app, deps):
         if not draft.get("email"):
             out.append("correo")
         if not draft.get("size_id"):
-            if draft.get("personas") and not draft.get("categoria_id"):
+            if draft.get("tamano_invalido"):
+                out.append("tamano no disponible")
+            elif draft.get("personas") and not draft.get("categoria_id"):
                 out.append("tipo de torta para %s personas" % draft.get("personas"))
             else:
                 out.append("tamano de torta")
@@ -1508,6 +1561,8 @@ def registrar_asistente_sucree(app, deps):
         if not faltan:
             return ""
         catalogo = catalogo or {}
+        if "tamano no disponible" in faltan:
+            return respuesta_tamano_invalido(draft, catalogo)
         if any(str(x).startswith("tipo de torta") for x in faltan):
             categorias = list_lines(catalogo.get("categorias") or [], lambda c: str(c.get("nombre") or ""), "sin tipos cargados")
             return "Tengo la cantidad de personas. Para avanzar necesito que elijas el tipo de torta:\n%s\n\nPuedes escribir, por ejemplo: bizcocho 15 personas con manjar." % categorias
@@ -1535,6 +1590,14 @@ def registrar_asistente_sucree(app, deps):
         draft = registrar_cliente_desde_draft(draft)
         resumen, err = cotizar(draft, catalogo)
         faltan = faltantes(draft, resumen, catalogo, err)
+
+        if "tamano no disponible" in faltan:
+            return {
+                "reply": respuesta_tamano_invalido(draft, catalogo),
+                "draft": draft,
+                "type": "invalid_catalog_option",
+                "suggestions": sugerencias_tamano_invalido(draft, catalogo),
+            }
 
         if not msg:
             return {"reply": "Escribeme que torta necesitas y para que fecha. Te ayudo a cotizar y revisar horas disponibles.", "draft": draft}
