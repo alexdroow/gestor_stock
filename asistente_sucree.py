@@ -35,6 +35,8 @@ def registrar_asistente_sucree(app, deps):
     cumple_anticipacion_reserva = deps.get("_cumple_anticipacion_reserva")
     minutos_anticipacion_reserva = deps.get("_minutos_anticipacion_reserva")
     topper_requiere_96h = deps.get("_topper_requiere_96h")
+    seguimiento_payload = deps.get("_seguimiento_agenda_payload")
+    seguimiento_label = deps.get("_seguimiento_agenda_label")
     public_base_url = str(deps.get("PUBLIC_BASE_URL") or "https://pasteleriasucree.cl").rstrip("/")
     whatsapp_pasteleria = "56964330546"
 
@@ -173,6 +175,70 @@ def registrar_asistente_sucree(app, deps):
         finally:
             if conn:
                 conn.close()
+
+    def detectar_codigo_pedido(texto):
+        raw = str(texto or "").upper()
+        m = re.search(r"\b(?:AGD|COT)-\d{8}-[A-Z0-9]{6,}\b", raw)
+        if m:
+            return m.group(0).strip()
+        m = re.search(r"\b(?:AGD|COT)[\s\-]*(\d{8})[\s\-]*([A-Z0-9]{6,})\b", raw)
+        if m:
+            prefix = raw[m.start():m.start() + 3]
+            return "%s-%s-%s" % (prefix, m.group(1), m.group(2))
+        return ""
+
+    def descripcion_estado_seguimiento(estado):
+        mapa = {
+            "pendiente": "Tu pedido fue registrado y esta pendiente de revision.",
+            "recepcionado": "Pasteleria Sucree ya reviso la informacion de tu pedido.",
+            "produccion": "Tu pedido esta siendo preparado por nuestro equipo.",
+            "espera_envio": "Tu pedido esta listo para coordinar entrega o retiro.",
+            "despachado": "Tu pedido ya fue despachado o va camino a destino.",
+            "entregado": "Tu pedido fue entregado correctamente.",
+        }
+        return mapa.get(str(estado or "").strip().lower(), "Tu pedido esta registrado en nuestro sistema.")
+
+    def consultar_estado_pedido(codigo):
+        codigo = str(codigo or "").strip().upper()
+        if not codigo:
+            return ""
+        seguimiento_url = "%s/seguimiento/%s" % (public_base_url, quote(codigo))
+        try:
+            from database import obtener_evento_agenda_por_codigo
+            evento = obtener_evento_agenda_por_codigo(codigo)
+        except Exception:
+            evento = None
+        if not evento:
+            return "\n".join([
+                "No encontre un pedido con el codigo %s." % codigo,
+                "",
+                "Revisa que el codigo este escrito completo. Tambien puedes intentar desde el link de seguimiento:",
+                seguimiento_url,
+            ])
+        payload = seguimiento_payload(evento) if callable(seguimiento_payload) else {}
+        estado = str((payload or {}).get("estado") or evento.get("seguimiento_estado") or "pendiente").strip().lower()
+        label = str((payload or {}).get("estado_label") or "").strip()
+        if not label:
+            label = seguimiento_label(estado) if callable(seguimiento_label) else estado.replace("_", " ").title()
+        titulo = str((payload or {}).get("titulo") or evento.get("titulo") or "Pedido Sucree").strip()
+        fecha = fmt_fecha((payload or {}).get("fecha") or evento.get("fecha"))
+        hora = str((payload or {}).get("hora") or evento.get("hora_entrega") or evento.get("hora_inicio") or "-").strip()[:5] or "-"
+        modalidad = str((payload or {}).get("modalidad") or ("Despacho" if evento.get("es_envio") else "Retiro en tienda")).strip()
+        lines = [
+            "Estado de tu pedido %s:" % codigo,
+            "",
+            "Pedido: %s" % titulo,
+            "Estado actual: %s" % label,
+            descripcion_estado_seguimiento(estado),
+            "",
+            "Fecha: %s" % fecha,
+            "Hora: %s" % hora,
+            "Modalidad: %s" % modalidad,
+            "",
+            "Tambien puedes revisar el avance actualizado desde este link:",
+            seguimiento_url,
+        ]
+        return "\n".join(lines)
 
     def aplicar_cliente_draft(draft, cliente):
         if not cliente:
@@ -1079,6 +1145,8 @@ def registrar_asistente_sucree(app, deps):
             add("Ver catalogo y precios")
         if "agendar torta" in norm(texto):
             add("Agendar torta")
+        if "codigo completo del pedido" in norm(texto) or "seguimiento" in norm(texto):
+            add("Consultar estado de pedido")
         return out[:8]
 
     def chat_logic(message, draft):
@@ -1091,6 +1159,29 @@ def registrar_asistente_sucree(app, deps):
 
         if not msg:
             return {"reply": "Escribeme que torta necesitas y para que fecha. Te ayudo a cotizar y revisar horas disponibles.", "draft": draft}
+        codigo_seguimiento = detectar_codigo_pedido(msg)
+        seguimiento_intent = any(x in nmsg for x in ["estado pedido", "estado de pedido", "seguimiento", "seguir pedido", "como va", "donde va", "mi pedido"])
+        if codigo_seguimiento:
+            return {
+                "reply": consultar_estado_pedido(codigo_seguimiento),
+                "draft": draft,
+                "type": "tracking",
+                "tracking_url": "%s/seguimiento/%s" % (public_base_url, quote(codigo_seguimiento)),
+            }
+        if seguimiento_intent:
+            return {
+                "reply": "\n".join([
+                    "Puedo revisar el estado de tu pedido.",
+                    "",
+                    "Enviame el codigo completo del pedido, por ejemplo:",
+                    "- AGD-20260916-000103",
+                    "",
+                    "Tambien puedes revisar directamente aqui:",
+                    "%s/seguimiento" % public_base_url,
+                ]),
+                "draft": draft,
+                "type": "tracking_help",
+            }
         kb = buscar_kb(msg)
         if kb:
             return {"reply": kb, "draft": draft, "type": "knowledge"}
@@ -1107,6 +1198,7 @@ def registrar_asistente_sucree(app, deps):
                     "- Agendar torta",
                     "- Ver catalogo y precios",
                     "- Revisar horas disponibles",
+                    "- Consultar estado de pedido con codigo",
                     "- Ordenar una cotizacion con datos desordenados",
                     "- Confirmar una reserva cuando falten cero datos",
                     "",
