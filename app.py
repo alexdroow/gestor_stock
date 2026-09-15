@@ -22501,19 +22501,6 @@ def _asistente_extraer_fecha(texto):
         if year < 100:
             year += 2000
         return f"{year:04d}-{int(m.group(2)):02d}-{int(m.group(1)):02d}", None
-    meses = {
-        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
-        "julio": 7, "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10,
-        "noviembre": 11, "diciembre": 12,
-    }
-    m = re.search(
-        r"\b(?:fecha\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s*(?:de\s*)?(20\d{2}))?\b",
-        low,
-    )
-    if m:
-        year = int(m.group(3) or now.year)
-        month = meses.get(m.group(2), now.month)
-        return f"{year:04d}-{month:02d}-{int(m.group(1)):02d}", None
     if "manana" in low:
         return (now + timedelta(days=1)).strftime("%Y-%m-%d"), None
     if "hoy" in low:
@@ -22532,12 +22519,9 @@ def _asistente_extraer_fecha(texto):
 
 def _asistente_extraer_hora(texto):
     raw = str(texto or "")
-    m = re.search(r"\b([01]?\d|2[0-3])\s*(?:[:\.h]|hrs?|horas?)\s*([0-5]\d)\b", raw, re.I)
+    m = re.search(r"\b([01]?\d|2[0-3])[:\.h]([0-5]\d)\b", raw, re.I)
     if m:
         return f"{int(m.group(1)):02d}:{int(m.group(2)):02d}", None
-    m = re.search(r"\b(?:a las|para las|hora)?\s*([01]?\d|2[0-3])\s*(?:hrs?|horas?)\b", raw, re.I)
-    if m:
-        return f"{int(m.group(1)):02d}:00", None
     m = re.search(r"\b(?:a las|para las|hora)\s+([01]?\d|2[0-3])\b", raw, re.I)
     if m:
         return f"{int(m.group(1)):02d}:00", None
@@ -22593,13 +22577,9 @@ def _asistente_extraer_datos(texto, draft=None):
     email_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", msg, re.I)
     if email_match:
         draft["email"] = email_match.group(0).strip().lower()
-    elif "sin correo" in _asistente_norm(msg) or "no tiene correo" in _asistente_norm(msg):
-        draft["sin_correo"] = True
     tel_digits = re.sub(r"\D+", "", msg)
     if len(tel_digits) >= 8:
         draft["telefono"] = f"+569{tel_digits[-8:]}"
-    if draft.get("sin_correo") and draft.get("telefono") and not draft.get("email"):
-        draft["email"] = f"asistente.{re.sub(r'\\D+', '', str(draft.get('telefono') or ''))[-8:]}@local.sucree"
     name_match = re.search(r"(?:para|cliente|nombre)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{3,80}?)(?:,|\.|\s+de\s+|\s+con\s+|\s+para\s+retirar|\s+retiro|\s+retira|\s+despacho|\s+el\s+|$)", msg, re.I)
     if name_match:
         nombre = re.sub(r"\s+", " ", name_match.group(1)).strip()
