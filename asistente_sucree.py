@@ -32,6 +32,9 @@ def registrar_asistente_sucree(app, deps):
     normalizar_telefono = deps["_normalizar_telefono_cl"]
     crear_pdf_reserva = deps.get("_crear_pdf_reserva_agenda_tienda")
     crear_backup = deps.get("crear_backup")
+    cumple_anticipacion_reserva = deps.get("_cumple_anticipacion_reserva")
+    minutos_anticipacion_reserva = deps.get("_minutos_anticipacion_reserva")
+    topper_requiere_96h = deps.get("_topper_requiere_96h")
     public_base_url = str(deps.get("PUBLIC_BASE_URL") or "https://pasteleriasucree.cl").rstrip("/")
     whatsapp_pasteleria = "56964330546"
 
@@ -307,16 +310,91 @@ def registrar_asistente_sucree(app, deps):
         except Exception:
             return str(hora_inicio or "")
 
-    def validar_hora_cotizacion(draft):
+    def info_anticipacion_torta(draft=None, catalogo=None):
+        draft = dict(draft or {})
+        catalogo = catalogo or {}
+        categoria = find_categoria(catalogo, draft.get("categoria_id") or "")
+        topper = None
+        topper_id = str(draft.get("topper_id") or "").strip()
+        if topper_id:
+            for row in catalogo.get("toppers") or []:
+                if str(row.get("id") or "").strip() == topper_id:
+                    topper = row
+                    break
+        try:
+            min_horas_categoria = int(float((categoria or {}).get("min_lead_hours") or 0))
+        except (TypeError, ValueError):
+            min_horas_categoria = 0
+        if callable(topper_requiere_96h):
+            requiere_topper = bool(topper_requiere_96h(topper_id=topper_id, topper_nombre=(topper or {}).get("nombre")))
+        else:
+            texto_topper = slug("%s %s" % (topper_id, (topper or {}).get("nombre") or ""))
+            requiere_topper = bool(texto_topper and "sin topper" not in texto_topper)
+        if callable(minutos_anticipacion_reserva):
+            try:
+                minutos = int(minutos_anticipacion_reserva(
+                    "torta",
+                    topper_requiere_96h=requiere_topper,
+                    min_horas_categoria=min_horas_categoria,
+                ))
+            except Exception:
+                minutos = max(48, min_horas_categoria) * 60
+        else:
+            minutos = max(96 if requiere_topper else 48, min_horas_categoria) * 60
+        horas = max(1, int((minutos + 59) // 60))
+        return {
+            "horas": horas,
+            "min_horas_categoria": min_horas_categoria,
+            "topper_96h": requiere_topper,
+        }
+
+    def cumple_anticipacion_torta(fecha, hora, cfg, draft=None, catalogo=None):
+        info = info_anticipacion_torta(draft, catalogo)
+        if callable(cumple_anticipacion_reserva):
+            try:
+                return bool(cumple_anticipacion_reserva(
+                    fecha,
+                    hora,
+                    "torta",
+                    cfg_agenda=cfg,
+                    now_local=datetime.now(ZoneInfo("America/Santiago")),
+                    topper_requiere_96h=bool(info.get("topper_96h")),
+                    min_horas_categoria=int(info.get("min_horas_categoria") or 0),
+                ))
+            except Exception:
+                pass
+        try:
+            slot_dt = datetime.strptime("%s %s" % (fecha, hora), "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("America/Santiago"))
+            min_dt = datetime.now(ZoneInfo("America/Santiago")) + timedelta(hours=int(info.get("horas") or 48))
+            return slot_dt >= min_dt
+        except Exception:
+            return False
+
+    def mensaje_anticipacion_torta(draft=None, catalogo=None):
+        info = info_anticipacion_torta(draft, catalogo)
+        horas = int(info.get("horas") or 48)
+        if info.get("topper_96h"):
+            return "Las tortas con topper requieren minimo %s horas de anticipacion." % horas
+        return "Las tortas requieren minimo %s horas de anticipacion." % horas
+
+    def validar_hora_cotizacion(draft, catalogo=None):
         fecha = str(draft.get("fecha") or "").strip()
         hora = str(draft.get("hora_inicio") or "").strip()[:5]
         if not fecha or not hora:
             return {"ok": False, "error": "Falta fecha u hora.", "horas": []}
-        horas = horas_disponibles(fecha, limite=30)
+        detalle = horas_disponibles_detalle(fecha, limite=30, draft=draft, catalogo=catalogo)
+        horas = detalle.get("horas") or []
         if draft.get("cotizacion_evento_id"):
             return {"ok": True, "horas": horas}
         if hora in horas:
             return {"ok": True, "horas": horas}
+        try:
+            if not cumple_anticipacion_torta(fecha, hora, cfg_agenda(), draft=draft, catalogo=catalogo):
+                return {"ok": False, "error": mensaje_anticipacion_torta(draft, catalogo), "horas": horas, "anticipacion": True}
+        except Exception:
+            pass
+        if detalle.get("bloqueadas_anticipacion"):
+            return {"ok": False, "error": mensaje_anticipacion_torta(draft, catalogo), "horas": horas, "anticipacion": True}
         return {"ok": False, "error": "La hora %s ya no esta disponible para %s." % (hora, fmt_fecha(fecha)), "horas": horas}
 
     def guia_agendar_texto(catalogo, draft=None):
@@ -340,7 +418,7 @@ def registrar_asistente_sucree(app, deps):
         ]
         lines.append(list_lines(categorias, lambda c: str(c.get("nombre") or ""), "sin tipos cargados"))
         if draft.get("fecha"):
-            horas = horas_disponibles(draft.get("fecha"), limite=6)
+            horas = horas_disponibles(draft.get("fecha"), limite=6, draft=draft, catalogo=catalogo)
             if horas:
                 lines.extend(["", "Horas tentativas para %s:" % fmt_fecha(draft.get("fecha"))])
                 lines.extend(["- " + h for h in horas])
@@ -729,11 +807,17 @@ def registrar_asistente_sucree(app, deps):
             out.append("opciones validas del catalogo")
         return out
 
-    def horas_disponibles(fecha, limite=8):
+    def horas_disponibles_detalle(fecha, limite=8, draft=None, catalogo=None):
         conn = None
+        out = {
+            "horas": [],
+            "bloqueadas_anticipacion": 0,
+            "bloqueadas_ocupacion": 0,
+            "slots_libres_base": 0,
+        }
         try:
             if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fecha or "")):
-                return []
+                return out
             cfg = cfg_agenda()
             conn = get_db()
             cur = conn.cursor()
@@ -742,25 +826,51 @@ def registrar_asistente_sucree(app, deps):
             horas = []
             for hora, slot in sorted(mapa.items()):
                 if bool((slot or {}).get("disponible")):
-                    horas.append(str(hora))
-            return horas[:int(limite or 8)]
+                    out["slots_libres_base"] += 1
+                    if cumple_anticipacion_torta(fecha, str(hora), cfg, draft=draft, catalogo=catalogo):
+                        horas.append(str(hora))
+                    else:
+                        out["bloqueadas_anticipacion"] += 1
+                else:
+                    out["bloqueadas_ocupacion"] += 1
+            out["horas"] = horas[:int(limite or 8)]
+            return out
         except Exception:
-            return []
+            return out
         finally:
             if conn:
                 conn.close()
 
-    def proximas_fechas():
+    def horas_disponibles(fecha, limite=8, draft=None, catalogo=None):
+        return horas_disponibles_detalle(fecha, limite=limite, draft=draft, catalogo=catalogo).get("horas") or []
+
+    def proximas_fechas(draft=None, catalogo=None):
         today = datetime.now(ZoneInfo("America/Santiago")).date()
         out = []
-        for offset in range(10):
+        cfg = cfg_agenda()
+        days_ahead = max(10, int((cfg or {}).get("days_ahead") or 10))
+        for offset in range(days_ahead):
             fecha = (today + timedelta(days=offset)).isoformat()
-            horas = horas_disponibles(fecha, limite=4)
+            horas = horas_disponibles(fecha, limite=4, draft=draft, catalogo=catalogo)
             if horas:
                 out.append({"fecha": fecha, "horas": horas})
             if len(out) >= 3:
                 break
         return out
+
+    def respuesta_sin_horas(fecha, detalle=None, draft=None, catalogo=None):
+        detalle = detalle or {}
+        bloqueada_por_fecha = False
+        try:
+            bloqueada_por_fecha = not cumple_anticipacion_torta(fecha, "23:59", cfg_agenda(), draft=draft, catalogo=catalogo)
+        except Exception:
+            bloqueada_por_fecha = False
+        if int(detalle.get("bloqueadas_anticipacion") or 0) > 0 or bloqueada_por_fecha:
+            return "%s\n\nPara %s no puedo ofrecer horas porque no cumple el plazo minimo de anticipacion. Puedo revisar otra fecha mas adelante si me indicas una." % (
+                mensaje_anticipacion_torta(draft, catalogo),
+                fmt_fecha(fecha),
+            )
+        return "Para %s no veo cupos disponibles.\n\nPuedo revisar otra fecha si me indicas una." % fmt_fecha(fecha)
 
     def reservar(draft):
         if draft.get("entrega_tipo") == "despacho":
@@ -788,8 +898,8 @@ def registrar_asistente_sucree(app, deps):
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
-    def registrar_cotizacion_completa(draft, resumen):
-        disponibilidad = validar_hora_cotizacion(draft)
+    def registrar_cotizacion_completa(draft, resumen, catalogo=None):
+        disponibilidad = validar_hora_cotizacion(draft, catalogo=catalogo)
         if not disponibilidad.get("ok"):
             horas = disponibilidad.get("horas") or []
             if horas:
@@ -804,6 +914,17 @@ def registrar_asistente_sucree(app, deps):
                         "Dime cual prefieres para actualizar la cotizacion.",
                     ]),
                     "suggestions": horas[:6],
+                }
+            if disponibilidad.get("anticipacion"):
+                return {
+                    "ok": False,
+                    "reply": "\n".join([
+                        disponibilidad.get("error") or mensaje_anticipacion_torta(draft, catalogo),
+                        "",
+                        "Para %s a las %s no puedo registrar la cotizacion porque no cumple el plazo minimo de agenda para tortas.",
+                        "Indica una fecha mas adelante y reviso las horas disponibles.",
+                    ]) % (fmt_fecha(draft.get("fecha")), str(draft.get("hora_inicio") or "-")[:5]),
+                    "suggestions": ["Horas disponibles"],
                 }
             link = whatsapp_url("Hola Sucree, necesito ayuda porque no encontre horas disponibles para agendar mi torta.")
             return {
@@ -1005,7 +1126,8 @@ def registrar_asistente_sucree(app, deps):
 
         if disponibilidad_intent and not agendar_intent:
             if draft.get("fecha"):
-                horas = horas_disponibles(draft.get("fecha"), limite=10)
+                detalle = horas_disponibles_detalle(draft.get("fecha"), limite=10, draft=draft, catalogo=catalogo)
+                horas = detalle.get("horas") or []
                 if horas:
                     reply = "\n".join(
                         ["Horas tentativas para %s:" % fmt_fecha(draft.get("fecha")), ""]
@@ -1013,9 +1135,9 @@ def registrar_asistente_sucree(app, deps):
                         + ["", "Dime cual prefieres."]
                     )
                 else:
-                    reply = "Para %s no veo cupos disponibles.\n\nPuedo revisar otra fecha si me indicas una." % fmt_fecha(draft.get("fecha"))
+                    reply = respuesta_sin_horas(draft.get("fecha"), detalle, draft=draft, catalogo=catalogo)
             else:
-                reply = disponibilidad_texto(proximas_fechas())
+                reply = disponibilidad_texto(proximas_fechas(draft=draft, catalogo=catalogo))
             return {"reply": reply, "draft": draft}
 
         if agendar_intent and faltan:
@@ -1031,19 +1153,20 @@ def registrar_asistente_sucree(app, deps):
             return {"reply": reply, "draft": draft, "quote": resumen}
         if any(x in nmsg for x in ["hora disponible", "horas disponibles", "disponibilidad", "agenda", "cuando puedo", "fecha disponible"]):
             if draft.get("fecha"):
-                horas = horas_disponibles(draft.get("fecha"), limite=10)
+                detalle = horas_disponibles_detalle(draft.get("fecha"), limite=10, draft=draft, catalogo=catalogo)
+                horas = detalle.get("horas") or []
                 if horas:
                     reply = "Para %s tengo estas horas tentativas: %s. Dime cual prefieres." % (draft.get("fecha"), ", ".join(horas))
                 else:
-                    reply = "Para %s no veo cupos disponibles. Puedo revisar otra fecha si me indicas una." % draft.get("fecha")
+                    reply = respuesta_sin_horas(draft.get("fecha"), detalle, draft=draft, catalogo=catalogo)
             else:
-                prox = proximas_fechas()
+                prox = proximas_fechas(draft=draft, catalogo=catalogo)
                 parts = ["%s: %s" % (x["fecha"], ", ".join(x["horas"])) for x in prox]
                 reply = "Estas son algunas fechas con horas tentativas: %s" % (" | ".join(parts) or "no encontre cupos en los proximos dias")
             return {"reply": reply, "draft": draft}
         confirmar = any(x in nmsg for x in ["confirmar", "reservar", "agendar", "crear pedido", "hacer pedido"])
         if confirmar and not faltan:
-            cierre = registrar_cotizacion_completa(draft, resumen)
+            cierre = registrar_cotizacion_completa(draft, resumen, catalogo=catalogo)
             reply = resumen_texto(draft, resumen) + "\n\n" + cierre.get("reply", "")
             return {
                 "reply": reply,
@@ -1070,7 +1193,7 @@ def registrar_asistente_sucree(app, deps):
             if cliente_msg:
                 reply += "\n\n" + cliente_msg
             if draft.get("fecha"):
-                horas = horas_disponibles(draft.get("fecha"), limite=6)
+                horas = horas_disponibles(draft.get("fecha"), limite=6, draft=draft, catalogo=catalogo)
                 if horas:
                     reply += "\n\nHoras tentativas disponibles para %s:\n%s" % (
                         fmt_fecha(draft.get("fecha")),
@@ -1079,7 +1202,7 @@ def registrar_asistente_sucree(app, deps):
             if faltan:
                 reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             else:
-                cierre = registrar_cotizacion_completa(draft, resumen)
+                cierre = registrar_cotizacion_completa(draft, resumen, catalogo=catalogo)
                 reply += "\n\n" + cierre.get("reply", "")
                 return {
                     "reply": reply,
@@ -1100,7 +1223,7 @@ def registrar_asistente_sucree(app, deps):
             if faltan:
                 reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             if draft.get("fecha"):
-                horas = horas_disponibles(draft.get("fecha"), limite=5)
+                horas = horas_disponibles(draft.get("fecha"), limite=5, draft=draft, catalogo=catalogo)
                 if horas:
                     reply += "\n\nHoras tentativas para %s:\n%s" % (
                         fmt_fecha(draft.get("fecha")),
