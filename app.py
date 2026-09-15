@@ -224,7 +224,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/presencial", "/tienda/presencial/", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
     if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):
         return True
@@ -235,6 +235,8 @@ def _ruta_es_publica(path):
     if ruta.startswith("/api/valoracion/"):
         return True
     if ruta.startswith("/api/seguimiento/"):
+        return True
+    if ruta.startswith("/api/asistente/public/"):
         return True
     return False
 
@@ -10813,6 +10815,10 @@ def api_tienda_agenda_cupon_disponible():
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+from asistente_sucree import registrar_asistente_sucree
+registrar_asistente_sucree(app, globals())
 
 
 @app.route('/api/tienda/agenda/reservar', methods=['POST'])

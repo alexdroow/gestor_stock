@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conocimiento asistente Sucrée</title>
+  <style>
+    :root {
+      --coffee: #35190e;
+      --orange: #ef6c00;
+      --cream: #fff6eb;
+      --line: #efdcc9;
+      --muted: #6b5b50;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: var(--coffee);
+      background: linear-gradient(135deg, #fffaf3, #f7eadb);
+    }
+    main {
+      width: min(1120px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0;
+    }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(30px, 5vw, 52px); }
+    .btn {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      color: #fff;
+      background: linear-gradient(135deg, #ff7a00, #db5700);
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255,255,255,.9);
+      box-shadow: 0 18px 50px rgba(53,25,14,.1);
+      overflow: hidden;
+    }
+    .card h2 {
+      margin: 0;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      font-size: 18px;
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      max-height: 680px;
+      overflow: auto;
+    }
+    .item {
+      border: 1px solid #f2c28a;
+      border-radius: 16px;
+      padding: 13px;
+      background: var(--cream);
+      cursor: pointer;
+    }
+    .item strong { display: block; margin-bottom: 6px; }
+    .meta { color: var(--muted); font-size: 12px; }
+    form {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+    }
+    label { font-weight: 800; font-size: 13px; }
+    textarea, input {
+      width: 100%;
+      border: 1px solid #e7cdb5;
+      border-radius: 14px;
+      padding: 12px;
+      font: 14px Arial, sans-serif;
+      color: var(--coffee);
+      background: #fff;
+    }
+    textarea { min-height: 150px; resize: vertical; }
+    .note {
+      padding: 0 16px 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      .head { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="head">
+      <div>
+        <h1>Conocimiento del asistente</h1>
+        <p>Preguntas que el asistente no entendió y respuestas globales para futuras consultas.</p>
+      </div>
+      <button id="reload" class="btn" type="button">Actualizar</button>
+    </div>
+    <section class="grid">
+      <article class="card">
+        <h2>Preguntas pendientes</h2>
+        <div id="list" class="list"></div>
+      </article>
+      <article class="card">
+        <h2>Crear respuesta global</h2>
+        <form id="form">
+          <input id="id" type="hidden">
+          <div>
+            <label for="pregunta">Pregunta o intención</label>
+            <textarea id="pregunta" required placeholder="Ej: tienen tortas sin azúcar?"></textarea>
+          </div>
+          <div>
+            <label for="respuesta">Respuesta que usará el asistente</label>
+            <textarea id="respuesta" required placeholder="Escribe la respuesta oficial que debe entregar al cliente."></textarea>
+          </div>
+          <button class="btn" type="submit">Guardar respuesta</button>
+        </form>
+        <p class="note">Al guardar, la respuesta queda disponible de forma global. Si se eligió una pregunta pendiente, también queda marcada como resuelta.</p>
+      </article>
+    </section>
+  </main>
+  <script>
+    const list = document.getElementById('list');
+    const reload = document.getElementById('reload');
+    const form = document.getElementById('form');
+    const idInput = document.getElementById('id');
+    const pregunta = document.getElementById('pregunta');
+    const respuesta = document.getElementById('respuesta');
+
+    async function load() {
+      list.innerHTML = '<div class="item">Cargando...</div>';
+      const res = await fetch('/api/asistente/admin/pendientes');
+      const data = await res.json();
+      const rows = data.pendientes || [];
+      if (!rows.length) {
+        list.innerHTML = '<div class="item">No hay preguntas pendientes.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      rows.forEach((row) => {
+        const node = document.createElement('button');
+        node.type = 'button';
+        node.className = 'item';
+        node.innerHTML = '<strong></strong><div class="meta"></div>';
+        node.querySelector('strong').textContent = row.pregunta || '';
+        node.querySelector('.meta').textContent = (row.estado || 'pendiente') + ' · ' + (row.creado_en || '');
+        node.addEventListener('click', () => {
+          idInput.value = row.id || '';
+          pregunta.value = row.pregunta || '';
+          respuesta.focus();
+        });
+        list.appendChild(node);
+      });
+    }
+
+    reload.addEventListener('click', load);
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const res = await fetch('/api/asistente/admin/pendientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: idInput.value, pregunta: pregunta.value, respuesta: respuesta.value })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.error || 'No se pudo guardar');
+        return;
+      }
+      idInput.value = '';
+      pregunta.value = '';
+      respuesta.value = '';
+      await load();
+      alert('Respuesta guardada');
+    });
+    load();
+  </script>
+</body>
+</html>

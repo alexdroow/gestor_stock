@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asistente Sucrée</title>
+  <style>
+    :root {
+      --coffee: #35190e;
+      --orange: #ef6c00;
+      --cream: #fff6eb;
+      --line: #efdcc9;
+      --green: #087a3d;
+      --muted: #6b5b50;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--coffee);
+      background:
+        radial-gradient(circle at top left, rgba(239,108,0,.14), transparent 34rem),
+        linear-gradient(135deg, #fffaf3, #f7eadb);
+    }
+    .shell {
+      width: min(960px, calc(100% - 24px));
+      margin: 0 auto;
+      padding: 22px 0;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: rgba(255,255,255,.82);
+      box-shadow: 0 22px 60px rgba(53,25,14,.12);
+      backdrop-filter: blur(10px);
+    }
+    .brand {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    .brand-mark {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      color: #fff;
+      background: linear-gradient(135deg, #ff8a00, #c65000);
+      font-size: 28px;
+      font-weight: 800;
+      box-shadow: 0 10px 30px rgba(239,108,0,.28);
+    }
+    h1 { margin: 0; font-size: clamp(32px, 8vw, 64px); line-height: .95; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: clamp(16px, 3vw, 20px); }
+    .status {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #e9f9ef;
+      color: var(--green);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .status::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .chat {
+      margin-top: 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(255,255,255,.88);
+      box-shadow: 0 22px 70px rgba(53,25,14,.14);
+    }
+    .messages {
+      height: min(620px, 62vh);
+      min-height: 420px;
+      overflow-y: auto;
+      padding: 18px;
+      scroll-behavior: smooth;
+    }
+    .msg {
+      width: fit-content;
+      max-width: min(690px, 88%);
+      margin: 0 0 12px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+      font-family: Arial, sans-serif;
+      font-size: 15px;
+    }
+    .bot {
+      background: var(--cream);
+      border: 1px solid #f5c991;
+      color: var(--coffee);
+      border-bottom-left-radius: 6px;
+    }
+    .user {
+      margin-left: auto;
+      background: linear-gradient(135deg, #ff7a00, #db5700);
+      color: #fff;
+      border-bottom-right-radius: 6px;
+      box-shadow: 0 12px 26px rgba(239,108,0,.24);
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 18px 14px;
+    }
+    .chip {
+      border: 1px solid #f2c28a;
+      background: #fffaf5;
+      color: var(--coffee);
+      border-radius: 999px;
+      padding: 9px 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .composer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 14px;
+      border-top: 1px solid var(--line);
+      background: rgba(255,246,235,.8);
+    }
+    textarea {
+      min-height: 54px;
+      max-height: 140px;
+      resize: vertical;
+      border: 1px solid #e7cdb5;
+      border-radius: 18px;
+      padding: 14px;
+      color: var(--coffee);
+      font: 15px Arial, sans-serif;
+      outline: none;
+      background: #fff;
+    }
+    textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 4px rgba(239,108,0,.12); }
+    .send {
+      border: 0;
+      border-radius: 18px;
+      padding: 0 22px;
+      min-width: 104px;
+      color: #fff;
+      background: linear-gradient(135deg, #ff7a00, #db5700);
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 13px 30px rgba(239,108,0,.28);
+    }
+    .send:disabled { opacity: .55; cursor: wait; }
+    .hint {
+      padding: 0 18px 18px;
+      color: var(--muted);
+      font: 13px Arial, sans-serif;
+    }
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 16px, 520px); padding: 8px 0; }
+      .hero { grid-template-columns: 1fr; border-radius: 22px; }
+      .status { width: fit-content; }
+      .messages { height: calc(100vh - 290px); min-height: 360px; padding: 12px; }
+      .msg { max-width: 94%; }
+      .composer { grid-template-columns: 1fr; }
+      .send { min-height: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div>
+          <h1>Asistente Sucrée</h1>
+          <p class="subtitle">Cotiza tortas, revisa horarios y deja tu solicitud guiada.</p>
+        </div>
+      </div>
+      <div class="status">Tienda conectada</div>
+    </section>
+
+    <section class="chat" aria-label="Chat asistente Sucrée">
+      <div id="messages" class="messages"></div>
+      <div class="chips">
+        <button class="chip" data-text="Ver catalogo y precios">Catalogo y precios</button>
+        <button class="chip" data-text="Que horas disponibles hay esta semana">Horas disponibles</button>
+        <button class="chip" data-text="Quiero una torta bizcocho 25 personas manjar sin topper para el 19 de septiembre a las 19 hrs">Ejemplo cotizacion</button>
+        <button class="chip" data-text="confirmar reserva">Confirmar reserva</button>
+      </div>
+      <form id="form" class="composer">
+        <textarea id="input" placeholder="Escribe tu solicitud. Ej: torta bizcocho 25 personas, manjar, 19 de septiembre 19hrs, soy Ana, +569..., correo..."></textarea>
+        <button id="send" class="send" type="submit">Enviar</button>
+      </form>
+      <div class="hint">Si el asistente no entiende una pregunta, la deja guardada internamente para que el equipo pueda agregar una respuesta.</div>
+    </section>
+  </main>
+
+  <script>
+    const messages = document.getElementById('messages');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+    let draft = {};
+
+    function addMessage(text, who) {
+      const node = document.createElement('div');
+      node.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
+      node.textContent = text;
+      messages.appendChild(node);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function ask(text) {
+      const clean = (text || '').trim();
+      if (!clean) return;
+      addMessage(clean, 'user');
+      input.value = '';
+      send.disabled = true;
+      try {
+        const res = await fetch('/api/asistente/public/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: clean, draft })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'No se pudo responder');
+        draft = data.draft || draft || {};
+        addMessage(data.reply || 'Estoy revisando esa informacion.', 'bot');
+      } catch (err) {
+        addMessage('Tuve un problema temporal. Intenta nuevamente en unos segundos.', 'bot');
+      } finally {
+        send.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      ask(input.value);
+    });
+
+    document.querySelectorAll('.chip').forEach((btn) => {
+      btn.addEventListener('click', () => ask(btn.dataset.text || btn.textContent));
+    });
+
+    addMessage('Hola, soy el asistente de Sucrée. Puedo ayudarte a cotizar tortas, ordenar los datos, revisar horas disponibles y dejar registrada una solicitud cuando esté completa.', 'bot');
+  </script>
+</body>
+</html>

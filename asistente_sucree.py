@@ -1,0 +1,572 @@
+import json
+import re
+import unicodedata
+from datetime import datetime, timedelta
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
+
+
+MESES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5,
+    "junio": 6, "julio": 7, "agosto": 8, "septiembre": 9,
+    "setiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
+}
+
+DIAS = {
+    "lunes": 0, "martes": 1, "miercoles": 2, "miércoles": 2,
+    "jueves": 3, "viernes": 4, "sabado": 5, "sábado": 5, "domingo": 6,
+}
+
+
+def registrar_asistente_sucree(app, deps):
+    render_template = deps["render_template"]
+    request = deps["request"]
+    jsonify = deps["jsonify"]
+    get_db = deps["get_db"]
+    catalogo_publico = deps["_catalogo_torta_publico"]
+    validar_payload = deps["_validar_payload_catalogo_torta"]
+    cfg_tienda = deps["_obtener_tienda_personalizacion"]
+    cfg_agenda = deps["_obtener_cfg_agenda_tienda"]
+    calcular_disponibilidad = deps["_calcular_disponibilidad_agenda_tienda"]
+    normalizar_email = deps["_normalizar_email"]
+    normalizar_telefono = deps["_normalizar_telefono_cl"]
+    public_base_url = str(deps.get("PUBLIC_BASE_URL") or "https://pasteleriasucree.cl").rstrip("/")
+
+    def fmt_clp(value):
+        try:
+            n = int(round(float(value or 0)))
+        except (TypeError, ValueError):
+            n = 0
+        return ("$%s" % format(n, ",")).replace(",", ".")
+
+    def norm(texto):
+        raw = str(texto or "").strip().lower()
+        raw = unicodedata.normalize("NFKD", raw)
+        raw = "".join(ch for ch in raw if not unicodedata.combining(ch))
+        raw = re.sub(r"[^a-z0-9@._+:/\-\s]", " ", raw)
+        return re.sub(r"\s+", " ", raw).strip()
+
+    def slug(texto):
+        return re.sub(r"[^a-z0-9]+", " ", norm(texto)).strip()
+
+    def ratio(query, target):
+        q = set(slug(query).split())
+        t = set(slug(target).split())
+        if not q or not t:
+            return 0.0
+        return float(len(q & t)) / float(max(1, min(len(q), len(t))))
+
+    def ensure_tables(cur):
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS asistente_kb (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pregunta TEXT NOT NULL,
+                respuesta TEXT NOT NULL,
+                activo INTEGER DEFAULT 1,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS asistente_unknown (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pregunta TEXT NOT NULL,
+                contexto_json TEXT,
+                estado TEXT DEFAULT 'pendiente',
+                respuesta_sugerida TEXT,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    def registrar_desconocida(pregunta, contexto=None):
+        conn = None
+        try:
+            pregunta = str(pregunta or "").strip()[:700]
+            if not pregunta:
+                return
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            ctx = json.dumps(contexto or {}, ensure_ascii=False)[:4000]
+            cur.execute(
+                "INSERT INTO asistente_unknown (pregunta, contexto_json, estado) VALUES (?, ?, 'pendiente')",
+                (pregunta, ctx),
+            )
+            conn.commit()
+        except Exception:
+            if conn:
+                conn.rollback()
+        finally:
+            if conn:
+                conn.close()
+
+    def buscar_kb(mensaje):
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            cur.execute(
+                "SELECT pregunta, respuesta FROM asistente_kb WHERE COALESCE(activo, 1) = 1 ORDER BY actualizado_en DESC, id DESC LIMIT 200"
+            )
+            best = None
+            best_score = 0.0
+            for row in cur.fetchall():
+                score = ratio(mensaje, row["pregunta"])
+                if score > best_score:
+                    best_score = score
+                    best = row
+            if best and best_score >= 0.55:
+                return str(best["respuesta"] or "").strip()
+        except Exception:
+            pass
+        finally:
+            if conn:
+                conn.close()
+        return ""
+
+    def cargar_catalogo():
+        cfg = cfg_tienda()
+        catalogo = catalogo_publico((cfg or {}).get("catalogo_torta") or {})
+        return catalogo if isinstance(catalogo, dict) else {}
+
+    def match_row(texto, rows, min_score=0.45):
+        if not texto:
+            return None
+        best = None
+        best_score = 0.0
+        texto_slug = slug(texto)
+        for row in rows or []:
+            nombre = str((row or {}).get("nombre") or "")
+            rid = str((row or {}).get("id") or "")
+            score = max(ratio(texto, nombre), ratio(texto, rid), ratio(texto, nombre + " " + rid))
+            nombre_slug = slug(nombre)
+            if nombre_slug and nombre_slug in texto_slug:
+                score = max(score, 1.0)
+            if score > best_score:
+                best_score = score
+                best = row
+        return best if best and best_score >= min_score else None
+
+    def parse_fecha(texto):
+        txt = norm(texto)
+        now = datetime.now(ZoneInfo("America/Santiago"))
+        m = re.search(r"\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b", txt)
+        if m:
+            try:
+                return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))).date().isoformat()
+            except ValueError:
+                pass
+        m = re.search(r"\b(\d{1,2})[-/](\d{1,2})(?:[-/](20\d{2}))?\b", txt)
+        if m:
+            year = int(m.group(3) or now.year)
+            try:
+                dt = datetime(year, int(m.group(2)), int(m.group(1))).date()
+                if dt < now.date() and not m.group(3):
+                    dt = datetime(year + 1, int(m.group(2)), int(m.group(1))).date()
+                return dt.isoformat()
+            except ValueError:
+                pass
+        m = re.search(r"\b(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s*(?:de\s*)?(20\d{2}))?\b", txt)
+        if m:
+            year = int(m.group(3) or now.year)
+            month = int(MESES.get(m.group(2)) or 0)
+            try:
+                dt = datetime(year, month, int(m.group(1))).date()
+                if dt < now.date() and not m.group(3):
+                    dt = datetime(year + 1, month, int(m.group(1))).date()
+                return dt.isoformat()
+            except ValueError:
+                pass
+        if "manana" in txt or "mañana" in txt:
+            return (now.date() + timedelta(days=1)).isoformat()
+        if "hoy" in txt:
+            return now.date().isoformat()
+        for dia, weekday in DIAS.items():
+            if re.search(r"\b" + re.escape(norm(dia)) + r"\b", txt):
+                delta = (weekday - now.weekday()) % 7
+                if delta == 0 or "proximo" in txt or "proxima" in txt:
+                    delta = delta or 7
+                return (now.date() + timedelta(days=delta)).isoformat()
+        return ""
+
+    def parse_hora(texto):
+        txt = norm(texto)
+        m = re.search(r"\b(\d{1,2})[:.](\d{2})\b", txt)
+        if m:
+            h = int(m.group(1))
+            minute = int(m.group(2))
+            if 0 <= h <= 23 and 0 <= minute <= 59:
+                return "%02d:%02d" % (h, minute)
+        m = re.search(r"\b(?:a\s+las\s+|hora\s*)?(\d{1,2})\s*(?:h|hrs|horas?)\b", txt)
+        if m:
+            h = int(m.group(1))
+            if 0 <= h <= 23:
+                return "%02d:00" % h
+        return ""
+
+    def parse_contacto(texto):
+        email = ""
+        telefono = ""
+        m = re.search(r"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}", str(texto or ""), flags=re.I)
+        if m:
+            email = normalizar_email(m.group(0))
+        phones = re.findall(r"(?:\+?56)?\s*9?\s*(?:\d[\s\-\.]*){8,9}", str(texto or ""))
+        for ph in phones:
+            clean = normalizar_telefono(ph)
+            if clean:
+                telefono = clean
+                break
+        return email, telefono
+
+    def detectar_entrega(texto):
+        txt = norm(texto)
+        if any(x in txt for x in ["despacho", "delivery", "enviar", "envio", "domicilio"]):
+            return "despacho"
+        if any(x in txt for x in ["retiro", "retirar", "tienda", "local"]):
+            return "retiro"
+        return ""
+
+    def actualizar_draft(draft, mensaje, catalogo):
+        draft = dict(draft or {})
+        texto = str(mensaje or "")
+        fecha = parse_fecha(texto)
+        hora = parse_hora(texto)
+        email, telefono = parse_contacto(texto)
+        entrega = detectar_entrega(texto)
+        if fecha:
+            draft["fecha"] = fecha
+        if hora:
+            draft["hora_inicio"] = hora
+        if email:
+            draft["email"] = email
+        if telefono:
+            draft["telefono"] = telefono
+        if entrega:
+            draft["entrega_tipo"] = entrega
+        if not draft.get("entrega_tipo"):
+            draft["entrega_tipo"] = "retiro"
+        m = re.search(r"\b(?:cliente|nombre|soy|me llamo)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{2,80})", texto, flags=re.I)
+        if m:
+            nombre = re.sub(r"\s+", " ", m.group(1)).strip(" .,-")[:80]
+            if len(nombre) >= 2:
+                draft["nombre"] = nombre
+        size = None
+        m = re.search(r"\b(\d{1,3})\s*(?:personas|pers|pax)\b", norm(texto))
+        if m:
+            size = match_row(m.group(1) + " personas", catalogo.get("sizes") or [], min_score=0.25)
+        if not size:
+            size = match_row(texto, catalogo.get("sizes") or [], min_score=0.55)
+        if size:
+            draft["size_id"] = str(size.get("id") or "")
+            if size.get("categoria_id"):
+                draft["categoria_id"] = str(size.get("categoria_id") or "")
+        categoria = match_row(texto, catalogo.get("categorias") or [], min_score=0.55)
+        if categoria:
+            draft["categoria_id"] = str(categoria.get("id") or "")
+        sabor = match_row(texto, catalogo.get("sabores") or [], min_score=0.58)
+        if sabor:
+            sid = str(sabor.get("id") or "")
+            actuales = list(draft.get("sabor_ids") or [])
+            if sid and sid not in actuales:
+                actuales.append(sid)
+            draft["sabor_ids"] = actuales[:3]
+        topper = match_row(texto, catalogo.get("toppers") or [], min_score=0.58)
+        if topper:
+            draft["topper_id"] = str(topper.get("id") or "")
+        elif "sin topper" in norm(texto):
+            for tp in catalogo.get("toppers") or []:
+                if "sin" in slug(tp.get("nombre")) and "topper" in slug(tp.get("nombre")):
+                    draft["topper_id"] = str(tp.get("id") or "")
+                    break
+        extras = list(draft.get("extra_items") or [])
+        extra = match_row(texto, catalogo.get("extras") or [], min_score=0.62)
+        if extra:
+            eid = str(extra.get("id") or "")
+            if eid and not any(str(x.get("id") or "") == eid for x in extras if isinstance(x, dict)):
+                extras.append({"id": eid, "qty": 1})
+            draft["extra_items"] = extras[:8]
+        if "sin extra" in norm(texto) or "sin extras" in norm(texto):
+            draft["extra_items"] = []
+        return draft
+
+    def payload_torta(draft):
+        return {
+            "categoria_id": str(draft.get("categoria_id") or ""),
+            "size_id": str(draft.get("size_id") or ""),
+            "sabor_ids": list(draft.get("sabor_ids") or []),
+            "extra_items": list(draft.get("extra_items") or []),
+            "topper_id": str(draft.get("topper_id") or ""),
+            "referencia_urls": [],
+            "nota": str(draft.get("nota") or ""),
+        }
+
+    def cotizar(draft, catalogo):
+        try:
+            if not draft.get("size_id") or not draft.get("sabor_ids"):
+                return None, ""
+            return validar_payload(payload_torta(draft), catalogo), ""
+        except Exception as exc:
+            return None, str(exc)
+
+    def resumen_texto(draft, resumen):
+        if not resumen:
+            return ""
+        size = resumen.get("size") or {}
+        categoria = resumen.get("categoria") or {}
+        sabores = ", ".join(str(x.get("nombre") or "") for x in (resumen.get("sabores") or []) if x)
+        extras_rows = resumen.get("extras") or []
+        extras = ", ".join((str(x.get("nombre") or "") + " x" + str(int(x.get("qty") or 1))) for x in extras_rows) or "Sin extras"
+        topper = resumen.get("topper") or {}
+        topper_txt = str(topper.get("nombre") or "Sin topper")
+        return "\n".join([
+            "Ya tengo esta cotizacion preliminar:",
+            "Producto: %s" % (str(categoria.get("nombre") or "Torta").strip() or "Torta"),
+            "Tamano: %s" % (size.get("nombre") or "-"),
+            "Rellenos: %s" % (sabores or "-"),
+            "Extras: %s" % extras,
+            "Topper: %s" % topper_txt,
+            "Precio productos: %s" % fmt_clp(resumen.get("subtotal") or 0),
+            "Cliente: %s" % (draft.get("nombre") or "-"),
+            "Contacto: %s / %s" % (draft.get("telefono") or "-", draft.get("email") or "-"),
+            "Entrega: %s" % ("despacho" if draft.get("entrega_tipo") == "despacho" else "retiro"),
+            "Fecha y hora: %s %s" % (draft.get("fecha") or "-", draft.get("hora_inicio") or "-"),
+        ])
+
+    def faltantes(draft, resumen):
+        out = []
+        if not draft.get("size_id"):
+            out.append("tamano de torta")
+        if not draft.get("sabor_ids"):
+            out.append("relleno/sabor")
+        if not draft.get("fecha"):
+            out.append("fecha")
+        if not draft.get("hora_inicio"):
+            out.append("hora")
+        if not draft.get("nombre"):
+            out.append("nombre")
+        if not draft.get("telefono"):
+            out.append("telefono")
+        if not draft.get("email"):
+            out.append("correo")
+        if draft.get("entrega_tipo") == "despacho" and not draft.get("direccion"):
+            out.append("direccion de despacho")
+        if draft.get("size_id") and draft.get("sabor_ids") and not resumen:
+            out.append("opciones validas del catalogo")
+        return out
+
+    def horas_disponibles(fecha, limite=8):
+        conn = None
+        try:
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(fecha or "")):
+                return []
+            cfg = cfg_agenda()
+            conn = get_db()
+            cur = conn.cursor()
+            disp = calcular_disponibilidad(cur, cfg, fecha, fecha)
+            mapa = ((disp.get("mapa") or {}).get(fecha) or {})
+            horas = []
+            for hora, slot in sorted(mapa.items()):
+                if bool((slot or {}).get("disponible")):
+                    horas.append(str(hora))
+            return horas[:int(limite or 8)]
+        except Exception:
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    def proximas_fechas():
+        today = datetime.now(ZoneInfo("America/Santiago")).date()
+        out = []
+        for offset in range(10):
+            fecha = (today + timedelta(days=offset)).isoformat()
+            horas = horas_disponibles(fecha, limite=4)
+            if horas:
+                out.append({"fecha": fecha, "horas": horas})
+            if len(out) >= 3:
+                break
+        return out
+
+    def reservar(draft):
+        if draft.get("entrega_tipo") == "despacho":
+            return {"success": False, "error": "Para despacho necesito que el cliente confirme la direccion desde el mapa de agenda."}
+        payload = {
+            "fecha": draft.get("fecha"),
+            "hora_inicio": draft.get("hora_inicio"),
+            "nombre": draft.get("nombre"),
+            "email": draft.get("email"),
+            "telefono": draft.get("telefono"),
+            "tipo": "torta",
+            "detalle": "Reserva creada desde asistente Sucree",
+            "catalogo_torta": payload_torta(draft),
+            "entrega_tipo": draft.get("entrega_tipo") or "retiro",
+            "direccion": "",
+            "direccion_confirmada": False,
+        }
+        try:
+            with app.test_client() as client:
+                rv = client.post("/api/tienda/agenda/reservar", json=payload)
+                data = rv.get_json(silent=True) or {}
+                if rv.status_code >= 400:
+                    data.setdefault("success", False)
+                return data
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def catalogo_texto(catalogo):
+        sizes = []
+        for s in (catalogo.get("sizes") or [])[:8]:
+            sizes.append("%s (%s)" % (s.get("nombre") or "Tamano", fmt_clp(s.get("precio") or 0)))
+        sabores = [str(s.get("nombre") or "") for s in (catalogo.get("sabores") or [])[:12] if s]
+        extras = [str(s.get("nombre") or "") for s in (catalogo.get("extras") or [])[:8] if s]
+        toppers = [str(s.get("nombre") or "") for s in (catalogo.get("toppers") or [])[:8] if s]
+        return (
+            "Puedo ayudarte con tortas de agenda.\n"
+            "Tamanos disponibles: %s.\n"
+            "Rellenos: %s.\n"
+            "Extras: %s.\n"
+            "Toppers: %s.\n"
+            "Dime algo como: quiero una torta bizcocho 25 personas, manjar, sin topper, para el 19 de septiembre a las 19 hrs."
+        ) % (
+            "; ".join(sizes) or "sin tamanos cargados",
+            ", ".join(sabores) or "sin rellenos cargados",
+            ", ".join(extras) or "sin extras cargados",
+            ", ".join(toppers) or "sin toppers cargados",
+        )
+
+    def chat_logic(message, draft):
+        catalogo = cargar_catalogo()
+        msg = str(message or "").strip()
+        nmsg = norm(msg)
+        draft = actualizar_draft(draft or {}, msg, catalogo)
+        resumen, err = cotizar(draft, catalogo)
+        faltan = faltantes(draft, resumen)
+
+        if not msg:
+            return {"reply": "Escribeme que torta necesitas y para que fecha. Te ayudo a cotizar y revisar horas disponibles.", "draft": draft}
+        kb = buscar_kb(msg)
+        if kb:
+            return {"reply": kb, "draft": draft, "type": "knowledge"}
+        if any(x in nmsg for x in ["catalogo", "opciones", "precios", "precio", "sabores", "rellenos", "tamanos", "tamaños"]):
+            reply = catalogo_texto(catalogo)
+            if resumen:
+                reply += "\n\n" + resumen_texto(draft, resumen)
+            return {"reply": reply, "draft": draft, "quote": resumen}
+        if any(x in nmsg for x in ["hora disponible", "horas disponibles", "disponibilidad", "agenda", "cuando puedo", "fecha disponible"]):
+            if draft.get("fecha"):
+                horas = horas_disponibles(draft.get("fecha"), limite=10)
+                if horas:
+                    reply = "Para %s tengo estas horas tentativas: %s. Dime cual prefieres." % (draft.get("fecha"), ", ".join(horas))
+                else:
+                    reply = "Para %s no veo cupos disponibles. Puedo revisar otra fecha si me indicas una." % draft.get("fecha")
+            else:
+                prox = proximas_fechas()
+                parts = ["%s: %s" % (x["fecha"], ", ".join(x["horas"])) for x in prox]
+                reply = "Estas son algunas fechas con horas tentativas: %s" % (" | ".join(parts) or "no encontre cupos en los proximos dias")
+            return {"reply": reply, "draft": draft}
+        confirmar = any(x in nmsg for x in ["confirmar", "reservar", "agendar", "crear pedido", "hacer pedido"])
+        if confirmar and not faltan:
+            res = reservar(draft)
+            if res.get("success"):
+                reserva = res.get("reserva") or {}
+                codigo = str(reserva.get("codigo_pedido") or "").strip()
+                link = "%s/seguimiento/%s" % (public_base_url, quote(codigo)) if codigo else "%s/seguimiento" % public_base_url
+                draft["codigo_pedido"] = codigo
+                return {
+                    "reply": "Listo, deje registrada tu solicitud. Codigo: %s\nPuedes seguir el pedido aqui: %s\nQueda a la espera de confirmacion de la pasteleria." % (codigo or "-", link),
+                    "draft": draft,
+                    "reserved": True,
+                    "tracking_url": link,
+                    "reserva": reserva,
+                }
+            return {"reply": "No pude registrar la reserva aun: %s" % (res.get("error") or "error desconocido"), "draft": draft, "error": res.get("error")}
+        if resumen:
+            reply = resumen_texto(draft, resumen)
+            if draft.get("fecha"):
+                horas = horas_disponibles(draft.get("fecha"), limite=6)
+                if horas:
+                    reply += "\n\nHoras tentativas disponibles para esa fecha: %s." % ", ".join(horas)
+            if faltan:
+                reply += "\n\nPara continuar falta: %s." % ", ".join(faltan)
+            else:
+                reply += "\n\nTengo todo para solicitar la reserva. Escribe 'confirmar reserva' para registrarla."
+            return {"reply": reply, "draft": draft, "quote": resumen}
+        meaningful = any(draft.get(k) for k in ["fecha", "hora_inicio", "email", "telefono", "nombre", "size_id", "sabor_ids"])
+        if meaningful:
+            reply = "Voy ordenando la informacion."
+            if err:
+                reply += " %s." % err
+            if faltan:
+                reply += " Para continuar falta: %s." % ", ".join(faltan)
+            if draft.get("fecha"):
+                horas = horas_disponibles(draft.get("fecha"), limite=5)
+                if horas:
+                    reply += " Horas tentativas para %s: %s." % (draft.get("fecha"), ", ".join(horas))
+            return {"reply": reply, "draft": draft}
+        registrar_desconocida(msg, {"draft": draft})
+        return {
+            "reply": "No entendi bien eso todavia. Lo deje registrado para que el equipo lo revise y pueda aprender esa respuesta. Si quieres, dime tipo de torta, tamano, relleno, fecha y hora.",
+            "draft": draft,
+            "unknown": True,
+        }
+
+    @app.route("/asistente-sucree")
+    def asistente_sucree():
+        return render_template("asistente_sucree.html")
+
+    @app.route("/ventas/asistente-conocimiento")
+    def asistente_sucree_conocimiento():
+        return render_template("asistente_conocimiento.html")
+
+    @app.route("/api/asistente/public/chat", methods=["POST"])
+    def api_asistente_public_chat():
+        try:
+            data = request.get_json(silent=True) or {}
+            msg = str(data.get("message") or "").strip()[:1200]
+            draft = data.get("draft") if isinstance(data.get("draft"), dict) else {}
+            out = chat_logic(msg, draft)
+            payload = {"success": True}
+            payload.update(out)
+            return jsonify(payload)
+        except Exception as exc:
+            registrar_desconocida(str((request.get_json(silent=True) or {}).get("message") or ""), {"error": str(exc)})
+            return jsonify({"success": False, "error": "El asistente tuvo un problema temporal. Intentalo nuevamente."}), 500
+
+    @app.route("/api/asistente/admin/pendientes", methods=["GET", "POST"])
+    def api_asistente_admin_pendientes():
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            if request.method == "POST":
+                data = request.get_json(silent=True) or {}
+                pregunta = str(data.get("pregunta") or "").strip()[:700]
+                respuesta = str(data.get("respuesta") or "").strip()[:2500]
+                unknown_id = int(data.get("id") or 0)
+                if not pregunta or not respuesta:
+                    return jsonify({"success": False, "error": "Pregunta y respuesta son obligatorias"}), 400
+                cur.execute("INSERT INTO asistente_kb (pregunta, respuesta, activo) VALUES (?, ?, 1)", (pregunta, respuesta))
+                if unknown_id > 0:
+                    cur.execute(
+                        "UPDATE asistente_unknown SET estado = 'resuelto', respuesta_sugerida = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                        (respuesta, unknown_id),
+                    )
+                conn.commit()
+                return jsonify({"success": True})
+            cur.execute("SELECT id, pregunta, contexto_json, estado, creado_en FROM asistente_unknown ORDER BY id DESC LIMIT 100")
+            rows = [dict(r) for r in cur.fetchall()]
+            return jsonify({"success": True, "pendientes": rows})
+        except Exception as exc:
+            if conn:
+                conn.rollback()
+            return jsonify({"success": False, "error": str(exc)}), 500
+        finally:
+            if conn:
+                conn.close()
