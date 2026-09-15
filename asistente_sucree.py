@@ -519,6 +519,95 @@ def registrar_asistente_sucree(app, deps):
                 out.append(row)
         return out
 
+    def palabras_catalogo_existentes(catalogo):
+        valores = []
+        for key in ["categorias", "sizes", "sabores", "extras", "toppers"]:
+            for row in catalogo.get(key) or []:
+                valores.append(slug(row.get("nombre") or ""))
+                valores.append(slug(row.get("id") or ""))
+        return [v for v in valores if v]
+
+    def texto_contiene_opcion_catalogo(texto_norm, catalogo):
+        t = slug(texto_norm)
+        return any(v and v in t for v in palabras_catalogo_existentes(catalogo))
+
+    def add_incompatibilidad(draft, campo, valor, mensaje=""):
+        draft = dict(draft or {})
+        items = [x for x in (draft.get("incompatibilidades") or []) if isinstance(x, dict)]
+        key = "%s:%s" % (campo, slug(valor))
+        if not any(str(x.get("key") or "") == key for x in items):
+            items.append({"key": key, "campo": campo, "valor": str(valor or "").strip(), "mensaje": str(mensaje or "").strip()})
+        draft["incompatibilidades"] = items[:5]
+        return draft
+
+    def clear_incompatibilidades(draft, campos=None):
+        draft = dict(draft or {})
+        if not campos:
+            draft.pop("incompatibilidades", None)
+            return draft
+        campos = {str(x or "") for x in campos}
+        draft["incompatibilidades"] = [x for x in (draft.get("incompatibilidades") or []) if str((x or {}).get("campo") or "") not in campos]
+        if not draft.get("incompatibilidades"):
+            draft.pop("incompatibilidades", None)
+        return draft
+
+    def extraer_valor_despues_de(texto, palabras):
+        raw = str(texto or "")
+        patron = r"\b(?:%s)\b\s*(?:de|del|con|:|-)?\s+(.+)" % "|".join(re.escape(p) for p in palabras)
+        m = re.search(patron, raw, flags=re.I)
+        if not m:
+            return ""
+        valor = re.split(r"\b(?:para|fecha|hora|correo|email|telefono|teléfono|fono|nombre|retiro|despacho|direccion|dirección|sin topper|topper|extra|extras)\b", m.group(1), flags=re.I)[0]
+        return re.sub(r"\s+", " ", valor).strip(" .,-:;")[:80]
+
+    def respuesta_incompatibilidades(draft, catalogo):
+        items = [x for x in (draft.get("incompatibilidades") or []) if isinstance(x, dict)]
+        if not items:
+            return ""
+        first = items[0]
+        campo = str(first.get("campo") or "opcion")
+        valor = str(first.get("valor") or "").strip()
+        categoria = find_categoria(catalogo, draft.get("categoria_id") or draft.get("tamano_invalido_categoria_id") or "")
+        lines = []
+        if valor:
+            lines.append("No puedo avanzar con %s: %s, porque no existe o no está disponible en el sistema." % (campo, valor))
+        else:
+            lines.append("No puedo avanzar con ese dato porque no existe o no está disponible en el sistema.")
+        lines.append("Antes de seguir necesito que elijas una opción válida del catálogo.")
+        if campo in {"tipo de torta", "producto"}:
+            lines.extend(["", "Tipos disponibles:", list_lines(catalogo.get("categorias") or [], lambda c: str(c.get("nombre") or ""), "sin tipos cargados")])
+        elif campo in {"relleno", "sabor"}:
+            sabores = rows_categoria(catalogo, "sabores", categoria) if categoria else list(catalogo.get("sabores") or [])
+            lines.extend(["", "Rellenos disponibles%s:" % ((" para " + str(categoria.get("nombre") or "")) if categoria else ""), list_lines(sabores[:12], lambda r: str(r.get("nombre") or ""), "sin rellenos cargados")])
+        elif campo == "topper":
+            toppers = rows_categoria(catalogo, "toppers", categoria) if categoria else list(catalogo.get("toppers") or [])
+            lines.extend(["", "Toppers disponibles:", list_lines(toppers[:10], lambda r: str(r.get("nombre") or ""), "sin toppers cargados")])
+        elif campo == "extra":
+            extras = rows_categoria(catalogo, "extras", categoria) if categoria else list(catalogo.get("extras") or [])
+            lines.extend(["", "Extras disponibles:", list_lines(extras[:10], lambda r: str(r.get("nombre") or ""), "sin extras cargados")])
+        else:
+            _, sizes = opciones_tamano_para_draft(draft, catalogo or {})
+            lines.extend(["", "Tamaños disponibles:", list_lines(sizes[:10], lambda r: "%s - %s" % (r.get("nombre") or "Tamaño", fmt_clp(r.get("precio") or 0)), "sin tamaños cargados")])
+        return "\n".join(lines)
+
+    def sugerencias_incompatibilidades(draft, catalogo):
+        items = [x for x in (draft.get("incompatibilidades") or []) if isinstance(x, dict)]
+        if not items:
+            return []
+        campo = str(items[0].get("campo") or "")
+        categoria = find_categoria(catalogo, draft.get("categoria_id") or draft.get("tamano_invalido_categoria_id") or "")
+        key = "categorias"
+        if campo in {"relleno", "sabor"}:
+            key = "sabores"
+        elif campo == "topper":
+            key = "toppers"
+        elif campo == "extra":
+            key = "extras"
+        elif campo in {"tamaño", "tamano"}:
+            key = "sizes"
+        rows = rows_categoria(catalogo, key, categoria) if key != "categorias" else list(catalogo.get("categorias") or [])
+        return [str(x.get("nombre") or "").strip() for x in rows[:6] if str(x.get("nombre") or "").strip()]
+
     def list_lines(rows, label_func, empty_text):
         out = []
         for row in rows or []:
@@ -831,7 +920,13 @@ def registrar_asistente_sucree(app, deps):
             draft["nombre"] = nombre_detectado
         if direccion_detectada:
             draft["direccion"] = direccion_detectada
+        texto_norm = norm(texto)
         categoria = detectar_categoria_catalogo(texto, catalogo) or match_row(texto, catalogo.get("categorias") or [], min_score=0.55)
+        if categoria:
+            draft = clear_incompatibilidades(draft, {"tipo de torta", "producto"})
+        elif any(x in texto_norm for x in ["red velvet", "cheesecake", "kuchen", "pie", "cupcake", "helado", "brownie", "tiramis", "selva negra"]):
+            valor_tipo = extraer_valor_despues_de(texto, ["torta", "pastel", "producto", "quiero", "necesito"]) or texto
+            draft = add_incompatibilidad(draft, "tipo de torta", valor_tipo)
         categoria_para_tamano = categoria or find_categoria(catalogo, draft.get("categoria_id") or "")
         size = None
         m = re.search(r"\b(\d{1,3})\s*(?:persona|personas|pers|pax)\b", norm(texto))
@@ -840,6 +935,7 @@ def registrar_asistente_sucree(app, deps):
             draft["personas"] = personas
             draft.pop("tamano_invalido", None)
             draft.pop("tamano_invalido_categoria_id", None)
+            draft = clear_incompatibilidades(draft, {"tamaño", "tamano"})
             if categoria_para_tamano:
                 candidatos = sizes_por_personas(catalogo, personas, categoria_para_tamano)
                 if len(candidatos) == 1:
@@ -847,10 +943,12 @@ def registrar_asistente_sucree(app, deps):
                 if not size:
                     draft["tamano_invalido"] = personas
                     draft["tamano_invalido_categoria_id"] = str(categoria_para_tamano.get("id") or "")
+                    draft = add_incompatibilidad(draft, "tamaño", "%s personas" % personas)
             else:
                 candidatos_globales = sizes_por_personas(catalogo, personas)
                 if not candidatos_globales:
                     draft["tamano_invalido"] = personas
+                    draft = add_incompatibilidad(draft, "tamaño", "%s personas" % personas)
                 elif len(candidatos_globales) == 1:
                     size = candidatos_globales[0]
         if not size and not m and not draft.get("personas"):
@@ -859,10 +957,20 @@ def registrar_asistente_sucree(app, deps):
             draft["size_id"] = str(size.get("id") or "")
             draft.pop("tamano_invalido", None)
             draft.pop("tamano_invalido_categoria_id", None)
+            draft = clear_incompatibilidades(draft, {"tamaño", "tamano"})
             if size.get("categoria_id"):
                 draft["categoria_id"] = str(size.get("categoria_id") or "")
         if categoria:
             draft["categoria_id"] = str(categoria.get("id") or "")
+            size_id_actual = str(draft.get("size_id") or "").strip()
+            if size_id_actual:
+                size_actual = None
+                for row in catalogo.get("sizes") or []:
+                    if str(row.get("id") or "").strip() == size_id_actual:
+                        size_actual = row
+                        break
+                if size_actual and str(size_actual.get("categoria_id") or "").strip().lower() != str(categoria.get("id") or "").strip().lower():
+                    draft.pop("size_id", None)
         if categoria and draft.get("personas") and not draft.get("size_id") and not draft.get("tamano_invalido"):
             personas = int(draft.get("personas") or 0)
             candidatos = sizes_por_personas(catalogo, personas, categoria)
@@ -871,6 +979,7 @@ def registrar_asistente_sucree(app, deps):
             else:
                 draft["tamano_invalido"] = personas
                 draft["tamano_invalido_categoria_id"] = str(categoria.get("id") or "")
+                draft = add_incompatibilidad(draft, "tamaño", "%s personas" % personas)
         actuales = list(draft.get("sabor_ids") or [])
         texto_key = keyword_slug(texto)
         encontrados = []
@@ -887,16 +996,27 @@ def registrar_asistente_sucree(app, deps):
             sid = str(sabor.get("id") or "")
             if sid and sid not in actuales:
                 actuales.append(sid)
+        if encontrados:
+            draft = clear_incompatibilidades(draft, {"relleno", "sabor"})
+        elif any(x in texto_norm for x in ["relleno", "sabor", "saborizado"]):
+            valor_sabor = extraer_valor_despues_de(texto, ["relleno", "rellenos", "sabor", "sabores"])
+            if valor_sabor:
+                draft = add_incompatibilidad(draft, "relleno", valor_sabor)
         if actuales:
             draft["sabor_ids"] = actuales[:3]
         topper = match_row(texto, catalogo.get("toppers") or [], min_score=0.58)
         if topper:
             draft["topper_id"] = str(topper.get("id") or "")
-        elif "sin topper" in norm(texto):
+            draft = clear_incompatibilidades(draft, {"topper"})
+        elif "sin topper" in texto_norm:
             for tp in catalogo.get("toppers") or []:
                 if "sin" in slug(tp.get("nombre")) and "topper" in slug(tp.get("nombre")):
                     draft["topper_id"] = str(tp.get("id") or "")
+                    draft = clear_incompatibilidades(draft, {"topper"})
                     break
+        elif "topper" in texto_norm:
+            valor_topper = extraer_valor_despues_de(texto, ["topper", "adorno", "decoracion", "decoraci?n"]) or "topper solicitado"
+            draft = add_incompatibilidad(draft, "topper", valor_topper)
         extras = list(draft.get("extra_items") or [])
         extra = match_row(texto, catalogo.get("extras") or [], min_score=0.62)
         if extra:
@@ -904,8 +1024,14 @@ def registrar_asistente_sucree(app, deps):
             if eid and not any(str(x.get("id") or "") == eid for x in extras if isinstance(x, dict)):
                 extras.append({"id": eid, "qty": 1})
             draft["extra_items"] = extras[:8]
-        if "sin extra" in norm(texto) or "sin extras" in norm(texto):
+            draft = clear_incompatibilidades(draft, {"extra"})
+        elif any(x in texto_norm for x in ["extra", "extras"]):
+            valor_extra = extraer_valor_despues_de(texto, ["extra", "extras"])
+            if valor_extra and "sin" not in slug(valor_extra):
+                draft = add_incompatibilidad(draft, "extra", valor_extra)
+        if "sin extra" in texto_norm or "sin extras" in texto_norm:
             draft["extra_items"] = []
+            draft = clear_incompatibilidades(draft, {"extra"})
         return draft
 
     def payload_torta(draft):
@@ -1159,6 +1285,8 @@ def registrar_asistente_sucree(app, deps):
 
     def faltantes(draft, resumen, catalogo=None, err=""):
         out = []
+        if draft.get("incompatibilidades"):
+            out.append("opcion incompatible")
         if not draft.get("email"):
             out.append("correo")
         if not draft.get("size_id"):
@@ -1690,6 +1818,8 @@ def registrar_asistente_sucree(app, deps):
         if not faltan:
             return ""
         catalogo = catalogo or {}
+        if "opcion incompatible" in faltan:
+            return respuesta_incompatibilidades(draft, catalogo)
         if "tamano no disponible" in faltan:
             return respuesta_tamano_invalido(draft, catalogo)
         if any(str(x).startswith("tipo de torta") for x in faltan):
@@ -1754,6 +1884,14 @@ def registrar_asistente_sucree(app, deps):
         draft = registrar_cliente_desde_draft(draft)
         resumen, err = cotizar(draft, catalogo)
         faltan = faltantes(draft, resumen, catalogo, err)
+
+        if "opcion incompatible" in faltan:
+            return {
+                "reply": respuesta_incompatibilidades(draft, catalogo),
+                "draft": draft,
+                "type": "invalid_catalog_option",
+                "suggestions": sugerencias_incompatibilidades(draft, catalogo) or sugerencias_catalogo(catalogo),
+            }
 
         if "tamano no disponible" in faltan:
             return {
@@ -1870,7 +2008,7 @@ def registrar_asistente_sucree(app, deps):
                 reply += "\n\n" + detalle
             return {"reply": reply, "draft": draft, "suggestions": sugerencias_faltantes(faltan) or sugerencias_catalogo(catalogo)}
 
-        confirmar = (nmsg.strip() in {"si", "s?", "ok", "okay", "dale", "correcto"}) or any(x in nmsg for x in ["confirmar", "confirmo", "confirmar reserva", "si confirmo", "s? confirmo", "esta bien", "est? bien", "todo bien", "enviar solicitud", "enviar cotizacion", "registrar solicitud", "reservar ahora"])
+        confirmar = (nmsg.strip() in {"si", "sí", "ok", "okay", "dale", "correcto"}) or any(x in nmsg for x in ["confirmar", "confirmo", "confirmar reserva", "si confirmo", "sí confirmo", "esta bien", "está bien", "todo bien", "enviar solicitud", "enviar cotizacion", "registrar solicitud", "reservar ahora"])
         if confirmar:
             resumen_confirm, err_confirm = cotizar(draft, catalogo)
             faltan_confirm = faltantes(draft, resumen_confirm, catalogo, err_confirm)
