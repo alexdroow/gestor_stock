@@ -209,6 +209,51 @@ def registrar_asistente_sucree(app, deps):
                 best = row
         return best if best and best_score >= min_score else None
 
+    def texto_catalogo_limpio(texto):
+        limpio = slug(texto)
+        stop = {
+            "catalogo", "catalogos", "precio", "precios", "opcion", "opciones",
+            "ver", "revisar", "mostrar", "quiero", "torta", "tortas", "de", "del",
+        }
+        return " ".join(w for w in limpio.split() if w not in stop)
+
+    def detectar_categoria_catalogo(texto, catalogo):
+        consulta = texto_catalogo_limpio(texto)
+        if not consulta:
+            return None
+        tokens = set(consulta.split())
+        consulta_compacta = consulta.replace(" ", "")
+        familias = [
+            ("mil hojas", {"mil", "hojas"}),
+            ("milhojas", {"milhojas"}),
+            ("sin azucar", {"sin", "azucar"}),
+            ("bizcocho", {"bizcocho"}),
+            ("panqueque", {"panqueque"}),
+            ("ganache", {"ganache"}),
+            ("puntillismo", {"puntillismo"}),
+            ("cuatro leches", {"cuatro", "leches"}),
+        ]
+        best = None
+        best_score = 0
+        for cat in catalogo.get("categorias") or []:
+            nombre_slug = slug(cat.get("nombre"))
+            nombre_compacto = nombre_slug.replace(" ", "")
+            nombre_tokens = set(nombre_slug.split())
+            score = len(tokens & nombre_tokens) * 10
+            for _, fam_tokens in familias:
+                if fam_tokens <= tokens and fam_tokens <= nombre_tokens:
+                    score += 20 + len(fam_tokens)
+            if consulta and consulta in nombre_slug:
+                score += 30
+            if consulta_compacta and consulta_compacta in nombre_compacto:
+                score += 30
+            if consulta_compacta == "milhojas" and ("milhojas" in nombre_compacto or {"mil", "hojas"} <= nombre_tokens):
+                score += 35
+            if score > best_score:
+                best = cat
+                best_score = score
+        return best if best_score > 0 else match_row(consulta, catalogo.get("categorias") or [], min_score=0.35)
+
     def find_categoria(catalogo, categoria_id):
         cid = str(categoria_id or "").strip().lower()
         for cat in catalogo.get("categorias") or []:
@@ -426,7 +471,7 @@ def registrar_asistente_sucree(app, deps):
             draft["size_id"] = str(size.get("id") or "")
             if size.get("categoria_id"):
                 draft["categoria_id"] = str(size.get("categoria_id") or "")
-        categoria = match_row(texto, catalogo.get("categorias") or [], min_score=0.55)
+        categoria = detectar_categoria_catalogo(texto, catalogo) or match_row(texto, catalogo.get("categorias") or [], min_score=0.55)
         if categoria:
             draft["categoria_id"] = str(categoria.get("id") or "")
         actuales = list(draft.get("sabor_ids") or [])
@@ -950,6 +995,9 @@ def registrar_asistente_sucree(app, deps):
             }
 
         if catalogo_intent:
+            categoria_msg = detectar_categoria_catalogo(msg, catalogo)
+            if categoria_msg:
+                draft["categoria_id"] = str(categoria_msg.get("id") or "")
             reply = catalogo_texto(catalogo, categoria_id=draft.get("categoria_id") or "")
             if resumen:
                 reply += "\n\n" + resumen_texto(draft, resumen)
