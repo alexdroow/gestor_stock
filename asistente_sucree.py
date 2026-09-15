@@ -506,6 +506,19 @@ def registrar_asistente_sucree(app, deps):
             return [r for r in rows if str(r.get("id") or "").strip().lower() in allowed]
         return rows
 
+    def sizes_por_personas(catalogo, personas, categoria=None):
+        try:
+            personas = int(personas or 0)
+        except (TypeError, ValueError):
+            return []
+        rows = rows_categoria(catalogo, "sizes", categoria) if categoria else list(catalogo.get("sizes") or [])
+        out = []
+        for row in rows:
+            nombre_size = norm(row.get("nombre") or "")
+            if re.search(r"\b%s\b" % re.escape(str(personas)), nombre_size):
+                out.append(row)
+        return out
+
     def list_lines(rows, label_func, empty_text):
         out = []
         for row in rows or []:
@@ -828,16 +841,18 @@ def registrar_asistente_sucree(app, deps):
             draft.pop("tamano_invalido", None)
             draft.pop("tamano_invalido_categoria_id", None)
             if categoria_para_tamano:
-                candidatos = []
-                for row in rows_categoria(catalogo, "sizes", categoria_para_tamano):
-                    nombre_size = norm(row.get("nombre") or "")
-                    if re.search(r"\b%s\b" % re.escape(str(personas)), nombre_size):
-                        candidatos.append(row)
+                candidatos = sizes_por_personas(catalogo, personas, categoria_para_tamano)
                 if len(candidatos) == 1:
                     size = candidatos[0]
                 if not size:
                     draft["tamano_invalido"] = personas
                     draft["tamano_invalido_categoria_id"] = str(categoria_para_tamano.get("id") or "")
+            else:
+                candidatos_globales = sizes_por_personas(catalogo, personas)
+                if not candidatos_globales:
+                    draft["tamano_invalido"] = personas
+                elif len(candidatos_globales) == 1:
+                    size = candidatos_globales[0]
         if not size and not m and not draft.get("personas"):
             size = match_row(texto, catalogo.get("sizes") or [], min_score=0.55)
         if size:
@@ -850,11 +865,7 @@ def registrar_asistente_sucree(app, deps):
             draft["categoria_id"] = str(categoria.get("id") or "")
         if categoria and draft.get("personas") and not draft.get("size_id") and not draft.get("tamano_invalido"):
             personas = int(draft.get("personas") or 0)
-            candidatos = []
-            for row in rows_categoria(catalogo, "sizes", categoria):
-                nombre_size = norm(row.get("nombre") or "")
-                if re.search(r"\b%s\b" % re.escape(str(personas)), nombre_size):
-                    candidatos.append(row)
+            candidatos = sizes_por_personas(catalogo, personas, categoria)
             if len(candidatos) == 1:
                 draft["size_id"] = str(candidatos[0].get("id") or "")
             else:
