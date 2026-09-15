@@ -4028,8 +4028,10 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     border = (0.88, 0.80, 0.69)
 
     motivo_raw = str(reserva.get("motivo") or "").strip().lower()
+    documento_tipo = str(reserva.get("documento_tipo") or "").strip().lower()
+    es_cotizacion = documento_tipo == "cotizacion"
     es_reserva_pendiente = "reserva cliente tienda online" in motivo_raw or str(reserva.get("estado") or "").strip().lower() == "pendiente"
-    estado_txt = "PENDIENTE" if es_reserva_pendiente else "CONFIRMADO"
+    estado_txt = "COTIZACION" if es_cotizacion else ("PENDIENTE" if es_reserva_pendiente else "CONFIRMADO")
     codigo_txt = _safe_text(reserva.get("codigo_pedido") or reserva.get("codigo_operacion") or (f"AGD-{rid:06d}" if rid else "-"))
     fecha_txt = _safe_text(reserva.get("fecha"))
     hora_txt = _safe_text(reserva.get("hora_entrega") or reserva.get("hora_inicio"))
@@ -4245,15 +4247,15 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
             pass
     c.setFillColorRGB(*brown)
     c.setFont("Helvetica-Bold", 20)
-    c.drawString(150, 740, "COMPROBANTE")
+    c.drawString(150, 740, "COTIZACION" if es_cotizacion else "COMPROBANTE")
     c.setFillColorRGB(*orange)
-    c.drawString(150, 718, "DE PEDIDO")
+    c.drawString(150, 718, "DE TORTA" if es_cotizacion else "DE PEDIDO")
     c.setStrokeColorRGB(*orange)
     c.setLineWidth(0.8)
     c.line(150, 706, 320, 706)
     c.setFillColorRGB(*brown)
     c.setFont("Helvetica-Bold", 7.5)
-    c.drawString(150, 686, "CODIGO DE PEDIDO")
+    c.drawString(150, 686, "CODIGO DE COTIZACION" if es_cotizacion else "CODIGO DE PEDIDO")
     c.setFont("Helvetica-Bold", 11)
     c.drawString(150, 672, _clip(codigo_txt, 30))
     c.setFont("Helvetica-Bold", 7.5)
@@ -4263,7 +4265,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     _draw_round(456, 716, 95, 44, radius=7, stroke=brown, fill=brown, lw=0)
     c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica-Bold", 7)
-    c.drawCentredString(503.5, 744, "ESTADO DEL PEDIDO")
+    c.drawCentredString(503.5, 744, "DOCUMENTO" if es_cotizacion else "ESTADO DEL PEDIDO")
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(503.5, 726, estado_txt)
 

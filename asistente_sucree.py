@@ -30,6 +30,7 @@ def registrar_asistente_sucree(app, deps):
     calcular_disponibilidad = deps["_calcular_disponibilidad_agenda_tienda"]
     normalizar_email = deps["_normalizar_email"]
     normalizar_telefono = deps["_normalizar_telefono_cl"]
+    crear_pdf_reserva = deps.get("_crear_pdf_reserva_agenda_tienda")
     public_base_url = str(deps.get("PUBLIC_BASE_URL") or "https://pasteleriasucree.cl").rstrip("/")
 
     def fmt_clp(value):
@@ -55,6 +56,10 @@ def registrar_asistente_sucree(app, deps):
 
     def slug(texto):
         return re.sub(r"[^a-z0-9]+", " ", norm(texto)).strip()
+
+    def keyword_slug(texto):
+        words = [w for w in slug(texto).split() if w not in {"de", "del", "la", "las", "el", "los", "y"}]
+        return " ".join(words)
 
     def ratio(query, target):
         q = set(slug(query).split())
@@ -136,6 +141,48 @@ def registrar_asistente_sucree(app, deps):
             if conn:
                 conn.close()
         return ""
+
+    def buscar_cliente_por_email(email):
+        conn = None
+        try:
+            email = normalizar_email(email)
+            if not email:
+                return None
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id, nombre, email, telefono, direccion_default, direccion_lat, direccion_lng
+                FROM tienda_clientes
+                WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
+                  AND COALESCE(activo, 1) = 1
+                ORDER BY actualizado_en DESC, id DESC
+                LIMIT 1
+                """,
+                (email,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+        except Exception:
+            return None
+        finally:
+            if conn:
+                conn.close()
+
+    def aplicar_cliente_draft(draft, cliente):
+        if not cliente:
+            return draft
+        draft = dict(draft or {})
+        if not draft.get("nombre") and str(cliente.get("nombre") or "").strip():
+            draft["nombre"] = str(cliente.get("nombre") or "").strip()
+        tel = normalizar_telefono(cliente.get("telefono"))
+        if not draft.get("telefono") and tel:
+            draft["telefono"] = tel
+        if not draft.get("direccion") and str(cliente.get("direccion_default") or "").strip():
+            draft["direccion"] = str(cliente.get("direccion_default") or "").strip()
+        draft["cliente_encontrado"] = True
+        draft["cliente_id"] = int(cliente.get("id") or 0)
+        return draft
 
     def cargar_catalogo():
         cfg = cfg_tienda()
@@ -323,6 +370,11 @@ def registrar_asistente_sucree(app, deps):
             draft["hora_inicio"] = hora
         if email:
             draft["email"] = email
+            cliente = buscar_cliente_por_email(email)
+            if cliente:
+                draft = aplicar_cliente_draft(draft, cliente)
+            else:
+                draft["cliente_encontrado"] = False
         if telefono:
             draft["telefono"] = telefono
         if entrega:
@@ -332,6 +384,7 @@ def registrar_asistente_sucree(app, deps):
         m = re.search(r"\b(?:cliente|nombre|soy|me llamo)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{2,80})", texto, flags=re.I)
         if m:
             nombre = re.sub(r"\s+", " ", m.group(1)).strip(" .,-")[:80]
+            nombre = re.split(r"\b(?:telefono|fono|correo|email|mail)\b", nombre, flags=re.I)[0].strip(" .,-")
             if len(nombre) >= 2:
                 draft["nombre"] = nombre
         size = None
@@ -347,12 +400,23 @@ def registrar_asistente_sucree(app, deps):
         categoria = match_row(texto, catalogo.get("categorias") or [], min_score=0.55)
         if categoria:
             draft["categoria_id"] = str(categoria.get("id") or "")
-        sabor = match_row(texto, catalogo.get("sabores") or [], min_score=0.58)
-        if sabor:
+        actuales = list(draft.get("sabor_ids") or [])
+        texto_key = keyword_slug(texto)
+        encontrados = []
+        for sb in catalogo.get("sabores") or []:
+            sb_key = keyword_slug(sb.get("nombre"))
+            if sb_key and sb_key in texto_key:
+                encontrados.append(sb)
+        if not encontrados:
+            sabor = match_row(texto, catalogo.get("sabores") or [], min_score=0.58)
+            if sabor:
+                encontrados.append(sabor)
+        encontrados.sort(key=lambda sb: texto_key.find(keyword_slug(sb.get("nombre"))) if keyword_slug(sb.get("nombre")) in texto_key else 9999)
+        for sabor in encontrados:
             sid = str(sabor.get("id") or "")
-            actuales = list(draft.get("sabor_ids") or [])
             if sid and sid not in actuales:
                 actuales.append(sid)
+        if actuales:
             draft["sabor_ids"] = actuales[:3]
         topper = match_row(texto, catalogo.get("toppers") or [], min_score=0.58)
         if topper:
@@ -383,6 +447,78 @@ def registrar_asistente_sucree(app, deps):
             "referencia_urls": [],
             "nota": str(draft.get("nota") or ""),
         }
+
+    def crear_ingredientes_cotizacion(draft, resumen):
+        categoria = resumen.get("categoria") or {}
+        size = resumen.get("size") or {}
+        sabores = resumen.get("sabores") or []
+        extras = resumen.get("extras") or []
+        topper = resumen.get("topper") or None
+        lines = [
+            "Cotizacion generada por asistente Sucree",
+            "Email: %s" % (draft.get("email") or "-"),
+            "Entrega: %s" % ("Despacho" if draft.get("entrega_tipo") == "despacho" else "Retiro"),
+            "--- Resumen de cotizacion (cliente) ---",
+            "Categoria: %s" % (categoria.get("nombre") or "-"),
+            "Tamano: %s (%s)" % (size.get("nombre") or "-", fmt_clp(size.get("precio") or 0)),
+            "Sabores:",
+        ]
+        if sabores:
+            for sb in sabores:
+                lines.append("- %s (%s)" % (sb.get("nombre") or "-", fmt_clp(sb.get("precio") or 0)))
+        else:
+            lines.append("- -")
+        lines.append("Extras:")
+        if extras:
+            for ex in extras:
+                qty = int(ex.get("qty") or 0)
+                lines.append("- %s x%s (%s)" % (ex.get("nombre") or "-", qty, fmt_clp(float(ex.get("precio") or 0) * qty)))
+        else:
+            lines.append("- -")
+        lines.append("Topper:")
+        if topper:
+            lines.append("- %s (%s)" % (topper.get("nombre") or "-", fmt_clp(topper.get("precio") or 0)))
+        else:
+            lines.append("- Sin topper")
+        lines.append("Subtotal estimado productos: %s" % fmt_clp(resumen.get("subtotal") or 0))
+        builder_raw = payload_torta(draft)
+        lines.append("--- Builder JSON ---")
+        lines.append(json.dumps(builder_raw, ensure_ascii=False, separators=(",", ":")))
+        lines.append("Total estimado pedido: %s" % fmt_clp(resumen.get("subtotal") or 0))
+        return "\n".join(lines)
+
+    def pdf_cotizacion_url(draft, resumen):
+        if not callable(crear_pdf_reserva) or not resumen:
+            return ""
+        try:
+            codigo = "COT-%s-%s" % (
+                re.sub(r"[^0-9]", "", str(draft.get("fecha") or ""))[:8] or datetime.now(ZoneInfo("America/Santiago")).strftime("%Y%m%d"),
+                datetime.now(ZoneInfo("America/Santiago")).strftime("%H%M%S"),
+            )
+            reserva = {
+                "id": 0,
+                "documento_tipo": "cotizacion",
+                "tipo": "torta",
+                "titulo": "Cotizacion asistente",
+                "fecha": draft.get("fecha") or "",
+                "hora_inicio": draft.get("hora_inicio") or "",
+                "hora_entrega": draft.get("hora_inicio") or "",
+                "cliente": draft.get("nombre") or "Cliente por confirmar",
+                "telefono": draft.get("telefono") or "",
+                "direccion": draft.get("direccion") or "",
+                "es_envio": 1 if draft.get("entrega_tipo") == "despacho" else 0,
+                "ingredientes": crear_ingredientes_cotizacion(draft, resumen),
+                "total": float(resumen.get("subtotal") or 0),
+                "abono": 0,
+                "motivo": "Cotizacion generada por asistente Sucree",
+                "estado": "borrador",
+                "codigo_pedido": codigo,
+                "codigo_operacion": codigo,
+            }
+            filename = crear_pdf_reserva(reserva)
+            return "%s/static/tienda_pedidos_pdf/%s" % (public_base_url, quote(filename))
+        except Exception:
+            return ""
 
     def cotizar(draft, catalogo):
         try:
@@ -418,8 +554,26 @@ def registrar_asistente_sucree(app, deps):
             "Hora: %s" % (draft.get("hora_inicio") or "-"),
         ])
 
+    def cliente_estado_texto(draft):
+        if draft.get("email") and draft.get("cliente_encontrado") is True:
+            datos = []
+            if draft.get("nombre"):
+                datos.append("nombre")
+            if draft.get("telefono"):
+                datos.append("telefono")
+            if draft.get("direccion"):
+                datos.append("direccion")
+            return "Cliente encontrado por correo. Complete automaticamente: %s." % (", ".join(datos) if datos else "datos disponibles")
+        if draft.get("email") and draft.get("cliente_encontrado") is False:
+            if not draft.get("nombre") or not draft.get("telefono"):
+                return "No encontre ese correo en la base de clientes. Necesito nombre y telefono para continuar."
+            return "No encontre ese correo en la base de clientes. Usare los datos que ingresaste para esta cotizacion."
+        return ""
+
     def faltantes(draft, resumen):
         out = []
+        if not draft.get("email"):
+            out.append("correo")
         if not draft.get("size_id"):
             out.append("tamano de torta")
         if not draft.get("sabor_ids"):
@@ -432,8 +586,6 @@ def registrar_asistente_sucree(app, deps):
             out.append("nombre")
         if not draft.get("telefono"):
             out.append("telefono")
-        if not draft.get("email"):
-            out.append("correo")
         if draft.get("entrega_tipo") == "despacho" and not draft.get("direccion"):
             out.append("direccion de despacho")
         if draft.get("size_id") and draft.get("sabor_ids") and not resumen:
@@ -632,7 +784,19 @@ def registrar_asistente_sucree(app, deps):
                 }
             return {"reply": "No pude registrar la reserva aun: %s" % (res.get("error") or "error desconocido"), "draft": draft, "error": res.get("error")}
         if resumen:
+            if not draft.get("email"):
+                reply = "\n".join([
+                    "Ya tengo la base de la torta, pero antes de continuar necesito el correo del cliente.",
+                    "",
+                    "Con ese correo revisare si ya existe en la base de datos para completar nombre, telefono y direccion si estan guardados.",
+                    "",
+                    "Por favor escribe el correo para seguir con la cotizacion.",
+                ])
+                return {"reply": reply, "draft": draft, "quote": resumen}
             reply = resumen_texto(draft, resumen)
+            cliente_msg = cliente_estado_texto(draft)
+            if cliente_msg:
+                reply += "\n\n" + cliente_msg
             if draft.get("fecha"):
                 horas = horas_disponibles(draft.get("fecha"), limite=6)
                 if horas:
@@ -643,8 +807,12 @@ def registrar_asistente_sucree(app, deps):
             if faltan:
                 reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             else:
+                pdf_url = pdf_cotizacion_url(draft, resumen)
+                if pdf_url:
+                    draft["cotizacion_pdf_url"] = pdf_url
+                    reply += "\n\nPDF de cotizacion:\n%s" % pdf_url
                 reply += "\n\nTengo todo para solicitar la reserva. Escribe 'confirmar reserva' para registrarla."
-            return {"reply": reply, "draft": draft, "quote": resumen}
+            return {"reply": reply, "draft": draft, "quote": resumen, "pdf_url": draft.get("cotizacion_pdf_url") or ""}
         meaningful = any(draft.get(k) for k in ["fecha", "hora_inicio", "email", "telefono", "nombre", "size_id", "sabor_ids"])
         if meaningful:
             reply = "Voy ordenando la informacion."
