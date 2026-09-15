@@ -689,6 +689,84 @@ def registrar_asistente_sucree(app, deps):
         ]
         return "\n".join(lines)
 
+    def sugerencias_catalogo(catalogo):
+        out = []
+        for cat in catalogo.get("categorias") or []:
+            nombre = str(cat.get("nombre") or "").strip()
+            cid = str(cat.get("id") or "").strip()
+            if nombre:
+                base = nombre
+            elif cid:
+                base = cid.replace("-", " ")
+            else:
+                continue
+            out.append("Catalogo " + base)
+        return out[:8]
+
+    def sugerencias_faltantes(faltan):
+        mapa = {
+            "correo": "Ingresar correo del cliente",
+            "nombre": "Ingresar nombre del cliente",
+            "telefono": "Ingresar telefono del cliente",
+            "fecha": "Ver horas disponibles",
+            "hora": "Horas disponibles",
+            "tamano de torta": "Ver catalogo y precios",
+            "relleno/sabor": "Ver rellenos disponibles",
+            "direccion de despacho": "Ingresar direccion de despacho",
+        }
+        out = []
+        for item in faltan or []:
+            label = mapa.get(item)
+            if label and label not in out:
+                out.append(label)
+        return out[:6]
+
+    def sugerencias_desde_respuesta(reply):
+        texto = str(reply or "")
+        out = []
+        seen = set()
+
+        def add(label):
+            clean = str(label or "").strip().strip(".")
+            clean = re.sub(r"^[-•]\s*", "", clean).strip()
+            if not clean or len(clean) > 90:
+                return
+            key = clean.lower()
+            if key in seen:
+                return
+            seen.add(key)
+            out.append(clean)
+
+        capture = False
+        mode = ""
+        for raw in texto.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+            line = str(raw or "").strip()
+            low = norm(line)
+            if any(x in low for x in ["escribe por ejemplo", "puedes escribir", "si quieres puedes escribir", "opciones", "tipos disponibles"]):
+                capture = True
+                mode = "tipos" if "tipos disponibles" in low else "ejemplos"
+                continue
+            if not line:
+                continue
+            m = re.match(r"^[-•]\s+(.+)$", line)
+            if m and capture:
+                label = m.group(1)
+                if mode == "tipos":
+                    label = re.sub(r"(?i)\btortas?\b", "", label).strip()
+                    label = "Catalogo " + label
+                add(label)
+        if "confirmar reserva" in norm(texto):
+            add("confirmar reserva")
+        if "correo" in norm(texto) and ("necesito" in norm(texto) or "por favor" in norm(texto)):
+            add("Ingresar correo del cliente")
+        if "horas disponibles" in norm(texto) or "horas tentativas" in norm(texto):
+            add("Horas disponibles")
+        if "catalogo" in norm(texto) or "precios" in norm(texto):
+            add("Ver catalogo y precios")
+        if "agendar torta" in norm(texto):
+            add("Agendar torta")
+        return out[:8]
+
     def chat_logic(message, draft):
         catalogo = cargar_catalogo()
         msg = str(message or "").strip()
@@ -850,6 +928,8 @@ def registrar_asistente_sucree(app, deps):
             msg = str(data.get("message") or "").strip()[:1200]
             draft = data.get("draft") if isinstance(data.get("draft"), dict) else {}
             out = chat_logic(msg, draft)
+            if not out.get("suggestions"):
+                out["suggestions"] = sugerencias_desde_respuesta(out.get("reply"))
             payload = {"success": True}
             payload.update(out)
             return jsonify(payload)

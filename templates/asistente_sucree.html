@@ -103,6 +103,35 @@
       font-family: Arial, sans-serif;
       font-size: 15px;
     }
+    .msg-wrap {
+      width: fit-content;
+      max-width: min(720px, 92%);
+      margin: 0 0 12px;
+    }
+    .msg-wrap.user { margin-left: auto; }
+    .msg-wrap .msg { margin-bottom: 0; max-width: 100%; }
+    .quick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+      padding-left: 4px;
+    }
+    .quick-action {
+      border: 1px solid #efb36d;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: linear-gradient(135deg, #fffaf5, #fff1df);
+      color: var(--coffee);
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(53,25,14,.08);
+    }
+    .quick-action:hover {
+      border-color: var(--orange);
+      transform: translateY(-1px);
+    }
     .bot {
       background: var(--cream);
       border: 1px solid #f5c991;
@@ -174,7 +203,7 @@
       .hero { grid-template-columns: 1fr; border-radius: 22px; }
       .status { width: fit-content; }
       .messages { height: calc(100vh - 290px); min-height: 360px; padding: 12px; }
-      .msg { max-width: 94%; }
+      .msg, .msg-wrap { max-width: 94%; }
       .composer { grid-template-columns: 1fr; }
       .send { min-height: 48px; }
     }
@@ -216,11 +245,82 @@
     const send = document.getElementById('send');
     let draft = {};
 
-    function addMessage(text, who) {
+    function normalizeActionText(text) {
+      return (text || '')
+        .replace(/^[-•]\s*/, '')
+        .replace(/^["']|["']$/g, '')
+        .replace(/\.$/, '')
+        .trim();
+    }
+
+    function buildAutoSuggestions(text) {
+      const raw = text || '';
+      const suggestions = [];
+      const seen = new Set();
+      function add(label) {
+        const clean = normalizeActionText(label);
+        if (!clean || clean.length > 90) return;
+        const key = clean.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        suggestions.push(clean);
+      }
+
+      const lines = raw.split(/\r?\n/);
+      let captureExamples = false;
+      let captureOptions = false;
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        const lower = cleanLine.toLowerCase();
+        if (/escribe.*por ejemplo|puedes escribir|puedes escribirlo|si quieres, puedes escribir|opciones:|tipos disponibles:/.test(lower)) {
+          captureExamples = true;
+          captureOptions = true;
+          continue;
+        }
+        if (!cleanLine) {
+          if (captureExamples) captureOptions = false;
+          continue;
+        }
+        const bullet = cleanLine.match(/^[-•]\s+(.+)/);
+        if (bullet && (captureExamples || captureOptions)) add(bullet[1]);
+      }
+
+      if (/correo del cliente|por favor escribe el correo/i.test(raw)) add('Ingresar correo del cliente');
+      if (/dime cual prefieres/i.test(raw)) {
+        lines.forEach((line) => {
+          const hour = line.trim().match(/^[-•]\s*(\d{1,2}:\d{2})$/);
+          if (hour) add(hour[1]);
+        });
+      }
+      if (/confirmar reserva/i.test(raw)) add('confirmar reserva');
+      if (/ver catalogo y precios/i.test(raw)) add('Ver catalogo y precios');
+      if (/horas disponibles/i.test(raw)) add('Horas disponibles');
+      if (/agendar torta/i.test(raw)) add('Agendar torta');
+      return suggestions.slice(0, 8);
+    }
+
+    function addMessage(text, who, suggestions) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-wrap ' + (who === 'user' ? 'user' : 'bot');
       const node = document.createElement('div');
       node.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
       node.textContent = text;
-      messages.appendChild(node);
+      wrap.appendChild(node);
+      const actions = who === 'bot' ? (Array.isArray(suggestions) && suggestions.length ? suggestions : buildAutoSuggestions(text)) : [];
+      if (actions.length) {
+        const box = document.createElement('div');
+        box.className = 'quick-actions';
+        actions.forEach((label) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'quick-action';
+          btn.textContent = label;
+          btn.addEventListener('click', () => ask(label));
+          box.appendChild(btn);
+        });
+        wrap.appendChild(box);
+      }
+      messages.appendChild(wrap);
       messages.scrollTop = messages.scrollHeight;
     }
 
@@ -239,7 +339,7 @@
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'No se pudo responder');
         draft = data.draft || draft || {};
-        addMessage(data.reply || 'Estoy revisando esa informacion.', 'bot');
+        addMessage(data.reply || 'Estoy revisando esa informacion.', 'bot', data.suggestions || []);
       } catch (err) {
         addMessage('Tuve un problema temporal. Intenta nuevamente en unos segundos.', 'bot');
       } finally {
