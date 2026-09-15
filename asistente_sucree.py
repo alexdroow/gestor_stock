@@ -299,6 +299,68 @@ def registrar_asistente_sucree(app, deps):
         }
         return mapa.get(str(estado or "").strip().lower(), "Tu pedido esta registrado en nuestro sistema.")
 
+
+    def buscar_pedidos_activos_por_email(email, limite=5):
+        email = normalizar_email(email)
+        if not email:
+            return []
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            hoy = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
+            like_email = "%Email: %s%" % email
+            cur.execute(
+                """
+                SELECT id, tipo, titulo, fecha, hora_inicio, hora_entrega, cliente, telefono,
+                       direccion, ingredientes, total, abono, estado, codigo_pedido,
+                       codigo_operacion, seguimiento_estado, es_envio, creado
+                FROM agenda_eventos
+                WHERE (
+                    LOWER(TRIM(COALESCE(cliente_email, ''))) = LOWER(TRIM(?))
+                    OR ingredientes LIKE ?
+                )
+                  AND COALESCE(NULLIF(TRIM(estado), ''), 'activo') NOT IN ('entregado', 'cancelado', 'anulado')
+                  AND (COALESCE(fecha, '') = '' OR fecha >= ?)
+                ORDER BY COALESCE(fecha, '') ASC, COALESCE(hora_inicio, hora_entrega, '') ASC, id DESC
+                LIMIT ?
+                """,
+                (email, like_email, hoy, int(limite or 5)),
+            )
+            return [dict(row) for row in cur.fetchall()]
+        except Exception:
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    def respuesta_seguimiento_por_email(email):
+        email = normalizar_email(email)
+        if not email:
+            return "Para revisar tus pedidos activos, enviame el correo usado al agendar o el codigo del pedido."
+        pedidos = buscar_pedidos_activos_por_email(email)
+        if not pedidos:
+            return "No encontre pedidos activos asociados a %s. Si tienes el codigo del pedido, enviamelo y lo reviso directamente." % email
+        lines = ["Estos son los pedidos activos que encontre para %s:" % email, ""]
+        for ev in pedidos:
+            codigo = str(ev.get("codigo_pedido") or ev.get("codigo_operacion") or ("#%s" % ev.get("id"))).strip()
+            estado = str(ev.get("seguimiento_estado") or ev.get("estado") or "pendiente").strip().lower()
+            label = seguimiento_label(estado) if callable(seguimiento_label) else estado.replace("_", " ").title()
+            titulo = str(ev.get("titulo") or "Pedido Sucree").strip()
+            fecha = fmt_fecha(ev.get("fecha"))
+            hora = str(ev.get("hora_entrega") or ev.get("hora_inicio") or "-").strip()[:5] or "-"
+            url = "%s/seguimiento/%s" % (public_base_url, quote(codigo)) if codigo and not codigo.startswith("#") else "%s/seguimiento" % public_base_url
+            lines.extend([
+                "- %s" % codigo,
+                "  Pedido: %s" % titulo,
+                "  Estado: %s" % label,
+                "  Fecha y hora: %s %s" % (fecha, hora),
+                "  Seguimiento: %s" % url,
+            ])
+        if len(pedidos) >= 5:
+            lines.extend(["", "Si no ves tu pedido, enviame el codigo exacto para buscarlo directamente."])
+        return "\n".join(lines)
+
     def consultar_estado_pedido(codigo):
         codigo = str(codigo or "").strip().upper()
         if not codigo:
@@ -1486,11 +1548,21 @@ def registrar_asistente_sucree(app, deps):
                 "tracking_url": "%s/seguimiento/%s" % (public_base_url, quote(codigo_seguimiento)),
             }
         if seguimiento_intent:
+            if draft.get("email"):
+                draft.pop("tracking_pending", None)
+                return {
+                    "reply": respuesta_seguimiento_por_email(draft.get("email")),
+                    "draft": draft,
+                    "type": "tracking_email",
+                    "suggestions": ["Enviar codigo de pedido", "Agendar torta"],
+                }
+            draft["tracking_pending"] = True
             return {
                 "reply": "\n".join([
                     "Puedo revisar el estado de tu pedido.",
                     "",
-                    "Enviame el codigo completo del pedido, por ejemplo:",
+                    "Enviame el correo usado al agendar para buscar tus pedidos activos.",
+                    "Si no aparece con el correo, tambien puedes enviarme el codigo completo del pedido, por ejemplo:",
                     "- AGD-20260916-000103",
                     "",
                     "Tambien puedes revisar directamente aqui:",
@@ -1498,6 +1570,15 @@ def registrar_asistente_sucree(app, deps):
                 ]),
                 "draft": draft,
                 "type": "tracking_help",
+                "suggestions": ["Consultar por correo", "Enviar codigo de pedido"],
+            }
+        if draft.get("tracking_pending") and draft.get("email"):
+            draft.pop("tracking_pending", None)
+            return {
+                "reply": respuesta_seguimiento_por_email(draft.get("email")),
+                "draft": draft,
+                "type": "tracking_email",
+                "suggestions": ["Enviar codigo de pedido", "Agendar torta"],
             }
         if es_saludo_simple(nmsg):
             return {
@@ -1551,69 +1632,87 @@ def registrar_asistente_sucree(app, deps):
             reply = catalogo_texto(catalogo, categoria_id=draft.get("categoria_id") or "")
             if "tradicional" in nmsg and not categoria_msg:
                 reply = "Para torta tradicional primero elige el tipo base que prefieres.\n\n" + reply
-            if resumen:
-                reply += "\n\n" + resumen_texto(draft, resumen)
-            return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": sugerencias_catalogo(catalogo)}
+            return {"reply": reply, "draft": draft, "suggestions": sugerencias_catalogo(catalogo)}
 
         if agendar_intent and faltan:
             detalle = respuesta_faltantes_contextual(draft, faltan, catalogo)
             reply = "Perfecto, voy armando tu solicitud."
-            if resumen:
-                reply = resumen_texto(draft, resumen)
             if hora_elegida_disponible(draft, catalogo):
                 reply += "\n\n" + respuesta_disponibilidad(draft, catalogo=catalogo, limite=6)
             if detalle:
                 reply += "\n\n" + detalle
-            return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": sugerencias_faltantes(faltan) or sugerencias_catalogo(catalogo)}
+            return {"reply": reply, "draft": draft, "suggestions": sugerencias_faltantes(faltan) or sugerencias_catalogo(catalogo)}
 
-        confirmar = any(x in nmsg for x in ["confirmar", "reservar", "agendar", "crear pedido", "hacer pedido"])
-        if confirmar and not faltan:
-            cierre = registrar_cotizacion_completa(draft, resumen, catalogo=catalogo)
-            reply = resumen_texto(draft, resumen) + "\n\n" + cierre.get("reply", "")
+        confirmar = any(x in nmsg for x in ["confirmar", "confirmar reserva", "enviar solicitud", "enviar cotizacion", "registrar solicitud", "reservar ahora"])
+        if confirmar:
+            resumen_confirm, err_confirm = cotizar(draft, catalogo)
+            faltan_confirm = faltantes(draft, resumen_confirm, catalogo, err_confirm)
+            if not resumen_confirm or faltan_confirm:
+                detalle = respuesta_faltantes_contextual(draft, faltan_confirm, catalogo)
+                reply = "Antes de enviar la solicitud necesito completar y revisar estos datos."
+                if detalle:
+                    reply += "\n\n" + detalle
+                return {
+                    "reply": reply,
+                    "draft": draft,
+                    "suggestions": sugerencias_faltantes(faltan_confirm) or sugerencias_catalogo(catalogo),
+                }
+            cierre = registrar_cotizacion_completa(draft, resumen_confirm, catalogo=catalogo)
+            if cierre.get("ok"):
+                reply = resumen_texto(draft, resumen_confirm) + "\n\n" + cierre.get("reply", "")
+            else:
+                reply = cierre.get("reply", "No pude registrar la solicitud en este momento.")
             return {
                 "reply": reply,
                 "draft": draft,
-                "quote": resumen,
+                "quote": resumen_confirm if cierre.get("ok") else None,
                 "pdf_url": cierre.get("pdf_url") or draft.get("cotizacion_pdf_url") or "",
                 "agenda_id": cierre.get("agenda_id"),
+                "codigo_pedido": cierre.get("codigo_pedido") or draft.get("cotizacion_codigo") or "",
                 "suggestions": cierre.get("suggestions") or [],
                 "whatsapp_url": cierre.get("whatsapp_url") or "",
                 "error": cierre.get("error"),
             }
         if resumen:
-            if not draft.get("email"):
-                reply = "\n".join([
-                    "Ya tengo la base de la torta, pero antes de continuar necesito el correo del cliente.",
-                    "",
-                    "Con ese correo revisare si puedo completar tus datos de contacto automaticamente.",
-                    "",
-                    "Por favor escribe el correo para seguir con la cotizacion.",
-                ])
-                return {"reply": reply, "draft": draft, "quote": resumen}
+            if faltan:
+                detalle = respuesta_faltantes_contextual(draft, faltan, catalogo)
+                reply = "Ya tengo parte de la cotizacion."
+                cliente_msg = cliente_estado_texto(draft)
+                if cliente_msg:
+                    reply += "\n\n" + cliente_msg
+                if draft.get("fecha") and not draft.get("hora_inicio"):
+                    reply += "\n\n" + respuesta_disponibilidad(draft, catalogo=catalogo, limite=6)
+                elif hora_elegida_disponible(draft, catalogo):
+                    reply += "\n\nHora confirmada: %s para %s." % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
+                if detalle:
+                    reply += "\n\n" + detalle
+                return {"reply": reply, "draft": draft, "suggestions": sugerencias_faltantes(faltan) or sugerencias_catalogo(catalogo)}
+
+            disponibilidad = validar_hora_cotizacion(draft, catalogo=catalogo)
+            if not disponibilidad.get("ok"):
+                horas = disponibilidad.get("horas") or []
+                if horas:
+                    reply = "Esa hora no esta disponible. Estas son horas disponibles para ese mismo dia:\n%s\n\nDime cual prefieres para actualizar la cotizacion." % "\n".join("- " + h for h in horas)
+                    return {"reply": reply, "draft": draft, "suggestions": horas[:6]}
+                if disponibilidad.get("anticipacion"):
+                    return {
+                        "reply": "%s\n\nIndica una fecha mas adelante y reviso las horas disponibles." % (disponibilidad.get("error") or mensaje_anticipacion_torta(draft, catalogo)),
+                        "draft": draft,
+                        "suggestions": ["Horas disponibles"],
+                    }
+                link = whatsapp_url("Hola Sucree, necesito ayuda porque no encontre horas disponibles para agendar mi torta.")
+                return {
+                    "reply": "Para %s no veo horas disponibles en la agenda. Por favor comunicate con la pasteleria por WhatsApp para revisar una alternativa:\n%s" % (fmt_fecha(draft.get("fecha")), link),
+                    "draft": draft,
+                    "whatsapp_url": link,
+                }
+
             reply = resumen_texto(draft, resumen)
             cliente_msg = cliente_estado_texto(draft)
             if cliente_msg:
                 reply += "\n\n" + cliente_msg
-            if draft.get("fecha") and not draft.get("hora_inicio"):
-                reply += "\n\n" + respuesta_disponibilidad(draft, catalogo=catalogo, limite=6)
-            elif hora_elegida_disponible(draft, catalogo):
-                reply += "\n\nHora confirmada: %s para %s." % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
-            if faltan:
-                reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
-            else:
-                cierre = registrar_cotizacion_completa(draft, resumen, catalogo=catalogo)
-                reply += "\n\n" + cierre.get("reply", "")
-                return {
-                    "reply": reply,
-                    "draft": draft,
-                    "quote": resumen,
-                    "pdf_url": cierre.get("pdf_url") or draft.get("cotizacion_pdf_url") or "",
-                    "agenda_id": cierre.get("agenda_id"),
-                    "suggestions": cierre.get("suggestions") or [],
-                    "whatsapp_url": cierre.get("whatsapp_url") or "",
-                    "error": cierre.get("error"),
-                }
-            return {"reply": reply, "draft": draft, "quote": resumen, "pdf_url": draft.get("cotizacion_pdf_url") or ""}
+            reply += "\n\nYa tengo toda la informacion minima. Revisa el resumen y, si esta correcto, presiona Enviar solicitud."
+            return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": ["Enviar solicitud", "Cambiar fecha", "Editar torta"]}
         meaningful = any(draft.get(k) for k in ["fecha", "hora_inicio", "email", "telefono", "nombre", "size_id", "sabor_ids", "personas", "categoria_id"])
         if meaningful:
             reply = "Voy ordenando la informacion."
