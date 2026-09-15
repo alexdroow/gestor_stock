@@ -1093,19 +1093,74 @@ def registrar_asistente_sucree(app, deps):
                 return (now.date() + timedelta(days=delta)).isoformat()
         return ""
 
-    def parse_hora(texto):
+    def parse_hora(texto, permitir_numero_suelto=False):
         txt = norm(texto)
-        m = re.search(r"\b(\d{1,2})[:.](\d{2})\b", txt)
+        m = re.search(r"\b(\d{1,2})[:.](\d{2})\s*(am|pm|a m|p m)?\b", txt)
         if m:
             h = int(m.group(1))
             minute = int(m.group(2))
+            mer = str(m.group(3) or "").replace(" ", "")
+            if mer == "pm" and h < 12:
+                h += 12
+            if mer == "am" and h == 12:
+                h = 0
             if 0 <= h <= 23 and 0 <= minute <= 59:
                 return "%02d:%02d" % (h, minute)
+        m = re.search(r"\b(?:a\s+las\s+|hora\s*)?(\d{1,2})\s*(am|pm|a m|p m)\b", txt)
+        if m:
+            h = int(m.group(1))
+            mer = str(m.group(2) or "").replace(" ", "")
+            if mer == "pm" and h < 12:
+                h += 12
+            if mer == "am" and h == 12:
+                h = 0
+            if 0 <= h <= 23:
+                return "%02d:00" % h
         m = re.search(r"\b(?:a\s+las\s+|hora\s*)?(\d{1,2})\s*(?:h|hrs|horas?)\b", txt)
         if m:
             h = int(m.group(1))
             if 0 <= h <= 23:
                 return "%02d:00" % h
+        if permitir_numero_suelto:
+            m = re.fullmatch(r"\s*(\d{1,2})\s*", txt)
+            if m:
+                h = int(m.group(1))
+                if 0 <= h <= 23:
+                    return "%02d:00" % h
+        return ""
+
+    def hora_pendiente_en_draft(draft):
+        draft = dict(draft or {})
+        return bool(not draft.get("hora_inicio") and (draft.get("fecha") or draft.get("size_id") or draft.get("sabor_ids") or draft.get("personas")))
+
+    def recuperar_hora_reciente_conversacion(conversation_id):
+        conn = None
+        try:
+            cid = str(conversation_id or "").strip()[:80]
+            if not cid:
+                return ""
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            cur.execute(
+                """
+                SELECT pregunta
+                FROM asistente_mensajes
+                WHERE conversation_id = ?
+                ORDER BY id DESC
+                LIMIT 6
+                """,
+                (cid,),
+            )
+            for row in cur.fetchall():
+                hora = parse_hora(row["pregunta"] or "", permitir_numero_suelto=True)
+                if hora:
+                    return hora
+        except Exception:
+            return ""
+        finally:
+            if conn:
+                conn.close()
         return ""
 
     def parse_contacto(texto):
@@ -1185,7 +1240,9 @@ def registrar_asistente_sucree(app, deps):
         draft = dict(draft or {})
         texto = str(mensaje or "")
         fecha = parse_fecha(texto)
-        hora = parse_hora(texto)
+        hora = parse_hora(texto, permitir_numero_suelto=hora_pendiente_en_draft(draft))
+        if not hora and hora_pendiente_en_draft(draft) and any(x in norm(texto) for x in ["es la hora", "esa hora", "la hora", "ese horario"]):
+            hora = recuperar_hora_reciente_conversacion(draft.get("conversation_id"))
         email, telefono = parse_contacto(texto)
         entrega = detectar_entrega(texto)
         nombre_detectado = parse_nombre_cliente(texto, draft)
@@ -1974,6 +2031,8 @@ def registrar_asistente_sucree(app, deps):
         t = str(texto_norm or "").strip()
         if not t:
             return ""
+        if t in {"es la hora", "esa hora", "la hora", "ese horario", "esa es la hora"}:
+            return ""
         mapas = [
             ("fecha", ["fecha", "dia", "cambiar fecha", "modificar fecha", "otra fecha"]),
             ("hora", ["hora", "horario", "cambiar hora", "modificar hora", "otra hora"]),
@@ -2208,13 +2267,19 @@ def registrar_asistente_sucree(app, deps):
                 "suggestions": sugerencias_incompatibilidades(draft, catalogo) or sugerencias_catalogo(catalogo),
             }
 
-        if "tamano no disponible" in faltan:
-            return {
-                "reply": respuesta_tamano_invalido(draft, catalogo),
-                "draft": draft,
-                "type": "invalid_catalog_option",
-                "suggestions": sugerencias_tamano_invalido(draft, catalogo),
-            }
+        if nmsg in {"es la hora", "esa hora", "la hora", "ese horario", "esa es la hora"} and draft.get("hora_inicio"):
+            if resumen and not faltan:
+                disponibilidad = validar_hora_cotizacion(draft, catalogo=catalogo)
+                if disponibilidad.get("ok"):
+                    reply = "Hora recibida: %s para %s.\n\n" % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
+                    reply += resumen_texto(draft, resumen)
+                    reply += "\n\nYa tengo toda la informaci?n m?nima. Revisa el resumen. Si est? correcto, presiona Enviar solicitud."
+                    return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": ["Enviar solicitud", "Fecha", "Relleno", "Nombre", "Hora", "Tama?o"]}
+            detalle = respuesta_faltantes_contextual(draft, faltan, catalogo)
+            reply = "Hora recibida: %s." % str(draft.get("hora_inicio") or "")[:5]
+            if detalle:
+                reply += "\n\n" + detalle
+            return {"reply": reply, "draft": draft, "suggestions": sugerencias_faltantes(faltan) or sugerencias_catalogo(catalogo)}
 
         if not msg:
             return {"reply": "Escribeme que torta necesitas y para que fecha. Te ayudo a cotizar y revisar horas disponibles.", "draft": draft}
