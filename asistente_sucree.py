@@ -584,7 +584,7 @@ def registrar_asistente_sucree(app, deps):
             "Tipos disponibles:",
         ]
         lines.append(list_lines(categorias, lambda c: str(c.get("nombre") or ""), "sin tipos cargados"))
-        if draft.get("fecha"):
+        if draft.get("fecha") and not draft.get("hora_inicio"):
             horas = horas_disponibles(draft.get("fecha"), limite=6, draft=draft, catalogo=catalogo)
             if horas:
                 lines.extend(["", "Horas tentativas para %s:" % fmt_fecha(draft.get("fecha"))])
@@ -1004,7 +1004,27 @@ def registrar_asistente_sucree(app, deps):
             return "No encontre ese correo en la base de clientes. Usare los datos que ingresaste para esta cotizacion."
         return ""
 
-    def faltantes(draft, resumen):
+    def diagnostico_catalogo_invalido(draft, catalogo, err=""):
+        categoria = find_categoria(catalogo, draft.get("categoria_id") or "")
+        sizes = rows_categoria(catalogo, "sizes", categoria) if categoria else list(catalogo.get("sizes") or [])
+        sabores = rows_categoria(catalogo, "sabores", categoria) if categoria else list(catalogo.get("sabores") or [])
+        parts = ["Hay un dato de la torta que no calza con el catalogo activo."]
+        if err:
+            parts.append("Detalle interno: %s" % str(err).strip())
+        if categoria:
+            parts.append("Estoy revisando el tipo: %s." % (categoria.get("nombre") or "torta"))
+        else:
+            parts.append("Necesito confirmar primero el tipo de torta, por ejemplo: bizcocho, panqueque o mil hojas.")
+        if sizes:
+            parts.append("Tamanos disponibles para elegir:")
+            parts.append(list_lines(sizes[:8], lambda s: str(s.get("nombre") or "Tamano"), "sin tamanos cargados"))
+        if sabores:
+            parts.append("Rellenos disponibles para ese tipo:")
+            parts.append(list_lines(sabores[:10], lambda s: str(s.get("nombre") or "Relleno"), "sin rellenos cargados"))
+        parts.append("Escribeme el dato corregido en una frase. Ejemplo: 25 personas bizcocho con manjar.")
+        return "\n".join([p for p in parts if p])
+
+    def faltantes(draft, resumen, catalogo=None, err=""):
         out = []
         if not draft.get("email"):
             out.append("correo")
@@ -1025,8 +1045,39 @@ def registrar_asistente_sucree(app, deps):
         if draft.get("entrega_tipo") == "despacho" and not draft.get("direccion"):
             out.append("direccion de despacho")
         if draft.get("size_id") and draft.get("sabor_ids") and not resumen:
-            out.append("opciones validas del catalogo")
+            out.append(diagnostico_catalogo_invalido(draft, catalogo or {}, err))
         return out
+
+    def hora_elegida_disponible(draft, catalogo=None):
+        if not draft.get("fecha") or not draft.get("hora_inicio"):
+            return False
+        return bool(validar_hora_cotizacion(draft, catalogo=catalogo).get("ok"))
+
+    def respuesta_disponibilidad(draft, catalogo=None, limite=10):
+        fecha = str(draft.get("fecha") or "").strip()
+        hora = str(draft.get("hora_inicio") or "").strip()[:5]
+        if fecha and hora:
+            validacion = validar_hora_cotizacion(draft, catalogo=catalogo)
+            if validacion.get("ok"):
+                return "La hora %s para %s esta disponible y queda tomada como horario elegido. No necesito mostrarte horas tentativas; sigo con los datos que falten para completar la solicitud." % (hora, fmt_fecha(fecha))
+            horas = validacion.get("horas") or []
+            if horas:
+                return "\n".join([
+                    validacion.get("error") or "Esa hora no esta disponible.",
+                    "",
+                    "Para ese mismo dia puedo ofrecer:",
+                    "\n".join("- " + h for h in horas[:limite]),
+                    "",
+                    "Elige una de esas horas y actualizo la solicitud.",
+                ])
+            return validacion.get("error") or respuesta_sin_horas(fecha, {}, draft=draft, catalogo=catalogo)
+        if fecha:
+            detalle = horas_disponibles_detalle(fecha, limite=limite, draft=draft, catalogo=catalogo)
+            horas = detalle.get("horas") or []
+            if horas:
+                return "\n".join(["Horas disponibles para %s:" % fmt_fecha(fecha), ""] + ["- " + h for h in horas] + ["", "Dime cual prefieres."])
+            return respuesta_sin_horas(fecha, detalle, draft=draft, catalogo=catalogo)
+        return disponibilidad_texto(proximas_fechas(draft=draft, catalogo=catalogo))
 
     def horas_disponibles_detalle(fecha, limite=8, draft=None, catalogo=None):
         conn = None
@@ -1311,7 +1362,7 @@ def registrar_asistente_sucree(app, deps):
         draft = actualizar_draft(draft or {}, msg, catalogo)
         draft = registrar_cliente_desde_draft(draft)
         resumen, err = cotizar(draft, catalogo)
-        faltan = faltantes(draft, resumen)
+        faltan = faltantes(draft, resumen, catalogo, err)
 
         if not msg:
             return {"reply": "Escribeme que torta necesitas y para que fecha. Te ayudo a cotizar y revisar horas disponibles.", "draft": draft}
@@ -1373,23 +1424,12 @@ def registrar_asistente_sucree(app, deps):
             return {"reply": reply, "draft": draft, "quote": resumen}
 
         if disponibilidad_intent and not agendar_intent:
-            if draft.get("fecha"):
-                detalle = horas_disponibles_detalle(draft.get("fecha"), limite=10, draft=draft, catalogo=catalogo)
-                horas = detalle.get("horas") or []
-                if horas:
-                    reply = "\n".join(
-                        ["Horas tentativas para %s:" % fmt_fecha(draft.get("fecha")), ""]
-                        + ["- " + h for h in horas]
-                        + ["", "Dime cual prefieres."]
-                    )
-                else:
-                    reply = respuesta_sin_horas(draft.get("fecha"), detalle, draft=draft, catalogo=catalogo)
-            else:
-                reply = disponibilidad_texto(proximas_fechas(draft=draft, catalogo=catalogo))
-            return {"reply": reply, "draft": draft}
+            return {"reply": respuesta_disponibilidad(draft, catalogo=catalogo, limite=10), "draft": draft}
 
         if agendar_intent and faltan:
             reply = guia_agendar_texto(catalogo, draft)
+            if hora_elegida_disponible(draft, catalogo):
+                reply += "\n\n" + respuesta_disponibilidad(draft, catalogo=catalogo, limite=6)
             if resumen:
                 reply += "\n\n" + resumen_texto(draft, resumen)
                 reply += "\n\nPara continuar falta:\n" + "\n".join("- " + x for x in faltan)
@@ -1400,18 +1440,7 @@ def registrar_asistente_sucree(app, deps):
                 reply += "\n\n" + resumen_texto(draft, resumen)
             return {"reply": reply, "draft": draft, "quote": resumen}
         if any(x in nmsg for x in ["hora disponible", "horas disponibles", "disponibilidad", "agenda", "cuando puedo", "fecha disponible"]):
-            if draft.get("fecha"):
-                detalle = horas_disponibles_detalle(draft.get("fecha"), limite=10, draft=draft, catalogo=catalogo)
-                horas = detalle.get("horas") or []
-                if horas:
-                    reply = "Para %s tengo estas horas tentativas: %s. Dime cual prefieres." % (draft.get("fecha"), ", ".join(horas))
-                else:
-                    reply = respuesta_sin_horas(draft.get("fecha"), detalle, draft=draft, catalogo=catalogo)
-            else:
-                prox = proximas_fechas(draft=draft, catalogo=catalogo)
-                parts = ["%s: %s" % (x["fecha"], ", ".join(x["horas"])) for x in prox]
-                reply = "Estas son algunas fechas con horas tentativas: %s" % (" | ".join(parts) or "no encontre cupos en los proximos dias")
-            return {"reply": reply, "draft": draft}
+            return {"reply": respuesta_disponibilidad(draft, catalogo=catalogo, limite=10), "draft": draft}
         confirmar = any(x in nmsg for x in ["confirmar", "reservar", "agendar", "crear pedido", "hacer pedido"])
         if confirmar and not faltan:
             cierre = registrar_cotizacion_completa(draft, resumen, catalogo=catalogo)
@@ -1440,13 +1469,10 @@ def registrar_asistente_sucree(app, deps):
             cliente_msg = cliente_estado_texto(draft)
             if cliente_msg:
                 reply += "\n\n" + cliente_msg
-            if draft.get("fecha"):
-                horas = horas_disponibles(draft.get("fecha"), limite=6, draft=draft, catalogo=catalogo)
-                if horas:
-                    reply += "\n\nHoras tentativas disponibles para %s:\n%s" % (
-                        fmt_fecha(draft.get("fecha")),
-                        "\n".join("- " + h for h in horas),
-                    )
+            if draft.get("fecha") and not draft.get("hora_inicio"):
+                reply += "\n\n" + respuesta_disponibilidad(draft, catalogo=catalogo, limite=6)
+            elif hora_elegida_disponible(draft, catalogo):
+                reply += "\n\nHora confirmada: %s para %s." % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
             if faltan:
                 reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             else:
@@ -1470,13 +1496,10 @@ def registrar_asistente_sucree(app, deps):
                 reply += " %s." % err
             if faltan:
                 reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
-            if draft.get("fecha"):
-                horas = horas_disponibles(draft.get("fecha"), limite=5, draft=draft, catalogo=catalogo)
-                if horas:
-                    reply += "\n\nHoras tentativas para %s:\n%s" % (
-                        fmt_fecha(draft.get("fecha")),
-                        "\n".join("- " + h for h in horas),
-                    )
+            if draft.get("fecha") and not draft.get("hora_inicio"):
+                reply += "\n\n" + respuesta_disponibilidad(draft, catalogo=catalogo, limite=5)
+            elif hora_elegida_disponible(draft, catalogo):
+                reply += "\n\nHora confirmada: %s para %s." % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
             return {"reply": reply, "draft": draft}
         registrar_desconocida(msg, {"draft": draft})
         return {
