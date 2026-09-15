@@ -59,10 +59,14 @@ def registrar_asistente_sucree(app, deps):
 
     def norm(texto):
         raw = str(texto or "").strip().lower()
+        raw = raw.replace("?", " ")
         raw = unicodedata.normalize("NFKD", raw)
         raw = "".join(ch for ch in raw if not unicodedata.combining(ch))
         raw = re.sub(r"[^a-z0-9@._+:/\-\s]", " ", raw)
         raw = re.sub(r"\s+", " ", raw).strip()
+        raw = raw.replace("tama o", "tamano").replace("taman o", "tamano")
+        raw = raw.replace("tel fono", "telefono").replace("direcci n", "direccion")
+        raw = raw.replace("cat logo", "catalogo").replace("cotizaci n", "cotizacion")
         reemplazos = {
             "q": "que", "k": "que", "xq": "porque", "pq": "porque", "xfa": "por favor",
             "porfa": "por favor", "porfis": "por favor", "plis": "por favor", "please": "por favor",
@@ -113,6 +117,11 @@ def registrar_asistente_sucree(app, deps):
             """
         )
         for column, ddl in [
+            ("pregunta", "pregunta TEXT DEFAULT ''"),
+            ("respuesta", "respuesta TEXT DEFAULT ''"),
+            ("activo", "activo INTEGER DEFAULT 1"),
+            ("creado_en", "creado_en TEXT"),
+            ("actualizado_en", "actualizado_en TEXT"),
             ("keywords", "keywords TEXT"),
             ("categoria", "categoria TEXT DEFAULT 'general'"),
             ("ejemplos_json", "ejemplos_json TEXT"),
@@ -134,6 +143,12 @@ def registrar_asistente_sucree(app, deps):
             """
         )
         for column, ddl in [
+            ("pregunta", "pregunta TEXT DEFAULT ''"),
+            ("contexto_json", "contexto_json TEXT"),
+            ("estado", "estado TEXT DEFAULT 'pendiente'"),
+            ("respuesta_sugerida", "respuesta_sugerida TEXT"),
+            ("creado_en", "creado_en TEXT"),
+            ("actualizado_en", "actualizado_en TEXT"),
             ("pregunta_norm", "pregunta_norm TEXT"),
             ("conversation_id", "conversation_id TEXT"),
             ("respuesta_actual", "respuesta_actual TEXT"),
@@ -1596,7 +1611,10 @@ def registrar_asistente_sucree(app, deps):
             sabor = match_row(texto, catalogo.get("sabores") or [], min_score=0.58)
             if sabor:
                 encontrados.append(sabor)
-        encontrados.sort(key=lambda sb: texto_key.find(keyword_slug(sb.get("nombre"))) if keyword_slug(sb.get("nombre")) in texto_key else 9999)
+        encontrados.sort(key=lambda sb: (
+            texto_key.find(keyword_slug(sb.get("nombre"))) if keyword_slug(sb.get("nombre")) in texto_key else 9999,
+            -len(keyword_slug(sb.get("nombre"))),
+        ))
         for sabor in encontrados:
             sid = str(sabor.get("id") or "")
             if sid and sid not in actuales:
@@ -2291,7 +2309,7 @@ def registrar_asistente_sucree(app, deps):
         mapas = [
             ("fecha", ["fecha", "dia", "cambiar fecha", "modificar fecha", "otra fecha"]),
             ("hora", ["hora", "horario", "cambiar hora", "modificar hora", "otra hora"]),
-            ("relleno", ["relleno", "rellenos", "sabor", "sabores", "manjar", "crema", "frambuesa", "lucuma", "mango"]),
+            ("relleno", ["relleno", "rellenos", "releno", "relle", "sabor", "sabores", "manjar", "crema", "frambuesa", "lucuma", "mango"]),
             ("tamano", ["tamano", "tamaño", "personas", "pax", "cantidad", "porciones"]),
             ("tipo", ["tipo", "bizcocho", "panqueque", "mil hojas", "milhojas", "tradicional"]),
             ("topper", ["topper", "sin topper", "adorno", "decoracion", "placa"]),
@@ -2513,6 +2531,18 @@ def registrar_asistente_sucree(app, deps):
         base_para_actualizar = limpiar_dato_para_edicion(draft_inicial, campo_pendiente) if campo_pendiente else draft_inicial
         base_para_actualizar.pop("editando_campo", None)
         draft = actualizar_draft(base_para_actualizar, msg, catalogo)
+        if campo_pendiente == "nombre" and not draft.get("nombre"):
+            nombre_editado = limpiar_nombre_cliente(msg)
+            if nombre_editado:
+                draft["nombre"] = nombre_editado
+        elif campo_pendiente == "telefono" and not draft.get("telefono"):
+            tel_editado = normalizar_telefono(msg)
+            if tel_editado:
+                draft["telefono"] = tel_editado
+        elif campo_pendiente == "correo" and not draft.get("email"):
+            email_editado, _ = parse_contacto(msg)
+            if email_editado:
+                draft["email"] = email_editado
         draft = reconciliar_draft_catalogo(draft, catalogo)
         cambio_detectado = cambios_relevantes_entrada(base_para_actualizar, draft)
         if campo_pendiente and not cambio_detectado:
