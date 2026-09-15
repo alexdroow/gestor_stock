@@ -108,6 +108,13 @@
       max-width: min(720px, 92%);
       margin: 0 0 12px;
     }
+    .msg a {
+      color: #b94700;
+      font-weight: 800;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      word-break: break-all;
+    }
     .msg-wrap.user { margin-left: auto; }
     .msg-wrap .msg { margin-bottom: 0; max-width: 100%; }
     .quick-actions {
@@ -299,12 +306,41 @@
       return suggestions.slice(0, 8);
     }
 
+    function renderMessageText(node, text, who) {
+      const raw = String(text || '');
+      if (who === 'user') {
+        node.textContent = raw;
+        return;
+      }
+      const urlRe = /(https?:\/\/[^\s]+)/g;
+      let last = 0;
+      let match;
+      while ((match = urlRe.exec(raw)) !== null) {
+        if (match.index > last) {
+          node.appendChild(document.createTextNode(raw.slice(last, match.index)));
+        }
+        const href = match[1].replace(/[).,;]+$/, '');
+        const trailing = match[1].slice(href.length);
+        const link = document.createElement('a');
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = href;
+        node.appendChild(link);
+        if (trailing) node.appendChild(document.createTextNode(trailing));
+        last = match.index + match[1].length;
+      }
+      if (last < raw.length) {
+        node.appendChild(document.createTextNode(raw.slice(last)));
+      }
+    }
+
     function addMessage(text, who, suggestions) {
       const wrap = document.createElement('div');
       wrap.className = 'msg-wrap ' + (who === 'user' ? 'user' : 'bot');
       const node = document.createElement('div');
       node.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
-      node.textContent = text;
+      renderMessageText(node, text, who);
       wrap.appendChild(node);
       const actions = who === 'bot' ? (Array.isArray(suggestions) && suggestions.length ? suggestions : buildAutoSuggestions(text)) : [];
       if (actions.length) {

@@ -31,7 +31,9 @@ def registrar_asistente_sucree(app, deps):
     normalizar_email = deps["_normalizar_email"]
     normalizar_telefono = deps["_normalizar_telefono_cl"]
     crear_pdf_reserva = deps.get("_crear_pdf_reserva_agenda_tienda")
+    crear_backup = deps.get("crear_backup")
     public_base_url = str(deps.get("PUBLIC_BASE_URL") or "https://pasteleriasucree.cl").rstrip("/")
+    whatsapp_pasteleria = "56964330546"
 
     def fmt_clp(value):
         try:
@@ -246,6 +248,32 @@ def registrar_asistente_sucree(app, deps):
                 lines.append("  - %s" % hora)
         return "\n".join(lines)
 
+    def whatsapp_url(texto):
+        msg = str(texto or "Hola, necesito ayuda para agendar una torta.").strip()
+        return "https://wa.me/%s?text=%s" % (whatsapp_pasteleria, quote(msg))
+
+    def hora_fin_estimada(hora_inicio, minutos=60):
+        try:
+            parts = str(hora_inicio or "").split(":")
+            h = int(parts[0])
+            m = int(parts[1] if len(parts) > 1 else 0)
+            total = max(0, min(23 * 60 + 59, h * 60 + m + int(minutos or 60)))
+            return "%02d:%02d" % (total // 60, total % 60)
+        except Exception:
+            return str(hora_inicio or "")
+
+    def validar_hora_cotizacion(draft):
+        fecha = str(draft.get("fecha") or "").strip()
+        hora = str(draft.get("hora_inicio") or "").strip()[:5]
+        if not fecha or not hora:
+            return {"ok": False, "error": "Falta fecha u hora.", "horas": []}
+        horas = horas_disponibles(fecha, limite=30)
+        if draft.get("cotizacion_evento_id"):
+            return {"ok": True, "horas": horas}
+        if hora in horas:
+            return {"ok": True, "horas": horas}
+        return {"ok": False, "error": "La hora %s ya no esta disponible para %s." % (hora, fmt_fecha(fecha)), "horas": horas}
+
     def guia_agendar_texto(catalogo, draft=None):
         draft = dict(draft or {})
         categorias = catalogo.get("categorias") or []
@@ -379,6 +407,7 @@ def registrar_asistente_sucree(app, deps):
             draft["telefono"] = telefono
         if entrega:
             draft["entrega_tipo"] = entrega
+            draft["entrega_confirmada"] = True
         if not draft.get("entrega_tipo"):
             draft["entrega_tipo"] = "retiro"
         m = re.search(r"\b(?:cliente|nombre|soy|me llamo)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{2,80})", texto, flags=re.I)
@@ -520,6 +549,67 @@ def registrar_asistente_sucree(app, deps):
         except Exception:
             return ""
 
+    def guardar_cotizacion_agenda(draft, resumen):
+        if not resumen:
+            return {"success": False, "error": "No hay cotizacion valida"}
+        try:
+            from database import guardar_evento_agenda
+            size = resumen.get("size") or {}
+            categoria = resumen.get("categoria") or {}
+            codigo = str(draft.get("cotizacion_codigo") or "").strip()
+            if not codigo:
+                codigo = "COT-%s-%s" % (
+                    re.sub(r"[^0-9]", "", str(draft.get("fecha") or ""))[:8] or datetime.now(ZoneInfo("America/Santiago")).strftime("%Y%m%d"),
+                    datetime.now(ZoneInfo("America/Santiago")).strftime("%H%M%S"),
+                )
+            evento = {
+                "tipo": "torta",
+                "titulo": "Cotizacion - %s" % (size.get("nombre") or categoria.get("nombre") or "Torta"),
+                "fecha": draft.get("fecha") or "",
+                "hora_inicio": draft.get("hora_inicio") or "",
+                "hora_fin": hora_fin_estimada(draft.get("hora_inicio"), 60),
+                "hora_entrega": draft.get("hora_inicio") or "",
+                "cliente": draft.get("nombre") or "Cliente por confirmar",
+                "telefono": draft.get("telefono") or "",
+                "es_envio": 1 if draft.get("entrega_tipo") == "despacho" else 0,
+                "direccion": draft.get("direccion") or "",
+                "ingredientes": crear_ingredientes_cotizacion(draft, resumen) + "\nEstado interno: COTIZACION_ASISTENTE_REQUIERE_REVISION",
+                "total": float(resumen.get("subtotal") or 0),
+                "abono": 0,
+                "motivo": "Cotizacion asistente - requiere revision interna",
+                "alerta_minutos": 1440,
+                "estado": "borrador",
+                "codigo_pedido": codigo,
+                "codigo_operacion": codigo,
+            }
+            try:
+                eid = int(draft.get("cotizacion_evento_id") or 0)
+            except Exception:
+                eid = 0
+            if eid > 0:
+                evento["id"] = eid
+            res = guardar_evento_agenda(evento)
+            if not res.get("success"):
+                return res
+            evento_id = int(res.get("id") or eid or 0)
+            codigo_final = str(res.get("codigo_pedido") or codigo).strip()
+            draft["cotizacion_evento_id"] = evento_id
+            draft["cotizacion_codigo"] = codigo_final
+            evento["id"] = evento_id
+            evento["codigo_pedido"] = codigo_final
+            evento["documento_tipo"] = "cotizacion"
+            filename = crear_pdf_reserva(evento) if callable(crear_pdf_reserva) else ""
+            pdf_url = "%s/static/tienda_pedidos_pdf/%s" % (public_base_url, quote(filename)) if filename else ""
+            draft["cotizacion_pdf_url"] = pdf_url
+            if callable(crear_backup):
+                try:
+                    crear_backup()
+                except Exception:
+                    pass
+            return {"success": True, "id": evento_id, "codigo_pedido": codigo_final, "pdf_url": pdf_url}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
     def cotizar(draft, catalogo):
         try:
             if not draft.get("size_id") or not draft.get("sabor_ids"):
@@ -549,7 +639,7 @@ def registrar_asistente_sucree(app, deps):
             "Precio productos: %s" % fmt_clp(resumen.get("subtotal") or 0),
             "Cliente: %s" % (draft.get("nombre") or "-"),
             "Contacto: %s / %s" % (draft.get("telefono") or "-", draft.get("email") or "-"),
-            "Entrega: %s" % ("despacho" if draft.get("entrega_tipo") == "despacho" else "retiro"),
+            "Entrega: %s" % (("despacho" if draft.get("entrega_tipo") == "despacho" else "retiro") if draft.get("entrega_confirmada") else "por confirmar"),
             "Fecha: %s" % fmt_fecha(draft.get("fecha")),
             "Hora: %s" % (draft.get("hora_inicio") or "-"),
         ])
@@ -586,6 +676,8 @@ def registrar_asistente_sucree(app, deps):
             out.append("nombre")
         if not draft.get("telefono"):
             out.append("telefono")
+        if not draft.get("entrega_confirmada"):
+            out.append("retiro o despacho")
         if draft.get("entrega_tipo") == "despacho" and not draft.get("direccion"):
             out.append("direccion de despacho")
         if draft.get("size_id") and draft.get("sabor_ids") and not resumen:
@@ -651,6 +743,61 @@ def registrar_asistente_sucree(app, deps):
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
+    def registrar_cotizacion_completa(draft, resumen):
+        disponibilidad = validar_hora_cotizacion(draft)
+        if not disponibilidad.get("ok"):
+            horas = disponibilidad.get("horas") or []
+            if horas:
+                return {
+                    "ok": False,
+                    "reply": "\n".join([
+                        disponibilidad.get("error") or "Esa hora no esta disponible.",
+                        "",
+                        "Estas son horas disponibles para ese mismo dia:",
+                        "\n".join("- " + h for h in horas),
+                        "",
+                        "Dime cual prefieres para actualizar la cotizacion.",
+                    ]),
+                    "suggestions": horas[:6],
+                }
+            link = whatsapp_url("Hola Sucree, necesito ayuda porque no encontre horas disponibles para agendar mi torta.")
+            return {
+                "ok": False,
+                "reply": "\n".join([
+                    "Para %s no veo horas disponibles en la agenda." % fmt_fecha(draft.get("fecha")),
+                    "",
+                    "Por favor comunicate con la pasteleria por WhatsApp para revisar una alternativa:",
+                    link,
+                ]),
+                "suggestions": [],
+                "whatsapp_url": link,
+            }
+
+        guardado = guardar_cotizacion_agenda(draft, resumen)
+        if not guardado.get("success"):
+            return {
+                "ok": False,
+                "reply": "No pude dejar la cotizacion en agenda aun: %s" % (guardado.get("error") or "error desconocido"),
+                "error": guardado.get("error"),
+            }
+        codigo = str(guardado.get("codigo_pedido") or draft.get("cotizacion_codigo") or "").strip()
+        pdf_url = str(guardado.get("pdf_url") or draft.get("cotizacion_pdf_url") or "").strip()
+        lines = [
+            "Cotizacion registrada en agenda como pendiente de revision.",
+            "Codigo: %s" % (codigo or "-"),
+            "",
+            "El equipo debe revisarla y confirmarla internamente antes de que quede como pedido confirmado.",
+        ]
+        if pdf_url:
+            lines.extend(["", "PDF de cotizacion:", pdf_url])
+        return {
+            "ok": True,
+            "reply": "\n".join(lines),
+            "pdf_url": pdf_url,
+            "agenda_id": guardado.get("id"),
+            "codigo_pedido": codigo,
+        }
+
     def catalogo_texto(catalogo, categoria_id=""):
         categoria = find_categoria(catalogo, categoria_id)
         if not categoria:
@@ -712,6 +859,7 @@ def registrar_asistente_sucree(app, deps):
             "hora": "Horas disponibles",
             "tamano de torta": "Ver catalogo y precios",
             "relleno/sabor": "Ver rellenos disponibles",
+            "retiro o despacho": "Indicar retiro o despacho",
             "direccion de despacho": "Ingresar direccion de despacho",
         }
         out = []
@@ -847,20 +995,18 @@ def registrar_asistente_sucree(app, deps):
             return {"reply": reply, "draft": draft}
         confirmar = any(x in nmsg for x in ["confirmar", "reservar", "agendar", "crear pedido", "hacer pedido"])
         if confirmar and not faltan:
-            res = reservar(draft)
-            if res.get("success"):
-                reserva = res.get("reserva") or {}
-                codigo = str(reserva.get("codigo_pedido") or "").strip()
-                link = "%s/seguimiento/%s" % (public_base_url, quote(codigo)) if codigo else "%s/seguimiento" % public_base_url
-                draft["codigo_pedido"] = codigo
-                return {
-                    "reply": "Listo, deje registrada tu solicitud. Codigo: %s\nPuedes seguir el pedido aqui: %s\nQueda a la espera de confirmacion de la pasteleria." % (codigo or "-", link),
-                    "draft": draft,
-                    "reserved": True,
-                    "tracking_url": link,
-                    "reserva": reserva,
-                }
-            return {"reply": "No pude registrar la reserva aun: %s" % (res.get("error") or "error desconocido"), "draft": draft, "error": res.get("error")}
+            cierre = registrar_cotizacion_completa(draft, resumen)
+            reply = resumen_texto(draft, resumen) + "\n\n" + cierre.get("reply", "")
+            return {
+                "reply": reply,
+                "draft": draft,
+                "quote": resumen,
+                "pdf_url": cierre.get("pdf_url") or draft.get("cotizacion_pdf_url") or "",
+                "agenda_id": cierre.get("agenda_id"),
+                "suggestions": cierre.get("suggestions") or [],
+                "whatsapp_url": cierre.get("whatsapp_url") or "",
+                "error": cierre.get("error"),
+            }
         if resumen:
             if not draft.get("email"):
                 reply = "\n".join([
@@ -885,11 +1031,18 @@ def registrar_asistente_sucree(app, deps):
             if faltan:
                 reply += "\n\nPara continuar falta:\n%s" % "\n".join("- " + x for x in faltan)
             else:
-                pdf_url = pdf_cotizacion_url(draft, resumen)
-                if pdf_url:
-                    draft["cotizacion_pdf_url"] = pdf_url
-                    reply += "\n\nPDF de cotizacion:\n%s" % pdf_url
-                reply += "\n\nTengo todo para solicitar la reserva. Escribe 'confirmar reserva' para registrarla."
+                cierre = registrar_cotizacion_completa(draft, resumen)
+                reply += "\n\n" + cierre.get("reply", "")
+                return {
+                    "reply": reply,
+                    "draft": draft,
+                    "quote": resumen,
+                    "pdf_url": cierre.get("pdf_url") or draft.get("cotizacion_pdf_url") or "",
+                    "agenda_id": cierre.get("agenda_id"),
+                    "suggestions": cierre.get("suggestions") or [],
+                    "whatsapp_url": cierre.get("whatsapp_url") or "",
+                    "error": cierre.get("error"),
+                }
             return {"reply": reply, "draft": draft, "quote": resumen, "pdf_url": draft.get("cotizacion_pdf_url") or ""}
         meaningful = any(draft.get(k) for k in ["fecha", "hora_inicio", "email", "telefono", "nombre", "size_id", "sabor_ids"])
         if meaningful:
@@ -928,7 +1081,7 @@ def registrar_asistente_sucree(app, deps):
             msg = str(data.get("message") or "").strip()[:1200]
             draft = data.get("draft") if isinstance(data.get("draft"), dict) else {}
             out = chat_logic(msg, draft)
-            if not out.get("suggestions"):
+            if "suggestions" not in out or out.get("suggestions") is None:
                 out["suggestions"] = sugerencias_desde_respuesta(out.get("reply"))
             payload = {"success": True}
             payload.update(out)
