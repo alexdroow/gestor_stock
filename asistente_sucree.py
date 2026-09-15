@@ -62,7 +62,22 @@ def registrar_asistente_sucree(app, deps):
         raw = unicodedata.normalize("NFKD", raw)
         raw = "".join(ch for ch in raw if not unicodedata.combining(ch))
         raw = re.sub(r"[^a-z0-9@._+:/\-\s]", " ", raw)
-        return re.sub(r"\s+", " ", raw).strip()
+        raw = re.sub(r"\s+", " ", raw).strip()
+        reemplazos = {
+            "q": "que", "k": "que", "xq": "porque", "pq": "porque", "xfa": "por favor",
+            "porfa": "por favor", "porfis": "por favor", "plis": "por favor", "please": "por favor",
+            "kiero": "quiero", "qiero": "quiero", "qro": "quiero", "keria": "queria", "kerria": "querria",
+            "nesesito": "necesito", "nececito": "necesito", "nesecito": "necesito", "necesitaria": "necesito",
+            "cotisar": "cotizar", "cotisacion": "cotizacion", "cotizacionn": "cotizacion",
+            "agendarr": "agendar", "ajendar": "agendar", "reserbar": "reservar",
+            "cumpleano": "cumpleanos", "cumpleanios": "cumpleanos", "cumple": "cumpleanos",
+            "retiroo": "retiro", "retirarlo": "retiro", "despachoo": "despacho", "delivery": "despacho",
+            "direccionn": "direccion", "dire": "direccion", "fono": "telefono", "wsp": "whatsapp", "wasap": "whatsapp",
+            "whastapp": "whatsapp", "guasap": "whatsapp", "mail": "email",
+            "rellenito": "relleno", "saborcito": "sabor", "sinpopper": "sin topper",
+            "manguito": "mango", "manjarsito": "manjar", "manjarsillo": "manjar",
+        }
+        return " ".join(reemplazos.get(token, token) for token in raw.split())
 
     def slug(texto):
         return re.sub(r"[^a-z0-9]+", " ", norm(texto)).strip()
@@ -449,6 +464,81 @@ def registrar_asistente_sucree(app, deps):
                 conn.close()
         return aprendidas
 
+
+    def registrar_vocabulario_autonomo(frase, intent_name, categoria=None, confianza=0.72):
+        conn = None
+        try:
+            frase = str(frase or "").strip()[:120]
+            intent_name = str(intent_name or "general").strip()[:80] or "general"
+            if not frase:
+                return False
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            registrar_vocabulario_aprendido(cur, frase, intent_name, float(confianza or 0.72), "aprendizaje_autonomo", True)
+            conn.commit()
+            return True
+        except Exception:
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if conn:
+                conn.close()
+
+    def inferir_intent_desde_aclaracion(texto_norm):
+        if any(x in texto_norm for x in ["torta", "pastel", "queque", "bizcocho", "panqueque", "agendar", "pedir", "encargar", "cotizar", "pedido"]):
+            return "agendar"
+        if any(x in texto_norm for x in ["hora", "horario", "disponible", "cupos", "fecha"]):
+            return "disponibilidad"
+        if any(x in texto_norm for x in ["catalogo", "precio", "valor", "cuanto", "opciones"]):
+            return "catalogo"
+        if any(x in texto_norm for x in ["seguimiento", "estado", "codigo"]):
+            return "seguimiento"
+        if any(x in texto_norm for x in ["telefono", "whatsapp", "correo", "email", "nombre", "direccion"]):
+            return "cliente"
+        return "general"
+
+    def procesar_aclaracion_palabra(draft, mensaje):
+        draft = dict(draft or {})
+        palabra = str(draft.get("palabra_no_entendida") or "").strip()
+        if not palabra:
+            return "", draft
+        texto_norm = norm(mensaje)
+        if not any(x in texto_norm for x in ["significa", "quise decir", "queria decir", "es ", "era ", "me refiero", "se refiere"]):
+            return "", draft
+        intent_name = inferir_intent_desde_aclaracion(texto_norm)
+        ok = registrar_vocabulario_autonomo(palabra, intent_name, categoria_aprendizaje(intent_name), confianza=0.74)
+        draft.pop("palabra_no_entendida", None)
+        if ok:
+            return "Perfecto, aprendí que '%s' se relaciona con %s. Lo tendré en cuenta para futuras conversaciones." % (palabra, intent_name), draft
+        return "Gracias por aclararlo. Voy a usar esa información para continuar.", draft
+
+    def palabra_no_entendida(mensaje, catalogo=None):
+        texto = norm(mensaje)
+        if not texto:
+            return ""
+        stop = {
+            "hola", "buenas", "gracias", "por", "favor", "quiero", "necesito", "busco", "dame", "una", "un", "uno",
+            "la", "el", "los", "las", "de", "del", "para", "con", "sin", "y", "o", "en", "al", "a", "mi", "me", "es",
+            "torta", "tortas", "tortita", "tortitas", "pastel", "pastelito", "pastelitos", "queque", "quequito", "quequitos",
+            "agendar", "cotizar", "pedido", "fecha", "hora", "correo", "email", "telefono", "whatsapp", "retiro", "despacho",
+            "catalogo", "precio", "personas", "persona", "pax", "relleno", "sabor", "topper", "extra", "extras",
+        }
+        catalogo = catalogo or {}
+        conocidos = set()
+        for key in ["categorias", "sizes", "sabores", "extras", "toppers"]:
+            for row in catalogo.get(key) or []:
+                conocidos.update(slug(row.get("nombre") or "").split())
+                conocidos.update(slug(row.get("id") or "").split())
+        for token in texto.split():
+            if token in stop or token in conocidos or token.isdigit() or "@" in token or len(token) < 4:
+                continue
+            if re.search(r"\d", token):
+                continue
+            return token[:60]
+        return ""
+
     def registrar_interaccion_asistente(conversation_id, pregunta, out, draft_entrada=None, user_agent=""):
         conn = None
         try:
@@ -595,7 +685,7 @@ def registrar_asistente_sucree(app, deps):
                 draft["size_id"] = str(candidatos[0].get("id") or "")
                 draft.pop("tamano_invalido", None)
                 draft.pop("tamano_invalido_categoria_id", None)
-                draft = clear_incompatibilidades(draft, {"tama?o", "tamano"})
+                draft = clear_incompatibilidades(draft, {"tamaño", "tamano"})
         if draft.get("sabor_ids"):
             categoria = find_categoria(catalogo, draft.get("categoria_id") or "")
             if categoria:
@@ -1465,8 +1555,8 @@ def registrar_asistente_sucree(app, deps):
                     draft = add_incompatibilidad(draft, "tamaño", "%s personas" % personas)
                 elif len(candidatos_globales) == 1:
                     size = candidatos_globales[0]
-        # No elegir un tama?o por similitud si el cliente no indic? personas o un tama?o expl?cito.
-        if not size and not m and not draft.get("personas") and any(x in texto_norm for x in ["persona", "personas", "pax", "tamano", "tama?o"]):
+        # No elegir un tamaño por similitud si el cliente no indic? personas o un tamaño expl?cito.
+        if not size and not m and not draft.get("personas") and any(x in texto_norm for x in ["persona", "personas", "pax", "tamano", "tamaño"]):
             size = match_row(texto, catalogo.get("sizes") or [], min_score=0.70)
         if size:
             draft["size_id"] = str(size.get("id") or "")
@@ -2296,7 +2386,10 @@ def registrar_asistente_sucree(app, deps):
                 return True
         return False
 
-    def respuesta_no_entendida(draft=None):
+    def respuesta_no_entendida(draft=None, palabra=""):
+        palabra = str(palabra or "").strip()
+        if palabra:
+            return "No entendí la palabra '%s'. ¿Me puedes explicar qué significa o escribirlo de otra forma? Así puedo aprenderla para futuras conversaciones." % palabra
         return "No entendí ese dato con seguridad. Para evitar dejar una cotización incorrecta, dime qué quieres hacer: cambiar fecha, cambiar relleno, ver catálogo, revisar horas disponibles o hablar con el equipo."
 
     def es_edicion_corta(texto_norm, campo):
@@ -2329,8 +2422,8 @@ def registrar_asistente_sucree(app, deps):
         palabras_catalogo = ["catalogo", "catálogo", "carta", "menu", "menú", "precio", "precios", "vale", "valor", "cuanto", "cuánto", "opciones", "tipos", "sabores", "rellenos", "tamanos", "tamaños", "tamano", "tamaño"]
         palabras_horas = ["hora", "horas", "horario", "horarios", "disponible", "disponibles", "disponibilidad", "cupos", "cupo", "agenda", "cuando puedo", "cuándo puedo", "fecha disponible", "hay hora", "tienen hora"]
         texto_torta = any(x in texto_norm for x in palabras_torta)
-        accion_directa = any(x in texto_norm for x in ["agendar", "reservar", "hacer pedido", "crear pedido", "encargar", "cotizar", "cotizacion", "cotizaci?n"])
-        pedido_simple_torta = bool(re.search(r"\b(?:quiero|necesito|busco|dame|quisiera|me\s+gustaria|me\s+gustar?a)\s+(?:\d+\s+)?(?:torta|tortita|tortitas|pastel|pastelito|pastelitos|queque|quequito|quequitos)\b", texto_norm))
+        accion_directa = any(x in texto_norm for x in ["agendar", "reservar", "hacer pedido", "crear pedido", "encargar", "cotizar", "cotizacion", "cotización", "pedir", "dame"])
+        pedido_simple_torta = bool(re.search(r"\b(?:quiero|necesito|busco|dame|quisiera|me\s+gustaria|me\s+gustaría)\s+(?:\d+\s+)?(?:torta|tortita|tortitas|pastel|pastelito|pastelitos|queque|quequito|quequitos)\b", texto_norm))
         agendar = accion_directa or pedido_simple_torta or (any(x in texto_norm for x in palabras_agenda) and (texto_torta or tiene_personas or tiene_fecha or tiene_hora))
         agendar = agendar or (texto_torta and (tiene_personas or tiene_fecha or tiene_hora or draft.get("size_id") or draft.get("personas")))
         catalogo = any(x in texto_norm for x in palabras_catalogo) or ("tradicional" in texto_norm and texto_torta and not tiene_fecha and not tiene_hora)
@@ -2386,6 +2479,15 @@ def registrar_asistente_sucree(app, deps):
         nmsg = norm(msg)
         draft_inicial = dict(draft or {})
 
+        aclaracion_reply, draft_aclarado = procesar_aclaracion_palabra(draft_inicial, msg)
+        if aclaracion_reply:
+            return {
+                "reply": aclaracion_reply,
+                "draft": draft_aclarado,
+                "type": "learning_ack",
+                "suggestions": ["Agendar torta", "Ver catálogo y precios", "Horas disponibles"],
+            }
+
         if draft_inicial.get("cotizacion_finalizada"):
             return {
                 "reply": "La cotización ya fue enviada y el PDF quedó disponible en esta conversación. Si necesitas otro pedido o una nueva cotización, inicia una nueva conversación.",
@@ -2439,8 +2541,8 @@ def registrar_asistente_sucree(app, deps):
                 if disponibilidad.get("ok"):
                     reply = "Hora recibida: %s para %s.\n\n" % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
                     reply += resumen_texto(draft, resumen)
-                    reply += "\n\nYa tengo toda la informaci?n m?nima. Revisa el resumen. Si est? correcto, presiona Enviar solicitud."
-                    return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": ["Enviar solicitud", "Fecha", "Relleno", "Nombre", "Hora", "Tama?o"]}
+                    reply += "\n\nYa tengo toda la información m?nima. Revisa el resumen. Si est? correcto, presiona Enviar solicitud."
+                    return {"reply": reply, "draft": draft, "quote": resumen, "suggestions": ["Enviar solicitud", "Fecha", "Relleno", "Nombre", "Hora", "Tamaño"]}
             detalle = respuesta_faltantes_contextual(draft, faltan, catalogo)
             reply = "Hora recibida: %s." % str(draft.get("hora_inicio") or "")[:5]
             if detalle:
@@ -2597,12 +2699,15 @@ def registrar_asistente_sucree(app, deps):
                 "closed": bool(cierre.get("ok")),
             }
         if not cambio_detectado and not any([agendar_intent, consulta_intent, catalogo_intent, disponibilidad_intent]):
-            registrar_desconocida(msg, {"draft": draft, "conversation_id": draft.get("conversation_id"), "motivo": "sin_cambios_relevantes"})
+            palabra = palabra_no_entendida(msg, catalogo)
+            if palabra:
+                draft["palabra_no_entendida"] = palabra
+            registrar_desconocida(msg, {"draft": draft, "conversation_id": draft.get("conversation_id"), "motivo": "sin_cambios_relevantes", "palabra_no_entendida": palabra})
             return {
-                "reply": respuesta_no_entendida(draft),
+                "reply": respuesta_no_entendida(draft, palabra),
                 "draft": draft,
                 "unknown": True,
-                "suggestions": ["Cambiar fecha", "Cambiar relleno", "Ver catalogo y precios", "Horas disponibles", "Hablar con el equipo"],
+                "suggestions": ["Cambiar fecha", "Cambiar relleno", "Ver catálogo y precios", "Horas disponibles", "Hablar con el equipo"],
             }
 
         if resumen:
@@ -2662,9 +2767,12 @@ def registrar_asistente_sucree(app, deps):
             elif hora_elegida_disponible(draft, catalogo):
                 reply += "\n\nHora confirmada: %s para %s." % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
             return {"reply": reply, "draft": draft}
-        registrar_desconocida(msg, {"draft": draft, "conversation_id": draft.get("conversation_id"), "motivo": "no_entendido_final"})
+        palabra = palabra_no_entendida(msg, catalogo)
+        if palabra:
+            draft["palabra_no_entendida"] = palabra
+        registrar_desconocida(msg, {"draft": draft, "conversation_id": draft.get("conversation_id"), "motivo": "no_entendido_final", "palabra_no_entendida": palabra})
         return {
-            "reply": respuesta_no_entendida(draft),
+            "reply": respuesta_no_entendida(draft, palabra),
             "draft": draft,
             "unknown": True,
         }
