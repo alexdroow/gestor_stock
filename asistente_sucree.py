@@ -160,8 +160,29 @@ def registrar_asistente_sucree(app, deps):
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS asistente_vocabulario (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                frase TEXT NOT NULL,
+                frase_norm TEXT NOT NULL UNIQUE,
+                intent TEXT DEFAULT 'general',
+                categoria TEXT DEFAULT 'general',
+                veces INTEGER DEFAULT 1,
+                aciertos INTEGER DEFAULT 0,
+                fallos INTEGER DEFAULT 0,
+                confianza REAL DEFAULT 0,
+                ultima_respuesta_tipo TEXT,
+                ejemplos_json TEXT,
+                activo INTEGER DEFAULT 1,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_asistente_unknown_norm ON asistente_unknown(pregunta_norm, estado)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_asistente_mensajes_conv ON asistente_mensajes(conversation_id, id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_asistente_vocab_norm ON asistente_vocabulario(frase_norm, activo)")
 
     def crear_conversation_id():
         return "ASC-%s" % uuid.uuid4().hex[:18].upper()
@@ -288,6 +309,144 @@ def registrar_asistente_sucree(app, deps):
                 conn.close()
         return ""
 
+
+    def aprendizaje_frase_norm(texto):
+        limpio = slug(texto)
+        limpio = re.sub(r"\b(porfa|porfis|por favor|plis|please)\b", "", limpio)
+        limpio = re.sub(r"\s+", " ", limpio).strip()
+        return limpio[:220]
+
+    def detectar_intent_aprendizaje(mensaje, draft=None, out=None, intent=None):
+        texto = norm(mensaje)
+        draft = dict(draft or {})
+        out = dict(out or {})
+        intent = dict(intent or {})
+        if parse_hora(mensaje, permitir_numero_suelto=hora_pendiente_en_draft(draft)):
+            return "hora"
+        if parse_fecha(mensaje):
+            return "fecha"
+        if detectar_codigo_pedido(mensaje) or out.get("type") in {"tracking", "tracking_email", "tracking_help"}:
+            return "seguimiento"
+        if re.search(r"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}", str(mensaje or ""), flags=re.I):
+            return "correo"
+        if normalizar_telefono(mensaje):
+            return "telefono"
+        if re.search(r"\b\d{1,3}\s*(?:persona|personas|pers|pax)\b", texto):
+            return "tamano"
+        if out.get("type") == "invalid_catalog_option":
+            return "catalogo_invalido"
+        if intent.get("disponibilidad"):
+            return "disponibilidad"
+        if intent.get("catalogo"):
+            return "catalogo"
+        if intent.get("agendar") or out.get("quote"):
+            return "agendar"
+        if intent.get("consulta"):
+            return "consulta"
+        if out.get("unknown"):
+            return "duda"
+        return "general"
+
+    def categoria_aprendizaje(intent_name):
+        mapa = {
+            "hora": "agenda", "fecha": "agenda", "disponibilidad": "agenda", "agendar": "agenda",
+            "catalogo": "catalogo", "catalogo_invalido": "catalogo", "tamano": "catalogo",
+            "seguimiento": "pedido", "correo": "cliente", "telefono": "cliente", "duda": "revision",
+        }
+        return mapa.get(str(intent_name or ""), "general")
+
+    def ejemplos_aprendizaje_actuales(raw):
+        try:
+            data = json.loads(raw or "[]")
+            return data if isinstance(data, list) else []
+        except Exception:
+            return []
+
+    def registrar_vocabulario_aprendido(cur, mensaje, intent_name, confianza, tipo, entendido):
+        frase = str(mensaje or "").strip()[:300]
+        frase_norm = aprendizaje_frase_norm(frase)
+        if not frase_norm:
+            return
+        # Evita llenar la base con ruido muy corto, salvo valores operativos como hora, fecha o contacto.
+        if len(frase_norm) < 3 and intent_name not in {"hora", "fecha", "correo", "telefono"}:
+            return
+        categoria = categoria_aprendizaje(intent_name)
+        cur.execute("SELECT id, ejemplos_json FROM asistente_vocabulario WHERE frase_norm = ? LIMIT 1", (frase_norm,))
+        row = cur.fetchone()
+        if row:
+            ejemplos = ejemplos_aprendizaje_actuales(row["ejemplos_json"])
+            if frase not in ejemplos:
+                ejemplos.insert(0, frase)
+            cur.execute(
+                """
+                UPDATE asistente_vocabulario
+                SET frase = ?, intent = ?, categoria = ?,
+                    veces = COALESCE(veces, 0) + 1,
+                    aciertos = COALESCE(aciertos, 0) + ?,
+                    fallos = COALESCE(fallos, 0) + ?,
+                    confianza = MAX(COALESCE(confianza, 0), ?),
+                    ultima_respuesta_tipo = ?, ejemplos_json = ?, actualizado_en = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (frase, intent_name, categoria, 1 if entendido else 0, 0 if entendido else 1, float(confianza or 0), tipo, json.dumps(ejemplos[:12], ensure_ascii=False), int(row["id"])),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO asistente_vocabulario
+                (frase, frase_norm, intent, categoria, veces, aciertos, fallos, confianza, ultima_respuesta_tipo, ejemplos_json, activo)
+                VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, 1)
+                """,
+                (frase, frase_norm, intent_name, categoria, 1 if entendido else 0, 0 if entendido else 1, float(confianza or 0), tipo, json.dumps([frase], ensure_ascii=False)),
+            )
+
+    def intenciones_aprendidas(mensaje):
+        conn = None
+        aprendidas = {}
+        try:
+            frase_norm = aprendizaje_frase_norm(mensaje)
+            if not frase_norm:
+                return aprendidas
+            conn = get_db()
+            cur = conn.cursor()
+            ensure_tables(cur)
+            cur.execute(
+                """
+                SELECT frase_norm, intent, confianza, aciertos, fallos, veces
+                FROM asistente_vocabulario
+                WHERE COALESCE(activo, 1) = 1
+                  AND COALESCE(aciertos, 0) >= COALESCE(fallos, 0)
+                ORDER BY COALESCE(confianza, 0) DESC, COALESCE(veces, 0) DESC
+                LIMIT 250
+                """
+            )
+            words = set(frase_norm.split())
+            for row in cur.fetchall():
+                learned = str(row["frase_norm"] or "").strip()
+                intent_name = str(row["intent"] or "general").strip()
+                if not learned or not intent_name:
+                    continue
+                learned_words = set(learned.split())
+                hit = learned in frase_norm or frase_norm in learned
+                overlap = (len(words & learned_words) / max(1, min(len(words), len(learned_words)))) if learned_words else 0
+                if hit or overlap >= 0.75:
+                    if intent_name == "agendar":
+                        aprendidas["agendar"] = True
+                    elif intent_name == "catalogo":
+                        aprendidas["catalogo"] = True
+                    elif intent_name in {"disponibilidad", "hora", "fecha"}:
+                        aprendidas["disponibilidad"] = True
+                    elif intent_name == "seguimiento":
+                        aprendidas["seguimiento"] = True
+                    elif intent_name == "consulta":
+                        aprendidas["consulta"] = True
+        except Exception:
+            return aprendidas
+        finally:
+            if conn:
+                conn.close()
+        return aprendidas
+
     def registrar_interaccion_asistente(conversation_id, pregunta, out, draft_entrada=None, user_agent=""):
         conn = None
         try:
@@ -299,6 +458,7 @@ def registrar_asistente_sucree(app, deps):
             confianza = confidence_from_output(out, intent)
             entendido = 0 if out.get("unknown") else 1
             tipo = str(out.get("type") or ("unknown" if out.get("unknown") else "reply")).strip()[:80]
+            intent_name = detectar_intent_aprendizaje(pregunta, draft=draft_entrada or {}, out=out, intent=intent)
             respuesta = str(out.get("reply") or "").strip()[:4000]
             estado_conv = "cerrada" if out.get("closed") else "activa"
             conn = get_db()
@@ -344,15 +504,18 @@ def registrar_asistente_sucree(app, deps):
                 """,
                 (0 if entendido else 1, conversation_id),
             )
+            registrar_vocabulario_aprendido(cur, pregunta, intent_name, confianza, tipo, entendido)
             conn.commit()
-            if not entendido:
+            debe_revisarse = (not entendido) or confianza <= 0.35 or tipo in {"invalid_catalog_option"}
+            if debe_revisarse:
                 registrar_desconocida(pregunta, {
                     "conversation_id": conversation_id,
                     "draft": draft_salida,
                     "draft_entrada": draft_entrada or {},
                     "intent": intent,
+                    "intent_aprendizaje": intent_name,
                     "respuesta_actual": respuesta,
-                    "motivo": "no_entendido",
+                    "motivo": "no_entendido" if not entendido else "revisar_baja_confianza",
                     "confianza": confianza,
                 })
             return conversation_id
@@ -2345,6 +2508,15 @@ def registrar_asistente_sucree(app, deps):
             return {"reply": kb, "draft": draft, "type": "knowledge"}
 
         intent = inferir_intenciones(nmsg, draft)
+        learned_intent = intenciones_aprendidas(msg)
+        if learned_intent.get("agendar"):
+            intent["agendar"] = True
+        if learned_intent.get("catalogo"):
+            intent["catalogo"] = True
+        if learned_intent.get("disponibilidad"):
+            intent["disponibilidad"] = True
+        if learned_intent.get("consulta"):
+            intent["consulta"] = True
         agendar_intent = intent.get("agendar")
         consulta_intent = intent.get("consulta")
         catalogo_intent = intent.get("catalogo")
@@ -2422,7 +2594,7 @@ def registrar_asistente_sucree(app, deps):
                 "closed": bool(cierre.get("ok")),
             }
         if not cambio_detectado and not any([agendar_intent, consulta_intent, catalogo_intent, disponibilidad_intent]):
-            registrar_desconocida(msg, {"draft": draft, "motivo": "sin_cambios_relevantes"})
+            registrar_desconocida(msg, {"draft": draft, "conversation_id": draft.get("conversation_id"), "motivo": "sin_cambios_relevantes"})
             return {
                 "reply": respuesta_no_entendida(draft),
                 "draft": draft,
@@ -2487,7 +2659,7 @@ def registrar_asistente_sucree(app, deps):
             elif hora_elegida_disponible(draft, catalogo):
                 reply += "\n\nHora confirmada: %s para %s." % (str(draft.get("hora_inicio") or "")[:5], fmt_fecha(draft.get("fecha")))
             return {"reply": reply, "draft": draft}
-        registrar_desconocida(msg, {"draft": draft})
+        registrar_desconocida(msg, {"draft": draft, "conversation_id": draft.get("conversation_id"), "motivo": "no_entendido_final"})
         return {
             "reply": respuesta_no_entendida(draft),
             "draft": draft,
@@ -2632,6 +2804,17 @@ def registrar_asistente_sucree(app, deps):
 
             cur.execute(
                 """
+                SELECT id, frase, frase_norm, intent, categoria, veces, aciertos, fallos, confianza, ultima_respuesta_tipo, actualizado_en
+                FROM asistente_vocabulario
+                WHERE COALESCE(activo, 1) = 1
+                ORDER BY actualizado_en DESC, veces DESC
+                LIMIT 160
+                """
+            )
+            vocab_rows = [dict(r) for r in cur.fetchall()]
+
+            cur.execute(
+                """
                 SELECT conversation_id, canal, estado, mensajes_total, desconocidas_total, ultimo_tipo, creado_en, actualizado_en
                 FROM asistente_conversaciones
                 ORDER BY actualizado_en DESC
@@ -2648,17 +2831,21 @@ def registrar_asistente_sucree(app, deps):
             mensajes_count = int((cur.fetchone() or {"c": 0})["c"] or 0)
             cur.execute("SELECT COUNT(*) AS c FROM asistente_kb WHERE COALESCE(activo, 1) = 1")
             kb_count = int((cur.fetchone() or {"c": 0})["c"] or 0)
+            cur.execute("SELECT COUNT(*) AS c FROM asistente_vocabulario WHERE COALESCE(activo, 1) = 1")
+            vocab_count = int((cur.fetchone() or {"c": 0})["c"] or 0)
 
             return jsonify({
                 "success": True,
                 "pendientes": pendientes,
                 "kb": kb_rows,
+                "vocabulario": vocab_rows,
                 "conversaciones": conversaciones,
                 "stats": {
                     "pendientes": pendientes_count,
                     "conversaciones": conversaciones_count,
                     "mensajes": mensajes_count,
                     "respuestas": kb_count,
+                    "vocabulario": vocab_count,
                 },
             })
         except Exception as exc:
