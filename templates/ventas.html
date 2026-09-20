@@ -5865,7 +5865,6 @@
         }
 
         async function _pollPedidosChatActivosVentas() {
-            if (window.__sucreePedidosGlobalInit) return;
             try {
                 const res = await fetch('/api/tienda/admin/pedidos-chat-activos', { headers: { Accept: 'application/json' } });
                 const data = await res.json();
