@@ -1988,6 +1988,14 @@
         .pedido-products { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
         .pedido-products th, .pedido-products td { border-bottom:1px solid #fed7aa; padding:7px 4px; text-align:left; vertical-align:top; }
         .pedido-products th:last-child, .pedido-products td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+        .pedido-product-check { width:100%; border:0; background:transparent; color:inherit; text-align:left; display:flex; align-items:flex-start; gap:8px; padding:0; cursor:pointer; font:inherit; }
+        .pedido-product-check .box { width:18px; height:18px; border:2px solid #fdba74; border-radius:6px; display:grid; place-items:center; flex:0 0 auto; color:#fff; background:#fff; margin-top:1px; font-size:12px; font-weight:950; }
+        .pedido-product-check .txt { min-width:0; }
+        .pedido-product-check.ready .box { background:#16a34a; border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.14); }
+        .pedido-product-check.ready .txt { color:#9f7357; text-decoration:line-through; text-decoration-thickness:2px; }
+        .pedido-product-check.ready .txt strong { color:#7c2d12; }
+        .pedido-products-ready { margin-top:9px; border:1px solid #fed7aa; background:#fff; color:#7c2d12; border-radius:11px; padding:8px 10px; font-size:12px; font-weight:900; }
+        .pedido-products-ready.complete { border-color:#86efac; background:#f0fdf4; color:#166534; }
         .pedido-total-row { display:flex; justify-content:space-between; align-items:center; font-weight:950; font-size:22px; color:var(--pos-ink); padding-top:8px; }
         .pedido-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
         .pedido-actions button { border-radius:12px; padding:11px; font-weight:950; cursor:pointer; }
@@ -4835,6 +4843,7 @@
         const PEDIDOS_TIENDA_LAST_ID_KEY = 'ventas_online_last_seen_id';
         const PEDIDO_ALERT_VOLUME_KEY = 'ventas_alert_volume';
         const PEDIDO_ALERT_TONE_KEY = 'ventas_alert_tone';
+        const PEDIDO_PRODUCTOS_READY_KEY = 'ventas_pedido_productos_ready_v1';
         let _pedidosTiendaLastId = Number(localStorage.getItem(PEDIDOS_TIENDA_LAST_ID_KEY) || 0) || 0;
         let _pedidosTiendaPollTimer = null;
         let _pedidosTiendaInicializado = false;
@@ -4974,6 +4983,47 @@
             return `<button class="primary" type="button" onclick="_actualizarEstadoPedidoOnline(${id}, 'preparando')">Actualizar estado</button>`;
         }
 
+        function _pedidoReadyStorePOS() {
+            try {
+                const raw = JSON.parse(localStorage.getItem(PEDIDO_PRODUCTOS_READY_KEY) || '{}');
+                return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+            } catch (_) {
+                return {};
+            }
+        }
+
+        function _pedidoReadySetPOS(pedidoId) {
+            const all = _pedidoReadyStorePOS();
+            const arr = Array.isArray(all[String(pedidoId)]) ? all[String(pedidoId)] : [];
+            return new Set(arr.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x >= 0));
+        }
+
+        function _guardarPedidoReadySetPOS(pedidoId, set) {
+            const all = _pedidoReadyStorePOS();
+            const id = String(Number(pedidoId || 0));
+            if (!id || id === '0') return;
+            all[id] = Array.from(set || []).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x >= 0);
+            try { localStorage.setItem(PEDIDO_PRODUCTOS_READY_KEY, JSON.stringify(all)); } catch (_) {}
+        }
+
+        function _limpiarPedidoReadyPOS(pedidoId) {
+            const all = _pedidoReadyStorePOS();
+            delete all[String(Number(pedidoId || 0))];
+            try { localStorage.setItem(PEDIDO_PRODUCTOS_READY_KEY, JSON.stringify(all)); } catch (_) {}
+        }
+
+        function _toggleProductoPedidoReadyPOS(pedidoId, index) {
+            const id = Number(pedidoId || 0);
+            const idx = Number(index);
+            if (!id || !Number.isFinite(idx) || idx < 0) return;
+            const ready = _pedidoReadySetPOS(id);
+            if (ready.has(idx)) ready.delete(idx);
+            else ready.add(idx);
+            _guardarPedidoReadySetPOS(id, ready);
+            _renderDetallePedidoPOS();
+        }
+        window._toggleProductoPedidoReadyPOS = _toggleProductoPedidoReadyPOS;
+
         function _pedidoTransferenciaInformadaPOS(p) {
             const raw = String(p?.pago_estado || p?.estado_pago || p?.pago_alerta || '').trim().toLowerCase();
             return Boolean(p?.transferencia_informada)
@@ -5027,14 +5077,27 @@
             const descuento = Number(p.descuento_monto || 0);
             const subtotal = Math.max(0, Number(p.subtotal || (total - despacho + descuento) || total));
             const obs = String(p.observaciones || p.nota || p.comentario || '').trim();
-            const productosHtml = lineas.length ? lineas.map((it) => `<tr><td>${Number(it.cantidad || 1)}</td><td>${escapeHtmlLocal(it.nombre)}${it.detalle ? `<br><small>${escapeHtmlLocal(it.detalle)}</small>` : ''}</td><td>${it.importe ? escapeHtmlLocal(_fmtCLPPos(it.importe)) : '-'}</td></tr>`).join('') : '<tr><td colspan="3">Sin detalle de productos disponible.</td></tr>';
+            const readySet = _pedidoReadySetPOS(id);
+            const readyCount = lineas.reduce((sum, _it, idx) => sum + (readySet.has(idx) ? 1 : 0), 0);
+            const productosHtml = lineas.length ? lineas.map((it, idx) => {
+                const listo = readySet.has(idx);
+                const detalle = it.detalle ? `<br><small>${escapeHtmlLocal(it.detalle)}</small>` : '';
+                return `<tr class="${listo ? 'ready' : ''}">
+                    <td>${Number(it.cantidad || 1)}</td>
+                    <td><button type="button" class="pedido-product-check ${listo ? 'ready' : ''}" onclick="_toggleProductoPedidoReadyPOS(${id}, ${idx})" title="Marcar producto como listo"><span class="box">${listo ? '✓' : ''}</span><span class="txt"><strong>${escapeHtmlLocal(it.nombre)}</strong>${detalle}</span></button></td>
+                    <td>${it.importe ? escapeHtmlLocal(_fmtCLPPos(it.importe)) : '-'}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="3">Sin detalle de productos disponible.</td></tr>';
+            const readyResumenHtml = lineas.length
+                ? `<div class="pedido-products-ready ${readyCount === lineas.length ? 'complete' : ''}">${readyCount === lineas.length ? 'Todos los productos están listos.' : `${readyCount} de ${lineas.length} producto(s) listos.`}</div>`
+                : '';
             const steps = ['Nuevo','Preparando','Listo','Entregado'].map((label, idx) => `<div class="pedido-step ${idx < paso ? 'done' : idx === paso ? 'active' : ''}">${label}</div>`).join('');
             root.innerHTML = `
                 <div class="pedido-detail-head"><div><h2>Pedido #${id}</h2><span class="pos-status-chip">${escapeHtmlLocal(estado)}</span></div><div class="pedido-detail-time">Recibido ${escapeHtmlLocal(String(p.recibido_hora || p.fecha || p.creado_en || '').trim() || '-')}</div></div>
                 <div class="pedido-progress">${steps}</div>
                 <div class="pedido-detail-card"><h3>Cliente y entrega</h3><div class="pedido-kv"><div><span>Cliente</span><strong>${escapeHtmlLocal(nombre)}</strong></div><div><span>Contacto</span><strong>${escapeHtmlLocal([tel,email].filter(Boolean).join(' · ') || '-')}</strong></div><div><span>Modalidad</span><strong>${escapeHtmlLocal(entrega)}</strong></div><div><span>Hora solicitada</span><strong>${escapeHtmlLocal(hora)}</strong></div>${direccion ? `<div style="grid-column:1/-1"><span>Direcci&oacute;n</span><strong>${escapeHtmlLocal(direccion)}</strong></div>` : ''}</div></div>
                 <div class="pedido-detail-card"><h3>Pago</h3><div class="pedido-kv"><div><span>M&eacute;todo</span><strong>${escapeHtmlLocal(metodo)}</strong></div><div><span>Estado de pago</span>${pagoEstadoHtml}</div></div>${pagoNotaHtml}</div>
-                <div class="pedido-detail-card"><h3>Productos</h3><table class="pedido-products"><thead><tr><th>Cant.</th><th>Producto</th><th>Importe</th></tr></thead><tbody>${productosHtml}</tbody></table><div class="pedido-total-row"><span>Total</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div>${despacho ? `<div class="pedido-kv"><div><span>Despacho</span><strong>${escapeHtmlLocal(_fmtCLPPos(despacho))}</strong></div></div>` : ''}${descuento ? `<div class="pedido-kv"><div><span>Descuento</span><strong>${escapeHtmlLocal(_fmtCLPPos(descuento))}</strong></div></div>` : ''}</div>
+                <div class="pedido-detail-card"><h3>Productos</h3><table class="pedido-products"><thead><tr><th>Cant.</th><th>Producto</th><th>Importe</th></tr></thead><tbody>${productosHtml}</tbody></table>${readyResumenHtml}<div class="pedido-total-row"><span>Total</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div>${despacho ? `<div class="pedido-kv"><div><span>Despacho</span><strong>${escapeHtmlLocal(_fmtCLPPos(despacho))}</strong></div></div>` : ''}${descuento ? `<div class="pedido-kv"><div><span>Descuento</span><strong>${escapeHtmlLocal(_fmtCLPPos(descuento))}</strong></div></div>` : ''}</div>
                 ${obs ? `<div class="pedido-detail-card"><h3>Observaciones</h3><div>${escapeHtmlLocal(obs)}</div></div>` : ''}
                 <div class="pedido-actions"><button class="secondary" type="button" onclick="abrirTicket58(${id})">Ticket 58 mm</button>${_accionPrincipalPedidoPOS(p)}<button class="secondary" type="button" onclick="_abrirChatPedidoOnline(${id}, '${encodeURIComponent(email || '-')}', '${encodeURIComponent(tel || '-')}')">Chat cliente</button><button class="secondary" type="button" onclick="window.location.href='/historial-ventas'">Historial</button></div>
             `;
@@ -6213,7 +6276,13 @@
                 const res = await fetch('/api/tienda/admin/pedidos-chat-activos', { headers: { Accept: 'application/json' } });
                 const data = await res.json();
                 if (!res.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar chats');
-                const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                const pedidos = (Array.isArray(data.pedidos) ? data.pedidos : []).filter((p) => String(p?.pedido_estado || p?.estado || '').trim().toLowerCase() !== 'entregado');
+                const idsActivos = new Set(pedidos.map((p) => Number(p.id || 0)).filter(Boolean));
+                _pedidosPendientesAtencion = (_pedidosPendientesAtencion || []).filter((p) => {
+                    const id = Number(p.id || 0);
+                    const estado = String(p.pedido_estado || p.estado || '').trim().toLowerCase();
+                    return id && idsActivos.has(id) && estado !== 'entregado';
+                });
                 pedidos.forEach(_upsertPedidoPOS);
                 _renderPedidosEnVivoPOS();
                 if (_pedidosPendientesAtencion.length) {
@@ -6321,19 +6390,30 @@
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar estado');
-                _pedidosPendientesAtencion = _pedidosPendientesAtencion.map((p) => {
-                    if (Number(p.id || 0) !== idNum) return p;
-                    return {
-                        ...p,
-                        pedido_estado: String(data.estado || estadoNorm),
-                        timer_minutos: Number(data.timer_minutos || 0) || null,
-                        timer_label: String(data.timer_label || ''),
-                        timer_inicio: String(data.timer_inicio || ''),
-                        timer_restante_segundos: Number.isFinite(Number(data.timer_restante_segundos))
-                            ? Number(data.timer_restante_segundos)
-                            : null,
-                    };
-                });
+                const estadoFinal = String(data.estado || estadoNorm).toLowerCase();
+                if (estadoFinal === 'entregado') {
+                    _pedidosPendientesAtencion = _pedidosPendientesAtencion.filter((p) => Number(p.id || 0) !== idNum);
+                    _limpiarPedidoReadyPOS(idNum);
+                    if (Number(_pedidoSeleccionadoPOS || 0) === idNum) {
+                        const next = _pedidosPendientesAtencion.slice().sort(_ordenPedidosPOS)[0];
+                        _pedidoSeleccionadoPOS = next ? _pedidoIdPos(next) : null;
+                    }
+                    if (Number(_pedidoAlertPedidoActualId || 0) === idNum) _cerrarPedidoAlert(true);
+                } else {
+                    _pedidosPendientesAtencion = _pedidosPendientesAtencion.map((p) => {
+                        if (Number(p.id || 0) !== idNum) return p;
+                        return {
+                            ...p,
+                            pedido_estado: estadoFinal,
+                            timer_minutos: Number(data.timer_minutos || 0) || null,
+                            timer_label: String(data.timer_label || ''),
+                            timer_inicio: String(data.timer_inicio || ''),
+                            timer_restante_segundos: Number.isFinite(Number(data.timer_restante_segundos))
+                                ? Number(data.timer_restante_segundos)
+                                : null,
+                        };
+                    });
+                }
                 _renderPedidoAlert();
                 _renderPedidosEnVivoPOS();
                 if (window.AppUX && typeof window.AppUX.toastSuccess === 'function') {
@@ -6603,7 +6683,7 @@
                     return;
                 }
                 _setVentasOnlineIndicator(true, 'Conectado y recibiendo pedidos');
-                const pedidos = Array.isArray(data.pedidos) ? data.pedidos : [];
+                const pedidos = (Array.isArray(data.pedidos) ? data.pedidos : []).filter((p) => String(p?.pedido_estado || p?.estado || '').trim().toLowerCase() !== 'entregado');
                 const maxIdResp = Number(data.max_id || 0) || 0;
 
                 if (!_pedidosTiendaInicializado) {
