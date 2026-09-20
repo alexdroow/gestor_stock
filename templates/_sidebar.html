@@ -244,6 +244,8 @@
         .sucree-alert-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; padding:16px 18px; background:linear-gradient(90deg,#fff7ed,#fff); border-bottom:1px solid #fed7aa; }
         .sucree-alert-title { display:flex; gap:12px; align-items:center; min-width:0; }
         .sucree-alert-bag { width:48px; height:48px; border-radius:50%; display:grid; place-items:center; background:#f97316; color:#fff; font-size:23px; font-weight:950; flex:0 0 auto; box-shadow:0 8px 18px rgba(249,115,22,.24); }
+        .sucree-alert-bag svg, .sucree-alert-icon svg { width:20px; height:20px; stroke:currentColor; stroke-width:2.2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+        .sucree-alert-bag svg { width:25px; height:25px; stroke-width:2.1; }
         .sucree-alert-title h2 { margin:0; color:#431407; font-size:25px; line-height:1.05; letter-spacing:-.03em; }
         .sucree-alert-title p { margin:3px 0 0; color:#78665c; font-size:13px; font-weight:750; }
         .sucree-alert-head-actions { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
@@ -271,7 +273,8 @@
         .sucree-alert-row:last-child { border-bottom:0; }
         .sucree-alert-qty { justify-self:start; min-width:36px; text-align:center; border-radius:10px; padding:7px 9px; background:#ffedd5; color:#9a3412; font-weight:950; font-variant-numeric:tabular-nums; }
         .sucree-alert-product { display:flex; gap:10px; align-items:center; min-width:0; }
-        .sucree-alert-thumb { width:48px; height:48px; border-radius:10px; display:grid; place-items:center; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-weight:950; flex:0 0 auto; }
+        .sucree-alert-thumb { width:48px; height:48px; border-radius:10px; display:grid; place-items:center; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-weight:950; flex:0 0 auto; overflow:hidden; }
+        .sucree-alert-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
         .sucree-alert-product strong { display:block; color:#431407; font-size:14px; line-height:1.25; word-break:break-word; }
         .sucree-alert-product span { display:block; color:#78665c; font-size:12px; margin-top:2px; word-break:break-word; }
         .sucree-alert-money { text-align:right; color:#431407; font-weight:950; font-variant-numeric:tabular-nums; }
@@ -568,7 +571,7 @@
             }
             function labelEstado(raw) {
                 const est = String(raw || 'recibido').trim().toLowerCase();
-                const map = { recibido:'Recibido', confirmado:'Confirmado', preparando:'En preparacion', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
+                const map = { recibido:'Recibido', confirmado:'Confirmado', preparando:'En preparación', listo:'Listo', entregado:'Entregado', cancelado:'Cancelado' };
                 return map[est] || 'Recibido';
             }
             function timerLabel(raw) {
@@ -779,24 +782,88 @@
                 return ov;
             }
 
+            function alertIcon(name) {
+                const icons = {
+                    bag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8Z"></path><path d="M9 8a3 3 0 0 1 6 0"></path></svg>',
+                    user: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+                    store: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16l-1.5-5h-13L4 10Z"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg>',
+                    truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"></path><path d="M14 10h4l3 3v4h-7z"></path><circle cx="7" cy="19" r="2"></circle><circle cx="18" cy="19" r="2"></circle></svg>',
+                    money: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M6 9h.01M18 15h.01"></path></svg>',
+                    printer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5"></path><path d="M7 18H5a2 2 0 0 1-2-2v-5h18v5a2 2 0 0 1-2 2h-2"></path><path d="M7 14h10v6H7z"></path></svg>',
+                    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>',
+                    info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>',
+                    box: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8l9 5 9-5Z"></path><path d="M3 8v8l9 5 9-5V8"></path><path d="M12 13v8"></path></svg>'
+                };
+                return icons[name] || icons.info;
+            }
+
+            function normalizarClaveProducto(raw) {
+                return String(raw || '')
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\[[^\]]*\]/g, '')
+                    .replace(/\(x\s*\d+(?:[.,]\d+)?\)/gi, '')
+                    .replace(/\b\d+\s*(unidad(?:es)?|unid\.?|u|g|gr|kg)\b/gi, '')
+                    .replace(/[^a-z0-9]+/g, ' ')
+                    .trim();
+            }
+
+            function productoCatalogoAlerta(id, nombre) {
+                try {
+                    if (typeof productosData !== 'undefined' && productosData) {
+                        const idNum = Number(id || 0);
+                        if (idNum && productosData[idNum]) return productosData[idNum];
+                        const target = normalizarClaveProducto(nombre);
+                        if (target) {
+                            const vals = Object.values(productosData || {});
+                            return vals.find((prod) => normalizarClaveProducto(prod?.nombre) === target)
+                                || vals.find((prod) => {
+                                    const pn = normalizarClaveProducto(prod?.nombre);
+                                    return pn && (target.includes(pn) || pn.includes(target));
+                                }) || null;
+                        }
+                    }
+                } catch (_) {}
+                return null;
+            }
+
+            function fotoProductoAlerta(item) {
+                const directa = String(item?.foto_url || item?.imagen_url || item?.foto || item?.imagen || '').trim();
+                if (directa) return directa.startsWith('http') || directa.startsWith('/') ? directa : `/static/${directa.replace(/^static\//, '')}`;
+                const prod = productoCatalogoAlerta(item?.producto_id || item?.id, item?.nombre || item?.producto || item?.descripcion || item?.nombre_producto);
+                return String(prod?.foto_url || '').trim();
+            }
+
             function pedidoLineasAlerta(p) {
                 const directas = Array.isArray(p?.items) ? p.items : (Array.isArray(p?.productos_items) ? p.productos_items : []);
                 if (directas.length) {
-                    return directas.map((it) => ({
-                        cantidad: Number(it.cantidad || it.qty || 1) || 1,
-                        nombre: String(it.nombre || it.producto || it.descripcion || it.nombre_producto || 'Producto'),
-                        detalle: String(it.variante || it.detalle || it.presentacion || it.observacion || ''),
-                        importe: Number(it.total || it.subtotal || it.importe || 0) || 0,
-                    }));
+                    return directas.map((it) => {
+                        const cantidad = Number(it.cantidad || it.qty || 1) || 1;
+                        const precio = Number(it.precio_unitario || it.precio || 0) || 0;
+                        const nombre = String(it.nombre || it.producto || it.descripcion || it.nombre_producto || 'Producto');
+                        return {
+                            producto_id: Number(it.producto_id || it.id || it.product_id || 0) || 0,
+                            cantidad,
+                            nombre,
+                            detalle: String(it.variante || it.detalle || it.presentacion || it.observacion || ''),
+                            foto_url: fotoProductoAlerta(it),
+                            importe: Number(it.total || it.subtotal || it.importe || 0) || (precio ? precio * cantidad : 0),
+                        };
+                    });
                 }
                 const raw = String(p?.productos || p?.productos_texto || '').trim();
                 if (!raw) return [];
                 return raw.split(/\s*[|;\n]+\s*/).map((part) => part.trim()).filter(Boolean).map((part) => {
                     const m = part.match(/^(.*?)(?:\s*\(x\s*(\d+(?:[.,]\d+)?)\))$/i);
+                    const nombre = m ? String(m[1] || '').trim() : part;
+                    const prod = productoCatalogoAlerta(0, nombre);
                     return {
+                        producto_id: Number(prod?.id || 0) || 0,
                         cantidad: m ? Number(String(m[2]).replace(',', '.')) || 1 : 1,
-                        nombre: m ? String(m[1] || '').trim() : part,
+                        nombre,
                         detalle: '',
+                        foto_url: String(prod?.foto_url || '').trim(),
                         importe: 0,
                     };
                 });
@@ -814,7 +881,7 @@
             }
 
             function estadoPagoAlerta(p) {
-                if (p?.pago_flow_pendiente || p?.pago_bloquea_preparacion) return 'Pago por confirmar';
+                if (p?.pago_flow_pendiente || p?.pago_bloquea_preparación) return 'Pago por confirmar';
                 const estado = String(p?.pago_estado || p?.estado_pago || '').trim();
                 if (estado) return estado;
                 return 'No informado';
@@ -823,7 +890,7 @@
             function resumenLineasAlerta(lineas) {
                 const arr = Array.isArray(lineas) ? lineas : [];
                 const unidades = arr.reduce((sum, it) => sum + (Number(it.cantidad || 0) || 0), 0);
-                return `${arr.length} producto${arr.length === 1 ? '' : 's'} ? ${Number(unidades || 0).toLocaleString('es-CL', { maximumFractionDigits: 2 })} unidad${Number(unidades || 0) === 1 ? '' : 'es'}`;
+                return `${arr.length} producto${arr.length === 1 ? '' : 's'} · ${Number(unidades || 0).toLocaleString('es-CL', { maximumFractionDigits: 2 })} unidad${Number(unidades || 0) === 1 ? '' : 'es'}`;
             }
 
             function imprimirTicketAlerta(id) {
@@ -1276,7 +1343,7 @@
                         </div>
                         <div id="sucree-quick-${id}" style="display:none;grid-template-columns:1fr;gap:6px;margin-top:6px;">
                             <button type="button" onclick="_sucreeSendQuickPedido(${id},'recibido')" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Pedido recibido</button>
-                            <button type="button" onclick="_sucreeSendQuickPedido(${id},'preparando')" style="border:1px solid #fde68a;background:#fffbeb;color:#92400e;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">En preparacion</button>
+                            <button type="button" onclick="_sucreeSendQuickPedido(${id},'preparando')" style="border:1px solid #fde68a;background:#fffbeb;color:#92400e;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">En preparación</button>
                             <button type="button" onclick="_sucreeSendQuickPedido(${id},'listo')" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Listo para retiro</button>
                             <button type="button" onclick="_sucreeSendQuickPedido(${id},'despacho')" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Despacho</button>
                             <button type="button" onclick="_sucreeSendQuickPedido(${id},'entregado')" style="border:1px solid #fecaca;background:#fef2f2;color:#991b1b;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;">Pedido entregado</button>
@@ -1412,14 +1479,14 @@
                 const productosHtml = lineas.length ? lineas.map((it) => `
                     <div class="sucree-alert-row">
                         <div><span class="sucree-alert-qty">${esc(String(it.cantidad || 1))}</span></div>
-                        <div class="sucree-alert-product"><span class="sucree-alert-thumb" aria-hidden="true">?</span><div><strong>${esc(it.nombre || 'Producto')}</strong>${it.detalle ? `<span>${esc(it.detalle)}</span>` : ''}</div></div>
+                        <div class="sucree-alert-product"><span class="sucree-alert-thumb" aria-hidden="true">${it.foto_url ? `<img src="${esc(it.foto_url)}" alt="">` : alertIcon('box')}</span><div><strong>${esc(it.nombre || 'Producto')}</strong>${it.detalle ? `<span>${esc(it.detalle)}</span>` : ''}</div></div>
                         <div class="sucree-alert-money">${it.importe ? `$${Math.round(Number(it.importe || 0)).toLocaleString('es-CL')}` : 'Sin importe'}</div>
                     </div>
-                `).join('') : '<div class="sucree-alert-row"><div></div><div class="sucree-alert-product"><span class="sucree-alert-thumb" aria-hidden="true">?</span><div><strong>Sin detalle de productos disponible</strong><span>Revisar pedido desde Pedidos activos.</span></div></div><div class="sucree-alert-money">-</div></div>';
+                `).join('') : `<div class="sucree-alert-row"><div></div><div class="sucree-alert-product"><span class="sucree-alert-thumb" aria-hidden="true">${alertIcon('box')}</span><div><strong>Sin detalle de productos disponible</strong><span>Revisar pedido desde Pedidos activos.</span></div></div><div class="sucree-alert-money">-</div></div>`;
                 const contactoSec = telefono || email
-                    ? `${telefono ? `Tel?fono: ${esc(telefono)}` : 'Tel?fono no informado'}${email ? `<br>Correo: ${esc(email)}` : '<br>Correo no informado'}`
-                    : 'Tel?fono y correo no informados';
-                const entregaSec = `${fecha || hora ? `${fecha ? esc(fecha) : ''}${fecha && hora ? ' ? ' : ''}${hora ? esc(hora) : ''}` : 'Horario no informado'}${direccion ? `<br>${esc(direccion)}` : ''}`;
+                    ? `${telefono ? `Teléfono: ${esc(telefono)}` : 'Teléfono no informado'}${email ? `<br>Correo: ${esc(email)}` : '<br>Correo no informado'}`
+                    : 'Teléfono y correo no informados';
+                const entregaSec = `${fecha || hora ? `${fecha ? esc(fecha) : ''}${fecha && hora ? ' · ' : ''}${hora ? esc(hora) : ''}` : 'Horario no informado'}${direccion ? `<br>${esc(direccion)}` : ''}`;
                 const flowButtons = String(pedido.metodo_pago || '').toLowerCase().includes('flow') ? `
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
                         <button type="button" class="sucree-alert-btn" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, true)">Confirmar pago</button>
@@ -1429,33 +1496,33 @@
                 panel.innerHTML = `
                     <div class="sucree-alert-head">
                         <div class="sucree-alert-title">
-                            <div class="sucree-alert-bag" aria-hidden="true">?</div>
-                            <div><h2 id="sucree-alert-title">?Nuevo pedido online!</h2><p>Recibido hace unos segundos</p></div>
+                            <div class="sucree-alert-bag" aria-hidden="true">${alertIcon('bag')}</div>
+                            <div><h2 id="sucree-alert-title">¡Nuevo pedido online!</h2><p>Recibido hace unos segundos</p></div>
                         </div>
                         <div class="sucree-alert-head-actions">
                             <span class="sucree-alert-count">${nuevosPendientes.length} por revisar</span>
-                            <button type="button" class="sucree-alert-close" id="sucree-pedidos-alert-close" aria-label="Cerrar">?</button>
+                            <button type="button" class="sucree-alert-close" id="sucree-pedidos-alert-close" aria-label="Cerrar">&times;</button>
                         </div>
                     </div>
                     <div class="sucree-alert-body">
                         <div class="sucree-alert-order-head"><h3>Pedido #${id}</h3><span class="sucree-alert-status">${esc(estado)}</span></div>
                         <div class="sucree-alert-grid">
-                            <div class="sucree-alert-card"><span class="sucree-alert-icon" aria-hidden="true">C</span><div><h4>Cliente</h4><strong>${esc(nombre || 'Sin nombre registrado')}</strong><span>${contactoSec}</span></div></div>
-                            <div class="sucree-alert-card"><span class="sucree-alert-icon" aria-hidden="true">${retiro ? 'T' : 'D'}</span><div><h4>Entrega</h4><strong>${esc(entregaTitulo)}</strong><span>${entregaSec}</span></div></div>
+                            <div class="sucree-alert-card"><span class="sucree-alert-icon" aria-hidden="true">${alertIcon('user')}</span><div><h4>Cliente</h4><strong>${esc(nombre || 'Sin nombre registrado')}</strong><span>${contactoSec}</span></div></div>
+                            <div class="sucree-alert-card"><span class="sucree-alert-icon" aria-hidden="true">${retiro ? alertIcon('store') : alertIcon('truck')}</span><div><h4>Entrega</h4><strong>${esc(entregaTitulo)}</strong><span>${entregaSec}</span></div></div>
                         </div>
-                        <div class="sucree-alert-pay"><span class="sucree-alert-icon" aria-hidden="true">$</span><strong>${esc(metodo)}</strong><span class="chip">${esc(pagoEstado)}</span></div>
+                        <div class="sucree-alert-pay"><span class="sucree-alert-icon" aria-hidden="true">${alertIcon('money')}</span><strong>${esc(metodo)}</strong><span class="chip">${esc(pagoEstado)}</span></div>
                         <div class="sucree-alert-section-title"><strong>Detalle del pedido</strong><span>${esc(resumenLineasAlerta(lineas))}</span></div>
                         <div class="sucree-alert-table"><div class="sucree-alert-row head"><div>Cant.</div><div>Producto</div><div class="sucree-alert-money">Importe</div></div>${productosHtml}</div>
                         <div class="sucree-alert-total"><span>Total del pedido</span><span>$${Math.round(total).toLocaleString('es-CL')}</span></div>
-                        <div class="sucree-alert-note">Aceptar el pedido no confirma su pago.</div>
+                        <div class="sucree-alert-note">${alertIcon('info')} Aceptar el pedido no confirma su pago.</div>
                         ${flowButtons}
                     </div>
                     <div class="sucree-alert-actions">
-                        <span class="sucree-alert-footnote">El pedido seguir? visible en Pedidos en vivo</span>
+                        <span class="sucree-alert-footnote">El pedido seguirá visible en Pedidos en vivo</span>
                         <div class="sucree-alert-actions-main">
-                            <button type="button" class="sucree-alert-btn" id="sucree-pedidos-alert-later">Revisar despu?s</button>
-                            <button type="button" class="sucree-alert-btn" onclick="_sucreeImprimirTicketAlerta(${id})">Imprimir ticket ? 58 mm</button>
-                            <button type="button" class="sucree-alert-btn primary" onclick="_sucreeAceptarPrepararAlerta(${id})">Aceptar y preparar</button>
+                            <button type="button" class="sucree-alert-btn" id="sucree-pedidos-alert-later">Revisar después</button>
+                            <button type="button" class="sucree-alert-btn" onclick="_sucreeImprimirTicketAlerta(${id})">${alertIcon('printer')} Imprimir ticket · 58 mm</button>
+                            <button type="button" class="sucree-alert-btn primary" onclick="_sucreeAceptarPrepararAlerta(${id})">${alertIcon('check')} Aceptar y preparar</button>
                         </div>
                     </div>`;
                 panel.querySelector('#sucree-pedidos-alert-close')?.addEventListener('click', () => { ov.style.display = 'none'; });
@@ -1469,7 +1536,7 @@
                 const ok = window.confirm(
                     confirmado
                         ? `Confirmar que el pago Flow del pedido #${id} fue recibido?`
-                        : `Confirmar que el pago del pedido #${id} NO se concreto?`
+                        : `Confirmar que el pago del pedido #${id} NO se concretó?`
                 );
                 if (!ok) return;
                 try {
@@ -1483,7 +1550,7 @@
                     if (!r1.ok || !d1?.success) throw new Error(d1?.error || 'No se pudo validar pago');
 
                     const msgCliente = confirmado
-                        ? 'Pago recibido correctamente. Tu pedido fue confirmado y comenzaremos su preparacion.'
+                        ? 'Pago recibido correctamente. Tu pedido fue confirmado y comenzaremos su preparación.'
                         : 'No se pudo confirmar tu pago. Por favor reintenta pagar con Flow o elige transferencia para completar tu pedido.';
                     const r2 = await fetch(`/api/tienda/chat/venta/${id}/enviar`, {
                         method: 'POST',
