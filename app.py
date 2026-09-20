@@ -9948,6 +9948,38 @@ def _tienda_admin_adjuntar_items_pedidos(cursor, pedidos):
         items = por_venta.get(vid) or []
         pedido["items"] = items
         pedido["productos_items"] = items
+
+    try:
+        cursor.execute(
+            f"""
+            SELECT origen_id AS venta_id, MAX(creado_en) AS informado_en
+            FROM tienda_pedido_chat
+            WHERE origen_tipo = 'venta'
+              AND origen_id IN ({placeholders})
+              AND remitente_tipo = 'cliente'
+              AND mensaje LIKE 'Aviso de transferencia informado por cliente%'
+            GROUP BY origen_id
+            """,
+            tuple(venta_ids),
+        )
+        transferencias = {
+            int(row["venta_id"] or 0): str(row["informado_en"] or "")
+            for row in cursor.fetchall() or []
+        }
+    except Exception:
+        transferencias = {}
+
+    for pedido in pedidos:
+        vid = int(pedido.get("id") or pedido.get("venta_id") or 0)
+        informado_en = transferencias.get(vid, "")
+        if informado_en:
+            pedido["transferencia_informada"] = True
+            pedido["transferencia_informada_en"] = informado_en
+            pedido["estado_pago"] = "transferencia_informada_por_verificar"
+            pedido["pago_estado"] = "transferencia_informada_por_verificar"
+            pedido["pago_alerta"] = "Transferencia realizada por el cliente. Revisar y verificar pago."
+        else:
+            pedido["transferencia_informada"] = bool(pedido.get("transferencia_informada"))
     return pedidos
 
 

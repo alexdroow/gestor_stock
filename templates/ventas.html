@@ -1981,6 +1981,10 @@
         .pedido-detail-card h3 { margin:0 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:#7c2d12; }
         .pedido-kv { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; font-size:13px; color:var(--pos-muted); }
         .pedido-kv strong { display:block; color:var(--pos-ink); font-size:14px; }
+        .pedido-payment-alert { display:inline-flex !important; align-items:center; gap:7px; width:max-content; max-width:100%; margin-top:3px; padding:6px 10px; border:1px solid #f97316; border-radius:999px; background:linear-gradient(135deg,#fff7ed,#fed7aa); color:#9a3412 !important; font-size:13px !important; font-weight:950; box-shadow:0 0 0 4px rgba(249,115,22,.12), 0 0 22px rgba(249,115,22,.45); animation:pedidoPaymentGlow 1.25s ease-in-out infinite alternate; }
+        .pedido-payment-alert::before { content:""; width:8px; height:8px; border-radius:999px; background:#22c55e; box-shadow:0 0 0 4px rgba(34,197,94,.16), 0 0 14px rgba(34,197,94,.8); flex:0 0 auto; }
+        .pedido-payment-note { margin-top:9px; border:1px solid #fb923c; background:linear-gradient(135deg,#fff7ed,#ffedd5); color:#7c2d12; border-radius:12px; padding:8px 10px; font-size:12px; font-weight:900; box-shadow:0 8px 20px rgba(249,115,22,.16); }
+        @keyframes pedidoPaymentGlow { from { box-shadow:0 0 0 4px rgba(249,115,22,.10), 0 0 16px rgba(249,115,22,.34); } to { box-shadow:0 0 0 6px rgba(249,115,22,.18), 0 0 28px rgba(249,115,22,.62); } }
         .pedido-products { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
         .pedido-products th, .pedido-products td { border-bottom:1px solid #fed7aa; padding:7px 4px; text-align:left; vertical-align:top; }
         .pedido-products th:last-child, .pedido-products td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
@@ -4968,6 +4972,25 @@
             return `<button class="primary" type="button" onclick="_actualizarEstadoPedidoOnline(${id}, 'preparando')">Actualizar estado</button>`;
         }
 
+        function _pedidoTransferenciaInformadaPOS(p) {
+            const raw = String(p?.pago_estado || p?.estado_pago || p?.pago_alerta || '').trim().toLowerCase();
+            return Boolean(p?.transferencia_informada)
+                || raw.includes('transferencia_informada')
+                || raw.includes('transferencia informada')
+                || raw.includes('transferencia realizada');
+        }
+
+        function _pedidoPagoEstadoDetallePOS(p) {
+            if (p?.pago_flow_pendiente || p?.pago_bloquea_preparacion) {
+                return { label: 'Por verificar', destacado: false, nota: 'Pago pendiente de validación. No se marca como pagado al aceptar preparación.' };
+            }
+            if (_pedidoTransferenciaInformadaPOS(p)) {
+                return { label: 'Transferencia realizada', destacado: true, nota: 'El cliente informó que realizó la transferencia. Revisar comprobante o cuenta bancaria antes de confirmar el pago.' };
+            }
+            const estado = String(p?.pago_estado || p?.estado_pago || '').trim();
+            return { label: estado || 'Registrado', destacado: false, nota: '' };
+        }
+
         function _renderDetallePedidoPOS() {
             const root = document.getElementById('pedido-detalle-section');
             if (!root) return;
@@ -4989,8 +5012,13 @@
             const hora = _pedidoHoraPos(p) || '-';
             const direccion = String(p.direccion_entrega || '').trim();
             const metodo = String(p.metodo_pago || p.pago_metodo || 'No informado').trim();
-            const pagoPendiente = Boolean(p.pago_flow_pendiente || p.pago_bloquea_preparacion);
-            const pagoEstado = pagoPendiente ? 'Por verificar' : (String(p.pago_estado || p.estado_pago || '').trim() || 'Registrado');
+            const pagoDetalle = _pedidoPagoEstadoDetallePOS(p);
+            const pagoEstadoHtml = pagoDetalle.destacado
+                ? `<strong class="pedido-payment-alert">${escapeHtmlLocal(pagoDetalle.label)}</strong>`
+                : `<strong>${escapeHtmlLocal(pagoDetalle.label)}</strong>`;
+            const pagoNotaHtml = pagoDetalle.nota
+                ? `<div class="${pagoDetalle.destacado ? 'pedido-payment-note' : ''}" style="${pagoDetalle.destacado ? '' : 'margin-top:8px;color:#9a3412;font-weight:900;'}">${escapeHtmlLocal(pagoDetalle.nota)}</div>`
+                : '';
             const lineas = _lineasPedidoPos(p);
             const total = Number(p.total_monto || p.total || 0);
             const despacho = Number(p.despacho_monto || 0);
@@ -5003,7 +5031,7 @@
                 <div class="pedido-detail-head"><div><h2>Pedido #${id}</h2><span class="pos-status-chip">${escapeHtmlLocal(estado)}</span></div><div class="pedido-detail-time">Recibido ${escapeHtmlLocal(String(p.recibido_hora || p.fecha || p.creado_en || '').trim() || '-')}</div></div>
                 <div class="pedido-progress">${steps}</div>
                 <div class="pedido-detail-card"><h3>Cliente y entrega</h3><div class="pedido-kv"><div><span>Cliente</span><strong>${escapeHtmlLocal(nombre)}</strong></div><div><span>Contacto</span><strong>${escapeHtmlLocal([tel,email].filter(Boolean).join(' · ') || '-')}</strong></div><div><span>Modalidad</span><strong>${escapeHtmlLocal(entrega)}</strong></div><div><span>Hora solicitada</span><strong>${escapeHtmlLocal(hora)}</strong></div>${direccion ? `<div style="grid-column:1/-1"><span>Direcci&oacute;n</span><strong>${escapeHtmlLocal(direccion)}</strong></div>` : ''}</div></div>
-                <div class="pedido-detail-card"><h3>Pago</h3><div class="pedido-kv"><div><span>M&eacute;todo</span><strong>${escapeHtmlLocal(metodo)}</strong></div><div><span>Estado de pago</span><strong>${escapeHtmlLocal(pagoEstado)}</strong></div></div>${pagoPendiente ? '<div style="margin-top:8px;color:#9a3412;font-weight:900;">Pago pendiente de validaci&oacute;n. No se marca como pagado al aceptar preparaci&oacute;n.</div>' : ''}</div>
+                <div class="pedido-detail-card"><h3>Pago</h3><div class="pedido-kv"><div><span>M&eacute;todo</span><strong>${escapeHtmlLocal(metodo)}</strong></div><div><span>Estado de pago</span>${pagoEstadoHtml}</div></div>${pagoNotaHtml}</div>
                 <div class="pedido-detail-card"><h3>Productos</h3><table class="pedido-products"><thead><tr><th>Cant.</th><th>Producto</th><th>Importe</th></tr></thead><tbody>${productosHtml}</tbody></table><div class="pedido-total-row"><span>Total</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div>${despacho ? `<div class="pedido-kv"><div><span>Despacho</span><strong>${escapeHtmlLocal(_fmtCLPPos(despacho))}</strong></div></div>` : ''}${descuento ? `<div class="pedido-kv"><div><span>Descuento</span><strong>${escapeHtmlLocal(_fmtCLPPos(descuento))}</strong></div></div>` : ''}</div>
                 ${obs ? `<div class="pedido-detail-card"><h3>Observaciones</h3><div>${escapeHtmlLocal(obs)}</div></div>` : ''}
                 <div class="pedido-actions"><button class="secondary" type="button" onclick="abrirTicket58(${id})">Ticket 58 mm</button>${_accionPrincipalPedidoPOS(p)}<button class="secondary" type="button" onclick="_abrirChatPedidoOnline(${id}, '${encodeURIComponent(email || '-')}', '${encodeURIComponent(tel || '-')}')">Chat cliente</button><button class="secondary" type="button" onclick="window.location.href='/historial-ventas'">Historial</button></div>
@@ -5564,6 +5592,7 @@
         function _pedidoAlertPagoLabel(p) {
             const estado = String(p?.pago_estado || p?.estado_pago || '').trim();
             if (p?.pago_flow_pendiente || p?.pago_bloquea_preparacion) return 'Pago por confirmar';
+            if (_pedidoTransferenciaInformadaPOS(p)) return 'Transferencia realizada';
             if (estado) return estado;
             const metodo = String(p?.metodo_pago || p?.pago_metodo || '').trim().toLowerCase();
             if (!metodo) return 'No informado';
