@@ -10782,6 +10782,81 @@ def api_tienda_chat_subir_comprobante_transferencia(origen_id):
             conn.close()
 
 
+@app.route('/api/tienda/pedido/<int:venta_id>/transferencia-aviso', methods=['POST'])
+def api_tienda_pedido_transferencia_aviso(venta_id):
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        email = str(data.get("email") or "").strip().lower()
+        telefono = _normalizar_telefono_cl(data.get("telefono"))
+        if not email or not telefono:
+            return jsonify({"success": False, "error": "Falta validar email/telefono del pedido"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        info = _chat_info_origen_cursor(cursor, "venta", int(venta_id))
+        if not info:
+            return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+        if not _chat_cliente_autorizado(info, email, telefono):
+            return jsonify({"success": False, "error": "Cliente no autorizado para este pedido"}), 403
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM tienda_pedido_chat
+            WHERE origen_tipo = 'venta'
+              AND origen_id = ?
+              AND remitente_tipo = 'cliente'
+              AND mensaje LIKE 'Aviso de transferencia informado por cliente%'
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (int(venta_id),),
+        )
+        previo = cursor.fetchone()
+        if previo:
+            conn.commit()
+            return jsonify(
+                {
+                    "success": True,
+                    "already_reported": True,
+                    "venta_id": int(venta_id),
+                    "estado_pago": "transferencia_informada_por_verificar",
+                    "mensaje": "La transferencia ya estaba informada y sigue pendiente de verificacion.",
+                }
+            )
+
+        mensaje = (
+            "Aviso de transferencia informado por cliente\n"
+            "Estado de pago: transferencia informada, pendiente de verificacion por el local."
+        )
+        cursor.execute(
+            """
+            INSERT INTO tienda_pedido_chat (
+                origen_tipo, origen_id, cliente_email, cliente_telefono, remitente_tipo, mensaje
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("venta", int(venta_id), email, telefono, "cliente", mensaje),
+        )
+        conn.commit()
+        return jsonify(
+            {
+                "success": True,
+                "already_reported": False,
+                "venta_id": int(venta_id),
+                "estado_pago": "transferencia_informada_por_verificar",
+                "mensaje": f"Recibimos tu aviso de transferencia. Verificaremos el pago de tu pedido #{int(venta_id)}.",
+            }
+        )
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/tienda/admin/comprobante-transferencia/<path:filename>', methods=['GET'])
 def api_tienda_admin_comprobante_transferencia(filename):
     if not session.get(_ADMIN_SESSION_KEY):
@@ -16851,6 +16926,7 @@ def api_tienda_checkout():
             return jsonify({'success': False, 'error': 'Correo electronico invalido'}), 400
         cupon_codigo = _normalizar_cupon_codigo(data.get("codigo_descuento"))
         cliente_ref = _normalizar_cliente_ref(cliente_email, cliente_telefono)
+        codigo_pedido_req = str(data.get("codigo_pedido") or "").strip().upper()[:80]
         entrega_tipo = str(data.get("entrega_tipo") or "retiro").strip().lower()
         if entrega_tipo not in {"retiro", "despacho"}:
             entrega_tipo = "retiro"
@@ -16879,6 +16955,55 @@ def api_tienda_checkout():
                 return jsonify({'success': False, 'error': 'Hora de retiro invalida.'}), 400
             if retiro_dt < min_retiro_dt:
                 return jsonify({'success': False, 'error': 'La hora de retiro/entrega debe ser al menos 30 minutos desde ahora.'}), 400
+
+        # Idempotencia para reintentos/doble clic: si este checkout ya creo una venta,
+        # devolvemos el mismo pedido sin volver a descontar stock ni crear duplicados.
+        if codigo_pedido_req:
+            conn_existing = None
+            try:
+                _ensure_ventas_metodo_pago_column()
+                conn_existing = get_db()
+                cur_existing = conn_existing.cursor()
+                cur_existing.execute(
+                    """
+                    SELECT id, codigo_operacion, total_monto, descuento_monto, cliente_nombre,
+                           cliente_email, cliente_telefono, entrega_tipo, hora_retiro,
+                           direccion_entrega, despacho_monto,
+                           COALESCE(NULLIF(TRIM(metodo_pago), ''), 'transferencia') AS metodo_pago
+                    FROM ventas
+                    WHERE UPPER(TRIM(COALESCE(codigo_pedido, ''))) = ?
+                      AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (codigo_pedido_req,),
+                )
+                existente = cur_existing.fetchone()
+                if existente:
+                    ex = dict(existente)
+                    return jsonify(
+                        {
+                            "success": True,
+                            "idempotent": True,
+                            "venta_id": int(ex.get("id") or 0),
+                            "codigo_operacion": str(ex.get("codigo_operacion") or ""),
+                            "codigo_pedido": codigo_pedido_req,
+                            "subtotal": float(ex.get("total_monto") or 0) + float(ex.get("descuento_monto") or 0) - float(ex.get("despacho_monto") or 0),
+                            "descuento_monto": float(ex.get("descuento_monto") or 0),
+                            "total_monto": float(ex.get("total_monto") or 0),
+                            "cliente_nombre": str(ex.get("cliente_nombre") or cliente_nombre),
+                            "cliente_email": str(ex.get("cliente_email") or cliente_email),
+                            "cliente_telefono": str(ex.get("cliente_telefono") or cliente_telefono),
+                            "entrega_tipo": str(ex.get("entrega_tipo") or entrega_tipo),
+                            "hora_retiro": str(ex.get("hora_retiro") or hora_retiro),
+                            "direccion_entrega": str(ex.get("direccion_entrega") or ""),
+                            "despacho_monto": float(ex.get("despacho_monto") or 0),
+                            "metodo_pago": str(ex.get("metodo_pago") or "transferencia"),
+                        }
+                    )
+            finally:
+                if conn_existing:
+                    conn_existing.close()
 
         categorias = _cargar_categorias_tienda()
         categorias_map = {str(c.get("nombre") or "").strip().lower(): c for c in categorias}
@@ -17074,7 +17199,7 @@ def api_tienda_checkout():
 
         payload_seguro = {
             "items": items_limpios,
-            "codigo_pedido": str(data.get("codigo_pedido") or "").strip()[:80],
+            "codigo_pedido": codigo_pedido_req,
             "fecha_venta": None,
         }
         respuesta = _procesar_venta_desde_payload(
