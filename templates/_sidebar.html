@@ -221,22 +221,70 @@
             position: fixed;
             inset: 0;
             z-index: 130000;
-            background: rgba(15,23,42,.74);
+            background: rgba(67,20,7,.48);
             padding: 18px;
             display: none;
             align-items: center;
             justify-content: center;
         }
         .sucree-pedidos-alert-panel {
-            width: min(920px, 96vw);
-            max-height: 88vh;
-            overflow: auto;
+            width: min(860px, 96vw);
+            max-height: min(88vh, 820px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
             background: #fff;
-            border: 2px solid #ef4444;
-            border-radius: 16px;
-            box-shadow: 0 28px 48px rgba(0,0,0,.35);
-            padding: 16px;
+            color: #431407;
+            border: 1px solid #fed7aa;
+            border-top: 6px solid #f97316;
+            border-radius: 18px;
+            box-shadow: 0 24px 60px rgba(67,20,7,.32);
+            padding: 0;
         }
+        .sucree-alert-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; padding:16px 18px; background:linear-gradient(90deg,#fff7ed,#fff); border-bottom:1px solid #fed7aa; }
+        .sucree-alert-title { display:flex; gap:12px; align-items:center; min-width:0; }
+        .sucree-alert-bag { width:48px; height:48px; border-radius:50%; display:grid; place-items:center; background:#f97316; color:#fff; font-size:23px; font-weight:950; flex:0 0 auto; box-shadow:0 8px 18px rgba(249,115,22,.24); }
+        .sucree-alert-title h2 { margin:0; color:#431407; font-size:25px; line-height:1.05; letter-spacing:-.03em; }
+        .sucree-alert-title p { margin:3px 0 0; color:#78665c; font-size:13px; font-weight:750; }
+        .sucree-alert-head-actions { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+        .sucree-alert-count { border-radius:999px; padding:8px 12px; background:#ffedd5; color:#9a3412; font-weight:950; font-size:13px; }
+        .sucree-alert-close { width:38px; height:38px; border:1px solid #fed7aa; border-radius:12px; background:#fff; color:#9a3412; font-size:24px; line-height:1; cursor:pointer; }
+        .sucree-alert-body { overflow:auto; padding:16px 18px 0; }
+        .sucree-alert-order-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+        .sucree-alert-order-head h3 { margin:0; color:#431407; font-size:24px; letter-spacing:-.03em; }
+        .sucree-alert-status { display:inline-flex; border-radius:999px; padding:6px 10px; background:#f97316; color:#fff; font-size:12px; font-weight:950; }
+        .sucree-alert-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+        .sucree-alert-card { border:1px solid #fed7aa; border-radius:12px; padding:12px; background:#fff; display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; min-width:0; }
+        .sucree-alert-icon { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:#fff7ed; color:#f97316; font-weight:950; border:1px solid #fed7aa; }
+        .sucree-alert-card h4 { margin:0 0 5px; color:#431407; font-size:14px; font-weight:950; }
+        .sucree-alert-card strong { display:block; color:#431407; font-size:14px; line-height:1.25; word-break:break-word; }
+        .sucree-alert-card span { display:block; color:#78665c; font-size:12px; line-height:1.35; word-break:break-word; }
+        .sucree-alert-pay { display:flex; align-items:center; gap:10px; border:1px solid #fed7aa; background:#fff7ed; border-radius:12px; padding:10px 12px; margin-bottom:12px; color:#431407; }
+        .sucree-alert-pay strong { font-size:14px; }
+        .sucree-alert-pay .chip { border-radius:999px; background:#ffedd5; color:#9a3412; padding:5px 9px; font-size:12px; font-weight:950; }
+        .sucree-alert-section-title { display:flex; justify-content:space-between; align-items:end; gap:12px; margin:10px 0 8px; color:#431407; }
+        .sucree-alert-section-title strong { font-size:16px; }
+        .sucree-alert-section-title span { color:#78665c; font-size:13px; font-weight:800; }
+        .sucree-alert-table { border:1px solid #fed7aa; border-radius:12px; overflow:hidden; }
+        .sucree-alert-row { display:grid; grid-template-columns:70px minmax(0,1fr) 118px; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px solid #ffedd5; background:#fff; }
+        .sucree-alert-row.head { background:#fff7ed; color:#78665c; font-size:12px; font-weight:950; padding-top:8px; padding-bottom:8px; }
+        .sucree-alert-row:last-child { border-bottom:0; }
+        .sucree-alert-qty { justify-self:start; min-width:36px; text-align:center; border-radius:10px; padding:7px 9px; background:#ffedd5; color:#9a3412; font-weight:950; font-variant-numeric:tabular-nums; }
+        .sucree-alert-product { display:flex; gap:10px; align-items:center; min-width:0; }
+        .sucree-alert-thumb { width:48px; height:48px; border-radius:10px; display:grid; place-items:center; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-weight:950; flex:0 0 auto; }
+        .sucree-alert-product strong { display:block; color:#431407; font-size:14px; line-height:1.25; word-break:break-word; }
+        .sucree-alert-product span { display:block; color:#78665c; font-size:12px; margin-top:2px; word-break:break-word; }
+        .sucree-alert-money { text-align:right; color:#431407; font-weight:950; font-variant-numeric:tabular-nums; }
+        .sucree-alert-total { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-top:10px; padding:12px 14px; border-radius:12px; background:#fff7ed; color:#431407; font-weight:950; }
+        .sucree-alert-total span:last-child { color:#9a3412; font-size:28px; font-variant-numeric:tabular-nums; }
+        .sucree-alert-note { margin-top:10px; color:#78665c; font-size:12px; font-weight:800; }
+        .sucree-alert-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 18px 16px; border-top:1px solid #fed7aa; background:#fff; }
+        .sucree-alert-actions-main { display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+        .sucree-alert-btn { min-height:44px; border-radius:12px; padding:10px 14px; font-weight:950; cursor:pointer; border:1px solid #fed7aa; background:#fff; color:#9a3412; }
+        .sucree-alert-btn.primary { border-color:#f97316; background:#f97316; color:#fff; box-shadow:0 10px 20px rgba(249,115,22,.22); }
+        .sucree-alert-btn.primary:hover { background:#ea580c; }
+        .sucree-alert-footnote { color:#78665c; font-size:12px; font-weight:750; }
+        @media (max-width:720px) { .sucree-alert-head, .sucree-alert-actions { align-items:stretch; flex-direction:column; } .sucree-alert-head-actions, .sucree-alert-actions-main { width:100%; justify-content:space-between; } .sucree-alert-grid { grid-template-columns:1fr; } .sucree-alert-row { grid-template-columns:52px minmax(0,1fr) 82px; padding:9px; } .sucree-alert-thumb { width:40px; height:40px; } .sucree-alert-total span:last-child { font-size:22px; } }
         .sucree-pedido-pendiente {
             border-color: #fecaca !important;
             background: #fff1f2;
@@ -722,30 +770,87 @@
                 ov = document.createElement('div');
                 ov.id = 'sucree-pedidos-alert';
                 ov.className = 'sucree-pedidos-alert';
-                ov.innerHTML = `
-                    <div class="sucree-pedidos-alert-panel">
-                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
-                            <div>
-                                <div style="font-size:1.2rem;font-weight:900;color:#991b1b;">Nuevo pedido online</div>
-                                <div style="font-size:.95rem;color:#475569;">Prioridad alta: revisa y responde al cliente.</div>
-                            </div>
-                            <div id="sucree-pedidos-alert-count" style="background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:999px;font-weight:800;">0</div>
-                        </div>
-                        <div id="sucree-pedidos-alert-body" style="display:grid;gap:10px;"></div>
-                        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
-                            <button type="button" id="sucree-pedidos-alert-open" style="border:1px solid #2563eb;background:#2563eb;color:#fff;padding:9px 12px;border-radius:8px;font-weight:800;cursor:pointer;">Ver pedidos activos</button>
-                            <button type="button" id="sucree-pedidos-alert-close" style="border:1px solid #cbd5e1;background:#fff;color:#334155;padding:9px 12px;border-radius:8px;font-weight:700;cursor:pointer;">Cerrar</button>
-                        </div>
-                    </div>`;
+                ov.setAttribute('role', 'dialog');
+                ov.setAttribute('aria-modal', 'true');
+                ov.setAttribute('aria-labelledby', 'sucree-alert-title');
+                ov.innerHTML = '<div class="sucree-pedidos-alert-panel" id="sucree-pedidos-alert-panel"></div>';
                 document.body.appendChild(ov);
-                ov.querySelector('#sucree-pedidos-alert-open')?.addEventListener('click', () => {
-                    ov.style.display = 'none';
-                    const hub = ensureHub();
-                    hub.style.display = 'block';
-                });
-                ov.querySelector('#sucree-pedidos-alert-close')?.addEventListener('click', () => { ov.style.display = 'none'; });
+                ov.addEventListener('click', (ev) => { if (ev.target === ov) ov.style.display = 'none'; });
                 return ov;
             }
+
+            function pedidoLineasAlerta(p) {
+                const directas = Array.isArray(p?.items) ? p.items : (Array.isArray(p?.productos_items) ? p.productos_items : []);
+                if (directas.length) {
+                    return directas.map((it) => ({
+                        cantidad: Number(it.cantidad || it.qty || 1) || 1,
+                        nombre: String(it.nombre || it.producto || it.descripcion || it.nombre_producto || 'Producto'),
+                        detalle: String(it.variante || it.detalle || it.presentacion || it.observacion || ''),
+                        importe: Number(it.total || it.subtotal || it.importe || 0) || 0,
+                    }));
+                }
+                const raw = String(p?.productos || p?.productos_texto || '').trim();
+                if (!raw) return [];
+                return raw.split(/\s*[|;\n]+\s*/).map((part) => part.trim()).filter(Boolean).map((part) => {
+                    const m = part.match(/^(.*?)(?:\s*\(x\s*(\d+(?:[.,]\d+)?)\))$/i);
+                    return {
+                        cantidad: m ? Number(String(m[2]).replace(',', '.')) || 1 : 1,
+                        nombre: m ? String(m[1] || '').trim() : part,
+                        detalle: '',
+                        importe: 0,
+                    };
+                });
+            }
+
+            function metodoPagoAlerta(p) {
+                const raw = String(p?.metodo_pago || p?.pago_metodo || '').trim();
+                const low = raw.toLowerCase();
+                if (!raw) return 'Medio no informado';
+                if (low.includes('transfer')) return 'Transferencia';
+                if (low.includes('efect')) return 'Efectivo';
+                if (low.includes('flow')) return 'Flow';
+                if (low.includes('tarjeta') || low.includes('card')) return 'Tarjeta';
+                return raw;
+            }
+
+            function estadoPagoAlerta(p) {
+                if (p?.pago_flow_pendiente || p?.pago_bloquea_preparacion) return 'Pago por confirmar';
+                const estado = String(p?.pago_estado || p?.estado_pago || '').trim();
+                if (estado) return estado;
+                return 'No informado';
+            }
+
+            function resumenLineasAlerta(lineas) {
+                const arr = Array.isArray(lineas) ? lineas : [];
+                const unidades = arr.reduce((sum, it) => sum + (Number(it.cantidad || 0) || 0), 0);
+                return `${arr.length} producto${arr.length === 1 ? '' : 's'} ? ${Number(unidades || 0).toLocaleString('es-CL', { maximumFractionDigits: 2 })} unidad${Number(unidades || 0) === 1 ? '' : 'es'}`;
+            }
+
+            function imprimirTicketAlerta(id) {
+                const pid = Number(id || 0);
+                const pedido = nuevosPendientes.find((p) => Number(p?.id || 0) === pid) || pedidosActivos.find((p) => Number(p?.id || 0) === pid);
+                try {
+                    if (pedido && typeof window._upsertPedidoPOS === 'function') window._upsertPedidoPOS(pedido);
+                    if (typeof window.abrirTicket58 === 'function') {
+                        window.abrirTicket58(pid);
+                        return;
+                    }
+                } catch (_) {}
+                window.location.href = '/ventas';
+            }
+            window._sucreeImprimirTicketAlerta = imprimirTicketAlerta;
+
+            function aceptarPrepararAlerta(id) {
+                const pid = Number(id || 0);
+                if (!pid) return;
+                setTimerPedido(pid).then(() => {
+                    nuevosPendientes = nuevosPendientes.filter((p) => Number(p?.id || 0) !== pid);
+                    const ov = document.getElementById('sucree-pedidos-alert');
+                    if (!nuevosPendientes.length && ov) ov.style.display = 'none';
+                    else renderAlert();
+                });
+            }
+            window._sucreeAceptarPrepararAlerta = aceptarPrepararAlerta;
 
             function quickMsg(kind, pedidoId) {
                 const id = Number(pedidoId || 0);
@@ -1282,29 +1387,79 @@
 
             function renderAlert() {
                 const ov = ensureAlert();
-                const count = ov.querySelector('#sucree-pedidos-alert-count');
-                const body = ov.querySelector('#sucree-pedidos-alert-body');
-                if (!count || !body) return;
-                count.textContent = String(nuevosPendientes.length);
-                body.innerHTML = nuevosPendientes.map((p) => `
-                    <div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
-                        <div style="font-weight:800;">Pedido #${Number(p.id || 0)}</div>
-                        <div style="font-size:.9rem;color:#475569;">Cliente: <strong>${esc(p.cliente_nombre || 'sin nombre')}</strong></div>
-                        <div style="font-size:.86rem;color:#64748b;">Correo: ${esc(p.cliente_email || '-')} · Telefono: ${esc(p.cliente_telefono || '-')}</div>
-                        <div style="font-size:.9rem;color:#334155;">Entrega: <strong>${esc(String(p.entrega_tipo || 'retiro'))}</strong>${String(p.hora_retiro || '').trim() ? ` · Hora: <strong>${esc(String(p.hora_retiro || ''))}</strong>` : ''}</div>
-                        <div style="font-size:.9rem;color:#0f172a;margin-top:4px;"><strong>Metodo pago:</strong> ${esc(String(p.metodo_pago || 'efectivo').toUpperCase())}</div>
-                        ${(String(p.metodo_pago || '').toLowerCase().includes('flow')) ? `<div style="margin-top:5px;display:inline-flex;align-items:center;gap:6px;border:2px solid #0284c7;background:#e0f2fe;color:#0c4a6e;padding:4px 9px;border-radius:999px;font-weight:900;letter-spacing:.5px;">FLOW</div>` : ''}
-                        ${String(p.direccion_entrega || '').trim() ? `<div style="font-size:.84rem;color:#475569;">Direccion: ${esc(String(p.direccion_entrega || ''))}</div>` : ''}
-                        <div style="font-size:.88rem;color:#334155;margin-top:4px;"><strong>Productos:</strong> ${esc(String(p.productos || '-'))}</div>
-                        <div style="font-size:.9rem;color:#111827;font-weight:700;">Total: $${Math.round(Number(p.total_monto || 0)).toLocaleString('es-CL')}</div>
-                        ${(String(p.metodo_pago || '').toLowerCase().includes('flow')) ? `
-                            <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap;">
-                                <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${Number(p.id || 0)}, true)" style="border:1px solid #22c55e;background:#16a34a;color:#fff;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;">Confirmar pago</button>
-                                <button type="button" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${Number(p.id || 0)}, false)" style="border:1px solid #f59e0b;background:#fff7ed;color:#9a3412;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;">Pago no concretado</button>
-                            </div>
-                        ` : ''}
+                const panel = ov.querySelector('#sucree-pedidos-alert-panel');
+                if (!panel) return;
+                const pedido = nuevosPendientes[0];
+                if (!pedido) {
+                    ov.style.display = 'none';
+                    return;
+                }
+                const id = Number(pedido.id || 0);
+                const nombre = String(pedido.cliente_nombre || '').trim();
+                const email = String(pedido.cliente_email || '').trim();
+                const telefono = String(pedido.cliente_telefono || '').trim();
+                const entregaTipo = String(pedido.entrega_tipo || 'retiro').trim().toLowerCase();
+                const retiro = entregaTipo !== 'despacho';
+                const entregaTitulo = retiro ? 'Retiro en tienda' : 'Despacho a domicilio';
+                const hora = String(pedido.hora_retiro || pedido.hora_entrega || '').trim();
+                const fecha = String(pedido.fecha_retiro || pedido.fecha_entrega || pedido.fecha || '').trim();
+                const direccion = String(pedido.direccion_entrega || pedido.direccion || '').trim();
+                const lineas = pedidoLineasAlerta(pedido);
+                const total = Number(pedido.total_monto || pedido.total || 0) || 0;
+                const metodo = metodoPagoAlerta(pedido);
+                const pagoEstado = estadoPagoAlerta(pedido);
+                const estado = labelEstado(pedido.pedido_estado || 'recibido');
+                const productosHtml = lineas.length ? lineas.map((it) => `
+                    <div class="sucree-alert-row">
+                        <div><span class="sucree-alert-qty">${esc(String(it.cantidad || 1))}</span></div>
+                        <div class="sucree-alert-product"><span class="sucree-alert-thumb" aria-hidden="true">?</span><div><strong>${esc(it.nombre || 'Producto')}</strong>${it.detalle ? `<span>${esc(it.detalle)}</span>` : ''}</div></div>
+                        <div class="sucree-alert-money">${it.importe ? `$${Math.round(Number(it.importe || 0)).toLocaleString('es-CL')}` : 'Sin importe'}</div>
                     </div>
-                `).join('');
+                `).join('') : '<div class="sucree-alert-row"><div></div><div class="sucree-alert-product"><span class="sucree-alert-thumb" aria-hidden="true">?</span><div><strong>Sin detalle de productos disponible</strong><span>Revisar pedido desde Pedidos activos.</span></div></div><div class="sucree-alert-money">-</div></div>';
+                const contactoSec = telefono || email
+                    ? `${telefono ? `Tel?fono: ${esc(telefono)}` : 'Tel?fono no informado'}${email ? `<br>Correo: ${esc(email)}` : '<br>Correo no informado'}`
+                    : 'Tel?fono y correo no informados';
+                const entregaSec = `${fecha || hora ? `${fecha ? esc(fecha) : ''}${fecha && hora ? ' ? ' : ''}${hora ? esc(hora) : ''}` : 'Horario no informado'}${direccion ? `<br>${esc(direccion)}` : ''}`;
+                const flowButtons = String(pedido.metodo_pago || '').toLowerCase().includes('flow') ? `
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+                        <button type="button" class="sucree-alert-btn" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, true)">Confirmar pago</button>
+                        <button type="button" class="sucree-alert-btn" onclick="_sucreeConfirmarPagoFlowDesdeAlerta(${id}, false)">Pago no concretado</button>
+                    </div>
+                ` : '';
+                panel.innerHTML = `
+                    <div class="sucree-alert-head">
+                        <div class="sucree-alert-title">
+                            <div class="sucree-alert-bag" aria-hidden="true">?</div>
+                            <div><h2 id="sucree-alert-title">?Nuevo pedido online!</h2><p>Recibido hace unos segundos</p></div>
+                        </div>
+                        <div class="sucree-alert-head-actions">
+                            <span class="sucree-alert-count">${nuevosPendientes.length} por revisar</span>
+                            <button type="button" class="sucree-alert-close" id="sucree-pedidos-alert-close" aria-label="Cerrar">?</button>
+                        </div>
+                    </div>
+                    <div class="sucree-alert-body">
+                        <div class="sucree-alert-order-head"><h3>Pedido #${id}</h3><span class="sucree-alert-status">${esc(estado)}</span></div>
+                        <div class="sucree-alert-grid">
+                            <div class="sucree-alert-card"><span class="sucree-alert-icon" aria-hidden="true">C</span><div><h4>Cliente</h4><strong>${esc(nombre || 'Sin nombre registrado')}</strong><span>${contactoSec}</span></div></div>
+                            <div class="sucree-alert-card"><span class="sucree-alert-icon" aria-hidden="true">${retiro ? 'T' : 'D'}</span><div><h4>Entrega</h4><strong>${esc(entregaTitulo)}</strong><span>${entregaSec}</span></div></div>
+                        </div>
+                        <div class="sucree-alert-pay"><span class="sucree-alert-icon" aria-hidden="true">$</span><strong>${esc(metodo)}</strong><span class="chip">${esc(pagoEstado)}</span></div>
+                        <div class="sucree-alert-section-title"><strong>Detalle del pedido</strong><span>${esc(resumenLineasAlerta(lineas))}</span></div>
+                        <div class="sucree-alert-table"><div class="sucree-alert-row head"><div>Cant.</div><div>Producto</div><div class="sucree-alert-money">Importe</div></div>${productosHtml}</div>
+                        <div class="sucree-alert-total"><span>Total del pedido</span><span>$${Math.round(total).toLocaleString('es-CL')}</span></div>
+                        <div class="sucree-alert-note">Aceptar el pedido no confirma su pago.</div>
+                        ${flowButtons}
+                    </div>
+                    <div class="sucree-alert-actions">
+                        <span class="sucree-alert-footnote">El pedido seguir? visible en Pedidos en vivo</span>
+                        <div class="sucree-alert-actions-main">
+                            <button type="button" class="sucree-alert-btn" id="sucree-pedidos-alert-later">Revisar despu?s</button>
+                            <button type="button" class="sucree-alert-btn" onclick="_sucreeImprimirTicketAlerta(${id})">Imprimir ticket ? 58 mm</button>
+                            <button type="button" class="sucree-alert-btn primary" onclick="_sucreeAceptarPrepararAlerta(${id})">Aceptar y preparar</button>
+                        </div>
+                    </div>`;
+                panel.querySelector('#sucree-pedidos-alert-close')?.addEventListener('click', () => { ov.style.display = 'none'; });
+                panel.querySelector('#sucree-pedidos-alert-later')?.addEventListener('click', () => { ov.style.display = 'none'; });
                 ov.style.display = 'flex';
             }
 
