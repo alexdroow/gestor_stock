@@ -2302,11 +2302,11 @@
                                 </div>
                             </div>
                             <div class="producto-publicacion" onclick="event.stopPropagation()">
-                                <label class="pos-switch" title="Publicar u ocultar en tienda online">
-                                    <input type="checkbox" {{ 'checked' if (p.activo_tienda is not defined or p.activo_tienda) else '' }} onchange="togglePublicacionProducto(event, {{ p.id }})">
+                                <label class="pos-switch" title="Publicar u ocultar en tienda online" onclick="event.stopPropagation()">
+                                    <input type="checkbox" {{ 'checked' if (p.activo_tienda is not defined or p.activo_tienda) else '' }} onclick="event.stopPropagation()" onchange="togglePublicacionProducto(event, {{ p.id }})">
                                     <span></span>
                                 </label>
-                                <small>{{ 'Publicado' if (p.activo_tienda is not defined or p.activo_tienda) else 'Oculto' }}</small>
+                                <small data-pub-label>{{ 'Publicado' if (p.activo_tienda is not defined or p.activo_tienda) else 'Oculto' }}</small>
                             </div>
                             <div class="producto-acciones">
                                 <button
@@ -5217,6 +5217,8 @@
             const info = productosData[id];
             const prev = info ? info.activo_tienda !== false : true;
             if (info) info.activo_tienda = activo;
+            if (input) input.disabled = true;
+            actualizarTarjetaProducto(id);
             try {
                 const response = await fetch(`/api/producto/${id}/actualizar`, {
                     method: 'POST',
@@ -5226,13 +5228,20 @@
                 const data = await response.json();
                 if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo actualizar publicación');
                 if (data.producto && productosData[id]) productosData[id].activo_tienda = data.producto.activo_tienda !== false;
+                if (input) input.checked = productosData[id]?.activo_tienda !== false;
                 actualizarTarjetaProducto(id);
                 filtrarProductos();
+                if (window.AppUX?.toastSuccess) {
+                    window.AppUX.toastSuccess(productosData[id]?.activo_tienda === false ? 'Producto oculto en tienda.' : 'Producto publicado en tienda.');
+                }
             } catch (err) {
                 if (info) info.activo_tienda = prev;
                 if (input) input.checked = prev;
+                actualizarTarjetaProducto(id);
                 if (window.AppUX?.toastError) window.AppUX.toastError(err.message || 'No se pudo actualizar publicaci?n');
                 else alert(err.message || 'No se pudo actualizar publicaci?n');
+            } finally {
+                if (input) input.disabled = false;
             }
         }
 

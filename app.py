@@ -6270,7 +6270,7 @@ def api_tienda_productos():
                     "motivo_estado": eval_cat.get("motivo"),
                 }
             )
-        return jsonify(
+        response = jsonify(
             {
                 "success": True,
                 "productos": disponibles,
@@ -6290,6 +6290,9 @@ def api_tienda_productos():
                 },
             }
         )
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        return response
     except Exception as e:
         return jsonify({"success": False, "productos": [], "error": str(e)}), 500
 
@@ -16946,6 +16949,8 @@ def api_tienda_checkout():
             prod = mapa.get(pid)
             if not prod:
                 return jsonify({'success': False, 'error': f'Producto #{pid} no disponible'}), 400
+            if not bool(prod.get("activo_tienda", True)):
+                return jsonify({'success': False, 'error': f'{prod.get("nombre")}: producto apagado en tienda. Eliminalo del carrito y elige otra opcion.'}), 409
             pack_items_final = []
             pack_rule = pack_rules_by_product.get(pid) or {"max_total": 0, "items": {}}
             pack_items_input = raw.get("pack_items")

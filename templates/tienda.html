@@ -16428,6 +16428,8 @@
         let productos = [];
         let categoriasDisponibles = [];
         let carrito = [];
+        let catalogoSyncEnCurso = null;
+        let catalogoSyncUltimoTs = 0;
         let packBuilderState = null;
         const CAT_STORAGE_KEY = "tienda_categoria_activa";
         const STORE_SORT_STORAGE_KEY = "tienda_store_sort";
@@ -21738,6 +21740,147 @@
             _trackTienda("cart");
         }
 
+        function _catalogoProductosActivos(rows) {
+            const mapa = new Map();
+            (Array.isArray(rows) ? rows : []).forEach((p) => {
+                const id = Number(p?.id || 0);
+                const max = Math.max(0, Number(p?.max_compra || 0));
+                if (id > 0 && max > 0 && p?.activo_tienda !== false && p?.categoria_activa !== false) {
+                    mapa.set(id, p);
+                }
+            });
+            return mapa;
+        }
+
+        function _recomendacionesCarritoActualizado(rows, removidos) {
+            const activos = (Array.isArray(rows) ? rows : [])
+                .filter((p) => Math.max(0, Number(p?.max_compra || 0)) > 0 && p?.activo_tienda !== false && p?.categoria_activa !== false);
+            const categorias = new Set(
+                (Array.isArray(removidos) ? removidos : [])
+                    .map((x) => String(x?.categoria_tienda || x?.categoria || "").trim().toLowerCase())
+                    .filter(Boolean)
+            );
+            let sugeridos = activos.filter((p) => categorias.size && categorias.has(String(p?.categoria_tienda || "").trim().toLowerCase()));
+            if (!sugeridos.length) sugeridos = activos;
+            const enCarrito = new Set(carrito.map((x) => Number(x.id || 0)));
+            return sugeridos
+                .filter((p) => !enCarrito.has(Number(p.id || 0)))
+                .slice(0, 3)
+                .map((p) => String(p.nombre || "Producto").trim())
+                .filter(Boolean);
+        }
+
+        async function sincronizarCatalogoYValidarCarrito(options = {}) {
+            const opts = options || {};
+            const force = Boolean(opts.force);
+            const silent = opts.silent !== false;
+            const forCheckout = Boolean(opts.forCheckout);
+            const now = Date.now();
+            if (!force && now - catalogoSyncUltimoTs < 6000) return true;
+            if (catalogoSyncEnCurso) return catalogoSyncEnCurso;
+            catalogoSyncEnCurso = (async () => {
+                try {
+                    const res = await fetch(`/api/tienda/productos?sync=${Date.now()}`, {
+                        headers: { Accept: "application/json" },
+                        cache: "no-store",
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data.success) throw new Error(data.error || "No se pudo actualizar el catalogo");
+                    catalogoSyncUltimoTs = Date.now();
+                    const nuevosProductos = Array.isArray(data.productos) ? data.productos : [];
+                    const activos = _catalogoProductosActivos(nuevosProductos);
+                    const removidos = [];
+                    const ajustados = [];
+                    const carritoActualizado = [];
+                    const teniaCarrito = carrito.length > 0;
+                    carrito.forEach((it) => {
+                        const pid = Number(it?.id || 0);
+                        const prod = activos.get(pid);
+                        if (!prod) {
+                            removidos.push(it);
+                            return;
+                        }
+                        const packItems = Array.isArray(it.pack_items) ? it.pack_items : [];
+                        if (packItems.length && Array.isArray(prod.pack_subopciones) && prod.pack_subopciones.length) {
+                            const subActivos = new Map(prod.pack_subopciones.map((x) => [Number(x.subproducto_id || 0), x]));
+                            const subInactivo = packItems.some((x) => {
+                                const sub = subActivos.get(Number(x.subproducto_id || 0));
+                                return !sub || sub.subproducto_activo_tienda === false;
+                            });
+                            if (subInactivo) {
+                                removidos.push(it);
+                                return;
+                            }
+                        }
+                        const max = Math.max(0, Number(prod.max_compra || 0));
+                        const cantidadActual = Math.max(1, Number(it.cantidad || 1));
+                        const cantidadFinal = Math.min(cantidadActual, max);
+                        if (cantidadFinal < cantidadActual) ajustados.push({ ...it, cantidad: cantidadFinal });
+                        carritoActualizado.push({
+                            ...it,
+                            nombre: prod.nombre || it.nombre,
+                            cantidad: cantidadFinal,
+                            categoria_tienda: prod.categoria_tienda || it.categoria_tienda || "",
+                            precio_base_unitario: n(prod.precio_final),
+                            precio_flow_unitario: flowPagoHabilitado ? _flowPriceFromBase(n(prod.precio_final)) : n(prod.precio_final),
+                            precio_unitario: flowPagoHabilitado ? _flowPriceFromBase(n(prod.precio_final)) : n(prod.precio_final),
+                        });
+                    });
+
+                    productos = nuevosProductos;
+                    categoriasDisponibles = Array.isArray(data.categorias)
+                        ? data.categorias.filter((c) => Boolean(c.activa_en_tienda))
+                        : [];
+                    aplicarPersonalizacionTienda(data.personalizacion || tiendaUiCfg || TIENDA_UI_INITIAL);
+                    if (_catalogoTortaConDatos(data?.personalizacion?.catalogo_torta)) {
+                        _setAgendaCakeCatalog(data.personalizacion.catalogo_torta);
+                    }
+                    setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
+                    mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
+                    tiendaAdminMode = Boolean(data.admin_mode);
+                    _adminSetPillVisible();
+                    _adminBindProductGestures();
+
+                    if (removidos.length || ajustados.length) {
+                        carrito = carritoActualizado;
+                        cuponAplicado = { codigo: "", descuento_monto: 0 };
+                    }
+                    renderCategoriasMenu();
+                    renderSecciones();
+                    _renderAgendaPastelResumen();
+                    if (teniaCarrito || removidos.length || ajustados.length) renderCart();
+
+                    if (removidos.length) {
+                        const nombres = removidos.map((x) => String(x.nombre || "Producto").trim()).filter(Boolean).join(", ");
+                        const recs = _recomendacionesCarritoActualizado(productos, removidos);
+                        const sugerencias = recs.length ? ` Puedes elegir otra opcion como: ${recs.join(", ")}.` : " Puedes revisar el catalogo para elegir otra opcion.";
+                        const texto = `${nombres || "Un producto"} ya no esta disponible en la tienda. Lo quitamos del carrito para evitar problemas al finalizar.${sugerencias}`;
+                        msg(texto, true);
+                        if (window.AppUX?.toastError) window.AppUX.toastError(texto);
+                        if (modalCheckoutResumenEl?.classList.contains("active")) cerrarModalCheckoutResumen();
+                        return false;
+                    }
+                    if (ajustados.length) {
+                        const texto = "Actualizamos una cantidad del carrito porque ya no quedaba suficiente stock disponible.";
+                        msg(texto, true);
+                        if (window.AppUX?.toastError) window.AppUX.toastError(texto);
+                        return false;
+                    }
+                    return true;
+                } catch (e) {
+                    if (!silent || forCheckout) {
+                        const texto = e.message || "No pudimos validar el catalogo. Intenta nuevamente.";
+                        msg(texto, true);
+                        if (window.AppUX?.toastError) window.AppUX.toastError(texto);
+                    }
+                    return !forCheckout;
+                } finally {
+                    catalogoSyncEnCurso = null;
+                }
+            })();
+            return catalogoSyncEnCurso;
+        }
+
         function toggleDesktopCart(forceOpen = null) {
             if (!_desktopStoreEnabled() || !cartPanelEl) return;
             const open = forceOpen === null
@@ -21957,7 +22100,10 @@
         function agregar(id) {
             if (!tiendaAbierta) return msg("La tienda esta cerrada. No se pueden agregar productos al carrito.", true);
             const p = productos.find((x) => x.id === id);
-            if (!p) return;
+            if (!p || p.activo_tienda === false) {
+                sincronizarCatalogoYValidarCarrito({ force: true, silent: false });
+                return msg("Ese producto ya no esta disponible. Actualizamos el catalogo para que puedas elegir otra opcion.", true);
+            }
             const max = Math.max(0, Number(p.max_compra || 0));
             if (max <= 0) return msg("Producto sin stock disponible.", true);
             const packOptions = _packDisponibleParaProducto(p);
@@ -21989,6 +22135,7 @@
                     id: p.id,
                     nombre: p.nombre,
                     cantidad: 1,
+                    categoria_tienda: p.categoria_tienda || "",
                     precio_base_unitario: precioBase,
                     precio_flow_unitario: precioFlow,
                     precio_unitario: precioFlow
@@ -22023,7 +22170,10 @@
             if (!tiendaAbierta) return msg("La tienda esta cerrada. No se pueden modificar compras.", true);
             const it = carrito.find((x) => x.id === id);
             const p = productos.find((x) => x.id === id);
-            if (!it || !p) return;
+            if (!it || !p || p.activo_tienda === false) {
+                sincronizarCatalogoYValidarCarrito({ force: true, silent: false });
+                return;
+            }
             const max = Math.max(0, Number(p.max_compra || 0));
             if (it.cantidad >= max) return msg(`No puedes superar ${max} unidad(es).`, true);
             it.cantidad += 1;
@@ -22090,7 +22240,7 @@
         async function cargarProductos() {
             msg("Cargando productos...");
             try {
-                const res = await fetch("/api/tienda/productos", { headers: { Accept: "application/json" } });
+                const res = await fetch(`/api/tienda/productos?ts=${Date.now()}`, { headers: { Accept: "application/json" }, cache: "no-store" });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar el catalogo");
                 productos = Array.isArray(data.productos) ? data.productos : [];
@@ -23062,6 +23212,11 @@
         async function confirmarCheckoutDesdeResumen() {
             if (!checkoutClientePendiente) return msg("No hay datos de cliente para confirmar.", true);
             setCheckoutStatusMsg("");
+            const catalogoOk = await sincronizarCatalogoYValidarCarrito({ force: true, silent: false, forCheckout: true });
+            if (!catalogoOk) {
+                setCheckoutStatusMsg("Actualizamos el carrito porque uno o mas productos ya no estaban disponibles. Revisa las opciones antes de continuar.", true);
+                return;
+            }
             const horaRetiro = String(checkoutHoraRetiroEl?.value || "").trim();
             if (!MODO_PRESENCIAL) {
                 const minHora = checkoutHoraManualActiva
@@ -23086,6 +23241,10 @@
 
         async function enviarCheckoutCliente(datosCliente) {
             msg("Procesando compra...");
+            const catalogoOk = await sincronizarCatalogoYValidarCarrito({ force: true, silent: false, forCheckout: true });
+            if (!catalogoOk) {
+                throw new Error("Actualizamos el carrito porque uno o mas productos ya no estaban disponibles. Revisa las opciones antes de continuar.");
+            }
             const entregaCheckout = MODO_PRESENCIAL ? "retiro" : checkoutEntregaTipo;
             const metodoPagoActual = _metodoPagoCheckoutActual();
             const itemsSnapshot = carrito.map((it) => ({
@@ -23331,6 +23490,8 @@
         async function checkout() {
             if (!tiendaAbierta) return msg("La tienda esta cerrada por el momento.", true);
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            const catalogoOk = await sincronizarCatalogoYValidarCarrito({ force: true, silent: false, forCheckout: true });
+            if (!catalogoOk) return;
             if (mobileCartModalEl) mobileCartModalEl.classList.remove("active");
             document.body.classList.remove("cart-open");
             if (MODO_PRESENCIAL) {
@@ -24382,6 +24543,8 @@
         async function confirmarCheckoutDesdeModal() {
             if (!tiendaAbierta) return msg("La tienda esta cerrada por el momento.", true);
             if (!carrito.length) return msg("Agrega productos al carrito.", true);
+            const catalogoOk = await sincronizarCatalogoYValidarCarrito({ force: true, silent: false, forCheckout: true });
+            if (!catalogoOk) return;
             const nombre = String(clienteNombreEl.value || "").trim();
             const telefonoDig = normalizarTelefono8(String(clienteTelefonoEl.value || ""));
             let email = normalizarEmailCliente(String(clienteEmailEl.value || "").trim().toLowerCase());
@@ -24965,6 +25128,9 @@
         cargarProductos();
         _trackTienda("view");
         setInterval(() => _trackTienda("heartbeat"), 5000);
+        setInterval(() => {
+            sincronizarCatalogoYValidarCarrito({ force: true, silent: true, forCheckout: false });
+        }, 15000);
         setInterval(() => {
             if (cuponesClienteDisponibles.length) renderCuponesCliente(cuponesClienteDisponibles, false);
         }, 60000);
