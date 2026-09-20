@@ -2005,6 +2005,7 @@
         .pedido-alert-overlay { position:fixed; inset:0; z-index:130000; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(67,20,7,.46); }
         .pedido-alert-overlay.active { display:flex; }
         .pedido-alert-dialog { width:min(860px,96vw); max-height:min(88vh,820px); display:flex; flex-direction:column; overflow:hidden; background:#fff; color:#431407; border:1px solid #fed7aa; border-top:6px solid #f97316; border-radius:18px; box-shadow:0 24px 60px rgba(67,20,7,.32); }
+        .pedido-alert-dialog::before, .pedido-alert-dialog::after, .pedido-alert-body::before, .pedido-alert-body::after { content:none !important; display:none !important; }
         .pedido-alert-dialog img, .pedido-alert-dialog canvas, .pedido-alert-dialog video { max-width:100%; max-height:100%; }
         .pedido-alert-dialog svg { width:20px !important; height:20px !important; max-width:20px !important; max-height:20px !important; stroke:currentColor !important; fill:none !important; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:0 0 auto; }
         .pedido-alert-dialog svg * { fill:none !important; stroke:currentColor !important; }
@@ -2022,6 +2023,7 @@
         .pedido-alert-count { border:0; border-radius:999px; padding:8px 12px; background:#ffedd5; color:#9a3412; font-weight:950; font-size:13px; }
         .pedido-alert-close { width:38px; height:38px; border:1px solid #fed7aa; border-radius:12px; background:#fff; color:#9a3412; font-size:24px; line-height:1; cursor:pointer; }
         .pedido-alert-body { flex:0 1 auto; min-height:0; max-height:calc(88vh - 164px); overflow:auto; padding:16px 18px 0; }
+        .pedido-alert-body > :not(.pedido-alert-order-head):not(.pedido-alert-info-grid):not(.pedido-alert-pay):not(.pedido-alert-note):not(.pedido-alert-section-title):not(.pedido-alert-table):not(.pedido-alert-total):not(.pedido-alert-totals-extra):not(.pedido-alert-warning) { display:none !important; }
         .pedido-alert-order-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
         .pedido-alert-order-head h3 { margin:0; color:#431407; font-size:24px; letter-spacing:-.03em; }
         .pedido-alert-status { display:inline-flex; align-items:center; border-radius:999px; padding:6px 10px; background:#f97316; color:#fff; font-size:12px; font-weight:950; }
@@ -5770,6 +5772,25 @@
         function _limpiarVisualesPedidoAlert() {
             const dialog = document.getElementById('pedido-alert-dialog');
             if (!dialog) return;
+            const body = dialog.querySelector('.pedido-alert-body');
+            if (body) {
+                const clasesPermitidas = new Set([
+                    'pedido-alert-order-head',
+                    'pedido-alert-info-grid',
+                    'pedido-alert-pay',
+                    'pedido-alert-note',
+                    'pedido-alert-section-title',
+                    'pedido-alert-table',
+                    'pedido-alert-total',
+                    'pedido-alert-totals-extra',
+                    'pedido-alert-warning'
+                ]);
+                Array.from(body.children).forEach((el) => {
+                    if (!Array.from(el.classList || []).some((cls) => clasesPermitidas.has(cls))) {
+                        el.remove();
+                    }
+                });
+            }
 
             const selectoresHuerfanos = [
                 ':scope > canvas',
