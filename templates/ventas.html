@@ -2044,13 +2044,26 @@
         .pos-ticket-head span { display:block; color:var(--pos-muted); font-size:12px; }
         .pos-ticket-head button { border:1px solid var(--pos-border); background:#fff7ed; color:#9a3412; border-radius:10px; padding:8px 10px; font-weight:900; cursor:pointer; }
         .pos-ticket-preview-wrap { max-height:66vh; overflow:auto; display:flex; justify-content:center; background:#fff7ed; padding:18px; }
-        .pos-ticket-paper { width:54mm; min-height:120mm; background:#fff; color:#000; padding:3mm; font-family:"Courier New",monospace; font-size:10px; line-height:1.25; box-shadow:0 8px 22px rgba(67,20,7,.18); }
-        .pos-ticket-paper .center { text-align:center; } .pos-ticket-paper .line { border-top:1px dashed #000; margin:5px 0; } .pos-ticket-paper .row { display:flex; justify-content:space-between; gap:6px; } .pos-ticket-paper .total { font-weight:900; font-size:12px; }
+        .pos-ticket-paper { width:52mm; background:#fff; color:#111; padding:0; font-family:Arial, Helvetica, sans-serif; font-size:10.5px; line-height:1.25; box-shadow:0 8px 22px rgba(67,20,7,.18); overflow-wrap:anywhere; word-break:break-word; }
+        .pos-ticket-paper .center { text-align:center; } .pos-ticket-paper .line { border-top:1px dashed #111; margin:6px 0; } .pos-ticket-paper .row { display:flex; justify-content:space-between; align-items:flex-start; gap:5px; margin:2px 0; } .pos-ticket-paper .row span { color:#333; flex:0 0 19mm; } .pos-ticket-paper .row strong { text-align:right; flex:1; font-weight:800; } .pos-ticket-paper .total { font-weight:900; font-size:12px; }
+        .pos-ticket-paper .ticket { width:52mm; padding:0; margin:0 auto; }
+        .pos-ticket-paper .brand { font-size:17px; font-weight:900; letter-spacing:.3px; margin:0; }
+        .pos-ticket-paper .sub { font-size:9px; letter-spacing:1.2px; margin-top:1px; text-transform:uppercase; }
+        .pos-ticket-paper .code { border:1px solid #111; border-radius:4px; padding:4px 3px; margin:6px 0; text-align:center; font-weight:900; font-size:11px; }
+        .pos-ticket-paper .sep { border:0; border-top:1px dashed #111; margin:6px 0; }
+        .pos-ticket-paper h2 { font-size:10.5px; text-transform:uppercase; margin:6px 0 3px; padding-bottom:2px; border-bottom:1px solid #111; }
+        .pos-ticket-paper .item { margin:3px 0; padding-left:1px; }
+        .pos-ticket-paper .muted { color:#333; font-size:9.5px; }
+        .pos-ticket-paper .item-price { text-align:right; font-weight:800; }
+        .pos-ticket-paper .total-box { border:1px solid #111; border-radius:5px; padding:5px 4px; margin-top:5px; }
+        .pos-ticket-paper .saldo { display:flex; justify-content:space-between; gap:6px; font-size:12px; font-weight:900; margin-top:4px; padding-top:4px; border-top:1px dashed #111; }
+        .pos-ticket-paper .note { white-space:pre-wrap; margin-top:3px; }
+        .pos-ticket-paper .foot { text-align:center; font-size:9px; margin-top:8px; }
         @media print {
             body * { visibility:hidden !important; }
             #pos-ticket-print-area, #pos-ticket-print-area * { visibility:visible !important; }
-            #pos-ticket-print-area { position:absolute; left:0; top:0; width:54mm !important; box-shadow:none !important; padding:3mm !important; }
-            @page { size:58mm auto; margin:2mm; }
+            #pos-ticket-print-area { position:absolute; left:0; top:0; width:52mm !important; box-shadow:none !important; padding:0 !important; }
+            @page { size:58mm auto; margin:3mm; }
         }
         @media (max-width:1180px) { .pos-redesign .productos-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .pos-redesign .ventas-layout { grid-template-columns:1fr; } .pedido-detalle-section { position:static; } }
         @media (max-width:760px) { .pos-live-strip, .pos-activity-strip { grid-template-columns:1fr; } .pos-activity-strip .tienda-live-mini { grid-template-columns:1fr; } .pos-cart-bar { grid-template-columns:1fr; } .pos-redesign .productos-grid { grid-template-columns:1fr; } .pos-redesign .productos-grid.vista-lista .producto-card { grid-template-columns:1fr; } }
@@ -4946,25 +4959,166 @@
             `;
         }
 
-        function _ticketHtmlPedidoPOS(p) {
+        function _lineaTicketPedido58(label, value) {
+            const v = String(value === null || value === undefined ? '' : value).trim();
+            if (!v || v === '-') return '';
+            return `
+                <div class="row">
+                    <span>${escapeHtmlLocal(label)}</span>
+                    <strong>${escapeHtmlLocal(v)}</strong>
+                </div>
+            `;
+        }
+
+        function _bloqueItemsTicketPedido58(title, lineas) {
+            const items = Array.isArray(lineas) ? lineas : [];
+            if (!items.length) return '<section><h2>Productos</h2><div class="item">- Sin productos</div></section>';
+            return `
+                <section>
+                    <h2>${escapeHtmlLocal(title)}</h2>
+                    ${items.map((it) => {
+                        const cantidad = Number(it.cantidad || 1);
+                        const nombre = String(it.nombre || 'Producto').trim();
+                        const detalle = [it.detalle, it.observacion].map((x) => String(x || '').trim()).filter(Boolean).join(' · ');
+                        const importe = Number(it.importe || it.subtotal || 0);
+                        return `
+                            <div class="item">
+                                <div><strong>${escapeHtmlLocal(Number.isInteger(cantidad) ? String(cantidad) : cantidad.toLocaleString('es-CL'))} x ${escapeHtmlLocal(nombre)}</strong></div>
+                                ${detalle ? `<div class="muted">${escapeHtmlLocal(detalle)}</div>` : ''}
+                                ${importe > 0 ? `<div class="item-price">${escapeHtmlLocal(_fmtCLPPos(importe))}</div>` : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                </section>
+            `;
+        }
+
+        function _ticketHtmlPedidoPOS(p, standalone = false) {
             const id = _pedidoIdPos(p);
             const lineas = _lineasPedidoPos(p);
             const total = Number(p.total_monto || p.total || 0);
+            const descuento = Number(p.descuento_monto || p.descuento || 0) || 0;
+            const despacho = Number(p.despacho_monto || p.costo_despacho || p.envio || 0) || 0;
             const nombre = String(p.cliente_nombre || '').trim() || '-';
             const tel = String(p.cliente_telefono || '').trim();
+            const email = String(p.cliente_email || '').trim();
             const entrega = String(p.entrega_tipo || 'retiro').toLowerCase() === 'despacho' ? 'DESPACHO' : 'RETIRO';
             const direccion = String(p.direccion_entrega || '').trim();
             const hora = _pedidoHoraPos(p) || '-';
             const metodo = String(p.metodo_pago || p.pago_metodo || '-').trim();
             const pago = Boolean(p.pago_flow_pendiente || p.pago_bloquea_preparacion) ? 'POR VERIFICAR' : (String(p.pago_estado || p.estado_pago || 'REGISTRADO').trim());
             const obs = String(p.observaciones || p.nota || p.comentario || '').trim();
-            const rows = lineas.map((it) => `<div>${escapeHtmlLocal(String(it.cantidad || 1))} ${escapeHtmlLocal(it.nombre)}</div><div class="row"><span>${it.detalle ? escapeHtmlLocal(it.detalle) : ''}</span><span>${it.importe ? escapeHtmlLocal(_fmtCLPPos(it.importe)) : ''}</span></div>`).join('');
-            return `<div class="center"><strong>SUCR&Eacute;E PASTELER&Iacute;A</strong><br>Comprobante operativo</div><div class="line"></div><div class="center"><strong>PEDIDO #${id}</strong></div><div>Fecha: ${escapeHtmlLocal(String(p.fecha || p.creado_en || new Date().toLocaleString('es-CL')))}</div><div>Cliente: ${escapeHtmlLocal(nombre)}</div>${tel ? `<div>Tel: ${escapeHtmlLocal(tel)}</div>` : ''}<div>${entrega} · Hora: ${escapeHtmlLocal(hora)}</div>${direccion ? `<div>Dir: ${escapeHtmlLocal(direccion)}</div>` : ''}<div class="line"></div>${rows || '<div>Sin productos</div>'}<div class="line"></div><div class="row total"><span>TOTAL</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div><div>Pago: ${escapeHtmlLocal(metodo)}</div><div>Estado pago: ${escapeHtmlLocal(pago)}</div>${obs ? `<div class="line"></div><div>Obs: ${escapeHtmlLocal(obs)}</div>` : ''}<div class="line"></div><div class="center">No v&aacute;lido como documento tributario</div>`;
+            const generado = new Date().toLocaleString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const fechaPedido = String(p.fecha || p.creado_en || generado).trim();
+            const codigo = String(p.codigo_pedido || p.codigo_operacion || `PED-${id}`).trim();
+            const ticket = `
+<main class="ticket">
+    <div class="center">
+        <div class="brand">SUCR&Eacute;E</div>
+        <div class="sub">Pasteleria</div>
+        <div>Comprobante interno de pedido</div>
+    </div>
+    <div class="code">${escapeHtmlLocal(codigo || `Pedido #${id}`)}</div>
+    ${_lineaTicketPedido58('Pedido', `#${id}`)}
+    ${_lineaTicketPedido58('Cliente', nombre)}
+    ${_lineaTicketPedido58('Telefono', tel || '-')}
+    ${_lineaTicketPedido58('Correo', email || '-')}
+    ${_lineaTicketPedido58('Emitido', generado)}
+    <hr class="sep">
+    <section>
+        <h2>Entrega</h2>
+        ${_lineaTicketPedido58('Fecha', fechaPedido)}
+        ${_lineaTicketPedido58('Hora', hora)}
+        ${_lineaTicketPedido58('Modalidad', entrega)}
+        ${_lineaTicketPedido58('Lugar', entrega === 'DESPACHO' ? (direccion || '-') : 'Sucree Pasteleria')}
+    </section>
+    ${_bloqueItemsTicketPedido58('Productos', lineas)}
+    <section>
+        <h2>Pago</h2>
+        <div class="total-box">
+            ${descuento ? _lineaTicketPedido58('Descuento', `-${_fmtCLPPos(descuento)}`) : ''}
+            ${despacho ? _lineaTicketPedido58('Despacho', _fmtCLPPos(despacho)) : ''}
+            ${_lineaTicketPedido58('Metodo', metodo)}
+            ${_lineaTicketPedido58('Estado pago', pago)}
+            <div class="saldo">
+                <span>Total</span>
+                <strong>${escapeHtmlLocal(_fmtCLPPos(total))}</strong>
+            </div>
+        </div>
+    </section>
+    <section>
+        <h2>Observaciones</h2>
+        <div class="note">${escapeHtmlLocal(obs || '-')}</div>
+    </section>
+    <hr class="sep">
+    <div class="foot">
+        Gracias por preferir Sucr&eacute;e Pasteleria<br>
+        +56 9 7191 8626
+    </div>
+</main>`;
+            if (!standalone) return ticket;
+            return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pedido ${escapeHtmlLocal(String(id || codigo || ''))} - 58mm</title>
+<style>
+    @page { size: 58mm auto; margin: 3mm; }
+    * { box-sizing: border-box; }
+    html, body {
+        width: 58mm;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+        color: #111;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10.5px;
+        line-height: 1.25;
+    }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .ticket {
+        width: 52mm;
+        padding: 0;
+        margin: 0 auto;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .center { text-align: center; }
+    .brand { font-size: 17px; font-weight: 900; letter-spacing: .3px; margin: 0; }
+    .sub { font-size: 9px; letter-spacing: 1.2px; margin-top: 1px; text-transform: uppercase; }
+    .code { border: 1px solid #111; border-radius: 4px; padding: 4px 3px; margin: 6px 0; text-align: center; font-weight: 900; font-size: 11px; }
+    .sep { border: 0; border-top: 1px dashed #111; margin: 6px 0; }
+    h2 { font-size: 10.5px; text-transform: uppercase; margin: 6px 0 3px; padding-bottom: 2px; border-bottom: 1px solid #111; }
+    .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 5px; margin: 2px 0; }
+    .row span { color: #333; flex: 0 0 19mm; }
+    .row strong { text-align: right; flex: 1; font-weight: 800; }
+    .item { margin: 3px 0; padding-left: 1px; }
+    .muted { color: #333; font-size: 9.5px; }
+    .item-price { text-align: right; font-weight: 800; }
+    .total-box { border: 1px solid #111; border-radius: 5px; padding: 5px 4px; margin-top: 5px; }
+    .saldo { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; font-weight: 900; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #111; }
+    .note { white-space: pre-wrap; margin-top: 3px; }
+    .foot { text-align: center; font-size: 9px; margin-top: 8px; }
+    @media print {
+        html, body { width: 58mm; }
+        .ticket { width: 52mm; }
+    }
+</style>
+</head>
+<body>${ticket}</body>
+</html>`;
         }
 
         function abrirTicket58(id) {
             const pedido = (_pedidosPendientesAtencion || []).find((p) => _pedidoIdPos(p) === Number(id || _pedidoSeleccionadoPOS || 0));
             if (!pedido) return;
+            _pedidoSeleccionadoPOS = _pedidoIdPos(pedido);
             const area = document.getElementById('pos-ticket-print-area');
             const overlay = document.getElementById('pos-ticket-overlay');
             const sub = document.getElementById('pos-ticket-subtitle');
@@ -4979,9 +5133,22 @@
         }
 
         function imprimirTicket58() {
-            const area = document.getElementById('pos-ticket-print-area');
-            if (!area || !area.innerHTML.trim()) return;
-            window.print();
+            const pedido = (_pedidosPendientesAtencion || []).find((p) => _pedidoIdPos(p) === Number(_pedidoSeleccionadoPOS || 0));
+            if (!pedido) return;
+            const win = window.open('', '_blank', 'width=360,height=720');
+            if (!win) {
+                alert('No se pudo abrir la ventana de impresion. Revisa el bloqueo de ventanas emergentes.');
+                return;
+            }
+            win.document.open();
+            win.document.write(_ticketHtmlPedidoPOS(pedido, true));
+            win.document.close();
+            setTimeout(() => {
+                try {
+                    win.focus();
+                    win.print();
+                } catch (_) {}
+            }, 350);
         }
 
         function ocultarFabPedidosGlobalVentas() {
