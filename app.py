@@ -9957,7 +9957,13 @@ def _tienda_admin_adjuntar_items_pedidos(cursor, pedidos):
             WHERE origen_tipo = 'venta'
               AND origen_id IN ({placeholders})
               AND remitente_tipo = 'cliente'
-              AND mensaje LIKE 'Aviso de transferencia informado por cliente%'
+              AND LOWER(COALESCE(mensaje, '')) LIKE '%transferencia%'
+              AND (
+                    LOWER(COALESCE(mensaje, '')) LIKE '%avis%'
+                 OR LOWER(COALESCE(mensaje, '')) LIKE '%inform%'
+                 OR LOWER(COALESCE(mensaje, '')) LIKE '%realiz%'
+                 OR LOWER(COALESCE(mensaje, '')) LIKE '%comprobante%'
+              )
             GROUP BY origen_id
             """,
             tuple(venta_ids),
@@ -10839,7 +10845,13 @@ def api_tienda_pedido_transferencia_aviso(venta_id):
             WHERE origen_tipo = 'venta'
               AND origen_id = ?
               AND remitente_tipo = 'cliente'
-              AND mensaje LIKE 'Aviso de transferencia informado por cliente%'
+              AND LOWER(COALESCE(mensaje, '')) LIKE '%transferencia%'
+              AND (
+                    LOWER(COALESCE(mensaje, '')) LIKE '%avis%'
+                 OR LOWER(COALESCE(mensaje, '')) LIKE '%inform%'
+                 OR LOWER(COALESCE(mensaje, '')) LIKE '%realiz%'
+                 OR LOWER(COALESCE(mensaje, '')) LIKE '%comprobante%'
+              )
             ORDER BY id DESC
             LIMIT 1
             """,

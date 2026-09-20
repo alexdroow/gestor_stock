@@ -24664,7 +24664,16 @@
                     }
                     setCheckoutStatusMsg("Registrando pedido con transferencia pendiente de confirmacion...");
                     try {
-                        await enviarCheckoutCliente(datosCliente);
+                        const pedidoCreado = await enviarCheckoutCliente(datosCliente);
+                        if (pedidoCreado && Number(pedidoCreado.venta_id || 0)) {
+                            try {
+                                setCheckoutStatusMsg("Avisando transferencia al local...");
+                                await _registrarAvisoTransferenciaPedido(pedidoCreado, msg, null);
+                            } catch (avisoErr) {
+                                console.warn("No se pudo registrar aviso de transferencia", avisoErr);
+                                showMsg("Pedido creado, pero no se pudo avisar la transferencia automaticamente. Puedes enviarnos el comprobante desde el resumen.", true);
+                            }
+                        }
                         ov.remove();
                     } catch (e) {
                         showMsg(String(e?.message || "No se pudo registrar el pedido"), true);
