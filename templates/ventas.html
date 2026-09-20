@@ -1983,6 +1983,8 @@
         .pedido-alert-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; padding:16px 18px; background:linear-gradient(90deg,#fff7ed,#fff); border-bottom:1px solid #fed7aa; }
         .pedido-alert-title { display:flex; gap:12px; align-items:center; min-width:0; }
         .pedido-alert-bag { width:48px; height:48px; border-radius:50%; display:grid; place-items:center; flex:0 0 auto; background:#f97316; color:#fff; font-size:24px; font-weight:950; box-shadow:0 8px 18px rgba(249,115,22,.24); }
+        .pedido-alert-bag svg, .pedido-alert-small-icon svg, .pedido-alert-thumb svg, .pedido-alert-close svg, .pedido-alert-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        .pedido-alert-bag svg { width:26px; height:26px; }
         .pedido-alert-title h2 { margin:0; color:#431407; font-size:26px; line-height:1.05; letter-spacing:-.03em; }
         .pedido-alert-title p { margin:3px 0 0; color:#78665c; font-size:13px; font-weight:750; }
         .pedido-alert-head-actions { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
@@ -2023,7 +2025,7 @@
         .pedido-alert-error { display:none; margin:10px 18px 0; border:1px solid #fed7aa; background:#fff7ed; color:#9a3412; border-radius:12px; padding:9px 11px; font-size:13px; font-weight:850; }
         .pedido-alert-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 18px 16px; border-top:1px solid #fed7aa; background:#fff; }
         .pedido-alert-actions-main { display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
-        .pedido-alert-btn { min-height:44px; border-radius:12px; padding:10px 14px; font-weight:950; cursor:pointer; border:1px solid #fed7aa; background:#fff; color:#9a3412; }
+        .pedido-alert-btn { min-height:44px; border-radius:12px; padding:10px 14px; font-weight:950; cursor:pointer; border:1px solid #fed7aa; background:#fff; color:#9a3412; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
         .pedido-alert-btn.primary { border-color:#f97316; background:#f97316; color:#fff; box-shadow:0 10px 20px rgba(249,115,22,.22); }
         .pedido-alert-btn.primary:hover { background:#ea580c; }
         .pedido-alert-btn[disabled] { opacity:.55; cursor:not-allowed; box-shadow:none; }
@@ -2118,7 +2120,7 @@
             <section class="pos-activity-strip" aria-live="polite">
                 <div class="pos-activity-title">
                     <strong>Actividad tienda online</strong>
-                    <span>Clientes conectados y carritos arm?ndose en vivo</span>
+                    <span>Clientes conectados y carritos arm&aacute;ndose en vivo</span>
                 </div>
                 <div class="tienda-live-mini" id="tienda-live-mini" title="Actividad tienda online en tiempo real">
                     <div class="mini-item"><span class="mini-label">Conectados</span><span class="mini-value" id="ventas-live-conectados">0</span></div>
@@ -4821,7 +4823,12 @@
             }));
             const texto = _pedidoProductosTextoPos(p);
             if (!texto) return [];
-            return texto.split(/\s*[|\n;,]+\s*/).map((part) => part.trim()).filter(Boolean).map((nombre) => ({ cantidad: 1, nombre, detalle: '', importe: 0 }));
+            const partes = texto.match(/[^,|;\n]+?\(x\s*\d+(?:[.,]\d+)?\)/gi) || texto.split(/\s*[|\n;]+\s*/);
+            return partes.map((part) => part.trim()).filter(Boolean).map((part) => {
+                const m = part.match(/^(.*?)(?:\s*\(x\s*(\d+(?:[.,]\d+)?)\))$/i);
+                const nombre = m ? String(m[1] || '').trim() : part;
+                return { cantidad: m ? Number(String(m[2]).replace(',', '.')) || 1 : 1, nombre, detalle: '', importe: 0 };
+            });
         }
 
         function _upsertPedidoPOS(pedido) {
@@ -4871,7 +4878,7 @@
                 const tiempo = p.creado_hace || p.tiempo_desde || p.recibido_hace || '';
                 return `<button type="button" class="pos-order-card${active}" onclick="seleccionarPedidoPOS(${id})">
                     <span class="pos-order-top"><span>#${id}</span><span class="pos-status-chip">${escapeHtmlLocal(estado)}</span></span>
-                    <span class="pos-order-meta">${escapeHtmlLocal(entrega)}${hora ? ` ? ${escapeHtmlLocal(hora)}` : ''}${tiempo ? ` ? ${escapeHtmlLocal(tiempo)}` : ''}</span>
+                    <span class="pos-order-meta">${escapeHtmlLocal(entrega)}${hora ? ` · ${escapeHtmlLocal(hora)}` : ''}${tiempo ? ` · ${escapeHtmlLocal(tiempo)}` : ''}</span>
                     <span class="pos-order-total">${escapeHtmlLocal(total)}</span>
                 </button>`;
             }).join('');
@@ -4929,8 +4936,8 @@
             root.innerHTML = `
                 <div class="pedido-detail-head"><div><h2>Pedido #${id}</h2><span class="pos-status-chip">${escapeHtmlLocal(estado)}</span></div><div class="pedido-detail-time">Recibido ${escapeHtmlLocal(String(p.recibido_hora || p.fecha || p.creado_en || '').trim() || '-')}</div></div>
                 <div class="pedido-progress">${steps}</div>
-                <div class="pedido-detail-card"><h3>Cliente y entrega</h3><div class="pedido-kv"><div><span>Cliente</span><strong>${escapeHtmlLocal(nombre)}</strong></div><div><span>Contacto</span><strong>${escapeHtmlLocal([tel,email].filter(Boolean).join(' ? ') || '-')}</strong></div><div><span>Modalidad</span><strong>${escapeHtmlLocal(entrega)}</strong></div><div><span>Hora solicitada</span><strong>${escapeHtmlLocal(hora)}</strong></div>${direccion ? `<div style="grid-column:1/-1"><span>Direcci?n</span><strong>${escapeHtmlLocal(direccion)}</strong></div>` : ''}</div></div>
-                <div class="pedido-detail-card"><h3>Pago</h3><div class="pedido-kv"><div><span>M?todo</span><strong>${escapeHtmlLocal(metodo)}</strong></div><div><span>Estado de pago</span><strong>${escapeHtmlLocal(pagoEstado)}</strong></div></div>${pagoPendiente ? '<div style="margin-top:8px;color:#9a3412;font-weight:900;">Pago pendiente de validaci?n. No se marca como pagado al aceptar preparaci?n.</div>' : ''}</div>
+                <div class="pedido-detail-card"><h3>Cliente y entrega</h3><div class="pedido-kv"><div><span>Cliente</span><strong>${escapeHtmlLocal(nombre)}</strong></div><div><span>Contacto</span><strong>${escapeHtmlLocal([tel,email].filter(Boolean).join(' · ') || '-')}</strong></div><div><span>Modalidad</span><strong>${escapeHtmlLocal(entrega)}</strong></div><div><span>Hora solicitada</span><strong>${escapeHtmlLocal(hora)}</strong></div>${direccion ? `<div style="grid-column:1/-1"><span>Direcci&oacute;n</span><strong>${escapeHtmlLocal(direccion)}</strong></div>` : ''}</div></div>
+                <div class="pedido-detail-card"><h3>Pago</h3><div class="pedido-kv"><div><span>M&eacute;todo</span><strong>${escapeHtmlLocal(metodo)}</strong></div><div><span>Estado de pago</span><strong>${escapeHtmlLocal(pagoEstado)}</strong></div></div>${pagoPendiente ? '<div style="margin-top:8px;color:#9a3412;font-weight:900;">Pago pendiente de validaci&oacute;n. No se marca como pagado al aceptar preparaci&oacute;n.</div>' : ''}</div>
                 <div class="pedido-detail-card"><h3>Productos</h3><table class="pedido-products"><thead><tr><th>Cant.</th><th>Producto</th><th>Importe</th></tr></thead><tbody>${productosHtml}</tbody></table><div class="pedido-total-row"><span>Total</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div>${despacho ? `<div class="pedido-kv"><div><span>Despacho</span><strong>${escapeHtmlLocal(_fmtCLPPos(despacho))}</strong></div></div>` : ''}${descuento ? `<div class="pedido-kv"><div><span>Descuento</span><strong>${escapeHtmlLocal(_fmtCLPPos(descuento))}</strong></div></div>` : ''}</div>
                 ${obs ? `<div class="pedido-detail-card"><h3>Observaciones</h3><div>${escapeHtmlLocal(obs)}</div></div>` : ''}
                 <div class="pedido-actions"><button class="secondary" type="button" onclick="abrirTicket58(${id})">Ticket 58 mm</button>${_accionPrincipalPedidoPOS(p)}<button class="secondary" type="button" onclick="_abrirChatPedidoOnline(${id}, '${encodeURIComponent(email || '-')}', '${encodeURIComponent(tel || '-')}')">Chat cliente</button><button class="secondary" type="button" onclick="window.location.href='/historial-ventas'">Historial</button></div>
@@ -4950,7 +4957,7 @@
             const pago = Boolean(p.pago_flow_pendiente || p.pago_bloquea_preparacion) ? 'POR VERIFICAR' : (String(p.pago_estado || p.estado_pago || 'REGISTRADO').trim());
             const obs = String(p.observaciones || p.nota || p.comentario || '').trim();
             const rows = lineas.map((it) => `<div>${escapeHtmlLocal(String(it.cantidad || 1))} ${escapeHtmlLocal(it.nombre)}</div><div class="row"><span>${it.detalle ? escapeHtmlLocal(it.detalle) : ''}</span><span>${it.importe ? escapeHtmlLocal(_fmtCLPPos(it.importe)) : ''}</span></div>`).join('');
-            return `<div class="center"><strong>SUCR?E PASTELER?A</strong><br>Comprobante operativo</div><div class="line"></div><div class="center"><strong>PEDIDO #${id}</strong></div><div>Fecha: ${escapeHtmlLocal(String(p.fecha || p.creado_en || new Date().toLocaleString('es-CL')))}</div><div>Cliente: ${escapeHtmlLocal(nombre)}</div>${tel ? `<div>Tel: ${escapeHtmlLocal(tel)}</div>` : ''}<div>${entrega} ? Hora: ${escapeHtmlLocal(hora)}</div>${direccion ? `<div>Dir: ${escapeHtmlLocal(direccion)}</div>` : ''}<div class="line"></div>${rows || '<div>Sin productos</div>'}<div class="line"></div><div class="row total"><span>TOTAL</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div><div>Pago: ${escapeHtmlLocal(metodo)}</div><div>Estado pago: ${escapeHtmlLocal(pago)}</div>${obs ? `<div class="line"></div><div>Obs: ${escapeHtmlLocal(obs)}</div>` : ''}<div class="line"></div><div class="center">No v?lido como documento tributario</div>`;
+            return `<div class="center"><strong>SUCR&Eacute;E PASTELER&Iacute;A</strong><br>Comprobante operativo</div><div class="line"></div><div class="center"><strong>PEDIDO #${id}</strong></div><div>Fecha: ${escapeHtmlLocal(String(p.fecha || p.creado_en || new Date().toLocaleString('es-CL')))}</div><div>Cliente: ${escapeHtmlLocal(nombre)}</div>${tel ? `<div>Tel: ${escapeHtmlLocal(tel)}</div>` : ''}<div>${entrega} · Hora: ${escapeHtmlLocal(hora)}</div>${direccion ? `<div>Dir: ${escapeHtmlLocal(direccion)}</div>` : ''}<div class="line"></div>${rows || '<div>Sin productos</div>'}<div class="line"></div><div class="row total"><span>TOTAL</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div><div>Pago: ${escapeHtmlLocal(metodo)}</div><div>Estado pago: ${escapeHtmlLocal(pago)}</div>${obs ? `<div class="line"></div><div>Obs: ${escapeHtmlLocal(obs)}</div>` : ''}<div class="line"></div><div class="center">No v&aacute;lido como documento tributario</div>`;
         }
 
         function abrirTicket58(id) {
@@ -4960,7 +4967,7 @@
             const overlay = document.getElementById('pos-ticket-overlay');
             const sub = document.getElementById('pos-ticket-subtitle');
             if (area) area.innerHTML = _ticketHtmlPedidoPOS(pedido);
-            if (sub) sub.textContent = `Pedido #${_pedidoIdPos(pedido)} ? Papel 58 mm`;
+                if (sub) sub.textContent = `Pedido #${_pedidoIdPos(pedido)} · Papel 58 mm`;
             if (overlay) { overlay.classList.add('active'); overlay.setAttribute('aria-hidden','false'); }
         }
 
@@ -5351,7 +5358,7 @@
             const arr = Array.isArray(lineas) ? lineas : [];
             const unidades = arr.reduce((sum, it) => sum + (Number.isFinite(Number(it.cantidad)) ? Number(it.cantidad) : 0), 0);
             const unidadesTxt = Number.isInteger(unidades) ? String(unidades) : unidades.toLocaleString('es-CL', { maximumFractionDigits: 2 });
-            return `${arr.length} producto${arr.length === 1 ? '' : 's'} ? ${unidadesTxt} unidad${Number(unidades) === 1 ? '' : 'es'}`;
+            return `${arr.length} producto${arr.length === 1 ? '' : 's'} · ${unidadesTxt} unidad${Number(unidades) === 1 ? '' : 'es'}`;
         }
 
         function _pedidoAlertTiempo(p) {
@@ -5379,6 +5386,21 @@
 
         function _pedidoAlertEscapeAttr(raw) {
             return String(raw || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function _pedidoAlertIcon(name) {
+            const icons = {
+                bag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8Z"></path><path d="M9 8a3 3 0 0 1 6 0"></path></svg>',
+                user: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+                store: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16l-1.5-5h-13L4 10Z"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg>',
+                truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"></path><path d="M14 10h4l3 3v4h-7z"></path><circle cx="7" cy="19" r="2"></circle><circle cx="18" cy="19" r="2"></circle></svg>',
+                money: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M6 9h.01M18 15h.01"></path></svg>',
+                box: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8l9 5 9-5Z"></path><path d="M3 8v8l9 5 9-5V8"></path><path d="M12 13v8"></path></svg>',
+                printer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5"></path><path d="M7 18H5a2 2 0 0 1-2-2v-5h18v5a2 2 0 0 1-2 2h-2"></path><path d="M7 14h10v6H7z"></path></svg>',
+                close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>',
+                check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>'
+            };
+            return icons[name] || icons.box;
         }
 
         function _pedidoAlertRenderHtml(p) {
@@ -5410,44 +5432,44 @@
             const resumenLineas = _pedidoAlertResumenLineas(lineas);
             const productoRows = lineas.length ? lineas.map((it) => {
                 const img = String(it.imagen || '').trim();
-                const detalle = [it.detalle, it.observacion].map((x) => String(x || '').trim()).filter(Boolean).join(' ? ');
+                const detalle = [it.detalle, it.observacion].map((x) => String(x || '').trim()).filter(Boolean).join(' · ');
                 const thumb = img
                     ? `<img src="${_pedidoAlertEscapeAttr(img)}" alt="">`
-                    : '<span class="pedido-alert-thumb" aria-hidden="true">?</span>';
+                    : `<span class="pedido-alert-thumb" aria-hidden="true">${_pedidoAlertIcon('box')}</span>`;
                 return `<div class="pedido-alert-row">
                     <div><span class="pedido-alert-qty">${escapeHtmlLocal(String(it.cantidad || 1))}</span></div>
                     <div class="pedido-alert-product">${thumb}<div><strong>${escapeHtmlLocal(it.nombre || 'Producto')}</strong>${detalle ? `<span>${escapeHtmlLocal(detalle)}</span>` : ''}</div></div>
                     <div class="pedido-alert-money">${it.importe ? escapeHtmlLocal(_fmtCLPPos(it.importe)) : 'Sin importe'}</div>
                 </div>`;
-            }).join('') : '<div class="pedido-alert-row"><div></div><div class="pedido-alert-product"><span class="pedido-alert-thumb" aria-hidden="true">?</span><div><strong>Sin detalle de productos disponible</strong><span>El pedido queda visible para revisi?n interna.</span></div></div><div class="pedido-alert-money">-</div></div>';
+            }).join('') : `<div class="pedido-alert-row"><div></div><div class="pedido-alert-product"><span class="pedido-alert-thumb" aria-hidden="true">${_pedidoAlertIcon('box')}</span><div><strong>Sin detalle de productos disponible</strong><span>El pedido queda visible para revisi&oacute;n interna.</span></div></div><div class="pedido-alert-money">-</div></div>`;
             const extras = [
                 subtotal ? `<div><span>Subtotal</span><strong>${escapeHtmlLocal(_fmtCLPPos(subtotal))}</strong></div>` : '',
                 descuento ? `<div><span>Descuento</span><strong>-${escapeHtmlLocal(_fmtCLPPos(descuento))}</strong></div>` : '',
                 despacho ? `<div><span>Despacho</span><strong>${escapeHtmlLocal(_fmtCLPPos(despacho))}</strong></div>` : '',
             ].filter(Boolean).join('');
             const contactoSec = tel || email
-                ? `${tel ? `Tel?fono: ${escapeHtmlLocal(tel)}` : 'Tel?fono no informado'}${email ? `<br>Correo: ${escapeHtmlLocal(email)}` : '<br>Correo no informado'}`
-                : 'Tel?fono y correo no informados';
-            const entregaSec = `${fecha || hora ? `${fecha ? escapeHtmlLocal(fecha) : ''}${fecha && hora ? ' ? ' : ''}${hora ? escapeHtmlLocal(hora) : ''}` : 'Horario no informado'}${direccion ? `<br>${escapeHtmlLocal(direccion)}` : ''}${instrucciones ? `<br>${escapeHtmlLocal(instrucciones)}` : ''}`;
+                ? `${tel ? `Tel&eacute;fono: ${escapeHtmlLocal(tel)}` : 'Tel&eacute;fono no informado'}${email ? `<br>Correo: ${escapeHtmlLocal(email)}` : '<br>Correo no informado'}`
+                : 'Tel&eacute;fono y correo no informados';
+            const entregaSec = `${fecha || hora ? `${fecha ? escapeHtmlLocal(fecha) : ''}${fecha && hora ? ' · ' : ''}${hora ? escapeHtmlLocal(hora) : ''}` : 'Horario no informado'}${direccion ? `<br>${escapeHtmlLocal(direccion)}` : ''}${instrucciones ? `<br>${escapeHtmlLocal(instrucciones)}` : ''}`;
             return `
                 <div class="pedido-alert-head">
                     <div class="pedido-alert-title">
-                        <div class="pedido-alert-bag" aria-hidden="true">?</div>
-                        <div><h2 id="pedido-alert-title">?Nuevo pedido online!</h2><p id="pedido-alert-desc">${escapeHtmlLocal(_pedidoAlertTiempo(p))}</p></div>
+                        <div class="pedido-alert-bag" aria-hidden="true">${_pedidoAlertIcon('bag')}</div>
+                        <div><h2 id="pedido-alert-title">&iexcl;Nuevo pedido online!</h2><p id="pedido-alert-desc">${escapeHtmlLocal(_pedidoAlertTiempo(p))}</p></div>
                     </div>
                     <div class="pedido-alert-head-actions">
                         <span class="pedido-alert-count">${pendientes || 0} por revisar</span>
-                        <button type="button" class="pedido-alert-close" id="pedido-alert-close" aria-label="Cerrar y revisar despu?s">?</button>
+                        <button type="button" class="pedido-alert-close" id="pedido-alert-close" aria-label="Cerrar y revisar despu&eacute;s">${_pedidoAlertIcon('close')}</button>
                     </div>
                 </div>
                 <div class="pedido-alert-body">
                     <div class="pedido-alert-order-head"><h3>Pedido #${id}</h3><span class="pedido-alert-status">${escapeHtmlLocal(estadoTxt)}</span></div>
                     <div class="pedido-alert-info-grid">
-                        <div class="pedido-alert-info-card"><span class="pedido-alert-small-icon" aria-hidden="true">C</span><div><h4>Cliente</h4><strong>${escapeHtmlLocal(nombre || 'Sin nombre registrado')}</strong><span>${contactoSec}</span></div></div>
-                        <div class="pedido-alert-info-card"><span class="pedido-alert-small-icon" aria-hidden="true">${retiro ? 'T' : 'D'}</span><div><h4>Entrega</h4><strong>${escapeHtmlLocal(entregaTitulo)}</strong><span>${entregaSec}</span></div></div>
+                        <div class="pedido-alert-info-card"><span class="pedido-alert-small-icon" aria-hidden="true">${_pedidoAlertIcon('user')}</span><div><h4>Cliente</h4><strong>${escapeHtmlLocal(nombre || 'Sin nombre registrado')}</strong><span>${contactoSec}</span></div></div>
+                        <div class="pedido-alert-info-card"><span class="pedido-alert-small-icon" aria-hidden="true">${_pedidoAlertIcon(retiro ? 'store' : 'truck')}</span><div><h4>Entrega</h4><strong>${escapeHtmlLocal(entregaTitulo)}</strong><span>${entregaSec}</span></div></div>
                     </div>
-                    <div class="pedido-alert-pay"><span class="pedido-alert-small-icon" aria-hidden="true">$</span><strong>${escapeHtmlLocal(metodo)}</strong><span class="pay-chip">${escapeHtmlLocal(pagoEstado)}</span></div>
-                    ${pagoFlowPendiente ? '<div class="pedido-alert-note">Pago Flow pendiente: espera confirmaci?n antes de comenzar preparaci?n.</div>' : ''}
+                    <div class="pedido-alert-pay"><span class="pedido-alert-small-icon" aria-hidden="true">${_pedidoAlertIcon('money')}</span><strong>${escapeHtmlLocal(metodo)}</strong><span class="pay-chip">${escapeHtmlLocal(pagoEstado)}</span></div>
+                    ${pagoFlowPendiente ? '<div class="pedido-alert-note">Pago Flow pendiente: espera confirmaci&oacute;n antes de comenzar preparaci&oacute;n.</div>' : ''}
                     <div class="pedido-alert-section-title"><strong>Detalle del pedido</strong><span>${escapeHtmlLocal(resumenLineas)}</span></div>
                     <div class="pedido-alert-table"><div class="pedido-alert-row head"><div>Cant.</div><div>Producto</div><div class="pedido-alert-money">Importe</div></div>${productoRows}</div>
                     <div class="pedido-alert-total"><span>Total del pedido</span><span>${escapeHtmlLocal(_fmtCLPPos(total))}</span></div>
@@ -5457,10 +5479,10 @@
                 </div>
                 <div class="pedido-alert-error" id="pedido-alert-error"></div>
                 <div class="pedido-alert-actions">
-                    <span class="pedido-alert-footnote">El pedido seguir? visible en Pedidos en vivo</span>
+                    <span class="pedido-alert-footnote">El pedido seguir&aacute; visible en Pedidos en vivo</span>
                     <div class="pedido-alert-actions-main">
-                        <button type="button" class="pedido-alert-btn" id="pedido-alert-later">Revisar despu?s</button>
-                        <button type="button" class="pedido-alert-btn" id="pedido-alert-print">Imprimir ticket ? 58 mm</button>
+                        <button type="button" class="pedido-alert-btn" id="pedido-alert-later">Revisar despu&eacute;s</button>
+                        <button type="button" class="pedido-alert-btn" id="pedido-alert-print">${_pedidoAlertIcon('printer')} Imprimir ticket · 58 mm</button>
                         <button type="button" class="pedido-alert-btn primary" id="pedido-alert-accept" ${(!puedeAceptar || pagoFlowPendiente) ? 'disabled' : ''}>Aceptar y preparar</button>
                     </div>
                 </div>`;
@@ -6275,4 +6297,3 @@
 <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
 </body>
 </html>
-

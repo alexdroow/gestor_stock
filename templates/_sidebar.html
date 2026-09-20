@@ -855,17 +855,20 @@
                 }
                 const raw = String(p?.productos || p?.productos_texto || '').trim();
                 if (!raw) return [];
-                return raw.split(/\s*[|;\n]+\s*/).map((part) => part.trim()).filter(Boolean).map((part) => {
+                const partes = raw.match(/[^,|;\n]+?\(x\s*\d+(?:[.,]\d+)?\)/gi) || raw.split(/\s*[|;\n]+\s*/);
+                return partes.map((part) => part.trim()).filter(Boolean).map((part) => {
                     const m = part.match(/^(.*?)(?:\s*\(x\s*(\d+(?:[.,]\d+)?)\))$/i);
                     const nombre = m ? String(m[1] || '').trim() : part;
                     const prod = productoCatalogoAlerta(0, nombre);
+                    const cantidad = m ? Number(String(m[2]).replace(',', '.')) || 1 : 1;
+                    const precio = Number(prod?.precio || prod?.precio_venta || 0) || 0;
                     return {
                         producto_id: Number(prod?.id || 0) || 0,
-                        cantidad: m ? Number(String(m[2]).replace(',', '.')) || 1 : 1,
+                        cantidad,
                         nombre,
                         detalle: '',
                         foto_url: String(prod?.foto_url || '').trim(),
-                        importe: 0,
+                        importe: precio > 0 ? precio * cantidad : 0,
                     };
                 });
             }
@@ -1616,7 +1619,6 @@
         })();
     </script>
 </aside>
-
 
 
 

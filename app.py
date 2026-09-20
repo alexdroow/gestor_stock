@@ -9728,6 +9728,129 @@ def api_adm_pagina_descuentos_desactivar(campana_id):
             conn.close()
 
 
+def _tienda_admin_foto_producto_url(foto_raw):
+    foto = str(foto_raw or "").strip()
+    if not foto:
+        return ""
+    if foto.startswith(("http://", "https://", "/")):
+        return foto
+    try:
+        return url_for("static", filename=foto.replace("\\", "/").replace("static/", "", 1))
+    except Exception:
+        return f"/static/{foto.replace('static/', '', 1)}"
+
+
+def _tienda_admin_adjuntar_items_pedidos(cursor, pedidos):
+    """Agrega items estructurados para que el POS no dependa de texto agrupado."""
+    if not pedidos:
+        return pedidos
+    venta_ids = []
+    for pedido in pedidos:
+        try:
+            vid = int(pedido.get("id") or pedido.get("venta_id") or 0)
+        except (TypeError, ValueError):
+            vid = 0
+        if vid > 0:
+            venta_ids.append(vid)
+    venta_ids = sorted(set(venta_ids))
+    if not venta_ids:
+        return pedidos
+
+    por_venta = {vid: [] for vid in venta_ids}
+    placeholders = ",".join(["?"] * len(venta_ids))
+
+    try:
+        cursor.execute(
+            f"""
+            SELECT vd.venta_id,
+                   vd.producto_id,
+                   COALESCE(NULLIF(TRIM(p.nombre), ''), 'Producto #' || vd.producto_id) AS nombre,
+                   vd.cantidad,
+                   COALESCE(vd.precio_unitario, 0) AS precio_unitario,
+                   COALESCE(vd.subtotal, vd.cantidad * COALESCE(vd.precio_unitario, 0)) AS subtotal,
+                   COALESCE(p.foto, '') AS foto
+            FROM venta_detalles vd
+            LEFT JOIN productos p ON p.id = vd.producto_id
+            WHERE vd.venta_id IN ({placeholders})
+            ORDER BY vd.venta_id ASC, vd.id ASC
+            """,
+            tuple(venta_ids),
+        )
+        for row in cursor.fetchall() or []:
+            d = dict(row)
+            vid = int(d.get("venta_id") or 0)
+            cantidad = float(d.get("cantidad") or 0)
+            precio = float(d.get("precio_unitario") or 0)
+            subtotal = float(d.get("subtotal") or 0)
+            if subtotal <= 0 and cantidad > 0 and precio > 0:
+                subtotal = cantidad * precio
+            if precio <= 0 and cantidad > 0 and subtotal > 0:
+                precio = subtotal / cantidad
+            if vid in por_venta and cantidad > 0:
+                por_venta[vid].append(
+                    {
+                        "id": int(d.get("producto_id") or 0),
+                        "producto_id": int(d.get("producto_id") or 0),
+                        "nombre": str(d.get("nombre") or "Producto").strip(),
+                        "cantidad": cantidad,
+                        "precio_unitario": precio,
+                        "subtotal": subtotal,
+                        "importe": subtotal,
+                        "foto_url": _tienda_admin_foto_producto_url(d.get("foto")),
+                    }
+                )
+    except Exception:
+        pass
+
+    faltantes = [vid for vid in venta_ids if not por_venta.get(vid)]
+    if faltantes:
+        placeholders_faltantes = ",".join(["?"] * len(faltantes))
+        try:
+            cursor.execute(
+                f"""
+                SELECT vi.venta_id,
+                       vi.producto_id,
+                       COALESCE(NULLIF(TRIM(vi.producto_nombre), ''), NULLIF(TRIM(p.nombre), ''), 'Producto #' || vi.producto_id) AS nombre,
+                       vi.cantidad,
+                       COALESCE(p.precio, 0) AS precio_unitario,
+                       COALESCE(p.foto, '') AS foto
+                FROM venta_items vi
+                LEFT JOIN productos p ON p.id = vi.producto_id
+                WHERE vi.venta_id IN ({placeholders_faltantes})
+                ORDER BY vi.venta_id ASC, vi.id ASC
+                """,
+                tuple(faltantes),
+            )
+            for row in cursor.fetchall() or []:
+                d = dict(row)
+                vid = int(d.get("venta_id") or 0)
+                cantidad = float(d.get("cantidad") or 0)
+                precio = float(d.get("precio_unitario") or 0)
+                subtotal = cantidad * precio if cantidad > 0 and precio > 0 else 0
+                if vid in por_venta and cantidad > 0:
+                    por_venta[vid].append(
+                        {
+                            "id": int(d.get("producto_id") or 0),
+                            "producto_id": int(d.get("producto_id") or 0),
+                            "nombre": str(d.get("nombre") or "Producto").strip(),
+                            "cantidad": cantidad,
+                            "precio_unitario": precio,
+                            "subtotal": subtotal,
+                            "importe": subtotal,
+                            "foto_url": _tienda_admin_foto_producto_url(d.get("foto")),
+                        }
+                    )
+        except Exception:
+            pass
+
+    for pedido in pedidos:
+        vid = int(pedido.get("id") or pedido.get("venta_id") or 0)
+        items = por_venta.get(vid) or []
+        pedido["items"] = items
+        pedido["productos_items"] = items
+    return pedidos
+
+
 @app.route('/api/tienda/admin/pedidos-nuevos', methods=['GET'])
 def api_tienda_admin_pedidos_nuevos():
     conn = None
@@ -9832,6 +9955,7 @@ def api_tienda_admin_pedidos_nuevos():
                 tuple(flow_ids_alertar),
             )
             conn.commit()
+        _tienda_admin_adjuntar_items_pedidos(cursor, rows)
         max_id = max(since_id, max_online_id)
         return jsonify({"success": True, "pedidos": rows, "max_id": max_id})
     except Exception as e:
@@ -10129,6 +10253,7 @@ def api_tienda_admin_pedidos_chat_activos():
             r for r in rows
             if _chat_estado_activo("venta", r.get("pedido_estado"), r.get("pedido_estado_actualizado"))
         ]
+        _tienda_admin_adjuntar_items_pedidos(cursor, rows)
         return jsonify({"success": True, "pedidos": rows})
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "pedidos": []}), 500
