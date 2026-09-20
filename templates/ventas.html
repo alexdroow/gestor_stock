@@ -5137,6 +5137,20 @@
             `;
         }
 
+        function _bloqueTransferenciaTicketPedido58() {
+            return `
+                <section>
+                    <h2>Datos transferencia</h2>
+                    ${_lineaTicketPedido58('Titular', 'ANGELLO GUTIERREZ SALGADO')}
+                    ${_lineaTicketPedido58('RUT', '19.284.422-3')}
+                    ${_lineaTicketPedido58('Banco', 'Banco Estado')}
+                    ${_lineaTicketPedido58('Cuenta', 'Cuenta RUT / Cuenta vista')}
+                    ${_lineaTicketPedido58('Nro cuenta', '19284422')}
+                    ${_lineaTicketPedido58('Correo', 'pasteleria.sucree@outlook.com')}
+                </section>
+            `;
+        }
+
         function _ticketHtmlPedidoPOS(p, standalone = false) {
             const id = _pedidoIdPos(p);
             const lineas = _lineasPedidoPos(p);
@@ -5196,6 +5210,7 @@
             </div>
         </div>
     </section>
+    ${_bloqueTransferenciaTicketPedido58()}
     <section>
         <h2>Observaciones</h2>
         <div class="note">${escapeHtmlLocal(obs || '-')}</div>
@@ -6128,7 +6143,7 @@
             const tiempo = String(timerTxt || '').trim() || 'sin tiempo definido';
             const resumenLista = _formatearResumenPedidoWhatsapp(resumenPedido);
             const total = String(totalTxt || '').trim() || '-';
-            return `Hola ${nombre}, su pedido #${Number(pedidoId || 0)}. a sido confirmado y lo estamos preperando , tiene un tiempo aproximado de ${tiempo}, mientras el pedido es preparado te dejamos los datos de transferencia.\n\n*Resumen del pedido:*\n${resumenLista}\n\n*TOTAL: ${total}*\n\n💳 Datos de Transferencia 💳\n\n⚠️ NUEVOS DATOS DE TRANSFERENCIA ⚠️\n(Si tienes registrada la cuenta "Banco Santander" debes añadir la nueva cuenta.)\n\nALEXIS JAVIER GUTIERREZ SALGADO\n18.121.947-5\nBci / Banco Crédito e Inversiones\nCuenta Vista\n777018121947\npasteleria.sucree@outlook.com\n\nTe avisaremos cuando tu pedido se encuentre listo para ser retirado/despachado\n\nMuchas gracias por preferir Pasteleria Sucrée`;
+            return `Hola ${nombre}, su pedido #${Number(pedidoId || 0)}. a sido confirmado y lo estamos preperando , tiene un tiempo aproximado de ${tiempo}, mientras el pedido es preparado te dejamos los datos de transferencia.\n\n*Resumen del pedido:*\n${resumenLista}\n\n*TOTAL: ${total}*\n\n💳 Datos de Transferencia 💳\n\nANGELLO GUTIERREZ SALGADO\n19.284.422-3\nBanco Estado\nCuenta RUT / Cuenta vista\n19284422\npasteleria.sucree@outlook.com\n\nTe avisaremos cuando tu pedido se encuentre listo para ser retirado/despachado\n\nMuchas gracias por preferir Pasteleria Sucrée`;
         }
 
         function _estadoPermiteWhatsapp(estadoRaw) {

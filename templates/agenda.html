@@ -6857,14 +6857,13 @@
                 '',
                 '*TOTAL ABONO {abono_50}*',
                 '',
-                'NUEVOS DATOS DE TRANSFERENCIA',
-                '(Si tienes registrada la cuenta "Banco Santander" debes anadir la nueva cuenta.)',
+                'DATOS DE TRANSFERENCIA',
                 '',
-                'ALEXIS JAVIER GUTIERREZ SALGADO',
-                '18.121.947-5',
-                'Bci / Banco Credito e Inversiones / Mach',
-                'Cuenta Vista',
-                '777018121947',
+                'ANGELLO GUTIERREZ SALGADO',
+                '19.284.422-3',
+                'Banco Estado',
+                'Cuenta RUT / Cuenta vista',
+                '19284422',
                 'pasteleria.sucree@outlook.com',
                 '',
                 'Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.',
@@ -8205,6 +8204,20 @@
             `;
         }
 
+        function bloqueTransferenciaTicket58() {
+            return `
+                <section>
+                    <h2>Datos transferencia</h2>
+                    ${lineaTicket58('Titular', 'ANGELLO GUTIERREZ SALGADO')}
+                    ${lineaTicket58('RUT', '19.284.422-3')}
+                    ${lineaTicket58('Banco', 'Banco Estado')}
+                    ${lineaTicket58('Cuenta', 'Cuenta RUT / Cuenta vista')}
+                    ${lineaTicket58('Nro cuenta', '19284422')}
+                    ${lineaTicket58('Correo', 'pasteleria.sucree@outlook.com')}
+                </section>
+            `;
+        }
+
         function construirHtmlImpresion58(evento) {
             const detalle = detalleCatalogoCompletoAgenda(evento);
             const codigo = String(evento.codigo_pedido || evento.id || '-').trim();
@@ -8376,6 +8389,7 @@
             </div>
         </div>
     </section>
+    ${bloqueTransferenciaTicket58()}
     <section>
         <h2>Observaciones</h2>
         <div class="note">${escapeHtml(obs || '-')}</div>

@@ -22804,14 +22804,13 @@ AGENDA_WHATSAPP_DEFAULTS = {
         "",
         "*TOTAL ABONO {abono_50}*",
         "",
-        "NUEVOS DATOS DE TRANSFERENCIA",
-        "(Si tienes registrada la cuenta \"Banco Santander\" debes anadir la nueva cuenta.)",
+        "DATOS DE TRANSFERENCIA",
         "",
-        "ALEXIS JAVIER GUTIERREZ SALGADO",
-        "18.121.947-5",
-        "Bci / Banco Credito e Inversiones / Mach",
-        "Cuenta Vista",
-        "777018121947",
+        "ANGELLO GUTIERREZ SALGADO",
+        "19.284.422-3",
+        "Banco Estado",
+        "Cuenta RUT / Cuenta vista",
+        "19284422",
         "pasteleria.sucree@outlook.com",
         "",
         "Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.",
@@ -22844,6 +22843,41 @@ def _ensure_agenda_whatsapp_config(cursor):
         VALUES (1, ?, ?, CURRENT_TIMESTAMP)
         """,
         (AGENDA_WHATSAPP_DEFAULTS["confirmacion"], AGENDA_WHATSAPP_DEFAULTS["pdf"]),
+    )
+    cursor.execute(
+        """
+        UPDATE agenda_whatsapp_config
+        SET mensaje_confirmacion = REPLACE(
+            REPLACE(
+                REPLACE(
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(mensaje_confirmacion,
+                                    'NUEVOS DATOS DE TRANSFERENCIA' || char(10) || '(Si tienes registrada la cuenta "Banco Santander" debes anadir la nueva cuenta.)',
+                                    'DATOS DE TRANSFERENCIA'
+                                ),
+                                'ALEXIS JAVIER GUTIERREZ SALGADO', 'ANGELLO GUTIERREZ SALGADO'
+                            ),
+                            '18.121.947-5', '19.284.422-3'
+                        ),
+                        'Bci / Banco Credito e Inversiones / Mach', 'Banco Estado'
+                    ),
+                    'Cuenta Vista', 'Cuenta RUT / Cuenta vista'
+                ),
+                '777018121947', '19284422'
+            ),
+            'BCI/MACHBANK', 'Banco Estado'
+        )
+        WHERE id = 1
+          AND (
+              mensaje_confirmacion LIKE '%ALEXIS JAVIER GUTIERREZ SALGADO%'
+              OR mensaje_confirmacion LIKE '%18.121.947-5%'
+              OR mensaje_confirmacion LIKE '%777018121947%'
+              OR mensaje_confirmacion LIKE '%Mach%'
+              OR mensaje_confirmacion LIKE '%Banco Santander%'
+          )
+        """
     )
 
 
