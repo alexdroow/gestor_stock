@@ -1899,8 +1899,29 @@
         .pos-activity-title span { color:var(--pos-muted); font-size:12px; font-weight:750; }
         .pos-activity-strip .tienda-live-mini { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:0; border:0; background:transparent; width:100%; }
         .pos-activity-strip .mini-item { min-width:0; padding:12px 14px; border:1px solid var(--pos-border); border-radius:14px; background:linear-gradient(180deg,#fff7ed,#fff); }
+        .pos-activity-strip .mini-item.interactive { cursor:pointer; user-select:none; transition:.16s ease; }
+        .pos-activity-strip .mini-item.interactive:hover { border-color:var(--pos-orange); box-shadow:0 0 0 2px rgba(249,115,22,.12); transform:translateY(-1px); }
+        .pos-activity-strip .mini-hint { display:block; margin-top:4px; color:#7c4a2d; font-size:11px; font-weight:750; }
         .pos-activity-strip .mini-label { color:#9a3412; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
         .pos-activity-strip .mini-value { color:var(--pos-ink); font-size:24px; font-weight:950; line-height:1; }
+        .live-carts-overlay { position:fixed; inset:0; z-index:13020; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(67,20,7,.48); }
+        .live-carts-overlay.active { display:flex; }
+        .live-carts-panel { width:min(760px,96vw); max-height:min(84vh,760px); display:flex; flex-direction:column; background:#fff; border:1px solid var(--pos-border); border-top:6px solid var(--pos-orange); border-radius:18px; box-shadow:0 24px 54px rgba(67,20,7,.28); overflow:hidden; color:var(--pos-ink); }
+        .live-carts-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 18px; background:linear-gradient(90deg,#fff7ed,#fff); border-bottom:1px solid var(--pos-border); }
+        .live-carts-head strong { display:block; font-size:21px; font-weight:950; }
+        .live-carts-head span { display:block; color:var(--pos-muted); font-size:13px; font-weight:750; margin-top:3px; }
+        .live-carts-close { border:1px solid var(--pos-border); background:#fff; color:#9a3412; border-radius:12px; padding:8px 10px; font-weight:950; cursor:pointer; }
+        .live-carts-body { overflow:auto; padding:14px 18px 18px; display:grid; gap:12px; }
+        .live-cart-card { border:1px solid var(--pos-border); border-radius:14px; background:#fff; padding:12px; }
+        .live-cart-top { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding-bottom:8px; border-bottom:1px dashed #fed7aa; }
+        .live-cart-top strong { font-size:15px; font-weight:950; }
+        .live-cart-meta { color:var(--pos-muted); font-size:12px; margin-top:2px; }
+        .live-cart-total { color:var(--pos-orange-dark); font-weight:950; text-align:right; white-space:nowrap; }
+        .live-cart-items { margin:9px 0 0; padding-left:19px; display:grid; gap:7px; }
+        .live-cart-items li { padding-left:2px; }
+        .live-cart-items strong { color:#431407; }
+        .live-cart-items small { display:block; color:#78665c; margin-top:2px; }
+        .live-carts-empty { border:1px dashed var(--pos-border); border-radius:14px; padding:18px; color:var(--pos-muted); font-weight:850; text-align:center; background:#fff7ed; }
         .pos-order-card { min-width:220px; border:1px solid var(--pos-border); background:#fff; border-radius:13px; padding:11px 12px; text-align:left; cursor:pointer; color:var(--pos-ink); box-shadow:0 6px 16px rgba(67,20,7,.06); }
         .pos-order-card:hover, .pos-order-card.active { border-color:var(--pos-orange); background:#fff7ed; box-shadow:0 0 0 2px rgba(249,115,22,.12); }
         .pos-order-top { display:flex; justify-content:space-between; gap:8px; align-items:center; font-weight:950; }
@@ -2139,7 +2160,11 @@
                 </div>
                 <div class="tienda-live-mini" id="tienda-live-mini" title="Actividad tienda online en tiempo real">
                     <div class="mini-item"><span class="mini-label">Conectados</span><span class="mini-value" id="ventas-live-conectados">0</span></div>
-                    <div class="mini-item"><span class="mini-label">Carritos activos</span><span class="mini-value" id="ventas-live-carritos">0</span></div>
+                    <div class="mini-item interactive" id="ventas-live-carritos-card" role="button" tabindex="0" title="Doble click para ver los productos que estan agregando al carrito">
+                        <span class="mini-label">Carritos activos</span>
+                        <span class="mini-value" id="ventas-live-carritos">0</span>
+                        <span class="mini-hint">Doble click para ver detalle</span>
+                    </div>
                     <div class="mini-item"><span class="mini-label">Preparando</span><span class="mini-value" id="ventas-live-preparando">0</span></div>
                 </div>
             </section>
@@ -2618,6 +2643,21 @@
             <div class="pos-ticket-actions">
                 <button type="button" class="pos-link-btn" onclick="cerrarTicket58()">Volver al pedido</button>
                 <button type="button" class="pos-pay-btn" onclick="imprimirTicket58()">Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="live-carts-overlay" id="live-carts-overlay" aria-hidden="true">
+        <div class="live-carts-panel" role="dialog" aria-modal="true" aria-labelledby="live-carts-title">
+            <div class="live-carts-head">
+                <div>
+                    <strong id="live-carts-title">Carritos activos</strong>
+                    <span id="live-carts-subtitle">Productos que los clientes est&aacute;n agregando en la tienda online</span>
+                </div>
+                <button type="button" class="live-carts-close" onclick="cerrarDetalleCarritosActivos()">Cerrar</button>
+            </div>
+            <div class="live-carts-body" id="live-carts-body">
+                <div class="live-carts-empty">A&uacute;n no hay carritos activos con productos.</div>
             </div>
         </div>
     </div>
@@ -4792,6 +4832,7 @@
         let _pedidoAlertPedidoActualId = null;
         let _pedidoAlertUltimoFoco = null;
         let _pedidoAlertGuardando = false;
+        let _carritosActivosDetalle = [];
 
         let _pedidoSeleccionadoPOS = null;
 
@@ -6312,18 +6353,87 @@
         }
         window._aceptarPedidoConTimer = _aceptarPedidoConTimer;
 
+        function _renderDetalleCarritosActivos() {
+            const body = document.getElementById('live-carts-body');
+            const subtitle = document.getElementById('live-carts-subtitle');
+            if (!body) return;
+            const carritos = Array.isArray(_carritosActivosDetalle) ? _carritosActivosDetalle : [];
+            if (subtitle) {
+                const totalItems = carritos.reduce((sum, c) => sum + Number(c.carrito_items || 0), 0);
+                subtitle.textContent = carritos.length
+                    ? `${carritos.length} carrito(s) activo(s) · ${totalItems} producto(s) en total`
+                    : 'Productos que los clientes estan agregando en la tienda online';
+            }
+            if (!carritos.length) {
+                body.innerHTML = '<div class="live-carts-empty">Aun no hay carritos activos con productos.</div>';
+                return;
+            }
+            body.innerHTML = carritos.map((cart, index) => {
+                const items = Array.isArray(cart.items) ? cart.items : [];
+                const alias = String(cart.alias || `Persona ${index + 1}`);
+                const total = _fmtCLPPos(Number(cart.carrito_total || 0));
+                const unidades = Number(cart.carrito_items || 0);
+                const pagina = String(cart.pagina || '/tienda');
+                const ultima = String(cart.ultima_actividad || '');
+                const lis = items.length ? items.map((it) => {
+                    const cantidad = Number(it.cantidad || 0);
+                    const nombre = String(it.nombre || 'Producto');
+                    const subtotal = Number(it.subtotal || it.importe || 0);
+                    const detalle = String(it.detalle || '').trim();
+                    return `<li>
+                        <strong>${escapeHtmlLocal(Number.isInteger(cantidad) ? String(cantidad) : cantidad.toLocaleString('es-CL'))} x ${escapeHtmlLocal(nombre)}</strong>
+                        ${subtotal > 0 ? `<small>Subtotal: ${escapeHtmlLocal(_fmtCLPPos(subtotal))}</small>` : ''}
+                        ${detalle ? `<small>${escapeHtmlLocal(detalle)}</small>` : ''}
+                    </li>`;
+                }).join('') : '<li><strong>Carrito con productos, pero sin detalle recibido todavia.</strong><small>Espera unos segundos o revisa nuevamente.</small></li>';
+                return `<article class="live-cart-card">
+                    <div class="live-cart-top">
+                        <div>
+                            <strong>${escapeHtmlLocal(alias)}</strong>
+                            <div class="live-cart-meta">${escapeHtmlLocal(unidades)} producto(s) · ${escapeHtmlLocal(pagina)}${ultima ? ` · ${escapeHtmlLocal(ultima)}` : ''}</div>
+                        </div>
+                        <div class="live-cart-total">${escapeHtmlLocal(total)}</div>
+                    </div>
+                    <ul class="live-cart-items">${lis}</ul>
+                </article>`;
+            }).join('');
+        }
+
+        function abrirDetalleCarritosActivos() {
+            _renderDetalleCarritosActivos();
+            const overlay = document.getElementById('live-carts-overlay');
+            if (overlay) {
+                overlay.classList.add('active');
+                overlay.setAttribute('aria-hidden', 'false');
+            }
+        }
+        window.abrirDetalleCarritosActivos = abrirDetalleCarritosActivos;
+
+        function cerrarDetalleCarritosActivos() {
+            const overlay = document.getElementById('live-carts-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.setAttribute('aria-hidden', 'true');
+            }
+        }
+        window.cerrarDetalleCarritosActivos = cerrarDetalleCarritosActivos;
+
         async function _pollActividadTiendaEnVentas() {
             try {
                 const response = await fetch('/api/tienda/admin/actividad', { headers: { Accept: 'application/json' } });
                 const data = await response.json();
                 if (!response.ok || !data.success) return;
                 const resumen = data.resumen || {};
+                _carritosActivosDetalle = Array.isArray(data.carritos_detalle) ? data.carritos_detalle : [];
                 const c = document.getElementById('ventas-live-conectados');
                 const a = document.getElementById('ventas-live-carritos');
                 const p = document.getElementById('ventas-live-preparando');
                 if (c) c.textContent = String(Number(resumen.conectados || 0));
                 if (a) a.textContent = String(Number(resumen.carritos_activos || 0));
                 if (p) p.textContent = String(Number(resumen.pedidos_preparando || 0));
+                if (document.getElementById('live-carts-overlay')?.classList.contains('active')) {
+                    _renderDetalleCarritosActivos();
+                }
             } catch (_) {}
         }
 
@@ -6436,6 +6546,22 @@
         _pedidosTiendaPollTimer = setInterval(_pollPedidosTiendaNuevos, 12000);
         _pollActividadTiendaEnVentas();
         _actividadTiendaPollTimer = setInterval(_pollActividadTiendaEnVentas, 5000);
+        const liveCartCard = document.getElementById('ventas-live-carritos-card');
+        if (liveCartCard) {
+            liveCartCard.addEventListener('dblclick', abrirDetalleCarritosActivos);
+            liveCartCard.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    abrirDetalleCarritosActivos();
+                }
+            });
+        }
+        const liveCartsOverlay = document.getElementById('live-carts-overlay');
+        if (liveCartsOverlay) {
+            liveCartsOverlay.addEventListener('click', (ev) => {
+                if (ev.target === liveCartsOverlay) cerrarDetalleCarritosActivos();
+            });
+        }
         ocultarFabPedidosGlobalVentas();
         setInterval(ocultarFabPedidosGlobalVentas, 250);
         try {
@@ -6459,6 +6585,7 @@
         }
         document.addEventListener('keydown', (ev) => {
             if (ev.key === 'Escape') cerrarEditorRapidoProducto();
+            if (ev.key === 'Escape') cerrarDetalleCarritosActivos();
         });
     </script>
 

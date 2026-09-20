@@ -7827,6 +7827,58 @@ def api_tienda_admin_categorias_eliminar(categoria_id):
             conn.close()
 
 
+def _normalizar_detalle_carrito_tienda(raw_items):
+    items = raw_items if isinstance(raw_items, list) else []
+    out = []
+    for raw in items[:40]:
+        if not isinstance(raw, dict):
+            continue
+        try:
+            producto_id = int(raw.get("id") or raw.get("producto_id") or 0)
+        except (TypeError, ValueError):
+            producto_id = 0
+        nombre = str(raw.get("nombre") or raw.get("producto") or raw.get("descripcion") or "Producto").strip()[:120]
+        if not nombre:
+            nombre = "Producto"
+        try:
+            cantidad = float(raw.get("cantidad") or raw.get("qty") or 0)
+        except (TypeError, ValueError):
+            cantidad = 0
+        try:
+            precio = float(raw.get("precio_unitario") or raw.get("precio") or 0)
+        except (TypeError, ValueError):
+            precio = 0
+        if cantidad <= 0:
+            continue
+        cantidad = min(cantidad, 999)
+        precio = max(0, min(precio, 9999999))
+        subtotal = round(cantidad * precio, 2)
+        detalle = str(raw.get("detalle") or raw.get("variante") or raw.get("observacion") or "").strip()[:160]
+        out.append(
+            {
+                "id": producto_id,
+                "producto_id": producto_id,
+                "nombre": nombre,
+                "cantidad": cantidad,
+                "precio_unitario": precio,
+                "subtotal": subtotal,
+                "detalle": detalle,
+            }
+        )
+    return out
+
+
+def _parse_detalle_carrito_tienda(raw_json):
+    raw = str(raw_json or "").strip()
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return []
+    return _normalizar_detalle_carrito_tienda(parsed)
+
+
 @app.route('/api/tienda/track', methods=['POST'])
 def api_tienda_track():
     conn = None
@@ -7849,9 +7901,12 @@ def api_tienda_track():
         cliente_email = _normalizar_email(data.get("cliente_email"))
         cliente_telefono = str(data.get("cliente_telefono") or "").strip()[:24]
         cliente_registrado = 1 if bool(data.get("cliente_registrado")) and bool(cliente_email) else 0
+        carrito_detalle = _normalizar_detalle_carrito_tienda(data.get("carrito_detalle") or data.get("carrito_items_detalle") or [])
+        carrito_detalle_json = json.dumps(carrito_detalle, ensure_ascii=False, separators=(",", ":")) if carrito_detalle else ""
 
         conn = get_db()
         cursor = conn.cursor()
+        _ensure_column_cursor(cursor, "tienda_visitas", "carrito_detalle_json", "TEXT")
         if evento in {"view", "enter", "checkout"}:
             try:
                 cursor.execute(
@@ -7872,6 +7927,7 @@ def api_tienda_track():
                 SET ultima_actividad = datetime('now', '-1 day'),
                     carrito_items = 0,
                     carrito_total = 0,
+                    carrito_detalle_json = '',
                     pagina = ?
                 WHERE session_id = ?
                 """,
@@ -7884,20 +7940,21 @@ def api_tienda_track():
                 """
                 INSERT INTO tienda_visitas (
                     session_id, primera_visita, ultima_actividad, pagina,
-                    carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent, ip_address
+                    carrito_items, carrito_total, carrito_detalle_json, checkouts, ultimo_checkout, user_agent, ip_address
                 )
-                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?, ?)
+                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?, ?)
                 ON CONFLICT(session_id) DO UPDATE SET
                     ultima_actividad = CURRENT_TIMESTAMP,
                     pagina = excluded.pagina,
                     carrito_items = excluded.carrito_items,
                     carrito_total = excluded.carrito_total,
+                    carrito_detalle_json = excluded.carrito_detalle_json,
                     checkouts = tienda_visitas.checkouts + excluded.checkouts,
                     ultimo_checkout = CASE WHEN excluded.checkouts > 0 THEN CURRENT_TIMESTAMP ELSE tienda_visitas.ultimo_checkout END,
                     user_agent = excluded.user_agent,
                     ip_address = excluded.ip_address
                 """,
-                (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent, ip_address),
+                (session_id, pagina, carrito_items, carrito_total, carrito_detalle_json, checkout_delta, checkout_delta, user_agent, ip_address),
             )
         except sqlite3.OperationalError as e:
             if "ip_address" not in str(e).lower():
@@ -7907,19 +7964,20 @@ def api_tienda_track():
                 """
                 INSERT INTO tienda_visitas (
                     session_id, primera_visita, ultima_actividad, pagina,
-                    carrito_items, carrito_total, checkouts, ultimo_checkout, user_agent
+                    carrito_items, carrito_total, carrito_detalle_json, checkouts, ultimo_checkout, user_agent
                 )
-                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?)
+                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?)
                 ON CONFLICT(session_id) DO UPDATE SET
                     ultima_actividad = CURRENT_TIMESTAMP,
                     pagina = excluded.pagina,
                     carrito_items = excluded.carrito_items,
                     carrito_total = excluded.carrito_total,
+                    carrito_detalle_json = excluded.carrito_detalle_json,
                     checkouts = tienda_visitas.checkouts + excluded.checkouts,
                     ultimo_checkout = CASE WHEN excluded.checkouts > 0 THEN CURRENT_TIMESTAMP ELSE tienda_visitas.ultimo_checkout END,
                     user_agent = excluded.user_agent
                 """,
-                (session_id, pagina, carrito_items, carrito_total, checkout_delta, checkout_delta, user_agent),
+                (session_id, pagina, carrito_items, carrito_total, carrito_detalle_json, checkout_delta, checkout_delta, user_agent),
             )
         conn.commit()
         return jsonify({"success": True})
@@ -8069,6 +8127,7 @@ def api_tienda_admin_actividad():
     try:
         conn = get_db()
         cursor = conn.cursor()
+        _ensure_column_cursor(cursor, "tienda_visitas", "carrito_detalle_json", "TEXT")
         cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-15 seconds')")
         conectados = int(cursor.fetchone()["total"] or 0)
         cursor.execute(
@@ -8080,6 +8139,32 @@ def api_tienda_admin_actividad():
             """
         )
         carritos_activos = int(cursor.fetchone()["total"] or 0)
+        cursor.execute(
+            """
+            SELECT session_id, ultima_actividad, carrito_items, carrito_total, pagina,
+                   COALESCE(carrito_detalle_json, '') AS carrito_detalle_json
+            FROM tienda_visitas
+            WHERE carrito_items > 0
+              AND datetime(ultima_actividad) >= datetime('now', '-30 minutes')
+            ORDER BY datetime(ultima_actividad) DESC
+            LIMIT 20
+            """
+        )
+        carritos_detalle = []
+        for idx, row in enumerate(cursor.fetchall() or [], start=1):
+            item = dict(row)
+            detalle = _parse_detalle_carrito_tienda(item.get("carrito_detalle_json"))
+            carritos_detalle.append(
+                {
+                    "session_id": str(item.get("session_id") or ""),
+                    "alias": f"Persona {idx}",
+                    "ultima_actividad": str(item.get("ultima_actividad") or ""),
+                    "carrito_items": int(item.get("carrito_items") or 0),
+                    "carrito_total": float(item.get("carrito_total") or 0),
+                    "pagina": str(item.get("pagina") or "/tienda"),
+                    "items": detalle,
+                }
+            )
         cursor.execute(
             """
             SELECT session_id, ultima_actividad, carrito_items, carrito_total, pagina
@@ -8139,6 +8224,7 @@ def api_tienda_admin_actividad():
                     "pedidos_recibidos": pedidos_recibidos,
                 },
                 "abandonados": abandonados,
+                "carritos_detalle": carritos_detalle,
                 "top_ips": top_ips,
             }
         )

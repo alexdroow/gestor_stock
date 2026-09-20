@@ -8196,6 +8196,7 @@ def migrar_db():
                 pagina TEXT DEFAULT '/tienda',
                 carrito_items INTEGER NOT NULL DEFAULT 0,
                 carrito_total REAL NOT NULL DEFAULT 0,
+                carrito_detalle_json TEXT,
                 checkouts INTEGER NOT NULL DEFAULT 0,
                 ultimo_checkout TEXT,
                 user_agent TEXT,
@@ -8222,6 +8223,7 @@ def migrar_db():
         _ensure_column(conn, "tienda_visitas_eventos", "cliente_telefono", "TEXT")
         _ensure_column(conn, "tienda_visitas_eventos", "cliente_registrado", "INTEGER DEFAULT 0")
         _ensure_column(conn, "tienda_visitas", "ip_address", "TEXT")
+        _ensure_column(conn, "tienda_visitas", "carrito_detalle_json", "TEXT")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tienda_ip_geo_cache (

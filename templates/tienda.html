@@ -18734,12 +18734,25 @@
         function _trackTienda(evento = "heartbeat", pagina = "/tienda") {
             try {
                 const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
+                const detalleCarrito = carrito.map((it) => {
+                    const cantidad = Number(it.cantidad || 0);
+                    const precio = Number(it.precio_unitario || 0);
+                    return {
+                        id: Number(it.id || it.producto_id || 0),
+                        nombre: String(it.nombre || it.producto || "Producto").trim(),
+                        cantidad,
+                        precio_unitario: precio,
+                        subtotal: Math.max(0, cantidad * precio),
+                        detalle: String(it.detalle || it.variante || it.observacion || "").trim(),
+                    };
+                }).filter((it) => Number(it.cantidad || 0) > 0);
                 const payload = {
                     session_id: tiendaSessionId,
                     evento,
                     pagina: String(pagina || "/tienda"),
                     carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
                     carrito_total: Math.max(0, Number(total || 0)),
+                    carrito_detalle: detalleCarrito,
                     cliente_registrado: Boolean(clienteRegistrado && clienteRegistrado.email),
                     cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
                     cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
@@ -18756,12 +18769,25 @@
         function _trackTiendaLeave() {
             try {
                 const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
+                const detalleCarrito = carrito.map((it) => {
+                    const cantidad = Number(it.cantidad || 0);
+                    const precio = Number(it.precio_unitario || 0);
+                    return {
+                        id: Number(it.id || it.producto_id || 0),
+                        nombre: String(it.nombre || it.producto || "Producto").trim(),
+                        cantidad,
+                        precio_unitario: precio,
+                        subtotal: Math.max(0, cantidad * precio),
+                        detalle: String(it.detalle || it.variante || it.observacion || "").trim(),
+                    };
+                }).filter((it) => Number(it.cantidad || 0) > 0);
                 const payload = {
                     session_id: tiendaSessionId,
                     evento: "leave",
                     pagina: "/tienda",
                     carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
                     carrito_total: Math.max(0, Number(total || 0)),
+                    carrito_detalle: detalleCarrito,
                     cliente_registrado: Boolean(clienteRegistrado && clienteRegistrado.email),
                     cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
                     cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
