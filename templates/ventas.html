@@ -2013,7 +2013,7 @@
         .pedido-alert-head-actions { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
         .pedido-alert-count { border:0; border-radius:999px; padding:8px 12px; background:#ffedd5; color:#9a3412; font-weight:950; font-size:13px; }
         .pedido-alert-close { width:38px; height:38px; border:1px solid #fed7aa; border-radius:12px; background:#fff; color:#9a3412; font-size:24px; line-height:1; cursor:pointer; }
-        .pedido-alert-body { flex:1 1 auto; min-height:0; overflow:auto; padding:16px 18px 0; }
+        .pedido-alert-body { flex:0 1 auto; min-height:0; max-height:calc(88vh - 164px); overflow:auto; padding:16px 18px 0; }
         .pedido-alert-order-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
         .pedido-alert-order-head h3 { margin:0; color:#431407; font-size:24px; letter-spacing:-.03em; }
         .pedido-alert-status { display:inline-flex; align-items:center; border-radius:999px; padding:6px 10px; background:#f97316; color:#fff; font-size:12px; font-weight:950; }
@@ -2054,6 +2054,7 @@
         .pedido-alert-btn[disabled] { opacity:.55; cursor:not-allowed; box-shadow:none; }
         .pedido-alert-footnote { color:#78665c; font-size:12px; font-weight:750; }
         .pedido-alert-overlay :focus-visible { outline:3px solid rgba(249,115,22,.32); outline-offset:2px; }
+        body.pedido-alert-open #darkModeBtn { display:none !important; visibility:hidden !important; }
         @media (max-width:720px) { .pedido-alert-head, .pedido-alert-actions { align-items:stretch; flex-direction:column; } .pedido-alert-head-actions, .pedido-alert-actions-main { width:100%; justify-content:space-between; } .pedido-alert-info-grid { grid-template-columns:1fr; } .pedido-alert-row { grid-template-columns:52px minmax(0,1fr) 82px; padding:9px; } .pedido-alert-product img, .pedido-alert-thumb { width:40px; height:40px; } .pedido-alert-total span:last-child { font-size:22px; } }
         #sucree-pedidos-fab, #ventas-chat-hub, #ventas-chat-hub-fab { display:none !important; }
         .pos-ticket-overlay { --pos-orange:#f97316; --pos-orange-dark:#ea580c; --pos-border:#fed7aa; --pos-ink:#431407; --pos-muted:#7c4a2d; position:fixed; inset:0; z-index:13000; display:none; align-items:center; justify-content:center; background:rgba(67,20,7,.52); padding:18px; }
@@ -5725,6 +5726,7 @@
                 overlay.classList.remove('active');
                 overlay.style.display = 'none';
             }
+            document.body.classList.remove('pedido-alert-open');
             if (detenerSonido) _stopPedidoAlarm();
             try { _pedidoAlertUltimoFoco?.focus?.(); } catch (_) {}
         }
@@ -5742,6 +5744,7 @@
             const overlay = _ensurePedidoModal();
             overlay.style.display = 'flex';
             overlay.classList.add('active');
+            document.body.classList.add('pedido-alert-open');
             setTimeout(() => document.getElementById('pedido-alert-later')?.focus(), 0);
         }
 

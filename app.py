@@ -8128,6 +8128,17 @@ def api_tienda_admin_actividad():
         conn = get_db()
         cursor = conn.cursor()
         _ensure_column_cursor(cursor, "tienda_visitas", "carrito_detalle_json", "TEXT")
+        cursor.execute(
+            """
+            UPDATE tienda_visitas
+            SET carrito_items = 0,
+                carrito_total = 0,
+                carrito_detalle_json = ''
+            WHERE carrito_items > 0
+              AND datetime(ultima_actividad) < datetime('now', '-30 seconds')
+            """
+        )
+        conn.commit()
         cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-15 seconds')")
         conectados = int(cursor.fetchone()["total"] or 0)
         cursor.execute(
@@ -8135,7 +8146,7 @@ def api_tienda_admin_actividad():
             SELECT COUNT(*) AS total
             FROM tienda_visitas
             WHERE carrito_items > 0
-              AND datetime(ultima_actividad) >= datetime('now', '-30 minutes')
+              AND datetime(ultima_actividad) >= datetime('now', '-30 seconds')
             """
         )
         carritos_activos = int(cursor.fetchone()["total"] or 0)
@@ -8145,7 +8156,7 @@ def api_tienda_admin_actividad():
                    COALESCE(carrito_detalle_json, '') AS carrito_detalle_json
             FROM tienda_visitas
             WHERE carrito_items > 0
-              AND datetime(ultima_actividad) >= datetime('now', '-30 minutes')
+              AND datetime(ultima_actividad) >= datetime('now', '-30 seconds')
             ORDER BY datetime(ultima_actividad) DESC
             LIMIT 20
             """
