@@ -2502,8 +2502,18 @@ def _flow_fee_cfg():
 
 
 def _flow_checkout_public_enabled():
-    # Flow queda conservado internamente, pero no disponible para clientes por ahora.
-    return False
+    # Requiere una habilitacion explicita: evita abrir cobros reales por accidente.
+    enabled = str(os.environ.get("GESTIONSTOCK_FLOW_ENABLED") or "0").strip().lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        return False
+    parsed = urlparse(_public_base_url())
+    return parsed.scheme == "https" and bool(parsed.netloc)
+
+
+def _flow_log(event, venta_id=0, status_code=None, detail=""):
+    """Diagnostico minimo: nunca registra credenciales ni tokens de Flow."""
+    safe_detail = re.sub(r"[^a-zA-Z0-9 _.,:-]", "", str(detail or ""))[:180]
+    print(f"[FLOW] event={event} venta_id={int(venta_id or 0)} status={status_code if status_code is not None else '-'} {safe_detail}".rstrip())
 
 
 def _flow_gross_from_net(net_amount, fee_cfg=None, apply_fixed=True):
@@ -2556,6 +2566,32 @@ def _flow_post(endpoint, params, cfg):
         if not msg:
             msg = f"Flow HTTP {int(getattr(http_err, 'code', 400) or 400)}"
         raise RuntimeError(msg)
+    data = json.loads(raw or "{}")
+    if isinstance(data, dict) and data.get("code"):
+        raise RuntimeError(str(data.get("message") or f"Flow error {data.get('code')}"))
+    return data
+
+
+def _flow_get(endpoint, params, cfg):
+    """Consulta segura para endpoints Flow documentados como GET, como payment/getStatus."""
+    payload = dict(params or {})
+    payload["apiKey"] = str(cfg.get("api_key") or "")
+    payload["s"] = _flow_sign(payload, cfg.get("secret_key") or "")
+    query = urlencode(payload)
+    req = UrlRequest(
+        f"{str(cfg.get('api_url') or '').rstrip('/')}/{str(endpoint).lstrip('/')}?{query}",
+        headers={"Accept": "application/json"},
+        method="GET",
+    )
+    try:
+        raw = urlopen(req, timeout=25).read().decode("utf-8", errors="replace")
+    except HTTPError as http_err:
+        try:
+            data_err = json.loads(http_err.read().decode("utf-8", errors="replace") or "{}")
+        except Exception:
+            data_err = {}
+        msg = str(data_err.get("message") or data_err.get("error") or "").strip()
+        raise RuntimeError(msg or f"Flow HTTP {int(getattr(http_err, 'code', 400) or 400)}")
     data = json.loads(raw or "{}")
     if isinstance(data, dict) and data.get("code"):
         raise RuntimeError(str(data.get("message") or f"Flow error {data.get('code')}"))
@@ -2972,9 +3008,10 @@ def _flow_confirmar_token_y_actualizar(token):
         return {"success": False, "error": "Flow no configurado"}
 
     try:
-        status = _flow_post("/payment/getStatus", {"token": token}, cfg)
+        status = _flow_get("/payment/getStatus", {"token": token}, cfg)
     except Exception as e:
         _set_flow_error(int(row.get("venta_id") or 0), str(e))
+        _flow_log("status_error", row.get("venta_id"), detail="payment_get_status_failed")
         raise
     def _safe_int(v, default=0):
         try:
@@ -2982,88 +3019,24 @@ def _flow_confirmar_token_y_actualizar(token):
         except Exception:
             return default
 
-    def _txt(v):
-        return str(v or "").strip().lower()
-
-    def _flow_pago_aprobado(payload):
-        data = payload if isinstance(payload, dict) else {}
-        status_code_local = _safe_int(data.get("status"), 0)
-        if status_code_local == 2:
-            return True
-        if status_code_local in {3, 4}:
-            return False
-
-        positivos = {"paid", "approved", "success", "successful", "completed", "authorized", "authorised", "pagado", "aprobado"}
-        negativos = {"pending", "rejected", "cancelled", "canceled", "failed", "error", "declined", "voided", "anulado", "rechazado"}
-
-        candidatos = []
-        status_nums = []
-        def _collect_status_like(obj):
-            if not isinstance(obj, dict):
-                return
-            for k in ("status", "statusCode", "paymentStatusCode", "payment_status_code"):
-                vv = obj.get(k)
-                if vv is None:
-                    continue
-                try:
-                    status_nums.append(int(vv))
-                except Exception:
-                    pass
-            for k in ("status_text", "statusText", "paymentStatus", "payment_status", "detailStatus", "message"):
-                vv = _txt(obj.get(k))
-                if vv:
-                    candidatos.append(vv)
-
-        # Formato Flow legacy/directo
-        _collect_status_like(data)
-        for k in ("status_text", "statusText", "paymentStatus", "payment_status", "detailStatus"):
-            vv = _txt(data.get(k))
-            if vv:
-                candidatos.append(vv)
-
-        # Formatos extendidos Flow (API v2/v6)
-        for root_key in ("paymenResult", "paymentResult", "payment_result", "lastPayment", "last_payment", "result"):
-            sub = data.get(root_key)
-            if isinstance(sub, dict):
-                _collect_status_like(sub)
-
-        payment_data = data.get("paymentData")
-        payment_items = []
-        if isinstance(payment_data, dict):
-            payment_items = [payment_data]
-        elif isinstance(payment_data, list):
-            payment_items = [x for x in payment_data if isinstance(x, dict)]
-
-        for it in payment_items:
-            _collect_status_like(it)
-            for k in ("type",):
-                vv = _txt(it.get(k))
-                if vv:
-                    candidatos.append(vv)
-
-        # Si cualquier status numérico anidado indica pagado, aprobamos.
-        if any(int(x) == 2 for x in status_nums):
-            return True
-        if any(int(x) in {3, 4} for x in status_nums):
-            return False
-
-        # Señal adicional: si hay flowOrder y fecha de pago en paymentData,
-        # tratamos como aprobado aunque status venga transitoriamente distinto.
-        has_flow_order = bool(str(data.get("flowOrder") or "").strip())
-        has_payment_date = any(bool(str((it.get("date") or it.get("paymentDate") or it.get("transferDate") or "")).strip()) for it in payment_items)
-        if has_flow_order and has_payment_date:
-            return True
-
-        if any(any(pos in c for pos in positivos) for c in candidatos):
-            if not any(any(neg in c for neg in negativos) for c in candidatos):
-                return True
-        return False
-
     venta_id = int(row.get("venta_id") or 0)
     status_code = _safe_int(status.get("status"), 0)
-    paid = bool(_flow_pago_aprobado(status))
+    commerce_order = str(status.get("commerceOrder") or "").strip()
+    expected_order = str(row.get("commerce_order") or "").strip()
+    try:
+        amount_matches = int(round(float(status.get("amount") or 0))) == int(round(float(row.get("amount") or 0)))
+    except (TypeError, ValueError):
+        amount_matches = False
+    if not commerce_order or commerce_order != expected_order or not amount_matches:
+        _set_flow_error(venta_id, "Respuesta Flow no coincide con orden o monto registrado")
+        _flow_log("status_mismatch", venta_id, status_code)
+        return {"success": False, "error": "Respuesta Flow no coincide con la orden"}
+
+    # Flow documenta status=2 como pago efectuado. No inferimos aprobacion por texto o fechas.
+    paid = status_code == 2
     estado_flow = "pagado" if paid else ("rechazado" if status_code in {3, 4} else "pendiente")
     _actualizar_flow_pago(venta_id=venta_id, estado=estado_flow, flow_order=status.get("flowOrder"), payment_data=status)
+    _flow_log("status_checked", venta_id, status_code, estado_flow)
 
     # metodo_pago visible en historial/clientes
     conn = None
@@ -6284,9 +6257,7 @@ def api_tienda_productos():
                 "admin_mode": bool(session.get(_ADMIN_SESSION_KEY)),
                 "payment_pricing": {
                     "flow_enabled": bool(_flow_checkout_public_enabled() and _flow_cfg().get("enabled")),
-                    "rate": 0,
-                    "iva": 0,
-                    "fixed": 0,
+                    **_flow_fee_cfg(),
                 },
             }
         )
@@ -16942,12 +16913,10 @@ def api_tienda_checkout():
         if metodo_pago_preferido not in {"transferencia", "flow"}:
             metodo_pago_preferido = "transferencia"
         if metodo_pago_preferido == "flow" and not flow_checkout_enabled:
-            metodo_pago_preferido = "transferencia"
+            return jsonify({'success': False, 'error': 'La pasarela Flow no esta disponible en este momento'}), 400
         flow_sim_status = str(data.get("flow_simulation_status") or "").strip().lower()
         flow_sim_status = flow_sim_status if flow_sim_status in {"paid", "pending", "error"} else ""
         flow_sim_enabled = bool(flow_sim_status and session.get(_ADMIN_SESSION_KEY) and flow_checkout_enabled)
-        if metodo_pago_preferido == "flow" and not flow_checkout_enabled:
-            return jsonify({'success': False, 'error': 'La pasarela Flow no esta disponible en este momento'}), 400
         items_req = data.get('items') or []
         if not isinstance(items_req, list) or not items_req:
             return jsonify({'success': False, 'error': 'Carrito vacio'}), 400
@@ -17531,55 +17500,61 @@ def api_tienda_flow_confirm():
         token = str(request.form.get("token") or request.args.get("token") or "").strip()
         result = _flow_confirmar_token_y_actualizar(token)
         if not result.get("success"):
+            _flow_log("confirmation_rejected", detail=result.get("error"))
             return "ERROR", 400
+        _flow_log("confirmation_accepted", result.get("venta_id"), detail=("paid" if result.get("paid") else "not_paid"))
         return "OK", 200
     except Exception:
+        _flow_log("confirmation_error")
         return "ERROR", 500
 
 
 @app.route('/tienda/flow/retorno', methods=['GET', 'POST'])
 def tienda_flow_retorno():
-    # Retorno del navegador del cliente luego del checkout Flow
-    def _redirigir_con_cookie(base_url, estado, venta_id=0):
-        vid = int(venta_id or 0)
-        if vid > 0:
-            _marcar_flow_cliente_regreso(vid)
-        if estado == "paid":
-            destino = f"{base_url}/tienda?flow=paid&venta_id={vid}"
-        elif estado == "pending":
-            destino = f"{base_url}/tienda?flow=pending&venta_id={vid}"
-        else:
-            destino = f"{base_url}/tienda?flow=error&venta_id={vid}"
-        resp = redirect(destino)
-        # Fallback movil: si se pierde query/localStorage, tienda.html lee esta cookie.
-        resp.set_cookie(
-            "flow_return_status",
-            f"{estado}:{vid}:{int(time.time())}",
-            max_age=60 * 20,
-            secure=True,
-            httponly=False,
-            samesite="Lax",
-            path="/",
-        )
-        return resp
-
+    # Retorno del navegador: informa el estado real, nunca confirma solo por volver desde Flow.
     try:
         token = str(request.values.get("token") or "").strip()
-        venta_hint = int(request.values.get("venta_id") or 0)
-        if not token:
-            base = _public_base_url(request.url_root)
-            return _redirigir_con_cookie(base, "pending", venta_hint)
-        result = _flow_confirmar_token_y_actualizar(token)
-        base = _public_base_url(request.url_root)
-        if not result.get("success"):
-            return _redirigir_con_cookie(base, "pending", venta_hint)
-        if bool(result.get("paid")):
-            return _redirigir_con_cookie(base, "paid", int(result.get("venta_id") or 0))
-        return _redirigir_con_cookie(base, "pending", int(result.get("venta_id") or 0))
+        result = _flow_confirmar_token_y_actualizar(token) if token else {"success": False, "error": "Flow no envio el identificador de pago"}
+        venta_id = int(result.get("venta_id") or 0)
+        if venta_id > 0:
+            _marcar_flow_cliente_regreso(venta_id)
+            session["flow_result_venta_id"] = venta_id
+            session["flow_result_until"] = int(time.time()) + (60 * 30)
+        estado = "pagado" if result.get("success") and result.get("paid") else "pendiente"
+        if result.get("success") and not result.get("paid"):
+            status_code = int((result.get("status") or {}).get("status") or 0)
+            if status_code in {3, 4}:
+                estado = "rechazado"
+        return render_template("flow_resultado.html", estado=estado, venta_id=venta_id, error=("" if result.get("success") else result.get("error", "No pudimos verificar el pago todavia")))
     except Exception:
-        base = _public_base_url(request.url_root)
-        venta_hint = int(request.values.get("venta_id") or 0)
-        return _redirigir_con_cookie(base, "pending", venta_hint)
+        _flow_log("return_error")
+        return render_template("flow_resultado.html", estado="pendiente", venta_id=0, error="No pudimos verificar el pago todavia"), 200
+
+
+@app.route('/api/tienda/flow/resultado/estado', methods=['GET'])
+def api_tienda_flow_resultado_estado():
+    venta_id = int(session.get("flow_result_venta_id") or 0)
+    expires_at = int(session.get("flow_result_until") or 0)
+    if venta_id <= 0 or expires_at < int(time.time()):
+        return jsonify({"success": False, "error": "Sesion de resultado expirada"}), 403
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        _ensure_flow_pago_table(cur)
+        cur.execute("SELECT * FROM tienda_flow_pagos WHERE venta_id = ? LIMIT 1", (venta_id,))
+        row = cur.fetchone()
+        data = dict(row) if row else None
+        conn.close()
+        if not data:
+            return jsonify({"success": False, "error": "Pago no encontrado"}), 404
+        if str(data.get("estado") or "").lower() == "pendiente":
+            _flow_confirmar_token_y_actualizar(str(data.get("flow_token") or ""))
+            data = _obtener_flow_pago_por_token(str(data.get("flow_token") or "")) or data
+        backup = json.loads(data.get("checkout_backup_json") or "{}")
+        return jsonify({"success": True, "estado": str(data.get("estado") or "pendiente"), "pedido": backup})
+    except Exception:
+        _flow_log("result_status_error", venta_id)
+        return jsonify({"success": False, "error": "No se pudo actualizar el estado"}), 502
 
 
 @app.route('/api/tienda/flow/estado', methods=['GET'])
@@ -17617,7 +17592,8 @@ def api_tienda_flow_estado():
                 backup = json.loads(raw_backup)
         except Exception:
             backup = None
-        return jsonify({"success": True, "found": True, "estado": str(data.get("estado") or "pendiente"), "data": data, "checkout_backup": backup})
+        # El navegador solo necesita el estado y el resumen: no exponemos token ni datos internos de Flow.
+        return jsonify({"success": True, "found": True, "estado": str(data.get("estado") or "pendiente"), "checkout_backup": backup})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

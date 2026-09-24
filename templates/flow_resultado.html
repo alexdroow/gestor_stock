@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Resultado de pago | Sucree</title>
+    <style>
+        :root { --ink:#431407; --orange:#f97316; --paper:#fffaf5; --line:#fed7aa; }
+        * { box-sizing:border-box; } body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px; color:var(--ink); font-family:Georgia, 'Times New Roman', serif; background:radial-gradient(circle at top,#fff7ed,#fff 62%); }
+        main { width:min(620px,100%); border:1px solid var(--line); border-top:6px solid var(--orange); border-radius:20px; overflow:hidden; background:#fff; box-shadow:0 24px 60px rgba(67,20,7,.16); }
+        header, section, footer { padding:22px; } header { background:var(--paper); } h1 { margin:0 0 6px; font-size:clamp(1.6rem,5vw,2.25rem); } p { margin:0; line-height:1.5; font-family:'Segoe UI',sans-serif; } .badge { display:inline-block; margin-top:12px; padding:7px 11px; border-radius:999px; font:700 .9rem 'Segoe UI',sans-serif; } .paid { background:#dcfce7; color:#166534; } .pending { background:#fef3c7; color:#92400e; } .rejected { background:#fee2e2; color:#991b1b; } #details { border-top:1px solid #ffedd5; display:grid; gap:8px; font-family:'Segoe UI',sans-serif; } .row { display:flex; justify-content:space-between; gap:12px; } .muted { color:#78716c; } footer { display:flex; gap:10px; flex-wrap:wrap; border-top:1px solid #ffedd5; font-family:'Segoe UI',sans-serif; } a, button { border-radius:10px; padding:10px 14px; font-weight:800; text-decoration:none; border:1px solid var(--orange); cursor:pointer; } a { color:var(--ink); background:#fff; } button { color:#fff; background:var(--orange); } .hidden { display:none; }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1 id="title">Verificando tu pago</h1>
+        <p id="message">Estamos consultando la confirmacion segura de Flow.</p>
+        <span id="badge" class="badge pending">Pendiente de confirmacion</span>
+    </header>
+    <section id="details" class="hidden"></section>
+    <footer>
+        <button id="refresh" type="button">Actualizar estado</button>
+        <button id="print" type="button" class="hidden">Descargar comprobante PDF</button>
+        <a href="/tienda">Volver a la tienda</a>
+    </footer>
+</main>
+<script>
+    const initialState = {{ estado|tojson }};
+    const initialError = {{ error|tojson }};
+    const title = document.getElementById('title'), message = document.getElementById('message'), badge = document.getElementById('badge'), details = document.getElementById('details'), printBtn = document.getElementById('print');
+    function money(value) { return new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(value || 0)); }
+    function render(state, pedido, error) {
+        const labels = { pagado:['Pago aprobado','Flow confirmo tu pago. Tu pedido fue registrado correctamente.','paid','Pago confirmado'], rechazado:['Pago rechazado o anulado','No se realizo el cobro. Puedes volver a la tienda y reintentar.','rejected','No aprobado'], pendiente:['Pago pendiente de confirmacion','Aun no recibimos la confirmacion final. Algunos medios de pago pueden tardar unos minutos.','pending','En verificacion'] };
+        const cfg = labels[state] || labels.pendiente;
+        title.textContent = cfg[0]; message.textContent = error || cfg[1]; badge.className = `badge ${cfg[2]}`; badge.textContent = cfg[3];
+        if (pedido && pedido.venta_id) { details.classList.remove('hidden'); const items = (pedido.items || []).map(x => `<div class="row"><span>${String(x.nombre || 'Producto')} x${Number(x.cantidad || 0)}</span><strong>${money(x.subtotal || (Number(x.precio_unitario || 0) * Number(x.cantidad || 0)))}</strong></div>`).join(''); details.innerHTML = `<div class="row"><strong>Pedido #${Number(pedido.venta_id)}</strong><span class="muted">${String(pedido.entrega_tipo || 'retiro')}</span></div>${items}<div class="row"><strong>Total pagado</strong><strong>${money(pedido.total_monto)}</strong></div>`; printBtn.classList.toggle('hidden', state !== 'pagado'); }
+    }
+    async function refresh() { try { const r = await fetch('/api/tienda/flow/resultado/estado',{cache:'no-store'}); const data = await r.json(); if (!r.ok || !data.success) return render('pendiente', null, data.error || initialError); render(data.estado, data.pedido, ''); } catch (_) { render(initialState, null, initialError); } }
+    document.getElementById('refresh').addEventListener('click', refresh); printBtn.addEventListener('click', () => window.print()); render(initialState, null, initialError); refresh(); setInterval(refresh, 12000);
+</script>
+</body>
+</html>

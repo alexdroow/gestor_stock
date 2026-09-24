@@ -22656,21 +22656,19 @@
                 }
                 setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
-                flowPagoHabilitado = false;
-                flowSimAdminEnabled = false;
+                flowPagoHabilitado = Boolean(data.flow_enabled);
+                flowSimAdminEnabled = Boolean(data.admin_flow_sim_enabled);
                 tiendaAdminMode = Boolean(data.admin_mode);
                 _adminSetPillVisible();
                 _adminBindProductGestures();
                 paymentPricingCfg = {
+                    ...(data.payment_pricing || {}),
                     flow_enabled: flowPagoHabilitado,
-                    rate: 0,
-                    iva: 0,
-                    fixed: 0,
                 };
                 _refreshTransferBenefitBadge();
-                if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = "none";
-                if (checkoutPagoFlowEl) checkoutPagoFlowEl.checked = false;
-                if (checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
+                if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = flowPagoHabilitado ? "" : "none";
+                if (!flowPagoHabilitado && checkoutPagoFlowEl) checkoutPagoFlowEl.checked = false;
+                if (!flowPagoHabilitado && checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
                 _syncFlowSimUi();
                 renderCategoriasMenu();
                 renderSecciones();
@@ -23807,7 +23805,7 @@
                 lat: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lat || 0) : null,
                 lng: entregaCheckout === "despacho" ? Number(checkoutDireccionPin.lng || 0) : null,
                 shipping_quote: entregaCheckout === "despacho" ? (checkoutShippingQuote || null) : null,
-                metodo_pago: "transferencia",
+                metodo_pago: metodoPagoActual,
                 codigo_pedido: _ensureCheckoutOperacionId(),
             };
             if (metodoPagoActual === "flow" && flowSimAdminEnabled && checkoutFlowSimStatusEl) {
@@ -24131,7 +24129,7 @@
                 if (!flow) {
                     if (cookieFlow === "paid" || cookieFlow === "pending" || cookieFlow === "error") {
                         const check = await _esperarEstadoFlowFinal(cookieVenta || fallbackVentaId || 0, 8, 1200);
-                        if (check.ok || cookieFlow === "paid") {
+                        if (check.ok) {
                             if (check?.backup && !draft) {
                                 ultimoComprobantePedido = { ...(ultimoComprobantePedido || {}), ...check.backup };
                                 guardarUltimoPedidoLocal();
