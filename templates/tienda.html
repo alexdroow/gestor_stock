@@ -3599,8 +3599,9 @@
             border-radius: 0;
             border: 0;
             box-shadow: none;
-            padding: max(12px, env(safe-area-inset-top)) 14px calc(132px + env(safe-area-inset-bottom));
+            padding: max(12px, env(safe-area-inset-top)) 14px calc(220px + env(safe-area-inset-bottom));
             overflow: auto;
+            scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom));
             background: linear-gradient(180deg, #fffaf4 0%, #fff 38%, #fff7ed 100%);
             color: #431407;
             gap: 14px;
@@ -3815,6 +3816,17 @@
         body.mobile-ui .checkout-mobile-payment-option small {
             display: block;
         }
+        body.mobile-ui .checkout-mobile-payment-saving {
+            display: inline-flex;
+            width: max-content;
+            margin-top: 4px;
+            padding: 3px 7px;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #166534;
+            font-size: .72rem;
+            font-weight: 900;
+        }
         body.mobile-ui .checkout-mobile-payment-option small {
             margin-top: 2px;
             color: #78665c;
@@ -3875,9 +3887,8 @@
             left: 0;
             right: 0;
             bottom: 0;
-            z-index: 2;
-            background: rgba(255,255,255,.96);
-            backdrop-filter: blur(12px);
+            z-index: 30;
+            background: #fff;
             border-top: 1px solid #fed7aa;
             padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
             display: grid;
@@ -16940,6 +16951,7 @@
         const MOBILE_OFFER_SESSION_KEY = "sucree_mobile_offer_seen";
         let flowPagoHabilitado = false;
         let flowSimAdminEnabled = false;
+        let checkoutMetodoPagoMovil = "transferencia";
         let tiendaAdminMode = false;
         let adminBindingsReady = false;
         let adminLongPressTimer = null;
@@ -18482,6 +18494,9 @@
         }
 
         function _metodoPagoCheckoutActual() {
+            if (document.body.classList.contains("mobile-ui") && flowPagoHabilitado && checkoutMetodoPagoMovil === "flow") {
+                return "flow";
+            }
             const checked = document.querySelector('input[name="checkout-metodo-pago"]:checked');
             const val = String(checked?.value || "").trim().toLowerCase();
             if (flowPagoHabilitado && val === "flow") return "flow";
@@ -23621,6 +23636,7 @@
                 : checkoutPagoTransferenciaEl;
             if (!control) return;
             // El selector visual movil gobierna el mismo radio usado por el checkout.
+            checkoutMetodoPagoMovil = (metodo === "flow" && flowPagoHabilitado) ? "flow" : "transferencia";
             control.checked = true;
             control.dispatchEvent(new Event("change", { bubbles: true }));
             if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
@@ -23633,6 +23649,9 @@
         function _renderResumenCheckoutMobile(norm, metodoPrecio) {
             if (!modalCheckoutClienteEl || !modalCheckoutDetalleEl) return;
             const totals = _checkoutCalcularTotales();
+            const transferSaving = flowPagoHabilitado
+                ? String(checkoutTransferBenefitEl?.textContent || "").trim()
+                : "";
             const totalProductos = carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0);
             const itemsHtml = carrito.map((it) => {
                 const prod = productos.find((p) => Number(p.id || 0) === Number(it.id || 0)) || {};
@@ -23703,13 +23722,13 @@
                         <span class="left"><span class="checkout-mobile-card-ico">${_checkoutIcon("bank", 22)}</span><span>Metodo de pago</span></span>
                     </div>
                     <div class="checkout-mobile-payment-options">
-                        <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "transferencia" ? "active" : ""}" data-mobile-payment="transferencia" onclick="window.seleccionarMetodoPagoMovil('transferencia')" aria-pressed="${metodoPrecio === "transferencia"}">
+                        <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "transferencia" ? "active" : ""}" data-mobile-payment="transferencia" onpointerdown="window.seleccionarMetodoPagoMovil('transferencia')" onclick="window.seleccionarMetodoPagoMovil('transferencia')" aria-pressed="${metodoPrecio === "transferencia"}">
                             <span class="checkout-mobile-payment-icon">${_checkoutIcon("bank", 22)}</span>
-                            <span><strong>Transferencia</strong><small>Transfiere despues de enviar el pedido.</small></span>
+                            <span><strong>Transferencia</strong><small>Transfiere despues de enviar el pedido.</small>${transferSaving ? `<em class="checkout-mobile-payment-saving">${esc(transferSaving)}</em>` : ""}</span>
                             <span class="checkout-mobile-payment-radio"></span>
                         </button>
                         ${flowPagoHabilitado ? `
-                            <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "flow" ? "active" : ""}" data-mobile-payment="flow" onclick="window.seleccionarMetodoPagoMovil('flow')" aria-pressed="${metodoPrecio === "flow"}">
+                            <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "flow" ? "active" : ""}" data-mobile-payment="flow" onpointerdown="window.seleccionarMetodoPagoMovil('flow')" onclick="window.seleccionarMetodoPagoMovil('flow')" aria-pressed="${metodoPrecio === "flow"}">
                                 <span class="checkout-mobile-payment-icon">${_checkoutIcon("card", 22)}</span>
                                 <span><strong>Pagar con Flow</strong><small>Tarjetas y medios de pago online seguros.</small></span>
                                 <span class="checkout-mobile-payment-radio"></span>
@@ -23741,6 +23760,7 @@
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             checkoutClientePendiente = norm.value;
             checkoutEntregaTipo = "retiro";
+            checkoutMetodoPagoMovil = "transferencia";
             checkoutHoraResumenOpenedAt = new Date();
             checkoutHoraManualActiva = false;
             checkoutShippingQuote = null;
