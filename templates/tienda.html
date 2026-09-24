@@ -18603,6 +18603,7 @@
             _sincronizarPreciosCarritoMetodo();
             _syncFlowSimUi();
             renderCart();
+            _actualizarImportesCarritoMovil(metodo);
             if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
                 _renderResumenCheckoutMobile(checkoutClientePendiente || {}, metodo);
                 _actualizarImportesCheckoutMovil(metodo);
@@ -18610,6 +18611,7 @@
             // Un segundo pase cubre renders diferidos del modal en navegadores moviles.
             requestAnimationFrame(() => {
                 _sincronizarVistaMetodoPago();
+                _actualizarImportesCarritoMovil(metodo);
                 _actualizarImportesCheckoutMovil(metodo);
             });
             _renderTotalesResumenCheckout();
@@ -23605,6 +23607,30 @@
             if (descEl) descEl.textContent = `-${money.format(descuento)}`;
             if (totalEl) totalEl.textContent = money.format(total);
             if (mobileTotalEl) mobileTotalEl.textContent = money.format(total);
+        }
+
+        function _actualizarImportesCarritoMovil(metodoRaw) {
+            const metodo = String(metodoRaw || "transferencia").toLowerCase() === "flow" ? "flow" : "transferencia";
+            const subtotal = carrito.reduce((acc, item) => {
+                return acc + (Number(item.cantidad || 0) * _precioUnitarioItemPorMetodo(item, metodo));
+            }, 0);
+            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
+            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
+            const total = Math.max(0, subtotal - descuento);
+            const rows = mobileCartListEl?.querySelectorAll(".cart-item") || [];
+            rows.forEach((row, index) => {
+                const item = carrito[index];
+                if (!item) return;
+                const price = _precioUnitarioItemPorMetodo(item, metodo);
+                const values = row.querySelectorAll(".cart-item-row > span");
+                if (values[0]) values[0].textContent = money.format(price);
+                if (values[1]) values[1].textContent = money.format(Number(item.cantidad || 0) * price);
+            });
+            if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(subtotal);
+            if (mobileDescuentoMontoEl) mobileDescuentoMontoEl.textContent = `-${money.format(descuento)}`;
+            if (mobileTotalEl) mobileTotalEl.textContent = money.format(total);
+            if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(total);
         }
 
         function _resetCheckoutShippingQuote() {
