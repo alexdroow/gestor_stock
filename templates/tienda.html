@@ -3774,6 +3774,9 @@
         body.mobile-ui .checkout-mobile-payment-options {
             display: grid;
             gap: 9px;
+            position: relative;
+            z-index: 4;
+            pointer-events: auto !important;
         }
         body.mobile-ui .checkout-mobile-payment-option {
             width: 100%;
@@ -3788,6 +3791,11 @@
             background: #fff;
             color: #431407;
             text-align: left;
+            position: relative;
+            z-index: 4;
+            cursor: pointer;
+            touch-action: manipulation;
+            pointer-events: auto !important;
         }
         body.mobile-ui .checkout-mobile-payment-option.active {
             border-color: #f97316;
@@ -23700,12 +23708,11 @@
             modalCheckoutDetalleEl.querySelectorAll("[data-mobile-payment]").forEach((btn) => {
                 btn.addEventListener("click", () => {
                     const metodo = String(btn.dataset.mobilePayment || "transferencia").toLowerCase();
-                    if (metodo === "flow" && flowPagoHabilitado && checkoutPagoFlowEl) {
-                        checkoutPagoFlowEl.checked = true;
-                    } else if (checkoutPagoTransferenciaEl) {
-                        checkoutPagoTransferenciaEl.checked = true;
-                    }
-                    _syncFlowSimUi();
+                    const control = (metodo === "flow" && flowPagoHabilitado)
+                        ? checkoutPagoFlowEl
+                        : checkoutPagoTransferenciaEl;
+                    // Reutiliza el evento original para mantener importes y estado sincronizados.
+                    if (control) control.click();
                     _renderResumenCheckoutMobile(checkoutClientePendiente || norm.value, _metodoPagoCheckoutActual());
                     _renderTotalesResumenCheckout();
                 });
