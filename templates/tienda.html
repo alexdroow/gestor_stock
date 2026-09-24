@@ -18559,14 +18559,20 @@
             return (flowPagoHabilitado && selectedCheckoutPaymentMethod === "flow") ? "flow" : "transferencia";
         }
 
+        function _precioBaseItemCarrito(item) {
+            const productId = Number(item?.id || item?.producto_id || 0);
+            const productoActual = productos.find((p) => Number(p?.id || 0) === productId);
+            const precioCatalogo = Number(productoActual?.precio_final);
+            // The server prices checkout from the current catalog, never from a cached cart amount.
+            if (Number.isFinite(precioCatalogo) && precioCatalogo >= 0) return precioCatalogo;
+            return Math.max(0, Number(item?.precio_base_unitario ?? item?.precio_unitario ?? 0));
+        }
+
         function _sincronizarPreciosCarritoMetodo() {
             const metodo = _metodoPagoCheckoutActual();
             carrito.forEach((item) => {
-                // Preserve the original price before replacing the displayed Flow price.
-                const precioBase = Number(item?.precio_base_unitario);
-                if (!Number.isFinite(precioBase) || precioBase < 0) {
-                    item.precio_base_unitario = Math.max(0, Number(item?.precio_unitario || 0));
-                }
+                // Keep cart prices aligned with the same catalog price validated by the server.
+                item.precio_base_unitario = _precioBaseItemCarrito(item);
                 item.precio_flow_unitario = _flowPriceFromBase(item.precio_base_unitario);
                 item.precio_unitario = _precioUnitarioItemPorMetodo(item, metodo);
             });
@@ -18621,7 +18627,7 @@
 
         function _precioUnitarioItemPorMetodo(it, metodoPago) {
             const metodo = String(metodoPago || "transferencia").toLowerCase();
-            const base = Math.max(0, Number(it?.precio_base_unitario ?? it?.precio_unitario ?? 0));
+            const base = _precioBaseItemCarrito(it);
             if (metodo === "flow" && flowPagoHabilitado) {
                 // Flow price is derived live; a persisted cart may contain an obsolete cache.
                 return _flowPriceFromBase(base);
