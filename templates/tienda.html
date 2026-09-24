@@ -3771,6 +3771,62 @@
             color: #431407;
             white-space: nowrap;
         }
+        body.mobile-ui .checkout-mobile-payment-options {
+            display: grid;
+            gap: 9px;
+        }
+        body.mobile-ui .checkout-mobile-payment-option {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 42px 1fr 22px;
+            align-items: center;
+            gap: 10px;
+            min-height: 66px;
+            padding: 10px;
+            border: 1px solid #fed7aa;
+            border-radius: 14px;
+            background: #fff;
+            color: #431407;
+            text-align: left;
+        }
+        body.mobile-ui .checkout-mobile-payment-option.active {
+            border-color: #f97316;
+            background: #fff7ed;
+            box-shadow: inset 0 0 0 1px #f97316;
+        }
+        body.mobile-ui .checkout-mobile-payment-icon {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            color: #9a3412;
+            background: #ffedd5;
+        }
+        body.mobile-ui .checkout-mobile-payment-option strong,
+        body.mobile-ui .checkout-mobile-payment-option small {
+            display: block;
+        }
+        body.mobile-ui .checkout-mobile-payment-option small {
+            margin-top: 2px;
+            color: #78665c;
+            font-size: .8rem;
+            line-height: 1.25;
+        }
+        body.mobile-ui .checkout-mobile-payment-radio {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fdba74;
+            border-radius: 50%;
+            position: relative;
+        }
+        body.mobile-ui .checkout-mobile-payment-option.active .checkout-mobile-payment-radio::after {
+            content: "";
+            position: absolute;
+            inset: 4px;
+            border-radius: 50%;
+            background: #f97316;
+        }
         body.mobile-ui .checkout-delivery-wrap {
             border-color: #fed7aa;
             background: #fff;
@@ -23580,7 +23636,7 @@
                 <div class="checkout-mobile-steps" aria-label="Paso 1 de 2">
                     <div class="checkout-mobile-step active"><span>1</span><strong>Resumen</strong></div>
                     <div class="checkout-mobile-divider"></div>
-                    <div class="checkout-mobile-step"><span>2</span><strong>Transferencia</strong></div>
+                    <div class="checkout-mobile-step"><span>2</span><strong>Pago</strong></div>
                 </div>
                 <div class="checkout-mobile-heading">
                     <h3>Revisa tu pedido</h3>
@@ -23618,10 +23674,51 @@
                         <div class="checkout-ticket-total final"><span>Total</span><strong id="checkout-ticket-total">${money.format(totals.total)}</strong></div>
                     </div>
                 </section>
+                <section class="checkout-mobile-card">
+                    <div class="checkout-mobile-card-title">
+                        <span class="left"><span class="checkout-mobile-card-ico">${_checkoutIcon("bank", 22)}</span><span>Metodo de pago</span></span>
+                    </div>
+                    <div class="checkout-mobile-payment-options">
+                        <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "transferencia" ? "active" : ""}" data-mobile-payment="transferencia" aria-pressed="${metodoPrecio === "transferencia"}">
+                            <span class="checkout-mobile-payment-icon">${_checkoutIcon("bank", 22)}</span>
+                            <span><strong>Transferencia</strong><small>Transfiere despues de enviar el pedido.</small></span>
+                            <span class="checkout-mobile-payment-radio"></span>
+                        </button>
+                        ${flowPagoHabilitado ? `
+                            <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "flow" ? "active" : ""}" data-mobile-payment="flow" aria-pressed="${metodoPrecio === "flow"}">
+                                <span class="checkout-mobile-payment-icon">${_checkoutIcon("card", 22)}</span>
+                                <span><strong>Pagar con Flow</strong><small>Tarjetas y medios de pago online seguros.</small></span>
+                                <span class="checkout-mobile-payment-radio"></span>
+                            </button>
+                        ` : ""}
+                    </div>
+                </section>
             `;
             modalCheckoutClienteEl.querySelector("[data-checkout-back]")?.addEventListener("click", _volverAlCarritoDesdeResumen);
             modalCheckoutClienteEl.querySelector("[data-edit-customer]")?.addEventListener("click", _abrirEditarDatosCheckout);
             modalCheckoutDetalleEl.querySelector("[data-edit-cart]")?.addEventListener("click", _volverAlCarritoDesdeResumen);
+            modalCheckoutDetalleEl.querySelectorAll("[data-mobile-payment]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const metodo = String(btn.dataset.mobilePayment || "transferencia").toLowerCase();
+                    if (metodo === "flow" && flowPagoHabilitado && checkoutPagoFlowEl) {
+                        checkoutPagoFlowEl.checked = true;
+                    } else if (checkoutPagoTransferenciaEl) {
+                        checkoutPagoTransferenciaEl.checked = true;
+                    }
+                    _syncFlowSimUi();
+                    _renderResumenCheckoutMobile(checkoutClientePendiente || norm.value, _metodoPagoCheckoutActual());
+                    _renderTotalesResumenCheckout();
+                });
+            });
+            const btnConfirm = document.getElementById("modal-checkout-confirm");
+            const note = document.querySelector(".checkout-mobile-bottom-note");
+            if (metodoPrecio === "flow") {
+                if (btnConfirm) btnConfirm.textContent = "Ir a pagar con Flow";
+                if (note) note.textContent = "Seras redirigido a Flow para pagar de forma segura. Confirmaremos el pedido solo cuando Flow apruebe el pago.";
+            } else {
+                if (btnConfirm) btnConfirm.textContent = "Confirmar compra";
+                if (note) note.textContent = "Al confirmar, enviaremos tu pedido al local. Luego podras realizar la transferencia.";
+            }
         }
 
         function abrirModalCheckoutResumen(datosCliente) {
@@ -24300,6 +24397,7 @@
                 calendar: `<path ${common} d="M7 3v4M17 3v4M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/>`,
                 map: `<path ${common} d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z"/><path ${common} d="M12 10.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/>`,
                 bank: `<path ${common} d="M4 10h16M6 10v8M10 10v8M14 10v8M18 10v8M4 18h16M3 21h18M12 3l8 4H4l8-4Z"/>`,
+                card: `<rect ${common} x="3" y="5" width="18" height="14" rx="2"/><path ${common} d="M3 10h18M7 15h3"/>`,
                 copy: `<path ${common} d="M9 9h10v10H9z"/><path ${common} d="M5 15H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/>`,
                 info: `<path ${common} d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"/><path ${common} d="M12 10v7M12 7h.01"/>`,
                 check: `<path ${common} d="m5 12 4 4L19 6"/>`,
