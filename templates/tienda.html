@@ -17011,7 +17011,8 @@
         const MOBILE_OFFER_SESSION_KEY = "sucree_mobile_offer_seen";
         let flowPagoHabilitado = false;
         let flowSimAdminEnabled = false;
-        let checkoutMetodoPagoMovil = "transferencia";
+        // Fuente unica de verdad para radios, tarjetas, precios y checkout.
+        let selectedCheckoutPaymentMethod = "transferencia";
         let checkoutMetodoPagoMovilAnimando = "";
         let tiendaAdminMode = false;
         let adminBindingsReady = false;
@@ -18555,13 +18556,31 @@
         }
 
         function _metodoPagoCheckoutActual() {
-            if (document.body.classList.contains("mobile-ui") && flowPagoHabilitado && checkoutMetodoPagoMovil === "flow") {
-                return "flow";
+            return (flowPagoHabilitado && selectedCheckoutPaymentMethod === "flow") ? "flow" : "transferencia";
+        }
+
+        function _sincronizarPreciosCarritoMetodo() {
+            const metodo = _metodoPagoCheckoutActual();
+            carrito.forEach((item) => {
+                item.precio_unitario = _precioUnitarioItemPorMetodo(item, metodo);
+            });
+        }
+
+        function seleccionarMetodoPagoCheckout(metodoRaw, options = {}) {
+            const metodo = (String(metodoRaw || "transferencia").trim().toLowerCase() === "flow" && flowPagoHabilitado)
+                ? "flow"
+                : "transferencia";
+            if (selectedCheckoutPaymentMethod === metodo && !options.force) return;
+            selectedCheckoutPaymentMethod = metodo;
+            if (checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = metodo === "transferencia";
+            if (checkoutPagoFlowEl) checkoutPagoFlowEl.checked = metodo === "flow";
+            _sincronizarPreciosCarritoMetodo();
+            _syncFlowSimUi();
+            renderCart();
+            if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
+                _renderResumenCheckoutMobile(checkoutClientePendiente || {}, metodo);
             }
-            const checked = document.querySelector('input[name="checkout-metodo-pago"]:checked');
-            const val = String(checked?.value || "").trim().toLowerCase();
-            if (flowPagoHabilitado && val === "flow") return "flow";
-            return "transferencia";
+            _renderTotalesResumenCheckout();
         }
 
         function _syncFlowSimUi() {
@@ -22807,9 +22826,8 @@
                 };
                 _refreshTransferBenefitBadge();
                 if (checkoutPagoFlowRowEl) checkoutPagoFlowRowEl.style.display = flowPagoHabilitado ? "" : "none";
-                if (!flowPagoHabilitado && checkoutPagoFlowEl) checkoutPagoFlowEl.checked = false;
-                if (!flowPagoHabilitado && checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
-                _syncFlowSimUi();
+                if (!flowPagoHabilitado) selectedCheckoutPaymentMethod = "transferencia";
+                seleccionarMetodoPagoCheckout(selectedCheckoutPaymentMethod, { force: true });
                 renderCategoriasMenu();
                 renderSecciones();
                 _renderAgendaPastelResumen();
@@ -23692,19 +23710,8 @@
 
         function seleccionarMetodoPagoMovil(metodoRaw) {
             const metodo = String(metodoRaw || "transferencia").trim().toLowerCase();
-            const control = (metodo === "flow" && flowPagoHabilitado)
-                ? checkoutPagoFlowEl
-                : checkoutPagoTransferenciaEl;
-            if (!control) return;
-            // El selector visual movil gobierna el mismo radio usado por el checkout.
-            checkoutMetodoPagoMovil = (metodo === "flow" && flowPagoHabilitado) ? "flow" : "transferencia";
-            checkoutMetodoPagoMovilAnimando = checkoutMetodoPagoMovil;
-            control.checked = true;
-            control.dispatchEvent(new Event("change", { bubbles: true }));
-            if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
-                _renderResumenCheckoutMobile(checkoutClientePendiente || {}, _metodoPagoCheckoutActual());
-                _renderTotalesResumenCheckout();
-            }
+            checkoutMetodoPagoMovilAnimando = (metodo === "flow" && flowPagoHabilitado) ? "flow" : "transferencia";
+            seleccionarMetodoPagoCheckout(checkoutMetodoPagoMovilAnimando, { force: true });
         }
         window.seleccionarMetodoPagoMovil = seleccionarMetodoPagoMovil;
 
@@ -23830,7 +23837,7 @@
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             checkoutClientePendiente = norm.value;
             checkoutEntregaTipo = "retiro";
-            checkoutMetodoPagoMovil = "transferencia";
+            selectedCheckoutPaymentMethod = "transferencia";
             checkoutHoraResumenOpenedAt = new Date();
             checkoutHoraManualActiva = false;
             checkoutShippingQuote = null;
@@ -23845,9 +23852,7 @@
             if (checkoutDireccionBuscarEl) {
                 checkoutDireccionBuscarEl.value = String(clienteRegistrado?.direccion_default || "").trim();
             }
-            if (checkoutPagoFlowEl) checkoutPagoFlowEl.checked = false;
-            if (checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = true;
-            _syncFlowSimUi();
+            seleccionarMetodoPagoCheckout("transferencia", { force: true });
             const metodoPrecio = _metodoPagoCheckoutActual();
             modalCheckoutResumenEl.classList.toggle("mobile-checkout-redesign", document.body.classList.contains("mobile-ui"));
             if (document.body.classList.contains("mobile-ui")) {
@@ -25622,12 +25627,10 @@
         checkoutEntregaRetiroEl?.addEventListener("click", () => _setCheckoutEntregaTipo("retiro"));
         checkoutEntregaDespachoEl?.addEventListener("click", () => _setCheckoutEntregaTipo("despacho"));
         checkoutPagoTransferenciaEl?.addEventListener("change", () => {
-            _syncFlowSimUi();
-            _renderTotalesResumenCheckout();
+            if (checkoutPagoTransferenciaEl.checked) seleccionarMetodoPagoCheckout("transferencia");
         });
         checkoutPagoFlowEl?.addEventListener("change", () => {
-            _syncFlowSimUi();
-            _renderTotalesResumenCheckout();
+            if (checkoutPagoFlowEl.checked) seleccionarMetodoPagoCheckout("flow");
         });
         checkoutHoraRetiroEl?.addEventListener("change", async () => {
             _actualizarAyudaHoraCheckout();
