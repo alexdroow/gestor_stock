@@ -23614,6 +23614,22 @@
             if (document.body.classList.contains("mobile-ui")) abrirCarritoMobile();
         }
 
+        function seleccionarMetodoPagoMovil(metodoRaw) {
+            const metodo = String(metodoRaw || "transferencia").trim().toLowerCase();
+            const control = (metodo === "flow" && flowPagoHabilitado)
+                ? checkoutPagoFlowEl
+                : checkoutPagoTransferenciaEl;
+            if (!control) return;
+            // El selector visual movil gobierna el mismo radio usado por el checkout.
+            control.checked = true;
+            control.dispatchEvent(new Event("change", { bubbles: true }));
+            if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
+                _renderResumenCheckoutMobile(checkoutClientePendiente || {}, _metodoPagoCheckoutActual());
+                _renderTotalesResumenCheckout();
+            }
+        }
+        window.seleccionarMetodoPagoMovil = seleccionarMetodoPagoMovil;
+
         function _renderResumenCheckoutMobile(norm, metodoPrecio) {
             if (!modalCheckoutClienteEl || !modalCheckoutDetalleEl) return;
             const totals = _checkoutCalcularTotales();
@@ -23687,13 +23703,13 @@
                         <span class="left"><span class="checkout-mobile-card-ico">${_checkoutIcon("bank", 22)}</span><span>Metodo de pago</span></span>
                     </div>
                     <div class="checkout-mobile-payment-options">
-                        <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "transferencia" ? "active" : ""}" data-mobile-payment="transferencia" aria-pressed="${metodoPrecio === "transferencia"}">
+                        <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "transferencia" ? "active" : ""}" data-mobile-payment="transferencia" onclick="window.seleccionarMetodoPagoMovil('transferencia')" aria-pressed="${metodoPrecio === "transferencia"}">
                             <span class="checkout-mobile-payment-icon">${_checkoutIcon("bank", 22)}</span>
                             <span><strong>Transferencia</strong><small>Transfiere despues de enviar el pedido.</small></span>
                             <span class="checkout-mobile-payment-radio"></span>
                         </button>
                         ${flowPagoHabilitado ? `
-                            <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "flow" ? "active" : ""}" data-mobile-payment="flow" aria-pressed="${metodoPrecio === "flow"}">
+                            <button type="button" class="checkout-mobile-payment-option ${metodoPrecio === "flow" ? "active" : ""}" data-mobile-payment="flow" onclick="window.seleccionarMetodoPagoMovil('flow')" aria-pressed="${metodoPrecio === "flow"}">
                                 <span class="checkout-mobile-payment-icon">${_checkoutIcon("card", 22)}</span>
                                 <span><strong>Pagar con Flow</strong><small>Tarjetas y medios de pago online seguros.</small></span>
                                 <span class="checkout-mobile-payment-radio"></span>
@@ -23705,18 +23721,6 @@
             modalCheckoutClienteEl.querySelector("[data-checkout-back]")?.addEventListener("click", _volverAlCarritoDesdeResumen);
             modalCheckoutClienteEl.querySelector("[data-edit-customer]")?.addEventListener("click", _abrirEditarDatosCheckout);
             modalCheckoutDetalleEl.querySelector("[data-edit-cart]")?.addEventListener("click", _volverAlCarritoDesdeResumen);
-            modalCheckoutDetalleEl.querySelectorAll("[data-mobile-payment]").forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    const metodo = String(btn.dataset.mobilePayment || "transferencia").toLowerCase();
-                    const control = (metodo === "flow" && flowPagoHabilitado)
-                        ? checkoutPagoFlowEl
-                        : checkoutPagoTransferenciaEl;
-                    // Reutiliza el evento original para mantener importes y estado sincronizados.
-                    if (control) control.click();
-                    _renderResumenCheckoutMobile(checkoutClientePendiente || norm.value, _metodoPagoCheckoutActual());
-                    _renderTotalesResumenCheckout();
-                });
-            });
             const btnConfirm = document.getElementById("modal-checkout-confirm");
             const note = document.querySelector(".checkout-mobile-bottom-note");
             if (metodoPrecio === "flow") {
