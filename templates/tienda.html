@@ -18523,15 +18523,18 @@
             return String(p.categoria_tienda || "General").trim() || "General";
         }
 
-        function _flowPriceFromBase(baseAmount, applyFixed = false) {
+        function _precioFlowDesdeBase(baseAmount, applyFixed = false) {
             const base = Math.max(0, Number(baseAmount || 0));
-            if (!flowPagoHabilitado) return base;
-            const rate = Math.max(0, Number(paymentPricingCfg?.rate || 0));
-            const iva = Math.max(0, Number(paymentPricingCfg?.iva || 0));
+            const rate = Math.max(0, Number(paymentPricingCfg?.rate ?? 0.0319));
+            const iva = Math.max(0, Number(paymentPricingCfg?.iva ?? 0.19));
             const fixed = applyFixed ? Math.max(0, Number(paymentPricingCfg?.fixed || 0)) : 0;
             const factor = 1 - (rate * (1 + iva));
             if (!(factor > 0)) return base;
             return Math.max(0, Math.ceil((base + fixed) / factor));
+        }
+
+        function _flowPriceFromBase(baseAmount, applyFixed = false) {
+            return flowPagoHabilitado ? _precioFlowDesdeBase(baseAmount, applyFixed) : Math.max(0, Number(baseAmount || 0));
         }
 
         function _refreshTransferBenefitBadge() {
@@ -18628,9 +18631,9 @@
         function _precioUnitarioItemPorMetodo(it, metodoPago) {
             const metodo = String(metodoPago || "transferencia").toLowerCase();
             const base = _precioBaseItemCarrito(it);
-            if (metodo === "flow" && flowPagoHabilitado) {
-                // Flow price is derived live; a persisted cart may contain an obsolete cache.
-                return _flowPriceFromBase(base);
+            if (metodo === "flow") {
+                // The selected Flow method must always use the server's fee formula.
+                return _precioFlowDesdeBase(base);
             }
             return base;
         }
