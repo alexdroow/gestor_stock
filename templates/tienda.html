@@ -18559,7 +18559,8 @@
         }
 
         function _metodoPagoCheckoutActual() {
-            return (flowPagoHabilitado && selectedCheckoutPaymentMethod === "flow") ? "flow" : "transferencia";
+            // If the customer can see and selected Flow, prices must use Flow immediately.
+            return selectedCheckoutPaymentMethod === "flow" ? "flow" : "transferencia";
         }
 
         function _precioBaseItemCarrito(item) {
@@ -18593,9 +18594,9 @@
         }
 
         function seleccionarMetodoPagoCheckout(metodoRaw, options = {}) {
-            const metodo = (String(metodoRaw || "transferencia").trim().toLowerCase() === "flow" && flowPagoHabilitado)
-                ? "flow"
-                : "transferencia";
+            const solicitaFlow = String(metodoRaw || "transferencia").trim().toLowerCase() === "flow";
+            const flowVisible = Boolean(document.querySelector('[data-mobile-payment="flow"], #checkout-pago-flow'));
+            const metodo = solicitaFlow && (flowPagoHabilitado || flowVisible) ? "flow" : "transferencia";
             if (selectedCheckoutPaymentMethod === metodo && !options.force) return;
             selectedCheckoutPaymentMethod = metodo;
             _sincronizarVistaMetodoPago();
@@ -23768,7 +23769,8 @@
 
         function seleccionarMetodoPagoMovil(metodoRaw) {
             const metodo = String(metodoRaw || "transferencia").trim().toLowerCase();
-            checkoutMetodoPagoMovilAnimando = (metodo === "flow" && flowPagoHabilitado) ? "flow" : "transferencia";
+            const flowVisible = Boolean(document.querySelector('[data-mobile-payment="flow"]'));
+            checkoutMetodoPagoMovilAnimando = (metodo === "flow" && (flowPagoHabilitado || flowVisible)) ? "flow" : "transferencia";
             seleccionarMetodoPagoCheckout(checkoutMetodoPagoMovilAnimando, { force: true });
         }
         window.seleccionarMetodoPagoMovil = seleccionarMetodoPagoMovil;
