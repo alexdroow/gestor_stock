@@ -18566,20 +18566,32 @@
             });
         }
 
+        function _sincronizarVistaMetodoPago() {
+            const metodo = _metodoPagoCheckoutActual();
+            if (checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = metodo === "transferencia";
+            if (checkoutPagoFlowEl) checkoutPagoFlowEl.checked = metodo === "flow";
+            document.querySelectorAll("[data-mobile-payment]").forEach((card) => {
+                const activo = String(card.dataset.mobilePayment || "") === metodo;
+                card.classList.toggle("active", activo);
+                card.setAttribute("aria-pressed", String(activo));
+            });
+        }
+
         function seleccionarMetodoPagoCheckout(metodoRaw, options = {}) {
             const metodo = (String(metodoRaw || "transferencia").trim().toLowerCase() === "flow" && flowPagoHabilitado)
                 ? "flow"
                 : "transferencia";
             if (selectedCheckoutPaymentMethod === metodo && !options.force) return;
             selectedCheckoutPaymentMethod = metodo;
-            if (checkoutPagoTransferenciaEl) checkoutPagoTransferenciaEl.checked = metodo === "transferencia";
-            if (checkoutPagoFlowEl) checkoutPagoFlowEl.checked = metodo === "flow";
+            _sincronizarVistaMetodoPago();
             _sincronizarPreciosCarritoMetodo();
             _syncFlowSimUi();
             renderCart();
             if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
                 _renderResumenCheckoutMobile(checkoutClientePendiente || {}, metodo);
             }
+            // Un segundo pase cubre renders diferidos del modal en navegadores moviles.
+            requestAnimationFrame(_sincronizarVistaMetodoPago);
             _renderTotalesResumenCheckout();
         }
 
@@ -23717,6 +23729,8 @@
 
         function _renderResumenCheckoutMobile(norm, metodoPrecio) {
             if (!modalCheckoutClienteEl || !modalCheckoutDetalleEl) return;
+            // La tarjeta siempre se dibuja desde el estado canonico, nunca desde un argumento atrasado.
+            metodoPrecio = _metodoPagoCheckoutActual();
             const totals = _checkoutCalcularTotales();
             const transferSaving = flowPagoHabilitado
                 ? String(checkoutTransferBenefitEl?.textContent || "").trim()
@@ -23809,6 +23823,7 @@
             modalCheckoutClienteEl.querySelector("[data-checkout-back]")?.addEventListener("click", _volverAlCarritoDesdeResumen);
             modalCheckoutClienteEl.querySelector("[data-edit-customer]")?.addEventListener("click", _abrirEditarDatosCheckout);
             modalCheckoutDetalleEl.querySelector("[data-edit-cart]")?.addEventListener("click", _volverAlCarritoDesdeResumen);
+            _sincronizarVistaMetodoPago();
             const optionToAnimate = checkoutMetodoPagoMovilAnimando
                 ? modalCheckoutDetalleEl.querySelector(`[data-mobile-payment="${checkoutMetodoPagoMovilAnimando}"]`)
                 : null;
