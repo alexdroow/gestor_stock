@@ -18604,9 +18604,13 @@
             renderCart();
             if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
                 _renderResumenCheckoutMobile(checkoutClientePendiente || {}, metodo);
+                _actualizarImportesCheckoutMovil(metodo);
             }
             // Un segundo pase cubre renders diferidos del modal en navegadores moviles.
-            requestAnimationFrame(_sincronizarVistaMetodoPago);
+            requestAnimationFrame(() => {
+                _sincronizarVistaMetodoPago();
+                _actualizarImportesCheckoutMovil(metodo);
+            });
             _renderTotalesResumenCheckout();
         }
 
@@ -23576,6 +23580,32 @@
             if (mobileTotalEl) mobileTotalEl.textContent = money.format(totals.total);
         }
 
+        function _actualizarImportesCheckoutMovil(metodoRaw) {
+            if (!document.body.classList.contains("mobile-ui")) return;
+            const metodo = String(metodoRaw || "transferencia").toLowerCase() === "flow" ? "flow" : "transferencia";
+            const subtotal = carrito.reduce((acc, item) => {
+                return acc + (Number(item.cantidad || 0) * _precioUnitarioItemPorMetodo(item, metodo));
+            }, 0);
+            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
+            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
+            const despacho = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0)) : 0;
+            const total = Math.max(0, subtotal - descuento + despacho);
+            document.querySelectorAll("[data-checkout-mobile-item-total]").forEach((el) => {
+                const index = Number(el.dataset.checkoutMobileItemTotal);
+                const item = carrito[index];
+                if (item) el.textContent = money.format(Number(item.cantidad || 0) * _precioUnitarioItemPorMetodo(item, metodo));
+            });
+            const subEl = document.getElementById("checkout-ticket-subtotal");
+            const descEl = document.getElementById("checkout-ticket-descuento");
+            const totalEl = document.getElementById("checkout-ticket-total");
+            const mobileTotalEl = document.getElementById("checkout-mobile-total-bottom");
+            if (subEl) subEl.textContent = money.format(subtotal);
+            if (descEl) descEl.textContent = `-${money.format(descuento)}`;
+            if (totalEl) totalEl.textContent = money.format(total);
+            if (mobileTotalEl) mobileTotalEl.textContent = money.format(total);
+        }
+
         function _resetCheckoutShippingQuote() {
             checkoutShippingQuote = null;
             checkoutShippingError = "";
@@ -23752,7 +23782,7 @@
                 ? String(checkoutTransferBenefitEl?.textContent || "").trim()
                 : "";
             const totalProductos = carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0);
-            const itemsHtml = carrito.map((it) => {
+            const itemsHtml = carrito.map((it, index) => {
                 const prod = productos.find((p) => Number(p.id || 0) === Number(it.id || 0)) || {};
                 const img = _productoImgSrc(prod);
                 const subtotal = Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPrecio);
@@ -23765,7 +23795,7 @@
                             <div class="checkout-mobile-muted">${pack ? esc(pack) : esc(String(prod.descripcion_tienda || prod.categoria_tienda || "").trim() || "Producto de tienda")}</div>
                             <div class="checkout-mobile-muted">Cant. ${Number(it.cantidad || 0)}</div>
                         </div>
-                        <div class="checkout-mobile-item-price">${money.format(subtotal)}</div>
+                        <div class="checkout-mobile-item-price" data-checkout-mobile-item-total="${index}">${money.format(subtotal)}</div>
                     </div>
                 `;
             }).join("");
