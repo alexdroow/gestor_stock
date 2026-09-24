@@ -18562,6 +18562,12 @@
         function _sincronizarPreciosCarritoMetodo() {
             const metodo = _metodoPagoCheckoutActual();
             carrito.forEach((item) => {
+                // Preserve the original price before replacing the displayed Flow price.
+                const precioBase = Number(item?.precio_base_unitario);
+                if (!Number.isFinite(precioBase) || precioBase < 0) {
+                    item.precio_base_unitario = Math.max(0, Number(item?.precio_unitario || 0));
+                }
+                item.precio_flow_unitario = _flowPriceFromBase(item.precio_base_unitario);
                 item.precio_unitario = _precioUnitarioItemPorMetodo(item, metodo);
             });
         }
@@ -18617,7 +18623,8 @@
             const metodo = String(metodoPago || "transferencia").toLowerCase();
             const base = Math.max(0, Number(it?.precio_base_unitario ?? it?.precio_unitario ?? 0));
             if (metodo === "flow" && flowPagoHabilitado) {
-                return Math.max(0, Number(it?.precio_flow_unitario ?? _flowPriceFromBase(base)));
+                // Flow price is derived live; a persisted cart may contain an obsolete cache.
+                return _flowPriceFromBase(base);
             }
             return base;
         }
