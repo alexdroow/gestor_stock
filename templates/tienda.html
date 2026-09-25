@@ -17012,7 +17012,9 @@
         let flowPagoHabilitado = false;
         let flowSimAdminEnabled = false;
         // Fuente unica de verdad para radios, tarjetas, precios y checkout.
-        let selectedCheckoutPaymentMethod = "transferencia";
+        // El precio publicado incluye la comision de Flow. Transferencia es un beneficio
+        // que se aplica despues como descuento, nunca como el precio de referencia.
+        let selectedCheckoutPaymentMethod = "flow";
         let checkoutMetodoPagoMovilAnimando = "";
         let tiendaAdminMode = false;
         let adminBindingsReady = false;
@@ -18651,19 +18653,34 @@
             return base;
         }
 
+        function _precioPublicoItemCarrito(item) {
+            const base = _precioBaseItemCarrito(item);
+            return flowPagoHabilitado ? _flowPriceFromBase(base) : base;
+        }
+
         // Fuente unica de los importes: el carrito, el resumen movil y el checkout
         // muestran siempre el mismo precio segun el metodo que acaba de elegir el cliente.
         function _calcularResumenCarritoPorMetodo(metodoRaw = _metodoPagoCheckoutActual(), incluirDespacho = false) {
             const metodo = String(metodoRaw || "transferencia").toLowerCase() === "flow" ? "flow" : "transferencia";
             const lineas = carrito.map((item) => {
                 const cantidad = Math.max(0, Number(item?.cantidad || 0));
-                const precioUnitario = _precioUnitarioItemPorMetodo(item, metodo);
-                return { cantidad, precioUnitario, total: cantidad * precioUnitario };
+                const precioVisible = _precioPublicoItemCarrito(item);
+                const precioCobro = _precioUnitarioItemPorMetodo(item, metodo);
+                return {
+                    cantidad,
+                    precioVisible,
+                    precioCobro,
+                    totalVisible: cantidad * precioVisible,
+                    descuentoTransferencia: Math.max(0, cantidad * (precioVisible - precioCobro)),
+                };
             });
-            const subtotal = lineas.reduce((acc, linea) => acc + linea.total, 0);
+            const subtotal = lineas.reduce((acc, linea) => acc + linea.totalVisible, 0);
+            const descuentoTransferencia = metodo === "transferencia"
+                ? lineas.reduce((acc, linea) => acc + linea.descuentoTransferencia, 0)
+                : 0;
             const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
-            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
+            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoTransferencia - descuentoCupon));
+            const descuento = Math.max(0, descuentoTransferencia + descuentoCupon + descuentoNivel);
             const despacho = incluirDespacho && _checkoutShippingVisible()
                 ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0))
                 : 0;
@@ -18671,6 +18688,7 @@
                 metodo,
                 lineas,
                 subtotal,
+                descuentoTransferencia,
                 descuento,
                 despacho,
                 total: Math.max(0, subtotal - descuento + despacho),
@@ -22333,7 +22351,7 @@
                 const linea = resumen.lineas[index];
                 return `
                 <div class="cart-item">
-                    <div class="cart-item-row"><strong>${esc(it.nombre)}</strong><span data-cart-item-unit="${index}">${money.format(linea.precioUnitario)}</span></div>
+                    <div class="cart-item-row"><strong>${esc(it.nombre)}</strong><span data-cart-item-unit="${index}">${money.format(linea.precioVisible)}</span></div>
                     ${it.pack_resumen ? `<div style="font-size:.78rem;color:#334155;margin:2px 0 6px 0;">${esc(it.pack_resumen)}</div>` : ""}
                     <div class="cart-item-row">
                         <div class="qty-wrap">
@@ -22343,7 +22361,7 @@
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;">
                             ${it.pack_resumen ? `<button class="qty-btn" type="button" title="Editar subitems del pack" onclick="editarPackEnCarrito(${it.id})">...</button>` : ""}
-                            <span data-cart-item-line="${index}">${money.format(linea.total)}</span>
+                            <span data-cart-item-line="${index}">${money.format(linea.totalVisible)}</span>
                         </div>
                     </div>
                 </div>
@@ -23617,7 +23635,7 @@
             document.querySelectorAll("[data-checkout-mobile-item-total]").forEach((el) => {
                 const index = Number(el.dataset.checkoutMobileItemTotal);
                 const linea = resumen.lineas[index];
-                if (linea) el.textContent = money.format(linea.total);
+                if (linea) el.textContent = money.format(linea.totalVisible);
             });
             const subEl = document.getElementById("checkout-ticket-subtotal");
             const descEl = document.getElementById("checkout-ticket-descuento");
@@ -23638,8 +23656,8 @@
                 if (!linea) return;
                 const unitEl = row.querySelector(`[data-cart-item-unit="${index}"]`);
                 const lineEl = row.querySelector(`[data-cart-item-line="${index}"]`);
-                if (unitEl) unitEl.textContent = money.format(linea.precioUnitario);
-                if (lineEl) lineEl.textContent = money.format(linea.total);
+                if (unitEl) unitEl.textContent = money.format(linea.precioVisible);
+                if (lineEl) lineEl.textContent = money.format(linea.totalVisible);
             });
             if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(resumen.subtotal);
             if (mobileDescuentoMontoEl) mobileDescuentoMontoEl.textContent = `-${money.format(resumen.descuento)}`;
@@ -23821,6 +23839,8 @@
             metodoPrecio = _metodoPagoCheckoutActual();
             const cliente = norm?.value || norm || {};
             const totals = _checkoutCalcularTotales();
+            const resumen = _calcularResumenCarritoPorMetodo(metodoPrecio, true);
+            const descuentoLabel = totals.descuentoTransferencia > 0 ? "Descuento transferencia" : "Descuento";
             const transferSaving = flowPagoHabilitado
                 ? String(checkoutTransferBenefitEl?.textContent || "").trim()
                 : "";
@@ -23828,7 +23848,7 @@
             const itemsHtml = carrito.map((it, index) => {
                 const prod = productos.find((p) => Number(p.id || 0) === Number(it.id || 0)) || {};
                 const img = _productoImgSrc(prod);
-                const subtotal = Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPrecio);
+                const subtotal = Number(resumen.lineas[index]?.totalVisible || 0);
                 const pack = String(it.pack_resumen || "").trim();
                 return `
                     <div class="checkout-mobile-item">
@@ -23884,7 +23904,7 @@
                     </div>
                     <div class="checkout-ticket-totals">
                         <div class="checkout-ticket-total"><span>Subtotal</span><strong id="checkout-ticket-subtotal">${money.format(totals.subtotal)}</strong></div>
-                        <div class="checkout-ticket-total discount"><span>Descuento</span><strong id="checkout-ticket-descuento">-${money.format(totals.descuento)}</strong></div>
+                        <div class="checkout-ticket-total discount"><span>${descuentoLabel}</span><strong id="checkout-ticket-descuento">-${money.format(totals.descuento)}</strong></div>
                         <div class="checkout-ticket-total" id="checkout-ticket-despacho-row" style="${checkoutEntregaTipo === "despacho" ? "" : "display:none;"}"><span>Despacho</span><strong id="checkout-ticket-despacho">${money.format(totals.despacho)}</strong></div>
                         <div class="checkout-ticket-total final"><span>Total</span><strong id="checkout-ticket-total">${money.format(totals.total)}</strong></div>
                     </div>
@@ -23941,7 +23961,8 @@
             if (!norm.ok) return msg(norm.error || "Datos de cliente invalidos.", true);
             checkoutClientePendiente = norm.value;
             checkoutEntregaTipo = "retiro";
-            selectedCheckoutPaymentMethod = "transferencia";
+            const metodoInicial = flowPagoHabilitado ? "flow" : "transferencia";
+            selectedCheckoutPaymentMethod = metodoInicial;
             checkoutHoraResumenOpenedAt = new Date();
             checkoutHoraManualActiva = false;
             checkoutShippingQuote = null;
@@ -23956,21 +23977,23 @@
             if (checkoutDireccionBuscarEl) {
                 checkoutDireccionBuscarEl.value = String(clienteRegistrado?.direccion_default || "").trim();
             }
-            seleccionarMetodoPagoCheckout("transferencia", { force: true });
+            seleccionarMetodoPagoCheckout(metodoInicial, { force: true });
             const metodoPrecio = _metodoPagoCheckoutActual();
             modalCheckoutResumenEl.classList.toggle("mobile-checkout-redesign", document.body.classList.contains("mobile-ui"));
             if (document.body.classList.contains("mobile-ui")) {
                 _renderResumenCheckoutMobile(norm, metodoPrecio);
             } else {
-            const items = carrito.map((it) => ({
+            const resumenCheckout = _checkoutCalcularTotales();
+            const items = carrito.map((it, index) => ({
                 nombre: String(it.nombre || ""),
                 cantidad: Number(it.cantidad || 0),
-                subtotal: Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodoPrecio),
+                subtotal: Number(resumenCheckout.lineas[index]?.totalVisible || 0),
                 pack_resumen: String(it.pack_resumen || ""),
             }));
-            const subtotal = items.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
-            const descuento = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const total = Math.max(0, subtotal - descuento);
+            const subtotal = resumenCheckout.subtotal;
+            const descuento = resumenCheckout.descuento;
+            const total = resumenCheckout.total;
+            const descuentoLabel = resumenCheckout.descuentoTransferencia > 0 ? "Descuento transferencia" : "Descuento";
             const cuponTxt = String(cuponAplicado.codigo || "").trim();
             modalCheckoutClienteEl.innerHTML = `
                 <div><strong>Cliente:</strong> ${esc(norm.value.nombre)}</div>
@@ -23990,7 +24013,7 @@
                 <hr class="checkout-ticket-divider">
                 <div class="checkout-ticket-totals">
                     <div class="checkout-ticket-total"><span>Subtotal</span><strong id="checkout-ticket-subtotal">${money.format(subtotal)}</strong></div>
-                    <div class="checkout-ticket-total discount"><span>Descuento</span><strong id="checkout-ticket-descuento">-${money.format(descuento)}</strong></div>
+                    <div class="checkout-ticket-total discount"><span>${descuentoLabel}</span><strong id="checkout-ticket-descuento">-${money.format(descuento)}</strong></div>
                     <div class="checkout-ticket-total" id="checkout-ticket-despacho-row" style="display:none;"><span>Despacho</span><strong id="checkout-ticket-despacho">${money.format(0)}</strong></div>
                     <div class="checkout-ticket-total final"><span>Total</span><strong id="checkout-ticket-total">${money.format(total)}</strong></div>
                 </div>
