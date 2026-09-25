@@ -18604,8 +18604,14 @@
             _syncFlowSimUi();
             renderCart();
             _actualizarImportesCarritoMovil(metodo);
-            if (modalCheckoutResumenEl?.classList.contains("mobile-checkout-redesign")) {
-                _renderResumenCheckoutMobile(checkoutClientePendiente || {}, metodo);
+            const checkoutMovilAbierto = Boolean(
+                document.body.classList.contains("mobile-ui")
+                && modalCheckoutResumenEl?.classList.contains("active")
+                && checkoutClientePendiente
+            );
+            if (checkoutMovilAbierto) {
+                // El render movil espera el mismo envoltorio normalizado que recibe al abrir el checkout.
+                _renderResumenCheckoutMobile({ value: checkoutClientePendiente }, metodo);
                 _actualizarImportesCheckoutMovil(metodo);
             }
             // Un segundo pase cubre renders diferidos del modal en navegadores moviles.
@@ -23813,6 +23819,7 @@
             if (!modalCheckoutClienteEl || !modalCheckoutDetalleEl) return;
             // La tarjeta siempre se dibuja desde el estado canonico, nunca desde un argumento atrasado.
             metodoPrecio = _metodoPagoCheckoutActual();
+            const cliente = norm?.value || norm || {};
             const totals = _checkoutCalcularTotales();
             const transferSaving = flowPagoHabilitado
                 ? String(checkoutTransferBenefitEl?.textContent || "").trim()
@@ -23855,9 +23862,9 @@
                         <div class="checkout-mobile-avatar">${_checkoutIcon("user", 24)}</div>
                         <div>
                             <div style="font-weight:900;color:#431407;">Tus datos</div>
-                            <div>${esc(norm.value.nombre)}</div>
-                            <div class="checkout-mobile-muted">${esc(norm.value.email)}</div>
-                            <div class="checkout-mobile-muted">${esc(norm.value.telefono)}</div>
+                            <div>${esc(cliente.nombre || "")}</div>
+                            <div class="checkout-mobile-muted">${esc(cliente.email || "")}</div>
+                            <div class="checkout-mobile-muted">${esc(cliente.telefono || "")}</div>
                         </div>
                         <button type="button" class="checkout-mobile-edit" data-edit-customer>${_checkoutIcon("edit", 18)} Editar</button>
                     </div>
