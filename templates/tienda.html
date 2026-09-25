@@ -18572,8 +18572,8 @@
             return Math.max(0, Number(item?.precio_base_unitario ?? item?.precio_unitario ?? 0));
         }
 
-        function _sincronizarPreciosCarritoMetodo() {
-            const metodo = _metodoPagoCheckoutActual();
+        function _sincronizarPreciosCarritoMetodo(metodoRaw = _metodoPagoCheckoutActual()) {
+            const metodo = String(metodoRaw || "transferencia").toLowerCase() === "flow" ? "flow" : "transferencia";
             carrito.forEach((item) => {
                 // Keep cart prices aligned with the same catalog price validated by the server.
                 item.precio_base_unitario = _precioBaseItemCarrito(item);
@@ -18643,6 +18643,32 @@
                 return _precioFlowDesdeBase(base);
             }
             return base;
+        }
+
+        // Fuente unica de los importes: el carrito, el resumen movil y el checkout
+        // muestran siempre el mismo precio segun el metodo que acaba de elegir el cliente.
+        function _calcularResumenCarritoPorMetodo(metodoRaw = _metodoPagoCheckoutActual(), incluirDespacho = false) {
+            const metodo = String(metodoRaw || "transferencia").toLowerCase() === "flow" ? "flow" : "transferencia";
+            const lineas = carrito.map((item) => {
+                const cantidad = Math.max(0, Number(item?.cantidad || 0));
+                const precioUnitario = _precioUnitarioItemPorMetodo(item, metodo);
+                return { cantidad, precioUnitario, total: cantidad * precioUnitario };
+            });
+            const subtotal = lineas.reduce((acc, linea) => acc + linea.total, 0);
+            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
+            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
+            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
+            const despacho = incluirDespacho && _checkoutShippingVisible()
+                ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0))
+                : 0;
+            return {
+                metodo,
+                lineas,
+                subtotal,
+                descuento,
+                despacho,
+                total: Math.max(0, subtotal - descuento + despacho),
+            };
         }
 
         function cumpleBusqueda(p) {
@@ -22275,6 +22301,9 @@
         }
 
         function renderCart() {
+            const metodoPrecio = _metodoPagoCheckoutActual();
+            _sincronizarPreciosCarritoMetodo(metodoPrecio);
+            const resumen = _calcularResumenCarritoPorMetodo(metodoPrecio);
             if (!carrito.length) {
                 cartListEl.innerHTML = `<div>${esc(carritoVacioTexto)}</div>`;
                 if (mobileCartListEl) mobileCartListEl.innerHTML = `<div>${esc(carritoVacioTexto)}</div>`;
@@ -22294,9 +22323,11 @@
                 _trackTienda("cart");
                 return;
             }
-            const htmlItems = carrito.map((it) => `
+            const htmlItems = carrito.map((it, index) => {
+                const linea = resumen.lineas[index];
+                return `
                 <div class="cart-item">
-                    <div class="cart-item-row"><strong>${esc(it.nombre)}</strong><span>${money.format(it.precio_unitario)}</span></div>
+                    <div class="cart-item-row"><strong>${esc(it.nombre)}</strong><span data-cart-item-unit="${index}">${money.format(linea.precioUnitario)}</span></div>
                     ${it.pack_resumen ? `<div style="font-size:.78rem;color:#334155;margin:2px 0 6px 0;">${esc(it.pack_resumen)}</div>` : ""}
                     <div class="cart-item-row">
                         <div class="qty-wrap">
@@ -22306,18 +22337,15 @@
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;">
                             ${it.pack_resumen ? `<button class="qty-btn" type="button" title="Editar subitems del pack" onclick="editarPackEnCarrito(${it.id})">...</button>` : ""}
-                            <span>${money.format(it.cantidad * it.precio_unitario)}</span>
+                            <span data-cart-item-line="${index}">${money.format(linea.total)}</span>
                         </div>
                     </div>
                 </div>
-            `).join("");
+            `;
+            }).join("");
             cartListEl.innerHTML = htmlItems;
             if (mobileCartListEl) mobileCartListEl.innerHTML = htmlItems;
-            const subtotal = carrito.reduce((acc, it) => acc + (it.cantidad * it.precio_unitario), 0);
-            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
-            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
-            const total = Math.max(0, subtotal - descuento);
+            const { subtotal, descuento, total } = resumen;
             subtotalMontoEl.textContent = money.format(subtotal);
             if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(subtotal);
             descuentoMontoEl.textContent = `-${money.format(descuento)}`;
@@ -23527,14 +23555,7 @@
         }
 
         function _checkoutCalcularTotales() {
-            const metodo = _metodoPagoCheckoutActual();
-            const subtotal = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * _precioUnitarioItemPorMetodo(it, metodo)), 0);
-            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
-            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
-            const despacho = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0)) : 0;
-            const total = Math.max(0, subtotal - descuento + despacho);
-            return { subtotal, descuento, despacho, total };
+            return _calcularResumenCarritoPorMetodo(_metodoPagoCheckoutActual(), true);
         }
 
         function _renderCheckoutShippingQuote() {
@@ -23586,51 +23607,38 @@
         function _actualizarImportesCheckoutMovil(metodoRaw) {
             if (!document.body.classList.contains("mobile-ui")) return;
             const metodo = String(metodoRaw || "transferencia").toLowerCase() === "flow" ? "flow" : "transferencia";
-            const subtotal = carrito.reduce((acc, item) => {
-                return acc + (Number(item.cantidad || 0) * _precioUnitarioItemPorMetodo(item, metodo));
-            }, 0);
-            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
-            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
-            const despacho = _checkoutShippingVisible() ? Math.max(0, Number(checkoutShippingQuote.shipping_fee || 0)) : 0;
-            const total = Math.max(0, subtotal - descuento + despacho);
+            const resumen = _calcularResumenCarritoPorMetodo(metodo, true);
             document.querySelectorAll("[data-checkout-mobile-item-total]").forEach((el) => {
                 const index = Number(el.dataset.checkoutMobileItemTotal);
-                const item = carrito[index];
-                if (item) el.textContent = money.format(Number(item.cantidad || 0) * _precioUnitarioItemPorMetodo(item, metodo));
+                const linea = resumen.lineas[index];
+                if (linea) el.textContent = money.format(linea.total);
             });
             const subEl = document.getElementById("checkout-ticket-subtotal");
             const descEl = document.getElementById("checkout-ticket-descuento");
             const totalEl = document.getElementById("checkout-ticket-total");
             const mobileTotalEl = document.getElementById("checkout-mobile-total-bottom");
-            if (subEl) subEl.textContent = money.format(subtotal);
-            if (descEl) descEl.textContent = `-${money.format(descuento)}`;
-            if (totalEl) totalEl.textContent = money.format(total);
-            if (mobileTotalEl) mobileTotalEl.textContent = money.format(total);
+            if (subEl) subEl.textContent = money.format(resumen.subtotal);
+            if (descEl) descEl.textContent = `-${money.format(resumen.descuento)}`;
+            if (totalEl) totalEl.textContent = money.format(resumen.total);
+            if (mobileTotalEl) mobileTotalEl.textContent = money.format(resumen.total);
         }
 
         function _actualizarImportesCarritoMovil(metodoRaw) {
             const metodo = String(metodoRaw || "transferencia").toLowerCase() === "flow" ? "flow" : "transferencia";
-            const subtotal = carrito.reduce((acc, item) => {
-                return acc + (Number(item.cantidad || 0) * _precioUnitarioItemPorMetodo(item, metodo));
-            }, 0);
-            const descuentoCupon = Math.max(0, Number(cuponAplicado.descuento_monto || 0));
-            const descuentoNivel = _descuentoNivelMonto(Math.max(0, subtotal - descuentoCupon));
-            const descuento = Math.max(0, descuentoCupon + descuentoNivel);
-            const total = Math.max(0, subtotal - descuento);
+            const resumen = _calcularResumenCarritoPorMetodo(metodo);
             const rows = mobileCartListEl?.querySelectorAll(".cart-item") || [];
             rows.forEach((row, index) => {
-                const item = carrito[index];
-                if (!item) return;
-                const price = _precioUnitarioItemPorMetodo(item, metodo);
-                const values = row.querySelectorAll(".cart-item-row > span");
-                if (values[0]) values[0].textContent = money.format(price);
-                if (values[1]) values[1].textContent = money.format(Number(item.cantidad || 0) * price);
+                const linea = resumen.lineas[index];
+                if (!linea) return;
+                const unitEl = row.querySelector(`[data-cart-item-unit="${index}"]`);
+                const lineEl = row.querySelector(`[data-cart-item-line="${index}"]`);
+                if (unitEl) unitEl.textContent = money.format(linea.precioUnitario);
+                if (lineEl) lineEl.textContent = money.format(linea.total);
             });
-            if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(subtotal);
-            if (mobileDescuentoMontoEl) mobileDescuentoMontoEl.textContent = `-${money.format(descuento)}`;
-            if (mobileTotalEl) mobileTotalEl.textContent = money.format(total);
-            if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(total);
+            if (mobileSubtotalMontoEl) mobileSubtotalMontoEl.textContent = money.format(resumen.subtotal);
+            if (mobileDescuentoMontoEl) mobileDescuentoMontoEl.textContent = `-${money.format(resumen.descuento)}`;
+            if (mobileTotalEl) mobileTotalEl.textContent = money.format(resumen.total);
+            if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(resumen.total);
         }
 
         function _resetCheckoutShippingQuote() {
