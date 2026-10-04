@@ -45,7 +45,7 @@
     <section id="whatsapp-view" class="view" hidden>
         <div class="back-title"><button class="icon-btn" data-go="cart">&#8592;</button><h1>Enviar por WhatsApp</h1></div>
         <div id="whatsapp-preview" class="whatsapp-preview"></div>
-        <label class="field" id="flow-email-field" style="margin-top:12px" hidden>Correo real del cliente (requerido para Flow)<input id="customer-email" type="email" maxlength="254" autocomplete="email" inputmode="email" placeholder="cliente@correo.cl"></label>
+        <label class="field" id="flow-email-field" style="margin-top:12px">Correo del cliente <small>Obligatorio para generar el enlace de pago Flow. Usa el correo real del cliente.</small><input id="customer-email" type="email" maxlength="254" autocomplete="email" inputmode="email" placeholder="cliente@correo.cl"></label>
         <label class="field" style="margin-top:12px">Mensaje para el cliente<textarea id="message-edit"></textarea></label>
         <div class="actions"><button class="secondary" id="copy-btn">Copiar resumen</button><button class="whatsapp" id="whatsapp-btn">Enviar por WhatsApp</button><button class="primary" id="save-btn">Enviar venta</button></div>
         <div id="saved-actions" class="actions" hidden><button class="danger" id="new-sale-btn">Vaciar pedido y volver al catálogo</button></div>
@@ -87,9 +87,7 @@
     const renderWhatsApp = () => {
         const s=summary();
         $('whatsapp-preview').innerHTML=`<div class="preview-head"><strong>Resumen del pedido</strong><span>${modeLabel()}</span></div><div class="preview-lines">${s.lines.map(l=>`<div class="preview-line"><span>${esc(l.product?.nombre||'Producto')} x${l.quantity}</span>${state.settings.show_prices_to_customer?`<b>${fmt(l.total)}</b>`:''}</div>`).join('')}</div><div class="total-row"><span>Subtotal</span><strong>${fmt(s.subtotal)}</strong></div>${s.discount?`<div class="total-row"><span>Descuento</span><strong>-${fmt(s.discount)}</strong></div>`:''}<div class="total-row final"><span>Total</span><strong>${fmt(s.total)}</strong></div>`;
-        const emailField=$('flow-email-field');
         const emailInput=$('customer-email');
-        emailField.hidden=state.settings.price_mode!=='card';
         emailInput.required=state.settings.price_mode==='card';
         emailInput.value=state.customer.email||'';
         $('message-edit').value=message();
@@ -149,6 +147,11 @@
             const errorText = err?.name==='AbortError'
                 ? 'La preparacion del enlace tardo demasiado. El pedido sigue activo; revisa el registro del servidor antes de reintentar.'
                 : (err.message||'No se pudo preparar el mensaje.');
+            if(/correo|email/i.test(errorText)) {
+                const emailInput=$('customer-email');
+                emailInput.focus();
+                emailInput.scrollIntoView({behavior:'smooth',block:'center'});
+            }
             toast(errorText,true);
         }
     };
