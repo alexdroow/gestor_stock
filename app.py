@@ -14799,7 +14799,12 @@ def _pos_admin_sale_items(summary):
 
 @app.route('/admin/pos')
 def admin_pos():
-    return render_template('pos_admin.html')
+    response = make_response(render_template('pos_admin.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['X-POS-Template-Version'] = 'flow-email-20261004-2'
+    return response
 
 
 @app.route('/api/admin/pos/catalogo')
