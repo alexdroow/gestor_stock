@@ -54,6 +54,7 @@
 </main>
 <div id="price-sheet" class="sheet" hidden><div class="sheet-body"><div class="sheet-grip"></div><div class="sheet-head"><h2>Configurar precios</h2><button class="icon-btn" data-close="price-sheet">&#215;</button></div><p style="margin:6px 0 11px;color:var(--muted);font-size:12px">Elige el precio que se usara en el POS y en el resumen del cliente.</p><div id="mode-options"></div><label class="field" style="margin-top:12px">Comision tarjeta (%)<input id="fee-input" type="number" min="0" max="50" step="0.1" inputmode="decimal"></label><label class="field" style="margin-top:10px">Motivo precio manual<input id="manual-reason" maxlength="240" placeholder="Obligatorio si cambia un precio"></label><label class="switch">Mostrar precios al cliente <input id="show-prices" type="checkbox"></label><button id="apply-prices" class="primary">Aplicar precios</button></div></div>
 <div id="confirm-modal" class="modal" hidden><div class="modal-body"><h2 style="margin-top:0">Vaciar carrito</h2><p style="color:var(--muted)">Se eliminaran los productos de este borrador POS. Esta accion no afecta el carrito de la tienda publica.</p><div class="actions"><button id="confirm-clear" class="danger">Si, vaciar carrito</button><button class="secondary" data-close="confirm-modal">Cancelar</button></div></div></div>
+<div id="flow-email-modal" class="modal" hidden><div class="modal-body"><h2 style="margin-top:0">Correo para el pago Flow</h2><p style="color:var(--muted)">Flow exige el correo real del cliente para generar el enlace. El pedido POS ya esta creado; esto no generara otra venta.</p><label class="field">Correo del cliente<input id="flow-email-input" type="email" maxlength="254" autocomplete="email" inputmode="email" autocapitalize="off" placeholder="cliente@correo.cl"></label><div class="actions"><button id="confirm-flow-email" class="primary">Continuar con Flow</button><button class="secondary" data-close="flow-email-modal">Cancelar</button></div></div></div>
 <div id="wa-account-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="wa-account-title"><div class="modal-body"><h2 id="wa-account-title" style="margin-top:0">Elige desde qué WhatsApp abrir</h2><p style="color:var(--muted)">El pedido ya quedó activo. Se abrirá el chat con el mensaje preparado; revísalo y toca Enviar en WhatsApp.</p><div class="actions"><button id="wa-business-btn" class="whatsapp">WhatsApp Business</button><button id="wa-normal-btn" class="secondary">WhatsApp normal</button><button id="wa-cancel-btn" class="secondary">Cancelar</button></div></div></div>
 <div id="toast" class="toast"></div>
 <script>
@@ -108,7 +109,13 @@
         if(!phone(state.customer.phone)) return toast('Ingresa un telefono movil chileno valido.',true);
         if(state.settings.price_mode==='card'&&!state.sent_order_id) return toast('Para incluir el enlace Flow, primero pulsa Enviar venta. Esta accion es la unica que envia el pedido a SucreeStock.',true);
         const customerEmail=String($('customer-email').value||'').trim().toLowerCase();
-        if(state.settings.price_mode==='card'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail)) return toast('Ingresa un correo real y valido del cliente para pagar con Flow.',true);
+        if(state.settings.price_mode==='card'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail)) {
+            const emailModal=$('flow-email-modal');
+            $('flow-email-input').value=customerEmail;
+            emailModal.hidden=false;
+            setTimeout(()=>$('flow-email-input').focus(),50);
+            return;
+        }
         state.customer.email=customerEmail;
         persist();
         const button=$('whatsapp-btn');
@@ -176,6 +183,19 @@
     };
     bind();
     $('customer-email').addEventListener('input', (event) => { state.customer.email=event.target.value; persist(); });
+    $('confirm-flow-email').addEventListener('click', () => {
+        const email=String($('flow-email-input').value||'').trim().toLowerCase();
+        if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+            toast('Ingresa un correo valido del cliente para continuar con Flow.',true);
+            $('flow-email-input').focus();
+            return;
+        }
+        $('customer-email').value=email;
+        state.customer.email=email;
+        persist();
+        $('flow-email-modal').hidden=true;
+        sendWhatsApp();
+    });
     $('wa-business-btn').addEventListener('click',()=>launchWhatsApp('business'));
     $('wa-normal-btn').addEventListener('click',()=>launchWhatsApp('normal'));
     $('wa-cancel-btn').addEventListener('click',()=>{pendingWhatsApp=null;$('wa-account-modal').hidden=true;});

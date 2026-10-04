@@ -14803,7 +14803,7 @@ def admin_pos():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-Template-Version'] = 'flow-email-20261004-2'
+    response.headers['X-POS-Template-Version'] = 'flow-email-dialog-20261004-3'
     return response
 
 
