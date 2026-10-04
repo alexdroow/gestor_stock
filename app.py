@@ -14989,8 +14989,20 @@ def api_admin_pos_whatsapp(venta_id):
                     _flow_log("pos_checkout_flow_rejected", venta_id, detail=flow_exc.__class__.__name__)
                     raise RuntimeError(f"Flow rechazo la solicitud: {flow_message}") from None
                 except (URLError, TimeoutError, socket.timeout) as flow_exc:
-                    _flow_log("pos_checkout_flow_network_error", venta_id, detail=flow_exc.__class__.__name__)
-                    raise RuntimeError("No fue posible conectar con Flow Sandbox. Revisa la conexion saliente del servidor e intenta nuevamente.") from None
+                    network_reason = getattr(flow_exc, "reason", flow_exc)
+                    reason_type = network_reason.__class__.__name__
+                    reason_errno = getattr(network_reason, "errno", None)
+                    reason_text = str(network_reason).lower()
+                    if isinstance(network_reason, socket.gaierror):
+                        network_message = "El servidor no pudo resolver sandbox.flow.cl (error DNS)."
+                    elif isinstance(network_reason, (TimeoutError, socket.timeout)):
+                        network_message = "La conexion HTTPS con Flow Sandbox excedio el tiempo de espera."
+                    elif reason_errno in {111, 113, 10061, 10065} or "403 forbidden" in reason_text or "connection refused" in reason_text:
+                        network_message = "El servidor rechazo o bloqueo la conexion saliente a Flow. Revisa las restricciones de red del hosting."
+                    else:
+                        network_message = "No fue posible establecer conexion HTTPS con Flow Sandbox desde el servidor."
+                    _flow_log("pos_checkout_flow_network_error", venta_id, detail=f"type:{reason_type} errno:{reason_errno if reason_errno is not None else '-'}")
+                    raise RuntimeError(network_message) from None
                 except Exception as flow_exc:
                     _flow_log("pos_checkout_flow_invalid_response", venta_id, detail=flow_exc.__class__.__name__)
                     raise RuntimeError("Flow Sandbox devolvio una respuesta invalida. Revisa el registro del servidor.") from None
