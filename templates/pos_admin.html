@@ -102,7 +102,7 @@
             let finalMessage=$('message-edit').value, whatsappUrl='';
             if(state.sent_order_id) {
                 const controller = new AbortController();
-                requestTimer = setTimeout(() => controller.abort(), 25000);
+                requestTimer = setTimeout(() => controller.abort(), 60000);
                 const response=await fetch(`/api/admin/pos/${state.sent_order_id}/whatsapp`,{
                     method:'POST',
                     headers:{'Content-Type':'application/json',Accept:'application/json'},

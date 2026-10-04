@@ -14978,7 +14978,7 @@ def api_admin_pos_whatsapp(venta_id):
                 }
                 _flow_log("pos_checkout_flow_start", venta_id)
                 try:
-                    flow_response = _flow_post("/payment/create", params, cfg, timeout=12)
+                    flow_response = _flow_post("/payment/create", params, cfg, timeout=45)
                 except RuntimeError as flow_exc:
                     flow_message = str(flow_exc).strip() or "Flow rechazo la solicitud de pago."
                     for secret in (cfg.get("api_key"), cfg.get("secret_key")):
