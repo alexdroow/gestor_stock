@@ -14889,8 +14889,9 @@ def api_admin_pos_whatsapp(venta_id):
         return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
 
     payload = request.get_json(silent=True) or {}
-    conn = get_db()
+    conn = None
     try:
+        conn = get_db()
         row = conn.execute(
             """
             SELECT v.id, v.cliente_nombre, v.cliente_telefono, v.cliente_email, v.total_monto,
@@ -14907,8 +14908,12 @@ def api_admin_pos_whatsapp(venta_id):
         destination = _pos_admin_phone(sale.get("cliente_telefono"))
         if not destination:
             return jsonify({"success": False, "error": "El pedido no tiene un telefono chileno movil valido."}), 400
+    except Exception as exc:
+        print(f"[POS_ADMIN] whatsapp_lookup_error={exc.__class__.__name__} venta_id={int(venta_id)}")
+        return jsonify({"success": False, "error": "No se pudo consultar el pedido. Recarga el POS y vuelve a intentarlo."}), 500
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
     try:
         snapshot = json.loads(sale.get("snapshot_json") or "{}")
