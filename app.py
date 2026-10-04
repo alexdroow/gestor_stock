@@ -25,7 +25,7 @@ except ModuleNotFoundError:
     imghdr = None
 from urllib.parse import urlencode, quote, unquote, urlparse
 from urllib.request import Request as UrlRequest, urlopen
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from datetime import datetime, timedelta
 from io import BytesIO, StringIO
 from zoneinfo import ZoneInfo
@@ -14979,9 +14979,21 @@ def api_admin_pos_whatsapp(venta_id):
                 _flow_log("pos_checkout_flow_start", venta_id)
                 try:
                     flow_response = _flow_post("/payment/create", params, cfg, timeout=12)
+                except RuntimeError as flow_exc:
+                    flow_message = str(flow_exc).strip() or "Flow rechazo la solicitud de pago."
+                    for secret in (cfg.get("api_key"), cfg.get("secret_key")):
+                        if secret:
+                            flow_message = flow_message.replace(str(secret), "[dato oculto]")
+                    flow_message = re.sub(r"(?i)(token|apiKey|secretKey)(\s*[=:]\s*)[^&\s]+", r"\1\2[dato oculto]", flow_message)
+                    flow_message = flow_message[:200]
+                    _flow_log("pos_checkout_flow_rejected", venta_id, detail=flow_exc.__class__.__name__)
+                    raise RuntimeError(f"Flow rechazo la solicitud: {flow_message}") from None
+                except (URLError, TimeoutError, socket.timeout) as flow_exc:
+                    _flow_log("pos_checkout_flow_network_error", venta_id, detail=flow_exc.__class__.__name__)
+                    raise RuntimeError("No fue posible conectar con Flow Sandbox. Revisa la conexion saliente del servidor e intenta nuevamente.") from None
                 except Exception as flow_exc:
-                    _flow_log("pos_checkout_flow_error", venta_id, detail=flow_exc.__class__.__name__)
-                    raise RuntimeError("Flow Sandbox no respondio. Revisa la conexion saliente, API Key y Secret Key del servidor.")
+                    _flow_log("pos_checkout_flow_invalid_response", venta_id, detail=flow_exc.__class__.__name__)
+                    raise RuntimeError("Flow Sandbox devolvio una respuesta invalida. Revisa el registro del servidor.") from None
                 _flow_log("pos_checkout_flow_response", venta_id)
                 stage = "flow_response_validate"
                 flow_token = str(flow_response.get("token") or "").strip()
@@ -15027,10 +15039,10 @@ def api_admin_pos_whatsapp(venta_id):
             "delivery": "device_app_chooser",
         })
     except RuntimeError as exc:
-        _flow_log("pos_whatsapp_failed", venta_id, status_code=503, detail=f"stage={stage} error={exc.__class__.__name__} elapsed_ms={int((time.monotonic() - started_at) * 1000)}")
+        _flow_log("pos_whatsapp_failed", venta_id, status_code=503, detail=f"stage:{stage} error:{exc.__class__.__name__} elapsed_ms:{int((time.monotonic() - started_at) * 1000)}")
         return jsonify({"success": False, "error": str(exc)}), 503
     except Exception as exc:
-        _flow_log("pos_whatsapp_failed", venta_id, status_code=500, detail=f"stage={stage} error={exc.__class__.__name__} elapsed_ms={int((time.monotonic() - started_at) * 1000)}")
+        _flow_log("pos_whatsapp_failed", venta_id, status_code=500, detail=f"stage:{stage} error:{exc.__class__.__name__} elapsed_ms:{int((time.monotonic() - started_at) * 1000)}")
         return jsonify({"success": False, "error": "No se pudo preparar el mensaje para WhatsApp. Revisa el registro del servidor e intenta nuevamente."}), 500
 
 
