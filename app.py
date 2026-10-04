@@ -2537,7 +2537,7 @@ def _flow_sign(params, secret_key):
     return hmac.new(str(secret_key).encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def _flow_post(endpoint, params, cfg):
+def _flow_post(endpoint, params, cfg, timeout=25):
     payload = dict(params or {})
     payload["apiKey"] = str(cfg.get("api_key") or "")
     payload["s"] = _flow_sign(payload, cfg.get("secret_key") or "")
@@ -2549,7 +2549,7 @@ def _flow_post(endpoint, params, cfg):
         method="POST",
     )
     try:
-        raw = urlopen(req, timeout=25).read().decode("utf-8", errors="replace")
+        raw = urlopen(req, timeout=max(1, int(timeout))).read().decode("utf-8", errors="replace")
     except HTTPError as http_err:
         raw_err = ""
         try:
@@ -14970,7 +14970,13 @@ def api_admin_pos_whatsapp(venta_id):
                     "urlConfirmation": f"{base_url}/api/tienda/flow/confirm",
                     "urlReturn": f"{base_url}/tienda/flow/retorno?venta_id={venta_id}",
                 }
-                flow_response = _flow_post("/payment/create", params, cfg)
+                _flow_log("pos_checkout_flow_start", venta_id)
+                try:
+                    flow_response = _flow_post("/payment/create", params, cfg, timeout=12)
+                except Exception as flow_exc:
+                    _flow_log("pos_checkout_flow_error", venta_id, detail=flow_exc.__class__.__name__)
+                    raise RuntimeError("Flow Sandbox no respondio. Revisa la conexion saliente, API Key y Secret Key del servidor.")
+                _flow_log("pos_checkout_flow_response", venta_id)
                 flow_token = str(flow_response.get("token") or "").strip()
                 flow_url = str(flow_response.get("url") or "").strip()
                 flow_host = (urlparse(flow_url).hostname or "").lower()
