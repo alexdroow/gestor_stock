@@ -14672,6 +14672,13 @@ def _pos_admin_phone(value):
     return ""
 
 
+def _pos_admin_email(value):
+    email = str(value or "").strip().lower()
+    if len(email) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        return ""
+    return email
+
+
 def _pos_admin_price_summary(payload, products_by_id):
     """Motor de precios puro del POS. El navegador solo recibe este mismo resumen."""
     raw_items = payload.get("items") or []
@@ -14941,6 +14948,21 @@ def api_admin_pos_whatsapp(venta_id):
             )
         elif mode == "card":
             stage = "flow_config"
+            customer_email = _pos_admin_email(payload.get("email") or sale.get("cliente_email"))
+            if not customer_email:
+                raise RuntimeError("Flow requiere el correo electronico real del cliente. Ingresalo para continuar.")
+            snapshot.setdefault("customer", {})["email"] = customer_email
+            email_conn = get_db()
+            try:
+                email_conn.execute("UPDATE ventas SET cliente_email = ? WHERE id = ? AND canal_venta = 'pos_admin'", (customer_email, venta_id))
+                email_conn.execute(
+                    "UPDATE pos_admin_snapshots SET snapshot_json = ? WHERE venta_id = ?",
+                    (json.dumps(snapshot, ensure_ascii=False), venta_id),
+                )
+                email_conn.commit()
+                sale["cliente_email"] = customer_email
+            finally:
+                email_conn.close()
             cfg = _flow_cfg()
             if not cfg.get("enabled") or not _flow_checkout_public_enabled():
                 raise RuntimeError("Flow no esta habilitado. Verifica las credenciales y la URL publica HTTPS.")
@@ -14972,7 +14994,7 @@ def api_admin_pos_whatsapp(venta_id):
                     "subject": _flow_subject_safe(f"Pedido Sucree POS #{venta_id}"),
                     "currency": "CLP",
                     "amount": amount,
-                    "email": str(sale.get("cliente_email") or f"pedido{venta_id}@pasteleriasucree.cl").strip(),
+                    "email": customer_email,
                     "urlConfirmation": f"{base_url}/api/tienda/flow/confirm",
                     "urlReturn": f"{base_url}/tienda/flow/retorno?venta_id={venta_id}",
                 }
