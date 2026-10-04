@@ -2828,15 +2828,18 @@ def _finalizar_venta_flow_pagada(venta_id, status_payload=None):
         conn = get_db()
         cur = conn.cursor()
         _ensure_flow_pago_table(cur)
+        row_canal = cur.execute("SELECT canal_venta FROM ventas WHERE id = ? LIMIT 1", (venta_id,)).fetchone()
+        canal_original = str((row_canal["canal_venta"] if row_canal else "") or "").strip().lower()
+        es_pos_admin = canal_original == "pos_admin"
         cur.execute(
             """
             UPDATE ventas
             SET metodo_pago = 'flow_pagado',
-                canal_venta = 'tienda_online',
-                flow_admin_alertado = 0
+                canal_venta = ?,
+                flow_admin_alertado = CASE WHEN metodo_pago = 'flow_pagado' THEN flow_admin_alertado ELSE 0 END
             WHERE id = ?
             """,
-            (venta_id,),
+            ("pos_admin" if es_pos_admin else "tienda_online", venta_id),
         )
         cur.execute(
             """
@@ -2854,7 +2857,7 @@ def _finalizar_venta_flow_pagada(venta_id, status_payload=None):
         cur.execute("SELECT notified_admin FROM tienda_flow_pagos WHERE venta_id = ? LIMIT 1", (venta_id,))
         row_n = cur.fetchone()
         notified_admin = int((dict(row_n).get("notified_admin") if row_n else 0) or 0)
-        if notified_admin == 0:
+        if notified_admin == 0 and not es_pos_admin:
             cur.execute(
                 """
                 SELECT id, total_monto, cliente_nombre, cliente_email, cliente_telefono,
@@ -3042,17 +3045,21 @@ def _flow_confirmar_token_y_actualizar(token):
     conn = None
     try:
         _ensure_ventas_metodo_pago_column()
+        _ensure_ventas_flow_admin_alert_column()
         conn = get_db()
         cur = conn.cursor()
+        venta_row = cur.execute("SELECT canal_venta FROM ventas WHERE id = ? LIMIT 1", (venta_id,)).fetchone()
+        canal_original = str((venta_row["canal_venta"] if venta_row else "") or "").strip().lower()
+        es_pos_admin = canal_original == "pos_admin"
         if paid:
             cur.execute(
-                "UPDATE ventas SET metodo_pago = ?, canal_venta = 'tienda_online' WHERE id = ?",
-                ("flow_pagado", venta_id),
+                "UPDATE ventas SET metodo_pago = ?, canal_venta = ?, flow_admin_alertado = CASE WHEN metodo_pago = 'flow_pagado' THEN flow_admin_alertado ELSE 0 END WHERE id = ?",
+                ("flow_pagado", "pos_admin" if es_pos_admin else "tienda_online", venta_id),
             )
         else:
             cur.execute(
-                "UPDATE ventas SET metodo_pago = ?, canal_venta = 'tienda_online_flow_pendiente' WHERE id = ?",
-                ("flow_pendiente", venta_id),
+                "UPDATE ventas SET metodo_pago = ?, canal_venta = ? WHERE id = ?",
+                ("flow_pendiente", "pos_admin" if es_pos_admin else "tienda_online_flow_pendiente", venta_id),
             )
         conn.commit()
     finally:
@@ -3076,7 +3083,7 @@ def _marcar_flow_cliente_regreso(venta_id):
             """
             UPDATE ventas
             SET flow_cliente_regreso = 1
-            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
             """,
             (vid,),
         )
@@ -14618,6 +14625,17 @@ def _ensure_pos_admin_tables():
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pos_admin_whatsapp_sends (
+                request_id TEXT PRIMARY KEY,
+                venta_id INTEGER NOT NULL,
+                estado TEXT NOT NULL DEFAULT 'enviando',
+                actualizado TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE
+            )
+            """
+        )
         ventas_exists = cur.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ventas'"
         ).fetchone()
@@ -14874,6 +14892,194 @@ def api_admin_pos_guardar():
     except Exception as exc:
         print(f"[POS_ADMIN] guardar_error={exc.__class__.__name__}")
         return jsonify({"success": False, "error": "No se pudo guardar la venta POS."}), 500
+
+
+@app.route('/api/admin/pos/<int:venta_id>/whatsapp', methods=['POST'])
+def api_admin_pos_whatsapp(venta_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
+
+    payload = request.get_json(silent=True) or {}
+    request_id = str(payload.get("request_id") or "").strip()[:80]
+    if not request_id:
+        return jsonify({"success": False, "error": "Falta el identificador del envio."}), 400
+
+    business_sender = _normalizar_numero_whatsapp("+56964330546")
+    configured_sender = _normalizar_numero_whatsapp(os.environ.get("TWILIO_WHATSAPP_FROM"))
+    if configured_sender != business_sender:
+        return jsonify({
+            "success": False,
+            "error": "Configura TWILIO_WHATSAPP_FROM como whatsapp:+56964330546 y verifica ese remitente WhatsApp Business en Twilio.",
+        }), 503
+    if not _bool_env("GESTIONSTOCK_WHATSAPP_ENABLED", default=False) or not _twilio_whatsapp_configurado():
+        return jsonify({"success": False, "error": "El envio de WhatsApp Business no esta habilitado o falta configurar Twilio."}), 503
+
+    _ensure_pos_admin_tables()
+    conn = get_db()
+    try:
+        row = conn.execute(
+            """
+            SELECT v.id, v.cliente_nombre, v.cliente_telefono, v.cliente_email, v.total_monto,
+                   v.metodo_pago, v.canal_venta, v.pedido_estado, s.snapshot_json
+            FROM ventas v JOIN pos_admin_snapshots s ON s.venta_id = v.id
+            WHERE v.id = ? AND v.canal_venta = 'pos_admin'
+            LIMIT 1
+            """,
+            (venta_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "No se encontro el pedido activo del POS."}), 404
+        sale = dict(row)
+        destination = _pos_admin_phone(sale.get("cliente_telefono"))
+        if not destination:
+            return jsonify({"success": False, "error": "El pedido no tiene un telefono chileno movil valido."}), 400
+
+        existing_send = conn.execute(
+            "SELECT estado FROM pos_admin_whatsapp_sends WHERE request_id = ? LIMIT 1", (request_id,)
+        ).fetchone()
+        if existing_send:
+            send_state = str(existing_send["estado"] or "")
+            if send_state == "enviado":
+                return jsonify({"success": True, "idempotent": True, "venta_id": venta_id})
+            if send_state == "enviando":
+                return jsonify({"success": False, "error": "Este mensaje ya esta en proceso de envio."}), 409
+            conn.execute(
+                "UPDATE pos_admin_whatsapp_sends SET estado = 'enviando', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
+                (request_id,),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO pos_admin_whatsapp_sends (request_id, venta_id, estado) VALUES (?, ?, 'enviando')",
+                (request_id, venta_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        snapshot = json.loads(sale.get("snapshot_json") or "{}")
+        summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
+        mode = str(summary.get("mode") or "").strip().lower()
+        if mode not in {"transfer", "card", "manual"}:
+            mode = "card" if "flow" in str(sale.get("metodo_pago") or "").lower() or "tarjeta" in str(sale.get("metodo_pago") or "").lower() else "transfer"
+        base_message = str(payload.get("message") or "").strip()[:1100]
+        additions = []
+        flow_url = ""
+
+        if mode == "transfer":
+            additions.append(
+                "DATOS PARA TRANSFERENCIA\n"
+                "Titular: Angello Gutierrez Salgado\n"
+                "RUT: 19.284.422-3\n"
+                "Banco: Banco Estado\n"
+                "Tipo de cuenta: Cuenta RUT / Cuenta vista\n"
+                "Numero de cuenta: 19284422\n"
+                "Correo: pasteleria.sucree@outlook.com"
+            )
+        elif mode == "card":
+            cfg = _flow_cfg()
+            if not cfg.get("enabled") or not _flow_checkout_public_enabled():
+                raise RuntimeError("Flow no esta habilitado. Verifica las credenciales y la URL publica HTTPS.")
+            if urlparse(cfg.get("api_url") or "").hostname != "sandbox.flow.cl":
+                raise RuntimeError("Por seguridad, los cobros del POS solo se habilitan con FLOW_API_URL=https://sandbox.flow.cl/api.")
+
+            _ensure_ventas_flow_return_column()
+            flow_conn = get_db()
+            try:
+                cur = flow_conn.cursor()
+                _ensure_flow_pago_table(cur)
+                saved_flow = cur.execute("SELECT * FROM tienda_flow_pagos WHERE venta_id = ? LIMIT 1", (venta_id,)).fetchone()
+                saved_flow = dict(saved_flow) if saved_flow else None
+            finally:
+                flow_conn.close()
+            if saved_flow and str(saved_flow.get("estado") or "").lower() == "pagado":
+                raise RuntimeError("Este pedido ya tiene un pago Flow confirmado.")
+            if saved_flow and str(saved_flow.get("estado") or "").lower() == "pendiente" and saved_flow.get("flow_redirect_url"):
+                flow_url = str(saved_flow["flow_redirect_url"])
+            else:
+                base_url = _public_base_url(request.url_root).rstrip("/")
+                commerce_order = f"POS-{venta_id}-{int(time.time())}"
+                amount = int(round(float(sale.get("total_monto") or 0)))
+                if amount <= 0:
+                    raise RuntimeError("El total del pedido no permite crear un cobro Flow.")
+                params = {
+                    "commerceOrder": commerce_order,
+                    "subject": _flow_subject_safe(f"Pedido Sucree POS #{venta_id}"),
+                    "currency": "CLP",
+                    "amount": amount,
+                    "email": str(sale.get("cliente_email") or f"pedido{venta_id}@pasteleriasucree.cl").strip(),
+                    "urlConfirmation": f"{base_url}/api/tienda/flow/confirm",
+                    "urlReturn": f"{base_url}/tienda/flow/retorno?venta_id={venta_id}",
+                }
+                flow_response = _flow_post("/payment/create", params, cfg)
+                flow_token = str(flow_response.get("token") or "").strip()
+                flow_url = str(flow_response.get("url") or "").strip()
+                flow_host = (urlparse(flow_url).hostname or "").lower()
+                if not flow_token or not flow_url or not flow_url.startswith("https://") or flow_host != "sandbox.flow.cl":
+                    raise RuntimeError("Flow no devolvio un enlace de pago seguro.")
+                backup = {
+                    "venta_id": venta_id,
+                    "cliente_nombre": sale.get("cliente_nombre") or "",
+                    "cliente_email": sale.get("cliente_email") or "",
+                    "cliente_telefono": sale.get("cliente_telefono") or "",
+                    "total": amount,
+                    "items": summary.get("lines") or [],
+                    "canal_venta": "pos_admin",
+                }
+                _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_url, backup)
+                flow_conn = get_db()
+                try:
+                    _ensure_ventas_flow_admin_alert_column()
+                    flow_conn.execute(
+                        "UPDATE ventas SET metodo_pago = 'flow_pendiente', canal_venta = 'pos_admin', flow_admin_alertado = 1 WHERE id = ?",
+                        (venta_id,),
+                    )
+                    flow_conn.commit()
+                finally:
+                    flow_conn.close()
+                _flow_log("pos_checkout_created", venta_id)
+            additions.append(f"Paga con debito o credito de forma segura en Flow (sandbox):\n{flow_url}")
+
+        final_message = "\n\n".join(part for part in (base_message, *additions) if part)
+        if len(final_message) > 1500:
+            raise RuntimeError("El mensaje es demasiado largo; acorta el resumen del pedido antes de enviarlo.")
+        ok, err = _enviar_whatsapp_twilio(final_message, to_number=destination)
+        if not ok:
+            raise RuntimeError("Twilio no acepto el mensaje; revisa el remitente y su estado en WhatsApp Business.")
+        conn_done = get_db()
+        try:
+            conn_done.execute(
+                "UPDATE pos_admin_whatsapp_sends SET estado = 'enviado', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
+                (request_id,),
+            )
+            conn_done.commit()
+        finally:
+            conn_done.close()
+        return jsonify({"success": True, "venta_id": venta_id, "message": final_message, "flow_payment_url": flow_url})
+    except RuntimeError as exc:
+        print(f"[POS_ADMIN] whatsapp_error={exc.__class__.__name__}")
+        conn_fail = get_db()
+        try:
+            conn_fail.execute(
+                "UPDATE pos_admin_whatsapp_sends SET estado = 'error', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
+                (request_id,),
+            )
+            conn_fail.commit()
+        finally:
+            conn_fail.close()
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:
+        print(f"[POS_ADMIN] whatsapp_error={exc.__class__.__name__}")
+        conn_fail = get_db()
+        try:
+            conn_fail.execute(
+                "UPDATE pos_admin_whatsapp_sends SET estado = 'error', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
+                (request_id,),
+            )
+            conn_fail.commit()
+        finally:
+            conn_fail.close()
+        return jsonify({"success": False, "error": "No se pudo completar el envio desde WhatsApp Business."}), 502
 
 
 def _ensure_ventas_mayoristas_tables(cursor):
