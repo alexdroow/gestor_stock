@@ -9976,7 +9976,7 @@ def api_tienda_admin_pedidos_nuevos():
             """
             SELECT COALESCE(MAX(id), 0) AS max_online_id
             FROM ventas
-            WHERE canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            WHERE canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
             """
         )
         max_online_id = int(cursor.fetchone()["max_online_id"] or 0)
@@ -10006,7 +10006,7 @@ def api_tienda_admin_pedidos_nuevos():
                 FROM venta_items
                 GROUP BY venta_id
             ) vp ON vp.venta_id = v.id
-            WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
               AND (
                     (
                         v.id > ?
@@ -10324,7 +10324,7 @@ def api_tienda_admin_pedidos_chat_activos():
                 FROM venta_items
                 GROUP BY venta_id
             ) vp ON vp.venta_id = v.id
-            WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            WHERE v.canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
               AND COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') IN ('recibido', 'confirmado', 'preparando', 'listo')
               AND (
                    CASE
@@ -10392,7 +10392,7 @@ def api_tienda_admin_pedido_estado(venta_id):
             SELECT id, pedido_timer_minutos, pedido_timer_inicio,
                    COALESCE(NULLIF(TRIM(metodo_pago), ''), 'efectivo') AS metodo_pago
             FROM ventas
-            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
             LIMIT 1
             """,
             (int(venta_id),),
@@ -10441,7 +10441,7 @@ def api_tienda_admin_pedido_estado(venta_id):
                 UPDATE ventas
                 SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP,
                     pedido_timer_minutos = ?, pedido_timer_inicio = CURRENT_TIMESTAMP
-                WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+                WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
                 """,
                 (nuevo_estado, guardar_timer, int(venta_id)),
             )
@@ -10451,7 +10451,7 @@ def api_tienda_admin_pedido_estado(venta_id):
                 UPDATE ventas
                 SET pedido_estado = ?, pedido_estado_actualizado = CURRENT_TIMESTAMP,
                     pedido_timer_minutos = ?, pedido_timer_inicio = ?
-                WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+                WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
                 """,
                 (nuevo_estado, guardar_timer, guardar_inicio, int(venta_id)),
             )
@@ -10463,7 +10463,7 @@ def api_tienda_admin_pedido_estado(venta_id):
             SELECT COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') AS pedido_estado,
                    pedido_timer_minutos, pedido_timer_inicio
             FROM ventas
-            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente')
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
             LIMIT 1
             """,
             (int(venta_id),),
@@ -14844,7 +14844,9 @@ def api_admin_pos_guardar():
             conn.execute(
                 """
                 UPDATE ventas
-                SET cliente_nombre = ?, cliente_telefono = ?, metodo_pago = ?, descuento_monto = ?, total_monto = ?, observaciones = ?
+                SET cliente_nombre = ?, cliente_telefono = ?, metodo_pago = ?, descuento_monto = ?, total_monto = ?, observaciones = ?,
+                    canal_venta = 'pos_admin', pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP,
+                    pedido_timer_minutos = NULL, pedido_timer_inicio = NULL, entrega_tipo = 'retiro'
                 WHERE id = ?
                 """,
                 (customer_name, customer_phone, method_label, summary["discount"], summary["total"], observations, venta_id),
@@ -14864,7 +14866,7 @@ def api_admin_pos_guardar():
         finally:
             conn.close()
         crear_backup()
-        return jsonify({"success": True, "venta_id": venta_id, "snapshot": snapshot, "mensaje": "Venta POS guardada correctamente."})
+        return jsonify({"success": True, "venta_id": venta_id, "snapshot": snapshot, "mensaje": "Pedido POS enviado a Pedidos en vivo para preparar."})
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except RuntimeError as exc:
