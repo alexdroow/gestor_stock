@@ -14584,6 +14584,296 @@ def ventas():
         return f"Error: {str(e)}", 500
 
 
+def _pos_admin_default_card_fee_pct():
+    try:
+        return max(0.0, min(50.0, float(os.environ.get("GESTIONSTOCK_POS_CARD_FEE_PCT") or 3.5)))
+    except (TypeError, ValueError):
+        return 3.5
+
+
+def _ensure_pos_admin_tables():
+    """Datos exclusivos del POS; no comparte estado ni tablas de carrito de tienda."""
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pos_admin_config (
+                clave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL,
+                actualizado TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pos_admin_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                venta_id INTEGER NOT NULL UNIQUE,
+                request_id TEXT UNIQUE,
+                vendedor TEXT,
+                snapshot_json TEXT NOT NULL,
+                creado TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE
+            )
+            """
+        )
+        ventas_exists = cur.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ventas'"
+        ).fetchone()
+        if ventas_exists:
+            ventas_cols = {str(row["name"]).strip().lower() for row in cur.execute("PRAGMA table_info(ventas)").fetchall()}
+            for column, definition in {
+                "cliente_nombre": "TEXT DEFAULT ''",
+                "cliente_telefono": "TEXT DEFAULT ''",
+                "descuento_monto": "REAL DEFAULT 0",
+                "observaciones": "TEXT DEFAULT ''",
+            }.items():
+                if column not in ventas_cols:
+                    cur.execute(f"ALTER TABLE ventas ADD COLUMN {column} {definition}")
+        cur.execute(
+            "INSERT OR IGNORE INTO pos_admin_config (clave, valor) VALUES ('card_fee_pct', ?)",
+            (str(_pos_admin_default_card_fee_pct()),),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _pos_admin_card_fee_pct():
+    try:
+        _ensure_pos_admin_tables()
+        conn = get_db()
+    except Exception:
+        return _pos_admin_default_card_fee_pct()
+    try:
+        row = conn.execute("SELECT valor FROM pos_admin_config WHERE clave = 'card_fee_pct' LIMIT 1").fetchone()
+        raw = row["valor"] if row else _pos_admin_default_card_fee_pct()
+        return max(0.0, min(50.0, float(raw)))
+    except (TypeError, ValueError):
+        return _pos_admin_default_card_fee_pct()
+    finally:
+        conn.close()
+
+
+def _pos_admin_phone(value):
+    digits = re.sub(r"\D+", "", str(value or ""))
+    if digits.startswith("56"):
+        digits = digits[2:]
+    if len(digits) == 9 and digits.startswith("9"):
+        return f"+56{digits}"
+    return ""
+
+
+def _pos_admin_price_summary(payload, products_by_id):
+    """Motor de precios puro del POS. El navegador solo recibe este mismo resumen."""
+    raw_items = payload.get("items") or []
+    if not isinstance(raw_items, list) or not raw_items:
+        raise ValueError("Agrega al menos un producto al carrito.")
+    settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+    mode = str(settings.get("price_mode") or "transfer").strip().lower()
+    if mode not in {"transfer", "card", "manual"}:
+        raise ValueError("Modo de precio invalido.")
+    fee_raw = settings.get("card_fee_pct")
+    if fee_raw in (None, ""):
+        fee_raw = _pos_admin_card_fee_pct()
+    try:
+        fee_pct = float(fee_raw)
+    except (TypeError, ValueError):
+        fee_pct = _pos_admin_card_fee_pct()
+    fee_pct = max(0.0, min(50.0, fee_pct))
+    manual_reason = str(settings.get("manual_reason") or "").strip()[:240]
+    lines = []
+    seen = set()
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            raise ValueError("Item POS invalido.")
+        try:
+            product_id = int(raw.get("product_id") or raw.get("id") or 0)
+            quantity = int(raw.get("quantity") or raw.get("cantidad") or 0)
+        except (TypeError, ValueError):
+            raise ValueError("Producto o cantidad invalida.")
+        if product_id <= 0 or quantity <= 0 or product_id in seen:
+            raise ValueError("El carrito contiene productos o cantidades invalidas.")
+        seen.add(product_id)
+        product = products_by_id.get(product_id)
+        if not product or not bool(product.get("disponible")):
+            raise ValueError("Uno de los productos ya no esta disponible.")
+        available = max(0, int(product.get("porciones_disponibles") or 0))
+        if quantity > available:
+            raise ValueError(f"{product.get('nombre')}: solo quedan {available} unidad(es).")
+        # El POS opera en pesos chilenos: normalizar evita diferencias entre
+        # el importe mostrado en el navegador y el que se guarda en la venta.
+        base = max(0.0, float(round(float(product.get("precio") or product.get("precio_final") or 0))))
+        transfer = max(0.0, float(round(float(product.get("precio_transferencia") or base))))
+        card = max(0.0, float(round(float(product.get("precio_tarjeta") or base))))
+        if mode == "manual":
+            try:
+                unit_price = float(round(float(raw.get("manual_price"))))
+            except (TypeError, ValueError):
+                raise ValueError(f"{product.get('nombre')}: ingresa un precio manual valido.")
+            if unit_price < 0 or unit_price > 10000000:
+                raise ValueError(f"{product.get('nombre')}: precio manual fuera de rango.")
+            if abs(unit_price - transfer) > 0.001 and len(manual_reason) < 3:
+                raise ValueError("Indica un motivo para el precio manual.")
+        else:
+            unit_price = transfer if mode == "transfer" else card
+        lines.append({
+            "product_id": product_id,
+            "name": str(product.get("nombre") or "Producto"),
+            "image": str(product.get("foto_url") or ""),
+            "quantity": quantity,
+            "base_price": round(base, 2),
+            "transfer_price": round(transfer, 2),
+            "card_price": round(card, 2),
+            "unit_price": round(unit_price, 2),
+            "line_total": round(unit_price * quantity, 2),
+        })
+    subtotal = round(sum(line["line_total"] for line in lines), 2)
+    discount = payload.get("discount") if isinstance(payload.get("discount"), dict) else {}
+    discount_type = str(discount.get("type") or "fixed").strip().lower()
+    try:
+        discount_value = max(0.0, float(discount.get("value") or 0))
+    except (TypeError, ValueError):
+        raise ValueError("Descuento invalido.")
+    if discount_type == "percent":
+        discount_amount = round(subtotal * min(100.0, discount_value) / 100.0, 2)
+    elif discount_type == "fixed":
+        discount_amount = round(discount_value, 2)
+    else:
+        raise ValueError("Tipo de descuento invalido.")
+    discount_amount = min(subtotal, max(0.0, discount_amount))
+    fee_base = max(0.0, subtotal - discount_amount)
+    # Reproduce Math.round() del cliente para que ambos lados redondeen .5 al alza.
+    card_fee = float(math.floor(fee_base * fee_pct / 100.0 + 0.5)) if mode == "card" else 0.0
+    total = float(math.floor(fee_base + card_fee + 0.5))
+    return {
+        "mode": mode,
+        "card_fee_pct": fee_pct,
+        "show_prices_to_customer": bool(settings.get("show_prices_to_customer", True)),
+        "manual_reason": manual_reason,
+        "discount_type": discount_type,
+        "discount_value": discount_value,
+        "discount_reason": str(discount.get("reason") or "").strip()[:240],
+        "lines": lines,
+        "subtotal": subtotal,
+        "discount": discount_amount,
+        "card_fee": card_fee,
+        "total": total,
+    }
+
+
+def _pos_admin_sale_items(summary):
+    """Distribuye descuento/comision en las lineas para que ventas y detalles sumen el total final."""
+    subtotal = float(summary.get("subtotal") or 0)
+    total = float(summary.get("total") or 0)
+    lines = list(summary.get("lines") or [])
+    if subtotal <= 0 or not lines:
+        raise ValueError("El total de la venta debe ser mayor a cero.")
+    assigned = 0.0
+    items = []
+    for index, line in enumerate(lines):
+        if index == len(lines) - 1:
+            final_line_total = round(total - assigned, 2)
+        else:
+            final_line_total = round(float(line["line_total"]) * total / subtotal, 2)
+            assigned += final_line_total
+        quantity = int(line["quantity"])
+        items.append({"id": int(line["product_id"]), "cantidad": quantity, "precio_unitario": round(final_line_total / quantity, 6)})
+    return items
+
+
+@app.route('/admin/pos')
+def admin_pos():
+    return render_template('pos_admin.html')
+
+
+@app.route('/api/admin/pos/catalogo')
+def api_admin_pos_catalogo():
+    try:
+        products = _obtener_productos_para_venta(include_zero_stock=True)
+        return jsonify({
+            "success": True,
+            "productos": products,
+            "card_fee_pct": _pos_admin_card_fee_pct(),
+            "vendedor": str(session.get(_ADMIN_USER_NAME_SESSION_KEY) or "Administrador"),
+        })
+    except Exception as exc:
+        return jsonify({"success": False, "productos": [], "error": str(exc)}), 500
+
+
+@app.route('/api/admin/pos/guardar', methods=['POST'])
+def api_admin_pos_guardar():
+    try:
+        payload = request.get_json(silent=True) or {}
+        request_id = str(payload.get("request_id") or "").strip()[:80]
+        _ensure_pos_admin_tables()
+        if request_id:
+            conn_existing = get_db()
+            try:
+                row = conn_existing.execute(
+                    "SELECT venta_id, snapshot_json FROM pos_admin_snapshots WHERE request_id = ? LIMIT 1", (request_id,)
+                ).fetchone()
+                if row:
+                    saved = json.loads(row["snapshot_json"] or "{}")
+                    return jsonify({"success": True, "idempotent": True, "venta_id": int(row["venta_id"]), "snapshot": saved})
+            finally:
+                conn_existing.close()
+        products = {int(p.get("id") or 0): p for p in _obtener_productos_para_venta(include_zero_stock=True)}
+        summary = _pos_admin_price_summary(payload, products)
+        customer = payload.get("customer") if isinstance(payload.get("customer"), dict) else {}
+        customer_name = str(customer.get("name") or "").strip()[:120]
+        customer_phone_raw = str(customer.get("phone") or "").strip()
+        customer_phone = _pos_admin_phone(customer_phone_raw) if customer_phone_raw else ""
+        if customer_phone_raw and not customer_phone:
+            raise ValueError("Ingresa un telefono chileno movil valido.")
+        processed = _procesar_venta_desde_payload(
+            {"items": _pos_admin_sale_items(summary), "canal_venta": "pos_admin"},
+            canal_por_defecto="pos_admin",
+            permitir_canal_usuario=False,
+            permitir_agenda=False,
+        )
+        venta_id = int(processed.get("venta_id") or 0)
+        if not venta_id:
+            raise RuntimeError("No se pudo registrar la venta POS.")
+        method_label = {"transfer": "transferencia", "card": "tarjeta", "manual": "precio_manual"}[summary["mode"]]
+        observations = f"POS admin | descuento: {summary['discount_reason'] or '-'} | manual: {summary['manual_reason'] or '-'}"
+        conn = get_db()
+        try:
+            _ensure_ventas_metodo_pago_column()
+            conn.execute(
+                """
+                UPDATE ventas
+                SET cliente_nombre = ?, cliente_telefono = ?, metodo_pago = ?, descuento_monto = ?, total_monto = ?, observaciones = ?
+                WHERE id = ?
+                """,
+                (customer_name, customer_phone, method_label, summary["discount"], summary["total"], observations, venta_id),
+            )
+            snapshot = {
+                "venta_id": venta_id,
+                "vendedor": str(session.get(_ADMIN_USER_NAME_SESSION_KEY) or "Administrador"),
+                "customer": {"name": customer_name, "phone": customer_phone},
+                "summary": summary,
+                "created_at": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
+            }
+            conn.execute(
+                "INSERT INTO pos_admin_snapshots (venta_id, request_id, vendedor, snapshot_json) VALUES (?, ?, ?, ?)",
+                (venta_id, request_id or None, snapshot["vendedor"], json.dumps(snapshot, ensure_ascii=False)),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        crear_backup()
+        return jsonify({"success": True, "venta_id": venta_id, "snapshot": snapshot, "mensaje": "Venta POS guardada correctamente."})
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        print(f"[POS_ADMIN] guardar_error={exc.__class__.__name__}")
+        return jsonify({"success": False, "error": "No se pudo guardar la venta POS."}), 500
+
+
 def _ensure_ventas_mayoristas_tables(cursor):
     conn = getattr(cursor, "connection", None)
     cursor.execute(
