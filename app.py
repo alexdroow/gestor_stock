@@ -23,7 +23,7 @@ try:
     import imghdr  # Python <= 3.12
 except ModuleNotFoundError:
     imghdr = None
-from urllib.parse import urlencode, quote, unquote, urlparse
+from urllib.parse import urlencode, quote, unquote, urlparse, parse_qsl, urlunparse
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 from datetime import datetime, timedelta
@@ -2535,6 +2535,17 @@ def _flow_sign(params, secret_key):
     keys = sorted([k for k in params.keys() if k != "s"])
     to_sign = "".join([f"{k}{params[k]}" for k in keys])
     return hmac.new(str(secret_key).encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _flow_payment_redirect_url(base_url, token):
+    """Flow entrega URL y token por separado; el checkout exige ambos en la redireccion."""
+    parsed = urlparse(str(base_url or "").strip())
+    flow_token = str(token or "").strip()
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() != "sandbox.flow.cl" or not flow_token:
+        raise ValueError("URL o token de checkout Flow Sandbox invalido.")
+    query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key.lower() != "token"]
+    query.append(("token", flow_token))
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 def _flow_post(endpoint, params, cfg, timeout=25):
@@ -14985,8 +14996,20 @@ def api_admin_pos_whatsapp(venta_id):
                 flow_conn.close()
             if saved_flow and str(saved_flow.get("estado") or "").lower() == "pagado":
                 raise RuntimeError("Este pedido ya tiene un pago Flow confirmado.")
-            if saved_flow and str(saved_flow.get("estado") or "").lower() == "pendiente" and saved_flow.get("flow_redirect_url"):
-                flow_url = str(saved_flow["flow_redirect_url"])
+            if (saved_flow and str(saved_flow.get("estado") or "").lower() == "pendiente"
+                    and saved_flow.get("flow_redirect_url") and saved_flow.get("flow_token")):
+                old_flow_url = str(saved_flow["flow_redirect_url"])
+                flow_url = _flow_payment_redirect_url(old_flow_url, saved_flow["flow_token"])
+                if flow_url != old_flow_url:
+                    repair_conn = get_db()
+                    try:
+                        repair_conn.execute(
+                            "UPDATE tienda_flow_pagos SET flow_redirect_url = ?, updated_at = CURRENT_TIMESTAMP WHERE venta_id = ?",
+                            (flow_url, venta_id),
+                        )
+                        repair_conn.commit()
+                    finally:
+                        repair_conn.close()
             else:
                 stage = "flow_create"
                 base_url = _public_base_url(request.url_root).rstrip("/")
@@ -15036,10 +15059,11 @@ def api_admin_pos_whatsapp(venta_id):
                 _flow_log("pos_checkout_flow_response", venta_id)
                 stage = "flow_response_validate"
                 flow_token = str(flow_response.get("token") or "").strip()
-                flow_url = str(flow_response.get("url") or "").strip()
-                flow_host = (urlparse(flow_url).hostname or "").lower()
-                if not flow_token or not flow_url or not flow_url.startswith("https://") or flow_host != "sandbox.flow.cl":
+                flow_base_url = str(flow_response.get("url") or "").strip()
+                flow_host = (urlparse(flow_base_url).hostname or "").lower()
+                if not flow_token or not flow_base_url or not flow_base_url.startswith("https://") or flow_host != "sandbox.flow.cl":
                     raise RuntimeError("Flow no devolvio un enlace de pago seguro.")
+                flow_url = _flow_payment_redirect_url(flow_base_url, flow_token)
                 backup = {
                     "venta_id": venta_id,
                     "cliente_nombre": sale.get("cliente_nombre") or "",
