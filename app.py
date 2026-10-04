@@ -1,4 +1,4 @@
-﻿from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response, send_file, Response, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response, send_file, Response, session
 import os
 import sys
 import math
@@ -14888,6 +14888,9 @@ def api_admin_pos_whatsapp(venta_id):
     if not session.get(_ADMIN_SESSION_KEY):
         return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
 
+    started_at = time.monotonic()
+    stage = "pedido_lookup"
+    _flow_log("pos_whatsapp_start", venta_id)
     payload = request.get_json(silent=True) or {}
     conn = None
     try:
@@ -14916,6 +14919,7 @@ def api_admin_pos_whatsapp(venta_id):
             conn.close()
 
     try:
+        stage = "snapshot_read"
         snapshot = json.loads(sale.get("snapshot_json") or "{}")
         summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
         mode = str(summary.get("mode") or "").strip().lower()
@@ -14936,6 +14940,7 @@ def api_admin_pos_whatsapp(venta_id):
                 "Correo: pasteleria.sucree@outlook.com"
             )
         elif mode == "card":
+            stage = "flow_config"
             cfg = _flow_cfg()
             if not cfg.get("enabled") or not _flow_checkout_public_enabled():
                 raise RuntimeError("Flow no esta habilitado. Verifica las credenciales y la URL publica HTTPS.")
@@ -14956,6 +14961,7 @@ def api_admin_pos_whatsapp(venta_id):
             if saved_flow and str(saved_flow.get("estado") or "").lower() == "pendiente" and saved_flow.get("flow_redirect_url"):
                 flow_url = str(saved_flow["flow_redirect_url"])
             else:
+                stage = "flow_create"
                 base_url = _public_base_url(request.url_root).rstrip("/")
                 commerce_order = f"POS-{venta_id}-{int(time.time())}"
                 amount = int(round(float(sale.get("total_monto") or 0)))
@@ -14977,6 +14983,7 @@ def api_admin_pos_whatsapp(venta_id):
                     _flow_log("pos_checkout_flow_error", venta_id, detail=flow_exc.__class__.__name__)
                     raise RuntimeError("Flow Sandbox no respondio. Revisa la conexion saliente, API Key y Secret Key del servidor.")
                 _flow_log("pos_checkout_flow_response", venta_id)
+                stage = "flow_response_validate"
                 flow_token = str(flow_response.get("token") or "").strip()
                 flow_url = str(flow_response.get("url") or "").strip()
                 flow_host = (urlparse(flow_url).hostname or "").lower()
@@ -14991,6 +14998,7 @@ def api_admin_pos_whatsapp(venta_id):
                     "items": summary.get("lines") or [],
                     "canal_venta": "pos_admin",
                 }
+                stage = "flow_persist"
                 _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_url, backup)
                 flow_conn = get_db()
                 try:
@@ -15009,6 +15017,7 @@ def api_admin_pos_whatsapp(venta_id):
         if len(final_message) > 1500:
             raise RuntimeError("El mensaje es demasiado largo; acorta el resumen del pedido antes de enviarlo.")
         whatsapp_url = f"https://wa.me/{destination.replace('+', '')}?text={quote(final_message, safe='')}"
+        _flow_log("pos_whatsapp_ready", venta_id, detail=f"mode={mode} elapsed_ms={int((time.monotonic() - started_at) * 1000)}")
         return jsonify({
             "success": True,
             "venta_id": venta_id,
@@ -15018,11 +15027,11 @@ def api_admin_pos_whatsapp(venta_id):
             "delivery": "device_app_chooser",
         })
     except RuntimeError as exc:
-        print(f"[POS_ADMIN] whatsapp_prepare_error={exc.__class__.__name__}")
-        return jsonify({"success": False, "error": str(exc)}), 502
+        _flow_log("pos_whatsapp_failed", venta_id, status_code=503, detail=f"stage={stage} error={exc.__class__.__name__} elapsed_ms={int((time.monotonic() - started_at) * 1000)}")
+        return jsonify({"success": False, "error": str(exc)}), 503
     except Exception as exc:
-        print(f"[POS_ADMIN] whatsapp_prepare_error={exc.__class__.__name__}")
-        return jsonify({"success": False, "error": "No se pudo preparar el mensaje para WhatsApp."}), 502
+        _flow_log("pos_whatsapp_failed", venta_id, status_code=500, detail=f"stage={stage} error={exc.__class__.__name__} elapsed_ms={int((time.monotonic() - started_at) * 1000)}")
+        return jsonify({"success": False, "error": "No se pudo preparar el mensaje para WhatsApp. Revisa el registro del servidor e intenta nuevamente."}), 500
 
 
 def _ensure_ventas_mayoristas_tables(cursor):
