@@ -14625,17 +14625,6 @@ def _ensure_pos_admin_tables():
             )
             """
         )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS pos_admin_whatsapp_sends (
-                request_id TEXT PRIMARY KEY,
-                venta_id INTEGER NOT NULL,
-                estado TEXT NOT NULL DEFAULT 'enviando',
-                actualizado TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE
-            )
-            """
-        )
         ventas_exists = cur.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ventas'"
         ).fetchone()
@@ -14900,21 +14889,6 @@ def api_admin_pos_whatsapp(venta_id):
         return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
 
     payload = request.get_json(silent=True) or {}
-    request_id = str(payload.get("request_id") or "").strip()[:80]
-    if not request_id:
-        return jsonify({"success": False, "error": "Falta el identificador del envio."}), 400
-
-    business_sender = _normalizar_numero_whatsapp("+56964330546")
-    configured_sender = _normalizar_numero_whatsapp(os.environ.get("TWILIO_WHATSAPP_FROM"))
-    if configured_sender != business_sender:
-        return jsonify({
-            "success": False,
-            "error": "Configura TWILIO_WHATSAPP_FROM como whatsapp:+56964330546 y verifica ese remitente WhatsApp Business en Twilio.",
-        }), 503
-    if not _bool_env("GESTIONSTOCK_WHATSAPP_ENABLED", default=False) or not _twilio_whatsapp_configurado():
-        return jsonify({"success": False, "error": "El envio de WhatsApp Business no esta habilitado o falta configurar Twilio."}), 503
-
-    _ensure_pos_admin_tables()
     conn = get_db()
     try:
         row = conn.execute(
@@ -14933,26 +14907,6 @@ def api_admin_pos_whatsapp(venta_id):
         destination = _pos_admin_phone(sale.get("cliente_telefono"))
         if not destination:
             return jsonify({"success": False, "error": "El pedido no tiene un telefono chileno movil valido."}), 400
-
-        existing_send = conn.execute(
-            "SELECT estado FROM pos_admin_whatsapp_sends WHERE request_id = ? LIMIT 1", (request_id,)
-        ).fetchone()
-        if existing_send:
-            send_state = str(existing_send["estado"] or "")
-            if send_state == "enviado":
-                return jsonify({"success": True, "idempotent": True, "venta_id": venta_id})
-            if send_state == "enviando":
-                return jsonify({"success": False, "error": "Este mensaje ya esta en proceso de envio."}), 409
-            conn.execute(
-                "UPDATE pos_admin_whatsapp_sends SET estado = 'enviando', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
-                (request_id,),
-            )
-        else:
-            conn.execute(
-                "INSERT INTO pos_admin_whatsapp_sends (request_id, venta_id, estado) VALUES (?, ?, 'enviando')",
-                (request_id, venta_id),
-            )
-        conn.commit()
     finally:
         conn.close()
 
@@ -15043,43 +14997,21 @@ def api_admin_pos_whatsapp(venta_id):
         final_message = "\n\n".join(part for part in (base_message, *additions) if part)
         if len(final_message) > 1500:
             raise RuntimeError("El mensaje es demasiado largo; acorta el resumen del pedido antes de enviarlo.")
-        ok, err = _enviar_whatsapp_twilio(final_message, to_number=destination)
-        if not ok:
-            raise RuntimeError("Twilio no acepto el mensaje; revisa el remitente y su estado en WhatsApp Business.")
-        conn_done = get_db()
-        try:
-            conn_done.execute(
-                "UPDATE pos_admin_whatsapp_sends SET estado = 'enviado', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
-                (request_id,),
-            )
-            conn_done.commit()
-        finally:
-            conn_done.close()
-        return jsonify({"success": True, "venta_id": venta_id, "message": final_message, "flow_payment_url": flow_url})
+        whatsapp_url = f"https://wa.me/{destination.replace('+', '')}?text={quote(final_message, safe='')}"
+        return jsonify({
+            "success": True,
+            "venta_id": venta_id,
+            "message": final_message,
+            "flow_payment_url": flow_url,
+            "whatsapp_url": whatsapp_url,
+            "delivery": "device_app_chooser",
+        })
     except RuntimeError as exc:
-        print(f"[POS_ADMIN] whatsapp_error={exc.__class__.__name__}")
-        conn_fail = get_db()
-        try:
-            conn_fail.execute(
-                "UPDATE pos_admin_whatsapp_sends SET estado = 'error', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
-                (request_id,),
-            )
-            conn_fail.commit()
-        finally:
-            conn_fail.close()
+        print(f"[POS_ADMIN] whatsapp_prepare_error={exc.__class__.__name__}")
         return jsonify({"success": False, "error": str(exc)}), 502
     except Exception as exc:
-        print(f"[POS_ADMIN] whatsapp_error={exc.__class__.__name__}")
-        conn_fail = get_db()
-        try:
-            conn_fail.execute(
-                "UPDATE pos_admin_whatsapp_sends SET estado = 'error', actualizado = CURRENT_TIMESTAMP WHERE request_id = ?",
-                (request_id,),
-            )
-            conn_fail.commit()
-        finally:
-            conn_fail.close()
-        return jsonify({"success": False, "error": "No se pudo completar el envio desde WhatsApp Business."}), 502
+        print(f"[POS_ADMIN] whatsapp_prepare_error={exc.__class__.__name__}")
+        return jsonify({"success": False, "error": "No se pudo preparar el mensaje para WhatsApp."}), 502
 
 
 def _ensure_ventas_mayoristas_tables(cursor):
