@@ -14818,10 +14818,42 @@ def admin_pos():
     return response
 
 
+@app.route('/admin/pos/mobile')
+def admin_pos_mobile():
+    response = make_response(render_template('pos_admin_mobile.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261005-1'
+    return response
+
+
 @app.route('/api/admin/pos/catalogo')
 def api_admin_pos_catalogo():
     try:
         products = _obtener_productos_para_venta(include_zero_stock=True)
+        top_sellers = set()
+        try:
+            ranking_conn = get_db()
+            try:
+                rows = ranking_conn.execute(
+                    """
+                    SELECT vi.producto_id, SUM(COALESCE(vi.cantidad, 0)) AS unidades
+                    FROM venta_items vi
+                    JOIN ventas v ON v.id = vi.venta_id
+                    WHERE datetime(v.fecha_hora) >= datetime('now', '-30 days')
+                    GROUP BY vi.producto_id
+                    ORDER BY unidades DESC
+                    LIMIT 12
+                    """
+                ).fetchall()
+                top_sellers = {int(row["producto_id"]) for row in rows if int(row["producto_id"] or 0) > 0}
+            finally:
+                ranking_conn.close()
+        except Exception:
+            top_sellers = set()
+        for product in products:
+            product["mas_vendido"] = int(product.get("id") or 0) in top_sellers
         return jsonify({
             "success": True,
             "productos": products,
@@ -14857,6 +14889,33 @@ def api_admin_pos_guardar():
         customer_phone = _pos_admin_phone(customer_phone_raw) if customer_phone_raw else ""
         if customer_phone_raw and not customer_phone:
             raise ValueError("Ingresa un telefono chileno movil valido.")
+        delivery_type = str(payload.get("delivery_type") or "retiro").strip().lower()
+        if delivery_type not in {"retiro", "despacho"}:
+            raise ValueError("Modalidad de entrega invalida.")
+        delivery_address = str(payload.get("delivery_address") or "").strip()[:400]
+        if delivery_type == "despacho" and not delivery_address:
+            raise ValueError("Ingresa la direccion para el despacho.")
+        payment_method = str(payload.get("payment_method") or summary["mode"]).strip().lower()
+        if payment_method not in {"transfer", "card", "cash", "manual"}:
+            raise ValueError("Metodo de pago invalido.")
+        method_label = {"transfer": "transferencia", "card": "tarjeta", "cash": "efectivo", "manual": "precio_manual"}[payment_method]
+        explicit_payment_method = "payment_method" in payload
+        customer_email = _pos_admin_email(customer.get("email"))
+        if explicit_payment_method and payment_method == "card" and not customer_email:
+            raise ValueError("Flow requiere el correo real del cliente.")
+        if explicit_payment_method and payment_method == "card":
+            method_label = "flow_pendiente"
+        internal_note = str(payload.get("note") or "").strip()[:500]
+        payment_reference = str(payload.get("payment_reference") or "").strip()[:120]
+        cash_received = 0
+        if payment_method == "cash":
+            try:
+                cash_received = int(round(float(payload.get("cash_received") or 0)))
+            except (TypeError, ValueError):
+                raise ValueError("Ingresa el monto recibido en efectivo.")
+            if cash_received < int(round(summary["total"])):
+                raise ValueError("El monto recibido no alcanza para cubrir el total.")
+        change_due = max(0, cash_received - int(round(summary["total"]))) if payment_method == "cash" else 0
         processed = _procesar_venta_desde_payload(
             {"items": _pos_admin_sale_items(summary), "canal_venta": "pos_admin"},
             canal_por_defecto="pos_admin",
@@ -14866,25 +14925,42 @@ def api_admin_pos_guardar():
         venta_id = int(processed.get("venta_id") or 0)
         if not venta_id:
             raise RuntimeError("No se pudo registrar la venta POS.")
-        method_label = {"transfer": "transferencia", "card": "tarjeta", "manual": "precio_manual"}[summary["mode"]]
-        observations = f"POS admin | descuento: {summary['discount_reason'] or '-'} | manual: {summary['manual_reason'] or '-'}"
+        payment_status = {"transfer": "pendiente de validacion", "card": "pendiente de Flow", "cash": "recibido", "manual": "por registrar"}[payment_method]
+        observations = (
+            f"POS admin | descuento: {summary['discount_reason'] or '-'} | manual: {summary['manual_reason'] or '-'}"
+            f" | nota: {internal_note or '-'} | referencia pago: {payment_reference or '-'}"
+            f" | recibido efectivo: {cash_received if payment_method == 'cash' else '-'}"
+            f" | vuelto: {change_due if payment_method == 'cash' else '-'} | pago: {payment_status}"
+        )
         conn = get_db()
         try:
             _ensure_ventas_metodo_pago_column()
             conn.execute(
                 """
                 UPDATE ventas
-                SET cliente_nombre = ?, cliente_telefono = ?, metodo_pago = ?, descuento_monto = ?, total_monto = ?, observaciones = ?,
+                SET cliente_nombre = ?, cliente_email = ?, cliente_telefono = ?, metodo_pago = ?, descuento_monto = ?, total_monto = ?, observaciones = ?,
                     canal_venta = 'pos_admin', pedido_estado = 'recibido', pedido_estado_actualizado = CURRENT_TIMESTAMP,
-                    pedido_timer_minutos = NULL, pedido_timer_inicio = NULL, entrega_tipo = 'retiro'
+                    pedido_timer_minutos = NULL, pedido_timer_inicio = NULL, entrega_tipo = ?,
+                    direccion_entrega = ?, despacho_monto = 0
                 WHERE id = ?
                 """,
-                (customer_name, customer_phone, method_label, summary["discount"], summary["total"], observations, venta_id),
+                (customer_name, customer_email, customer_phone, method_label, summary["discount"], summary["total"], observations,
+                 delivery_type, delivery_address if delivery_type == "despacho" else None, venta_id),
             )
             snapshot = {
                 "venta_id": venta_id,
                 "vendedor": str(session.get(_ADMIN_USER_NAME_SESSION_KEY) or "Administrador"),
-                "customer": {"name": customer_name, "phone": customer_phone},
+                "customer": {"name": customer_name, "phone": customer_phone, "email": customer_email},
+                "checkout": {
+                    "payment_method": payment_method,
+                    "payment_status": payment_status,
+                    "delivery_type": delivery_type,
+                    "delivery_address": delivery_address if delivery_type == "despacho" else "",
+                    "note": internal_note,
+                    "payment_reference": payment_reference,
+                    "cash_received": cash_received,
+                    "change_due": change_due,
+                },
                 "summary": summary,
                 "created_at": datetime.now(ZoneInfo("America/Santiago")).isoformat(),
             }
@@ -14945,9 +15021,16 @@ def api_admin_pos_whatsapp(venta_id):
         stage = "snapshot_read"
         snapshot = json.loads(sale.get("snapshot_json") or "{}")
         summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
+        saved_method = str(sale.get("metodo_pago") or "").strip().lower()
         mode = str(summary.get("mode") or "").strip().lower()
-        if mode not in {"transfer", "card", "manual"}:
-            mode = "card" if "flow" in str(sale.get("metodo_pago") or "").lower() or "tarjeta" in str(sale.get("metodo_pago") or "").lower() else "transfer"
+        if saved_method in {"flow", "flow_pending", "flow_pendiente", "flow_pagado", "tarjeta"}:
+            mode = "card"
+        elif saved_method in {"efectivo", "cash"}:
+            mode = "cash"
+        elif saved_method in {"transferencia", "transfer"}:
+            mode = "transfer"
+        elif mode not in {"transfer", "card", "manual"}:
+            mode = "transfer"
         base_message = str(payload.get("message") or "").strip()[:1100]
         additions = []
         flow_url = ""
