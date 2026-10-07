@@ -2036,6 +2036,10 @@
             padding: 20px 24px 16px;
         }
 
+        .agenda-mobile-wizard-bar,
+        .agenda-mobile-wizard-actions { display: none; }
+        .agenda-mobile-step-hidden { display: none !important; }
+
         #modal-rellenos-mes .modal {
             width: min(94vw, 940px);
             max-width: 940px;
@@ -3468,6 +3472,35 @@
             #modal-evento .modal-footer .btn {
                 flex: 1 1 calc(50% - 8px);
             }
+            #modal-evento.agenda-mobile-wizard-active .modal {
+                width: 100vw; max-width: none; height: 100dvh; max-height: 100dvh;
+                border-radius: 0; padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+            #modal-evento.agenda-mobile-wizard-active .agenda-mobile-wizard-bar {
+                display: block; flex: 0 0 auto; padding: 10px 16px 8px;
+                background: #fffaf4; border-bottom: 1px solid #f0dfca;
+            }
+            .agenda-mobile-wizard-top { display:flex; justify-content:space-between; gap:10px; color:#713512; font-size:13px; font-weight:800; }
+            .agenda-mobile-wizard-top strong { text-align:right; }
+            .agenda-mobile-wizard-track { height:5px; margin-top:9px; background:#f2dfca; border-radius:99px; overflow:hidden; }
+            .agenda-mobile-wizard-track span { display:block; width:25%; height:100%; background:#ef6a12; border-radius:inherit; transition:width .22s ease; }
+            .agenda-mobile-wizard-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin-top:8px; color:#8a7564; font-size:10px; text-align:center; font-weight:700; }
+            .agenda-mobile-wizard-tabs [aria-current="step"] { color:#bd4b0b; }
+            #modal-evento.agenda-mobile-wizard-active .modal-body { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:14px 16px 20px; }
+            #modal-evento.agenda-mobile-wizard-active .agenda-mobile-wizard-actions { display:flex; flex:0 0 auto; gap:10px; padding:10px 14px; background:#fff; border-top:1px solid #f0dfca; }
+            #modal-evento.agenda-mobile-wizard-active .agenda-mobile-wizard-actions .btn { min-height:48px; flex:1; }
+            #modal-evento.agenda-mobile-wizard-active .modal-footer { padding:10px 14px calc(10px + env(safe-area-inset-bottom, 0px)); gap:7px; max-height:32vh; overflow-y:auto; }
+            #modal-evento.agenda-mobile-wizard-active .modal-footer .btn { min-height:44px; flex:1 1 calc(50% - 8px); }
+            #modal-evento.agenda-mobile-wizard-active:not(.agenda-mobile-footer-final) #btn-guardar-evento,
+            #modal-evento.agenda-mobile-wizard-active:not(.agenda-mobile-footer-final) #btn-editar-whatsapp-msg,
+            #modal-evento.agenda-mobile-wizard-active:not(.agenda-mobile-footer-final) #btn-whatsapp-cliente,
+            #modal-evento.agenda-mobile-wizard-active:not(.agenda-mobile-footer-final) #btn-whatsapp-pdf,
+            #modal-evento.agenda-mobile-wizard-active:not(.agenda-mobile-footer-final) #btn-pdf { display:none !important; }
+            #modal-evento.agenda-mobile-wizard-active .torta-manual-box { padding:12px; }
+            #modal-evento.agenda-mobile-wizard-active .torta-builder-total { position:sticky; bottom:0; z-index:2; box-shadow:0 -5px 14px rgba(64,35,15,.08); }
+            #modal-evento.agenda-mobile-wizard-active input,
+            #modal-evento.agenda-mobile-wizard-active select,
+            #modal-evento.agenda-mobile-wizard-active textarea { font-size:16px; }
             .resumen-pedido-grid {
                 grid-template-columns: 1fr;
             }
@@ -3836,6 +3869,13 @@
                 <h3 class="modal-title" id="modal-titulo">Nuevo Evento</h3>
                 <button onclick="cerrarModal()" class="modal-close">&times;</button>
             </div>
+            <div class="agenda-mobile-wizard-bar" id="agenda-mobile-wizard-bar" aria-live="polite">
+                <div class="agenda-mobile-wizard-top"><span id="agenda-mobile-wizard-step">Paso 1 de 4</span><strong id="agenda-mobile-wizard-total">Total estimado: $0</strong></div>
+                <div class="agenda-mobile-wizard-track"><span id="agenda-mobile-wizard-progress"></span></div>
+                <div class="agenda-mobile-wizard-tabs" aria-label="Pasos para agendar torta">
+                    <span data-wizard-tab="1">Fecha</span><span data-wizard-tab="2">Torta</span><span data-wizard-tab="3">Diseño</span><span data-wizard-tab="4">Cliente y pago</span>
+                </div>
+            </div>
             <div class="modal-body">
                 <input type="hidden" id="evento-id">
                 <div class="pedido-ficha-dashboard" id="pedido-ficha-dashboard"></div>
@@ -4069,6 +4109,10 @@
                         <option value="2880">2 dÃ­as antes</option>
                     </select>
                 </div>
+            </div>
+            <div class="agenda-mobile-wizard-actions" id="agenda-mobile-wizard-actions">
+                <button type="button" class="btn btn-secondary" id="agenda-mobile-wizard-prev">Anterior</button>
+                <button type="button" class="btn btn-primary" id="agenda-mobile-wizard-next">Continuar</button>
             </div>
             <div class="modal-footer">
                 <button onclick="eliminarEvento()" class="btn btn-danger" id="btn-eliminar" style="display: none;">Eliminar</button>
@@ -6039,6 +6083,16 @@
         document.addEventListener('DOMContentLoaded', () => {
             applyDarkModePreference();
             inicializarBusquedaDireccion();
+            document.getElementById('agenda-mobile-wizard-next')?.addEventListener('click', avanzarWizardTortaMovil);
+            document.getElementById('agenda-mobile-wizard-prev')?.addEventListener('click', () => {
+                agendaMobileWizardStep = Math.max(1, agendaMobileWizardStep - 1);
+                actualizarWizardTortaMovil();
+                document.querySelector('#modal-evento .modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            const wizardModal = document.getElementById('modal-evento');
+            ['input', 'change', 'click'].forEach((eventName) => wizardModal?.addEventListener(eventName, () => {
+                if (wizardModal.classList.contains('agenda-mobile-wizard-active')) window.requestAnimationFrame(actualizarWizardTortaMovil);
+            }));
             cargarEstadoDayHoursPanel();
             cargarReservasTiendaSeen();
             fechaSeleccionada = formatearFecha(new Date());
@@ -9278,8 +9332,82 @@
             actualizarBotonWhatsAppCliente();
         }
 
+        let agendaMobileWizardStep = 1;
+
+        function actualizarWizardTortaMovil() {
+            const modal = document.getElementById('modal-evento');
+            if (!modal?.classList.contains('agenda-mobile-wizard-active')) return;
+            const step = Math.max(1, Math.min(4, Number(agendaMobileWizardStep || 1)));
+            agendaMobileWizardStep = step;
+            const groups = {
+                1: ['#evento-codigo-pedido', '#evento-tipo', '#evento-titulo', '#grupo-fecha-hora', '#grupo-hora-fin', '#agenda-torta-horarios-box'],
+                2: ['#torta-categoria', '#torta-size', '#torta-sabores-list', '#torta-extras-list', '#torta-topper-select'],
+                3: ['#torta-ref-file', '#torta-ref-list', '#torta-nota', '#torta-admin-manual-mode', '#torta-otros-cargos-list', '#torta-descuento-tipo', '#torta-descuento-valor', '#torta-builder-total'],
+                4: ['#evento-cliente', '#evento-telefono', '#evento-envio', '#grupo-direccion', '#evento-ingredientes', '#evento-total', '#evento-abono', '#evento-restante', '#evento-alerta'],
+            };
+            modal.querySelectorAll('.agenda-mobile-step-hidden').forEach((el) => el.classList.remove('agenda-mobile-step-hidden'));
+            const assigned = new Map();
+            Object.entries(groups).forEach(([stepNumber, selectors]) => selectors.forEach((selector) => {
+                const field = modal.querySelector(selector);
+                if (!field) return;
+                const group = field.closest('.form-group, .form-row, .torta-dispo-box, .checkbox-group, .money-display') || field;
+                assigned.set(group, Number(stepNumber));
+            }));
+            assigned.forEach((fieldStep, group) => {
+                if (fieldStep !== step) group.classList.add('agenda-mobile-step-hidden');
+            });
+            const cakeBox = modal.querySelector('#bloque-torta-manual');
+            if (cakeBox) cakeBox.classList.toggle('agenda-mobile-step-hidden', step !== 2 && step !== 3);
+            const customer = modal.querySelector('#campos-cliente');
+            if (customer) customer.style.display = 'block';
+            const stepText = modal.querySelector('#agenda-mobile-wizard-step');
+            const progress = modal.querySelector('#agenda-mobile-wizard-progress');
+            const total = modal.querySelector('#agenda-mobile-wizard-total');
+            const next = modal.querySelector('#agenda-mobile-wizard-next');
+            const prev = modal.querySelector('#agenda-mobile-wizard-prev');
+            if (stepText) stepText.textContent = `Paso ${step} de 4: ${['Fecha', 'Torta', 'Diseño', 'Cliente y pago'][step - 1]}`;
+            if (progress) progress.style.width = `${step * 25}%`;
+            const manualTotal = Number(document.getElementById('evento-total')?.value || 0);
+            const catalogTotal = document.getElementById('torta-builder-total')?.textContent || '$0';
+            const visibleTotal = step === 4 && manualTotal > 0
+                ? `$${new Intl.NumberFormat('es-CL').format(manualTotal)}`
+                : catalogTotal;
+            if (total) total.textContent = `Total estimado: ${visibleTotal}`;
+            if (next) { next.textContent = step === 3 ? 'Continuar a cliente' : 'Continuar'; next.style.display = step === 4 ? 'none' : ''; }
+            if (prev) prev.disabled = step === 1;
+            modal.querySelectorAll('[data-wizard-tab]').forEach((tab) => {
+                const current = Number(tab.getAttribute('data-wizard-tab'));
+                if (current === step) tab.setAttribute('aria-current', 'step');
+                else tab.removeAttribute('aria-current');
+            });
+            const footer = modal.querySelector('.modal-footer');
+            if (footer) footer.classList.toggle('agenda-mobile-footer-final', step === 4);
+            modal.classList.toggle('agenda-mobile-footer-final', step === 4);
+        }
+
+        function avanzarWizardTortaMovil() {
+            const fecha = document.getElementById('evento-fecha')?.value;
+            const hora = document.getElementById('evento-hora-inicio')?.value;
+            if (agendaMobileWizardStep === 1 && (!fecha || !hora)) {
+                alert('Selecciona la fecha y hora del pedido antes de continuar.');
+                return;
+            }
+            if (agendaMobileWizardStep === 2) {
+                const size = document.getElementById('torta-size')?.value;
+                const sabores = document.querySelectorAll('#torta-sabores-list input[type="checkbox"]:checked').length;
+                const manual = Boolean(document.getElementById('torta-admin-manual-mode')?.checked) || Boolean(modoAdminManualTorta);
+                if (!size) { alert('Selecciona el tamaño de la torta antes de continuar.'); return; }
+                if (!sabores && !manual) { alert('Selecciona al menos un sabor o relleno antes de continuar.'); return; }
+            }
+            agendaMobileWizardStep = Math.min(4, agendaMobileWizardStep + 1);
+            actualizarWizardTortaMovil();
+            document.querySelector('#modal-evento .modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
         function cerrarModal() {
-            document.getElementById('modal-evento').classList.remove('active');
+            document.getElementById('modal-evento').classList.remove('active', 'agenda-mobile-wizard-active');
+            document.getElementById('modal-evento')?.classList.remove('agenda-mobile-footer-final');
+            document.querySelectorAll('#modal-evento .agenda-mobile-step-hidden').forEach((el) => el.classList.remove('agenda-mobile-step-hidden'));
             eventoEditando = null;
             modoAgendarTorta = false;
             modoAdminManualTorta = false;
@@ -9506,6 +9634,10 @@
             nuevoEvento();
             modoAgendarTorta = true;
             modoAdminManualTorta = true;
+            const mobileWizard = window.matchMedia('(max-width: 760px)').matches;
+            const eventModal = document.getElementById('modal-evento');
+            eventModal?.classList.toggle('agenda-mobile-wizard-active', mobileWizard);
+            agendaMobileWizardStep = 1;
             document.getElementById('modal-titulo').textContent = 'Agendar Torta Manual';
             document.getElementById('evento-tipo').value = 'torta';
             document.getElementById('evento-tipo').disabled = true;
@@ -9516,6 +9648,7 @@
             mostrarBloqueTortaManual(true);
             cargarCatalogoTortaManual(true).finally(() => renderTortaBuilder());
             cambiarTipo();
+            if (mobileWizard) actualizarWizardTortaMovil();
         }
 
         async function editarEvento(id) {
