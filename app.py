@@ -14722,7 +14722,10 @@ def _pos_admin_price_summary(payload, products_by_id):
             raise ValueError("El carrito contiene productos o cantidades invalidas.")
         seen.add(product_id)
         product = products_by_id.get(product_id)
-        if not product or not bool(product.get("disponible")):
+        active_in_store = True
+        if product and product.get("activo_tienda") is not None:
+            active_in_store = str(product.get("activo_tienda")).strip().lower() not in {"0", "false", "no", "off", ""}
+        if not product or not bool(product.get("disponible")) or not active_in_store:
             raise ValueError("Uno de los productos ya no esta disponible.")
         available = max(0, int(product.get("porciones_disponibles") or 0))
         if quantity > available:
