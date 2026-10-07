@@ -8306,8 +8306,6 @@ def api_tienda_admin_producto_quick_update(producto_id):
         if stock < 0:
             return jsonify({"success": False, "error": "El stock no puede ser negativo"}), 400
         activo_tienda = 0 if oculto else 1
-        if stock <= 0:
-            activo_tienda = 0
 
         conn = get_db()
         cur = conn.cursor()
@@ -8340,7 +8338,16 @@ def api_tienda_admin_producto_quick_update(producto_id):
             )
         conn.commit()
         crear_backup()
-        return jsonify({"success": True, "message": "Producto actualizado"})
+        return jsonify({
+            "success": True,
+            "message": "Producto actualizado",
+            "producto": {
+                "id": int(producto_id),
+                "precio": float(precio),
+                "stock": float(stock),
+                "activo_tienda": bool(activo_tienda),
+            },
+        })
     except Exception as e:
         if conn:
             conn.rollback()
