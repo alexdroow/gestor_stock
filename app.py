@@ -12393,13 +12393,6 @@ def api_actualizar_producto(id):
             data["stock"] = float(data.get("stock") or 0)
             if float(data["stock"]) < 0:
                 raise ValueError("El stock no puede ser negativo")
-            # Regla operativa: si el stock queda en 0, el producto debe quedar apagado en tienda.
-            if float(data["stock"]) <= 0:
-                data["activo_tienda"] = False
-            # Si se repone stock desde ventas y no se envio el toggle manual,
-            # reactivar tienda automaticamente para evitar que quede oculto.
-            elif "activo_tienda" not in data:
-                data["activo_tienda"] = True
         if "oferta_inicio_tienda" in data:
             data["oferta_inicio_tienda"] = str(data.get("oferta_inicio_tienda") or "").strip() or None
         if "oferta_fin_tienda" in data:
