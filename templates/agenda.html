@@ -120,6 +120,9 @@
             z-index: 100;
         }
 
+        .agenda-mobile-menu-toggle,
+        .agenda-mobile-menu-scrim { display: none; }
+
         .logo {
             display: flex;
             align-items: center;
@@ -3364,6 +3367,30 @@
         }
 
         @media (max-width: 760px) {
+            .sidebar {
+                width: min(82vw, 320px);
+                max-width: calc(100vw - 48px);
+                height: 100dvh;
+                z-index: 1301;
+                transform: translateX(-105%);
+                transition: transform .24s ease;
+                box-shadow: 12px 0 32px rgba(44, 27, 12, .18);
+                padding-top: max(20px, env(safe-area-inset-top, 0px));
+            }
+            body.agenda-mobile-menu-open .sidebar { transform: translateX(0); }
+            .agenda-mobile-menu-scrim {
+                position: fixed; inset: 0; z-index: 1300;
+                background: rgba(35, 23, 14, .42); border: 0; padding: 0;
+            }
+            body.agenda-mobile-menu-open .agenda-mobile-menu-scrim { display: block; }
+            .agenda-mobile-menu-toggle {
+                display: inline-flex; align-items: center; justify-content: center;
+                width: 44px; height: 44px; margin: 0 0 12px;
+                border: 1px solid var(--sucree-border); border-radius: 12px;
+                background: #fff; color: #713512; font-size: 23px; line-height: 1;
+                box-shadow: 0 3px 10px rgba(64, 35, 15, .08); cursor: pointer;
+            }
+            body.agenda-mobile-menu-open { overflow: hidden; }
             .main-content {
                 margin-left: 0;
                 max-width: 100%;
@@ -3648,9 +3675,11 @@
     <div style="display: flex; min-height: 100vh;">
         <!-- Sidebar -->
         {% include "_sidebar.html" %}
+        <button type="button" class="agenda-mobile-menu-scrim" id="agenda-mobile-menu-scrim" aria-label="Cerrar menú"></button>
 
         <!-- Main Content -->
         <main class="main-content">
+            <button type="button" class="agenda-mobile-menu-toggle" id="agenda-mobile-menu-toggle" aria-label="Abrir menú de navegación" aria-expanded="false">&#9776;</button>
             <div class="page-header">
                 <div>
                     <h1 class="page-title">Agenda</h1>
@@ -6083,6 +6112,17 @@
         document.addEventListener('DOMContentLoaded', () => {
             applyDarkModePreference();
             inicializarBusquedaDireccion();
+            const mobileMenuToggle = document.getElementById('agenda-mobile-menu-toggle');
+            const mobileMenuScrim = document.getElementById('agenda-mobile-menu-scrim');
+            mobileMenuToggle?.addEventListener('click', () => setAgendaMobileMenu(!document.body.classList.contains('agenda-mobile-menu-open')));
+            mobileMenuScrim?.addEventListener('click', () => setAgendaMobileMenu(false));
+            document.querySelectorAll('.sidebar a').forEach((link) => link.addEventListener('click', () => setAgendaMobileMenu(false)));
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') setAgendaMobileMenu(false);
+            });
+            window.addEventListener('resize', () => {
+                if (!window.matchMedia('(max-width: 760px)').matches) setAgendaMobileMenu(false);
+            });
             document.getElementById('agenda-mobile-wizard-next')?.addEventListener('click', avanzarWizardTortaMovil);
             document.getElementById('agenda-mobile-wizard-prev')?.addEventListener('click', () => {
                 agendaMobileWizardStep = Math.max(1, agendaMobileWizardStep - 1);
@@ -9330,6 +9370,14 @@
         function abrirModal() {
             document.getElementById('modal-evento').classList.add('active');
             actualizarBotonWhatsAppCliente();
+        }
+
+        function setAgendaMobileMenu(open) {
+            const isMobile = window.matchMedia('(max-width: 760px)').matches;
+            const shouldOpen = Boolean(open && isMobile);
+            document.body.classList.toggle('agenda-mobile-menu-open', shouldOpen);
+            document.getElementById('agenda-mobile-menu-toggle')?.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+            if (shouldOpen) document.querySelector('.sidebar a')?.focus({ preventScroll: true });
         }
 
         let agendaMobileWizardStep = 1;
