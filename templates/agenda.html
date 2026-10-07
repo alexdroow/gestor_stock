@@ -2042,6 +2042,12 @@
         .agenda-mobile-wizard-bar,
         .agenda-mobile-wizard-actions { display: none; }
         .agenda-mobile-step-hidden { display: none !important; }
+        .mobile-order-tabs,
+        .mobile-filter-trigger,
+        .agenda-mobile-fab,
+        .agenda-mobile-bottom-nav,
+        .agenda-mobile-filter-backdrop,
+        .agenda-mobile-filter-sheet { display: none; }
 
         #modal-rellenos-mes .modal {
             width: min(94vw, 940px);
@@ -3394,8 +3400,112 @@
             .main-content {
                 margin-left: 0;
                 max-width: 100%;
-                padding: 18px 14px;
+                padding: 12px 12px calc(104px + env(safe-area-inset-bottom, 0px));
             }
+            .agenda-mobile-menu-toggle { display:none !important; }
+            .page-header { margin-bottom:12px; }
+            .page-title { font-size:22px; }
+            .page-subtitle { display:none; }
+            .agenda-header-actions { width:100%; }
+            .agenda-header-actions > .btn-primary { display:none; }
+            .agenda-header-actions .agenda-more-wrap { margin-left:auto; }
+            .agenda-kpis,.agenda-alerts { display:none !important; }
+            .agenda-layout { gap:10px; }
+            .agenda-main-column { min-width:0; gap:10px; }
+            .day-hours-card,.notas-board { display:none !important; }
+            .calendar-card { border-radius:15px; overflow:hidden; box-shadow:0 4px 16px rgba(64,35,15,.05); }
+            .calendar-header { padding:10px; gap:8px; }
+            .calendar-nav { display:grid; grid-template-columns:38px minmax(0,1fr) 38px 46px; gap:5px; }
+            .calendar-nav .btn-icon { min-width:38px; width:38px; height:38px; padding:0; }
+            .calendar-nav h2 { font-size:12px; line-height:1.2; }
+            .agenda-view-switch { display:grid; grid-template-columns:repeat(3,1fr); border:0; background:#edf2f8; padding:3px; border-radius:10px; }
+            .agenda-view-switch button { min-height:34px; padding:6px 3px; font-size:12px; }
+            .agenda-toolbar { display:grid; grid-template-columns:1fr; padding:0 10px 10px; gap:7px; }
+            .agenda-search { display:flex; gap:7px; min-width:0; }
+            .agenda-search input { min-width:0; height:42px; font-size:14px; }
+            .mobile-filter-trigger { display:inline-flex; position:relative; align-items:center; justify-content:center; gap:5px; border:1px solid #dce3ec; border-radius:10px; background:#fff; color:#334155; padding:0 10px; font-weight:800; white-space:nowrap; }
+            .mobile-filter-trigger b { position:absolute; top:-6px; right:-5px; min-width:18px; height:18px; display:grid; place-items:center; border-radius:50%; background:#ef6a12; color:white; font-size:10px; }
+            .agenda-toolbar > select,.agenda-toolbar > .btn { display:none !important; }
+            .agenda-active-filter { margin:0 10px 8px; }
+            .mobile-order-tabs { display:none; grid-template-columns:repeat(3,1fr); gap:5px; padding:0 10px 10px; }
+            body.agenda-mobile-orders .mobile-order-tabs { display:grid; }
+            .mobile-order-tabs button { min-height:36px; border:1px solid #e4e9ef; border-radius:9px; background:#fff; color:#475569; font-size:11px; font-weight:800; }
+            .mobile-order-tabs button.active { background:#f16a13; border-color:#f16a13; color:#fff; }
+            .agenda-mobile-calendar { display:block !important; min-height:0 !important; border-top:0; overflow:hidden; }
+            .mobile-week-strip { display:flex; overflow-x:auto; gap:6px; padding:9px 10px; border-bottom:1px solid #edf0f4; scrollbar-width:none; }
+            .mobile-week-strip::-webkit-scrollbar { display:none; }
+            .mobile-week-day { flex:1 1 0; min-width:0; min-height:60px; border:1px solid transparent; border-radius:10px; background:#f7f8fa; color:#64748b; display:grid; place-content:center; gap:3px; text-align:center; }
+            .mobile-week-day small { font-size:9px; font-weight:800; text-transform:uppercase; }
+            .mobile-week-day strong { font-size:15px; color:#263548; }
+            .mobile-week-day em { width:5px; height:5px; margin:auto; border-radius:50%; background:#f16a13; }
+            .mobile-week-day.selected { background:#f16a13; border-color:#f16a13; color:white; }
+            .mobile-week-day.selected strong { color:white; }
+            .mobile-agenda-day-title { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px 6px; color:#4a2a18; font-size:13px; font-weight:900; }
+            .mobile-agenda-day-title small { padding:4px 7px; border-radius:99px; background:#f1f5f9; color:#64748b; font-size:10px; white-space:nowrap; }
+            .mobile-agenda-timeline { padding:4px 10px 12px; }
+            .mobile-agenda-event { display:grid; grid-template-columns:42px minmax(0,1fr); gap:8px; align-items:stretch; position:relative; padding:3px 0; }
+            .mobile-agenda-time { position:relative; padding-top:12px; color:#68778c; font-size:10px; font-weight:900; text-align:right; }
+            .mobile-agenda-time::after { content:""; position:absolute; top:17px; right:-5px; width:6px; height:6px; border-radius:50%; background:#ef6a12; box-shadow:0 0 0 3px #fff3e6; }
+            .mobile-agenda-event-card { width:100%; min-width:0; border:1px solid #e7ebf0; border-radius:10px; background:#fff; padding:9px; text-align:left; color:#273548; box-shadow:0 2px 6px rgba(25,39,52,.04); }
+            .mobile-agenda-event-card.selected,.mobile-agenda-event-card.borrador { border-color:#f16a13; background:#fffaf4; }
+            .mobile-agenda-event-head { display:flex; justify-content:space-between; gap:6px; align-items:flex-start; }
+            .mobile-agenda-event-head strong { font-size:12px; line-height:1.25; }
+            .mobile-agenda-event-card p { margin-top:4px; color:#68778c; font-size:10px; line-height:1.3; }
+            .mobile-agenda-event-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; color:#68778c; font-size:9px; font-weight:700; }
+            .mobile-agenda-empty { padding:25px 12px; text-align:center; color:#7b8794; font-size:13px; }
+            .mobile-order-row { display:grid; grid-template-columns:50px minmax(0,1fr) 18px; gap:9px; align-items:center; width:calc(100% - 20px); margin:8px 10px; padding:10px; border:1px solid #e7ebf0; border-radius:12px; background:#fff; text-align:left; color:#263548; }
+            .mobile-order-date { padding:7px 3px; background:#f1f5f9; border-radius:8px; text-align:center; font-size:9px; color:#64748b; font-weight:800; }
+            .mobile-order-date strong { display:block; color:#29384d; font-size:15px; }
+            .mobile-order-copy { min-width:0; }
+            .mobile-order-copy strong,.mobile-order-copy span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .mobile-order-copy strong { font-size:12px; }
+            .mobile-order-copy span { margin-top:3px; color:#68778c; font-size:10px; }
+            .mobile-order-arrow { color:#94a3b8; }
+            #calendario.agenda-list-view { display:block; }
+            .agenda-mobile-fab { display:inline-flex; position:fixed; right:16px; bottom:calc(78px + env(safe-area-inset-bottom, 0px)); z-index:999; align-items:center; gap:5px; min-height:48px; padding:0 14px; border:0; border-radius:999px; background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff; font-weight:900; box-shadow:0 8px 20px rgba(217,95,2,.3); }
+            .agenda-mobile-fab:first-letter { font-size:21px; }
+            .agenda-mobile-bottom-nav { display:grid; position:fixed; inset:auto 0 0; z-index:998; grid-template-columns:repeat(4,1fr); padding:6px 5px calc(6px + env(safe-area-inset-bottom, 0px)); background:rgba(255,255,255,.97); border-top:1px solid #eadbcc; box-shadow:0 -4px 16px rgba(64,35,15,.06); }
+            .agenda-mobile-bottom-nav button,.agenda-mobile-bottom-nav a { display:grid; justify-items:center; gap:2px; min-height:48px; padding:5px 2px; border:0; border-radius:10px; background:transparent; color:#7c8796; text-decoration:none; font-size:10px; font-weight:700; }
+            .agenda-mobile-bottom-nav span { font-size:17px; line-height:1.2; }
+            .agenda-mobile-bottom-nav [aria-current="page"],.agenda-mobile-bottom-nav .active { background:#fff1df; color:#d65a0d; }
+            .agenda-mobile-filter-backdrop { position:fixed; inset:0; z-index:1400; background:rgba(37,25,15,.38); }
+            body.agenda-mobile-filter-open .agenda-mobile-filter-backdrop { display:block; }
+            .agenda-mobile-filter-sheet { display:block; position:fixed; left:0; right:0; bottom:0; z-index:1401; padding:10px 18px calc(18px + env(safe-area-inset-bottom, 0px)); border-radius:20px 20px 0 0; background:#fff; box-shadow:0 -14px 40px rgba(30,41,59,.18); transform:translateY(105%); transition:transform .24s ease; }
+            body.agenda-mobile-filter-open .agenda-mobile-filter-sheet { transform:translateY(0); }
+            .agenda-mobile-sheet-grip { width:38px; height:4px; margin:0 auto 10px; border-radius:9px; background:#d5dbe2; }
+            .agenda-mobile-filter-sheet header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+            .agenda-mobile-filter-sheet h2 { color:#432817; font-size:18px; }
+            .agenda-mobile-filter-sheet header button { width:36px; height:36px; border:0; border-radius:50%; background:#f4f5f6; font-size:22px; }
+            .agenda-mobile-filter-sheet label { display:grid; gap:5px; margin:10px 0; color:#475569; font-size:12px; font-weight:800; }
+            .agenda-mobile-filter-sheet select { width:100%; min-height:44px; border:1px solid #dce3ec; border-radius:10px; padding:0 10px; background:white; font-size:14px; }
+            .agenda-mobile-sheet-actions { display:grid; grid-template-columns:1fr 1.4fr; gap:8px; margin-top:14px; }
+            .agenda-mobile-sheet-actions button { min-height:46px; border:1px solid #eadbcc; border-radius:10px; background:#fff; color:#713512; font-weight:800; }
+            .agenda-mobile-sheet-actions .primary { border-color:#ef6a12; background:#ef6a12; color:white; }
+            body.agenda-mobile-detail-open .agenda-mobile-bottom-nav,body.agenda-mobile-detail-open .agenda-mobile-fab { display:none; }
+            body.agenda-mobile-detail-open .agenda-detail-panel { position:fixed; inset:0; z-index:1500; overflow:auto; max-height:100dvh; border:0; border-radius:0; padding:14px 14px calc(25px + env(safe-area-inset-bottom, 0px)); background:#fffaf4; box-shadow:none; }
+            body.agenda-mobile-detail-open .agenda-detail-head { position:sticky; top:-14px; z-index:3; margin:-14px -14px 10px; padding:14px; background:rgba(255,250,244,.97); border-bottom:1px solid #eadbcc; }
+            body.agenda-mobile-detail-open .agenda-detail-body { max-height:none; overflow:visible; padding-bottom:84px; }
+            body.agenda-mobile-detail-open .agenda-detail-actions { position:fixed; left:0; right:0; bottom:0; z-index:4; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; padding:9px 10px calc(9px + env(safe-area-inset-bottom,0px)); background:#fff; border-top:1px solid #eadbcc; }
+            body.agenda-mobile-detail-open .agenda-detail-actions button { min-height:44px; padding:6px; font-size:11px; }
+            body.agenda-mobile-detail-open .side-panel > .panel-card { display:none; }
+            body.agenda-mobile-detail-open .agenda-layout { display:block; }
+            body.agenda-mobile-detail-open .agenda-main-column { display:none; }
+            body.agenda-mobile-detail-open .side-panel { display:block; position:static; }
+            body.agenda-mobile-detail-open { overflow:hidden; }
+            body:not(.agenda-mobile-detail-open) .agenda-detail-panel { display:none; }
+            body.agenda-mobile-mode-agenda #agenda-pending-card,
+            body.agenda-mobile-mode-agenda #agenda-past-card,
+            body.agenda-mobile-mode-agenda #agenda-blocked-card,
+            body.agenda-mobile-mode-agenda #agenda-legend-card { display:none; }
+            body.agenda-mobile-mode-orders .agenda-mobile-fab { display:inline-flex; }
+            body.agenda-mobile-mode-orders .agenda-view-switch { display:none; }
+            body.agenda-mobile-mode-orders .mobile-order-tabs { display:grid; }
+            body.agenda-mobile-mode-orders .agenda-mobile-upcoming-card { display:none; }
+            body.agenda-mobile-mode-orders .side-panel > .panel-card { display:none; }
+            body.agenda-mobile-wizard-active .agenda-mobile-bottom-nav,
+            body.agenda-mobile-wizard-active .agenda-mobile-fab,
+            body.agenda-mobile-menu-open .agenda-mobile-bottom-nav { display:none; }
+            body.agenda-mobile-shell #sucree-pedidos-fab { display:none !important; }
             .page-header {
                 flex-direction: column;
                 align-items: stretch;
@@ -3730,6 +3840,7 @@
                         <div class="agenda-toolbar">
                             <div class="agenda-search">
                                 <input type="search" id="agenda-search-input" placeholder="Buscar cliente o pedido..." oninput="actualizarFiltrosAgenda()">
+                                <button type="button" class="mobile-filter-trigger" id="mobile-agenda-filter-trigger" aria-label="Abrir filtros" onclick="abrirFiltrosAgendaMovil()">&#9776;<span>Filtros</span><b id="mobile-agenda-filter-count" hidden>0</b></button>
                             </div>
                             <select id="agenda-filter-estado" onchange="actualizarFiltrosAgenda()">
                                 <option value="">Estado</option>
@@ -3748,6 +3859,11 @@
                                 <option value="despacho">Despacho</option>
                             </select>
                             <button type="button" class="btn btn-secondary" onclick="limpiarFiltrosAgenda()">Limpiar filtros</button>
+                        </div>
+                        <div class="mobile-order-tabs" id="mobile-agenda-order-tabs" aria-label="Filtrar pedidos">
+                            <button type="button" data-order-tab="proximos" onclick="cambiarPestanaPedidosMovil('proximos')">Pr&oacute;ximos</button>
+                            <button type="button" data-order-tab="confirmar" onclick="cambiarPestanaPedidosMovil('confirmar')">Por confirmar</button>
+                            <button type="button" data-order-tab="pasados" onclick="cambiarPestanaPedidosMovil('pasados')">Pasados</button>
                         </div>
                         <div class="agenda-active-filter" id="agenda-active-filter"></div>
                         <div class="calendar-grid" id="calendario">
@@ -3804,7 +3920,7 @@
                     </div>
 
                     <!-- PrÃ³ximos Eventos -->
-                    <div class="panel-card">
+                    <div class="panel-card agenda-mobile-upcoming-card">
                         <div class="panel-header">
                             &#128203; Pr&oacute;ximos Eventos
                         </div>
@@ -3814,7 +3930,7 @@
                             </p>
                         </div>
                     </div>
-                    <div class="panel-card">
+                    <div class="panel-card" id="agenda-pending-card">
                         <div class="panel-header">
                             &#128221; Pedidos pendientes por confirmar
                         </div>
@@ -3824,7 +3940,7 @@
                             </p>
                         </div>
                     </div>
-                    <div class="panel-card">
+                    <div class="panel-card" id="agenda-past-card">
                         <div class="panel-header">
                             ðŸ—‚ Eventos pasados
                         </div>
@@ -3835,7 +3951,7 @@
                         </div>
                     </div>
 
-                    <div class="panel-card">
+                    <div class="panel-card" id="agenda-blocked-card">
                         <div class="panel-header">
                             &#9940; Bloqueos Activos
                         </div>
@@ -3847,7 +3963,7 @@
                     </div>
 
                     <!-- Leyenda -->
-                    <div class="panel-card">
+                    <div class="panel-card" id="agenda-legend-card">
                         <div class="panel-header">
                             &#127991; Leyenda
                         </div>
@@ -3876,6 +3992,23 @@
             </div>
         </main>
     </div>
+
+    <button type="button" class="agenda-mobile-fab" id="agenda-mobile-fab" onclick="agendarTortaManual()" aria-label="Agendar torta">+<span>Agendar</span></button>
+    <nav class="agenda-mobile-bottom-nav" id="agenda-mobile-bottom-nav" aria-label="Navegaci&oacute;n de agenda">
+        <button type="button" class="active" data-mobile-dest="agenda" onclick="navegarAgendaMovil('agenda')"><span aria-hidden="true">&#128197;</span>Agenda</button>
+        <button type="button" data-mobile-dest="pedidos" onclick="navegarAgendaMovil('pedidos')"><span aria-hidden="true">&#128203;</span>Pedidos</button>
+        <a href="/settings/clientes" data-mobile-dest="clientes"><span aria-hidden="true">&#128101;</span>Clientes</a>
+        <button type="button" data-mobile-dest="ajustes" onclick="navegarAgendaMovil('ajustes')"><span aria-hidden="true">&#9881;</span>Ajustes</button>
+    </nav>
+    <div class="agenda-mobile-filter-backdrop" id="agenda-mobile-filter-backdrop" onclick="cerrarFiltrosAgendaMovil()"></div>
+    <section class="agenda-mobile-filter-sheet" id="agenda-mobile-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="agenda-mobile-filter-title">
+        <div class="agenda-mobile-sheet-grip"></div>
+        <header><h2 id="agenda-mobile-filter-title">Filtros</h2><button type="button" onclick="cerrarFiltrosAgendaMovil()" aria-label="Cerrar filtros">&times;</button></header>
+        <label>Estado<select id="mobile-agenda-filter-estado"></select></label>
+        <label>Entrega<select id="mobile-agenda-filter-entrega"></select></label>
+        <label>Pago<select id="mobile-agenda-filter-pago"><option value="">Cualquier estado de pago</option><option value="pendiente">Pendiente de pago</option><option value="pagado">Pagado</option></select></label>
+        <div class="agenda-mobile-sheet-actions"><button type="button" onclick="limpiarFiltrosAgenda()">Limpiar</button><button type="button" class="primary" onclick="aplicarFiltrosAgendaMovil()">Ver resultados</button></div>
+    </section>
 
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loading">
@@ -4458,10 +4591,15 @@
         let loadingTimer = null;
         let loadingVisible = false;
         let agendaVista = 'semana';
+        let agendaMobileMode = 'agenda';
+        let agendaMobileOrdersTab = 'proximos';
+        let agendaMobileLastView = 'dia';
+        let agendaMobileDateRestored = false;
         let agendaFiltroRapido = '';
         let agendaBusqueda = '';
         let agendaFiltroEstado = '';
         let agendaFiltroEntrega = '';
+        let agendaFiltroPago = '';
         let agendaDetalleId = null;
         let agendaQuickEditId = null;
         let agendaQuickEditDraft = null;
@@ -4592,6 +4730,10 @@
         }
 
         function rangoVisibleAgenda() {
+            if (agendaVista === 'dia') {
+                const dia = parseFechaISO(fechaSeleccionada) || new Date(fechaActual.getFullYear(), fechaActual.getMonth(), fechaActual.getDate());
+                return { inicio: dia, fin: dia };
+            }
             if (agendaVista === 'semana') {
                 const inicio = inicioSemanaLunes(fechaActual);
                 const fin = sumarDiasAgenda(inicio, 6);
@@ -4620,6 +4762,7 @@
         function textoPeriodoAgenda() {
             const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
             const r = rangoVisibleAgenda();
+            if (agendaVista === 'dia') return formatearFechaLarga(formatearFecha(r.inicio));
             if (agendaVista === 'mes') {
                 return `${meses[fechaActual.getMonth()]} ${fechaActual.getFullYear()}`;
             }
@@ -4665,6 +4808,8 @@
                 const entrega = agendaEsDespacho(evento) ? 'despacho' : 'retiro';
                 if (entrega !== agendaFiltroEntrega) return false;
             }
+            if (agendaFiltroPago === 'pendiente' && obtenerSaldoAgenda(evento) <= 0) return false;
+            if (agendaFiltroPago === 'pagado' && obtenerSaldoAgenda(evento) > 0) return false;
             if (agendaFiltroRapido === 'hoy' && evento.fecha !== formatearFecha(new Date())) return false;
             if (agendaFiltroRapido === 'confirmar' && !esPedidoPendientePorConfirmar(evento)) return false;
             if (agendaFiltroRapido === 'saldo' && obtenerSaldoAgenda(evento) <= 0) return false;
@@ -5987,13 +6132,30 @@
         }
 
         function actualizarVistaSwitchAgenda() {
-            document.querySelectorAll('#agenda-view-switch [data-view]').forEach((btn) => {
+            const buttons = Array.from(document.querySelectorAll('#agenda-view-switch [data-view]'));
+            const mobile = window.matchMedia('(max-width: 760px)').matches;
+            if (buttons.length >= 3) {
+                buttons[0].dataset.view = mobile ? 'dia' : 'mes';
+                buttons[0].textContent = mobile ? 'Dia' : 'Mes';
+                buttons[0].setAttribute('onclick', `cambiarVistaAgenda('${mobile ? 'dia' : 'mes'}')`);
+            }
+            buttons.forEach((btn) => {
                 btn.classList.toggle('active', btn.getAttribute('data-view') === agendaVista);
             });
         }
 
         function cambiarVistaAgenda(vista) {
-            agendaVista = ['mes', 'semana', 'lista'].includes(vista) ? vista : 'semana';
+            const mobile = window.matchMedia('(max-width: 760px)').matches;
+            if (mobile) {
+                agendaMobileMode = 'agenda';
+                document.body.classList.remove('agenda-mobile-mode-orders');
+                document.body.classList.add('agenda-mobile-mode-agenda');
+                agendaVista = ['dia', 'semana', 'lista'].includes(vista) ? vista : 'dia';
+                agendaMobileLastView = agendaVista;
+                try { localStorage.setItem('agenda_mobile_view_v1', agendaVista); } catch (_) {}
+            } else {
+                agendaVista = ['mes', 'semana', 'lista'].includes(vista) ? vista : 'semana';
+            }
             renderizarCalendario();
             renderizarDetalleHorarioDia();
         }
@@ -6001,6 +6163,7 @@
         function irAgendaHoy() {
             fechaActual = new Date();
             fechaSeleccionada = formatearFecha(fechaActual);
+            try { localStorage.setItem('agenda_mobile_date_v1', fechaSeleccionada); } catch (_) {}
             renderizarCalendario();
             renderizarDetalleHorarioDia();
         }
@@ -6011,12 +6174,14 @@
             agendaFiltroEntrega = String(document.getElementById('agenda-filter-entrega')?.value || '').trim();
             renderizarCalendario();
             renderizarDetalleHorarioDia();
+            actualizarContadorFiltrosMovil();
         }
 
         function limpiarFiltrosAgenda() {
             agendaBusqueda = '';
             agendaFiltroEstado = '';
             agendaFiltroEntrega = '';
+            agendaFiltroPago = '';
             agendaFiltroRapido = '';
             const input = document.getElementById('agenda-search-input');
             const estado = document.getElementById('agenda-filter-estado');
@@ -6024,8 +6189,93 @@
             if (input) input.value = '';
             if (estado) estado.value = '';
             if (entrega) entrega.value = '';
+            const estadoMovil = document.getElementById('mobile-agenda-filter-estado');
+            const entregaMovil = document.getElementById('mobile-agenda-filter-entrega');
+            const pagoMovil = document.getElementById('mobile-agenda-filter-pago');
+            if (estadoMovil) estadoMovil.value = '';
+            if (entregaMovil) entregaMovil.value = '';
+            if (pagoMovil) pagoMovil.value = '';
             renderizarCalendario();
             renderizarDetalleHorarioDia();
+            actualizarContadorFiltrosMovil();
+        }
+
+        function prepararFiltrosAgendaMovil() {
+            const pairs = [
+                ['agenda-filter-estado', 'mobile-agenda-filter-estado'],
+                ['agenda-filter-entrega', 'mobile-agenda-filter-entrega'],
+            ];
+            pairs.forEach(([sourceId, targetId]) => {
+                const source = document.getElementById(sourceId);
+                const target = document.getElementById(targetId);
+                if (!source || !target || target.dataset.ready === '1') return;
+                target.innerHTML = source.innerHTML;
+                target.value = source.value;
+                target.dataset.ready = '1';
+            });
+            actualizarContadorFiltrosMovil();
+        }
+
+        function abrirFiltrosAgendaMovil() {
+            prepararFiltrosAgendaMovil();
+            document.getElementById('mobile-agenda-filter-estado').value = agendaFiltroEstado;
+            document.getElementById('mobile-agenda-filter-entrega').value = agendaFiltroEntrega;
+            document.getElementById('mobile-agenda-filter-pago').value = agendaFiltroPago;
+            document.body.classList.add('agenda-mobile-filter-open');
+        }
+
+        function cerrarFiltrosAgendaMovil() {
+            document.body.classList.remove('agenda-mobile-filter-open');
+        }
+
+        function aplicarFiltrosAgendaMovil() {
+            const estado = document.getElementById('mobile-agenda-filter-estado')?.value || '';
+            const entrega = document.getElementById('mobile-agenda-filter-entrega')?.value || '';
+            agendaFiltroPago = document.getElementById('mobile-agenda-filter-pago')?.value || '';
+            const estadoDesk = document.getElementById('agenda-filter-estado');
+            const entregaDesk = document.getElementById('agenda-filter-entrega');
+            if (estadoDesk) estadoDesk.value = estado;
+            if (entregaDesk) entregaDesk.value = entrega;
+            actualizarFiltrosAgenda();
+            cerrarFiltrosAgendaMovil();
+        }
+
+        function actualizarContadorFiltrosMovil() {
+            const count = [agendaFiltroEstado, agendaFiltroEntrega, agendaFiltroPago].filter(Boolean).length;
+            const badge = document.getElementById('mobile-agenda-filter-count');
+            if (!badge) return;
+            badge.hidden = count === 0;
+            badge.textContent = String(count);
+        }
+
+        function cambiarPestanaPedidosMovil(tab) {
+            agendaMobileOrdersTab = ['proximos', 'confirmar', 'pasados'].includes(tab) ? tab : 'proximos';
+            document.querySelectorAll('#mobile-agenda-order-tabs [data-order-tab]').forEach((button) => {
+                button.classList.toggle('active', button.dataset.orderTab === agendaMobileOrdersTab);
+            });
+            renderizarCalendario();
+        }
+
+        function navegarAgendaMovil(destination) {
+            if (destination === 'ajustes') { abrirConfig(); return; }
+            document.body.classList.remove('agenda-mobile-detail-open');
+            if (destination === 'pedidos' && agendaMobileMode !== 'orders') agendaMobileLastView = ['dia', 'semana', 'lista'].includes(agendaVista) ? agendaVista : 'dia';
+            agendaMobileMode = destination === 'pedidos' ? 'orders' : 'agenda';
+            document.body.classList.toggle('agenda-mobile-mode-orders', agendaMobileMode === 'orders');
+            document.body.classList.toggle('agenda-mobile-mode-agenda', agendaMobileMode === 'agenda');
+            document.querySelectorAll('#agenda-mobile-bottom-nav [data-mobile-dest]').forEach((item) => {
+                const active = item.dataset.mobileDest === destination;
+                item.classList.toggle('active', active);
+                if (active) item.setAttribute('aria-current', 'page');
+                else item.removeAttribute('aria-current');
+            });
+            if (agendaMobileMode === 'orders') agendaVista = 'lista';
+            else {
+                agendaVista = agendaMobileLastView;
+                try { localStorage.setItem('agenda_mobile_view_v1', agendaVista); } catch (_) {}
+            }
+            renderizarCalendario();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function aplicarFiltroRapidoAgenda(tipo) {
@@ -6112,13 +6362,36 @@
         document.addEventListener('DOMContentLoaded', () => {
             applyDarkModePreference();
             inicializarBusquedaDireccion();
+            if (window.matchMedia('(max-width: 760px)').matches) {
+                let initialDate = new Date();
+                try {
+                    const savedView = localStorage.getItem('agenda_mobile_view_v1');
+                    const savedDate = parseFechaISO(localStorage.getItem('agenda_mobile_date_v1'));
+                    agendaVista = ['dia', 'semana', 'lista'].includes(savedView) ? savedView : 'dia';
+                    agendaMobileLastView = agendaVista;
+                    if (savedDate) {
+                        initialDate = savedDate;
+                        agendaMobileDateRestored = true;
+                    }
+                } catch (_) { agendaVista = 'dia'; }
+                fechaActual = initialDate;
+                fechaSeleccionada = formatearFecha(fechaActual);
+                agendaMobileMode = 'agenda';
+                document.body.classList.add('agenda-mobile-shell', 'agenda-mobile-mode-agenda');
+                prepararFiltrosAgendaMovil();
+                actualizarVistaSwitchAgenda();
+            }
             const mobileMenuToggle = document.getElementById('agenda-mobile-menu-toggle');
             const mobileMenuScrim = document.getElementById('agenda-mobile-menu-scrim');
             mobileMenuToggle?.addEventListener('click', () => setAgendaMobileMenu(!document.body.classList.contains('agenda-mobile-menu-open')));
             mobileMenuScrim?.addEventListener('click', () => setAgendaMobileMenu(false));
             document.querySelectorAll('.sidebar a').forEach((link) => link.addEventListener('click', () => setAgendaMobileMenu(false)));
             document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') setAgendaMobileMenu(false);
+                if (event.key === 'Escape') {
+                    setAgendaMobileMenu(false);
+                    cerrarFiltrosAgendaMovil();
+                    if (document.body.classList.contains('agenda-mobile-detail-open')) cerrarDetallePedidoAgenda();
+                }
             });
             window.addEventListener('resize', () => {
                 if (!window.matchMedia('(max-width: 760px)').matches) setAgendaMobileMenu(false);
@@ -6135,7 +6408,7 @@
             }));
             cargarEstadoDayHoursPanel();
             cargarReservasTiendaSeen();
-            fechaSeleccionada = formatearFecha(new Date());
+            if (!agendaMobileDateRestored) fechaSeleccionada = formatearFecha(new Date());
             cargarConfig();
             cargarPlantillasWhatsAppAgenda();
             cargarEventos({ silent: true }); // Evita parpadeo al entrar a Agenda
@@ -7700,6 +7973,10 @@
         // CALENDARIO
         function renderizarCalendario() {
             renderizarAgendaShell();
+            if (window.matchMedia('(max-width: 760px)').matches) {
+                renderizarCalendarioMovil();
+                return;
+            }
             if (agendaVista === 'semana') {
                 renderizarAgendaSemana();
                 return;
@@ -7709,6 +7986,78 @@
                 return;
             }
             renderizarCalendarioMes();
+        }
+
+        function renderizarCalendarioMovil() {
+            const grid = document.getElementById('calendario');
+            if (!grid) return;
+            grid.className = agendaVista === 'lista' || agendaMobileMode === 'orders' ? 'agenda-list-view' : 'agenda-mobile-calendar';
+            if (agendaMobileMode === 'orders') {
+                document.getElementById('mes-actual').textContent = 'Pedidos';
+                renderizarListaAgendaMovil(true);
+                document.querySelectorAll('#mobile-agenda-order-tabs [data-order-tab]').forEach((button) => {
+                    button.classList.toggle('active', button.dataset.orderTab === agendaMobileOrdersTab);
+                });
+                return;
+            }
+            document.getElementById('mes-actual').textContent = agendaVista === 'semana' ? textoPeriodoAgenda() : (agendaVista === 'lista' ? textoPeriodoAgenda() : formatearFechaLarga(fechaSeleccionada));
+            if (agendaVista === 'lista') {
+                renderizarListaAgendaMovil(false);
+                return;
+            }
+            const visibles = eventosFiltradosAgenda().filter((evento) => String(evento.tipo || '').toLowerCase() !== 'bloqueo');
+            const selectedDate = agendaVista === 'semana' ? fechaSeleccionada : (fechaSeleccionada || formatearFecha(new Date()));
+            let weekStrip = '';
+            if (agendaVista === 'semana') {
+                const start = inicioSemanaLunes(fechaActual);
+                const today = formatearFecha(new Date());
+                const weekdays = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+                weekStrip = `<div class="mobile-week-strip" role="tablist" aria-label="Seleccionar dia de la semana">${Array.from({ length: 7 }, (_, index) => {
+                    const date = sumarDiasAgenda(start, index);
+                    const iso = formatearFecha(date);
+                    const count = visibles.filter((event) => event.fecha === iso).length;
+                    return `<button type="button" class="mobile-week-day ${iso === selectedDate ? 'selected' : ''}" role="tab" aria-selected="${iso === selectedDate}" onclick="seleccionarDiaCalendario('${iso}')"><small>${weekdays[index]}</small><strong>${date.getDate()}</strong>${count ? '<em aria-label="Tiene pedidos"></em>' : ''}</button>`;
+                }).join('')}</div>`;
+            }
+            const dayEvents = visibles.filter((event) => event.fecha === selectedDate).sort((a,b) => String(a.hora_entrega || a.hora_inicio || '').localeCompare(String(b.hora_entrega || b.hora_inicio || '')));
+            const dayLabel = formatearFechaLarga(selectedDate);
+            const rows = dayEvents.map((event) => {
+                const status = obtenerEstadoOperativoAgenda(event);
+                const saldo = obtenerSaldoAgenda(event);
+                const time = String(event.hora_entrega || event.hora_inicio || '--:--').slice(0,5);
+                const product = _resumenCatalogoTorta(event).categoria;
+                return `<div class="mobile-agenda-event"><div class="mobile-agenda-time">${escapeHtml(time)}</div><button type="button" class="mobile-agenda-event-card ${esEventoBorrador(event) ? 'borrador' : ''}" onclick="abrirDetallePedidoAgenda(${Number(event.id || 0)})"><div class="mobile-agenda-event-head"><strong>${escapeHtml(event.cliente || 'Sin cliente')}</strong><span class="agenda-status-pill ${escapeHtml(status)}">${escapeHtml(labelEstadoOperativoAgenda(status))}</span></div><p>${escapeHtml(product && product !== '-' ? product : event.titulo || 'Pedido')}</p><div class="mobile-agenda-event-meta"><span>${agendaEsDespacho(event) ? 'Despacho' : 'Retiro'}</span>${saldo > 0 ? `<strong style="color:#c2410c">${escapeHtml(formatoMonedaCLP(saldo))} pendiente</strong>` : ''}<span>${escapeHtml(String(event.codigo_pedido || '').trim())}</span></div></button></div>`;
+            }).join('');
+            grid.innerHTML = `${weekStrip}<div class="mobile-agenda-day-title"><span>${agendaVista === 'semana' ? `Pedidos del ${dayLabel}` : dayLabel}</span><small>${dayEvents.length} ${dayEvents.length === 1 ? 'pedido' : 'pedidos'}</small></div><div class="mobile-agenda-timeline">${rows || '<div class="mobile-agenda-empty">No hay pedidos agendados para este dia.</div>'}</div>`;
+        }
+
+        function renderizarListaAgendaMovil(orderTab = false) {
+            const grid = document.getElementById('calendario');
+            if (!grid) return;
+            const today = formatearFecha(new Date());
+            let rows = orderTab ? eventos.filter((event) => event && String(event.tipo || '').toLowerCase() !== 'bloqueo') : eventosFiltradosAgenda();
+            if (orderTab) {
+                rows = rows.filter((event) => {
+                    if (agendaMobileOrdersTab === 'confirmar') return esPedidoPendientePorConfirmar(event);
+                    if (agendaMobileOrdersTab === 'pasados') return esEventoPasado(event);
+                    return String(event.fecha || '') >= today && !esPedidoPendientePorConfirmar(event) && obtenerEstadoOperativoAgenda(event) !== 'entregado';
+                });
+                document.querySelectorAll('#mobile-agenda-order-tabs [data-order-tab]').forEach((button) => button.classList.toggle('active', button.dataset.orderTab === agendaMobileOrdersTab));
+            }
+            rows = rows.filter(eventoPasaFiltrosAgenda).sort((a,b) => `${a.fecha || ''} ${a.hora_entrega || a.hora_inicio || ''}`.localeCompare(`${b.fecha || ''} ${b.hora_entrega || b.hora_inicio || ''}`));
+            if (!rows.length) {
+                grid.innerHTML = `<div class="mobile-agenda-empty">${orderTab ? 'No hay pedidos en esta lista.' : 'No hay pedidos para el periodo o los filtros seleccionados.'}</div>`;
+                return;
+            }
+            const monthNames = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+            grid.innerHTML = rows.map((event) => {
+                const dt = parseFechaISO(event.fecha);
+                const status = obtenerEstadoOperativoAgenda(event);
+                const saldo = obtenerSaldoAgenda(event);
+                const time = String(event.hora_entrega || event.hora_inicio || '--:--').slice(0,5);
+                const product = _resumenCatalogoTorta(event).categoria;
+                return `<button type="button" class="mobile-order-row" onclick="abrirDetallePedidoAgenda(${Number(event.id || 0)})"><span class="mobile-order-date">${dt ? monthNames[dt.getMonth()] : ''}<strong>${dt ? dt.getDate() : '--'}</strong>${escapeHtml(time)}</span><span class="mobile-order-copy"><strong>${escapeHtml(event.cliente || 'Sin cliente')} · ${escapeHtml(product && product !== '-' ? product : event.titulo || 'Pedido')}</strong><span><i class="agenda-status-pill ${escapeHtml(status)}">${escapeHtml(labelEstadoOperativoAgenda(status))}</i> ${agendaEsDespacho(event) ? 'Despacho' : 'Retiro'}${saldo > 0 ? ` · ${escapeHtml(formatoMonedaCLP(saldo))} pendiente` : ''}</span></span><span class="mobile-order-arrow">&#8250;</span></button>`;
+            }).join('');
         }
 
         function renderizarCalendarioMes() {
@@ -8019,6 +8368,7 @@
         function cerrarDetallePedidoAgenda() {
             agendaDetalleId = null;
             eventoDetalleSeleccionadoId = null;
+            document.body.classList.remove('agenda-mobile-detail-open');
             renderizarCalendario();
             renderizarPanelDetallePedido();
         }
@@ -8031,6 +8381,9 @@
             agendaDetalleId = idNum;
             eventoDetalleSeleccionadoId = idNum;
             fechaSeleccionada = evento.fecha || fechaSeleccionada;
+            if (window.matchMedia('(max-width: 760px)').matches) {
+                document.body.classList.add('agenda-mobile-detail-open');
+            }
             renderizarCalendario();
             renderizarDetalleHorarioDia();
             renderizarPanelDetallePedido();
@@ -9336,8 +9689,13 @@
                     fechaSeleccionada = formatearFecha(new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1));
                 }
             } else {
-                fechaActual = sumarDiasAgenda(fechaActual, Number(delta || 0) * (agendaVista === 'lista' ? 14 : 7));
+                const mobile = window.matchMedia('(max-width: 760px)').matches;
+                const stride = mobile ? (agendaVista === 'dia' ? 1 : (agendaVista === 'lista' ? 14 : 7)) : (agendaVista === 'lista' ? 14 : 7);
+                fechaActual = sumarDiasAgenda(fechaActual, Number(delta || 0) * stride);
                 fechaSeleccionada = formatearFecha(fechaActual);
+            }
+            if (window.matchMedia('(max-width: 760px)').matches) {
+                try { localStorage.setItem('agenda_mobile_date_v1', fechaSeleccionada); } catch (_) {}
             }
             renderizarCalendario();
             renderizarDetalleHorarioDia();
@@ -9345,6 +9703,8 @@
 
         function seleccionarDiaCalendario(fecha) {
             fechaSeleccionada = fecha;
+            fechaActual = parseFechaISO(fecha) || fechaActual;
+            try { localStorage.setItem('agenda_mobile_date_v1', fechaSeleccionada); } catch (_) {}
             eventoDetalleSeleccionadoId = null;
             renderizarCalendario();
             renderizarDetalleHorarioDia();
@@ -9679,6 +10039,8 @@
         }
 
         function agendarTortaManual(fechaSugerida = null) {
+            cerrarFiltrosAgendaMovil();
+            document.body.classList.remove('agenda-mobile-detail-open');
             nuevoEvento();
             modoAgendarTorta = true;
             modoAdminManualTorta = true;
@@ -9703,6 +10065,8 @@
             const idNum = Number(id || 0);
             const evento = eventos.find(e => Number(e.id || 0) === idNum);
             if (!evento) return;
+
+            document.body.classList.remove('agenda-mobile-detail-open');
 
             eventoEditando = evento;
             modoAgendarTorta = false;
