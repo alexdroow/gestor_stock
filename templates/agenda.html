@@ -6380,6 +6380,13 @@
                 document.body.classList.add('agenda-mobile-shell', 'agenda-mobile-mode-agenda');
                 prepararFiltrosAgendaMovil();
                 actualizarVistaSwitchAgenda();
+                ocultarBotonPedidosFlotanteAgenda();
+                new MutationObserver(ocultarBotonPedidosFlotanteAgenda).observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['style']
+                });
             }
             const mobileMenuToggle = document.getElementById('agenda-mobile-menu-toggle');
             const mobileMenuScrim = document.getElementById('agenda-mobile-menu-scrim');
@@ -9738,6 +9745,14 @@
             document.body.classList.toggle('agenda-mobile-menu-open', shouldOpen);
             document.getElementById('agenda-mobile-menu-toggle')?.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
             if (shouldOpen) document.querySelector('.sidebar a')?.focus({ preventScroll: true });
+        }
+
+        function ocultarBotonPedidosFlotanteAgenda() {
+            if (!window.matchMedia('(max-width: 760px)').matches) return;
+            const fab = document.getElementById('sucree-pedidos-fab');
+            if (fab && (fab.style.getPropertyValue('display') !== 'none' || fab.style.getPropertyPriority('display') !== 'important')) {
+                fab.style.setProperty('display', 'none', 'important');
+            }
         }
 
         let agendaMobileWizardStep = 1;
