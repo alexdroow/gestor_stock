@@ -101,8 +101,9 @@ def _model(conn, model_id, public=False):
     data["allow_message"] = bool(data["allow_message"])
     data["active_sizes"] = [x for x in data["sizes"] if int(x["active"])]
     data["from_price"] = min((int(x["price_clp"]) for x in data["active_sizes"]), default=None)
+    data["to_price"] = max((int(x["price_clp"]) for x in data["active_sizes"]), default=None)
     if public:
-        data = {k: data[k] for k in ("id", "slug", "name", "short_description", "description", "ingredients", "allergens", "care_text", "allow_message", "message_max_chars", "message_instructions", "sizes", "images", "cover", "from_price")}
+        data = {k: data[k] for k in ("id", "slug", "name", "short_description", "description", "ingredients", "allergens", "care_text", "allow_message", "message_max_chars", "message_instructions", "sizes", "images", "cover", "from_price", "to_price")}
     return data
 
 
