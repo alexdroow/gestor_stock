@@ -58,6 +58,8 @@ else:
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+from ready_cakes import ready_cakes, ensure_ready_cakes_schema, get_published_ready_cake
+app.register_blueprint(ready_cakes)
 CAMERA_HUB = CameraHub()
 app.secret_key = os.environ.get("GESTIONSTOCK_SECRET_KEY", "gestor_stock_dev_secret_change_me")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -224,7 +226,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
         return True
     if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):
         return True
@@ -3244,7 +3246,7 @@ def _calcular_disponibilidad_agenda_tienda(cursor, cfg_agenda, fecha_desde, fech
 
 def _normalizar_tipo_reserva_tienda(raw):
     tipo = str(raw or "").strip().lower()
-    if tipo in {"torta", "tortas"}:
+    if tipo in {"torta", "tortas", "torta_lista", "torta-lista", "ready_cake"}:
         return "torta"
     if tipo in {"pastel", "pasteles"}:
         return "pastel"
@@ -3454,6 +3456,22 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     if canvas is None:
         raise RuntimeError("ReportLab no esta instalado en el entorno.")
     rid = int(reserva.get("id") or 0)
+    ready_cake_snapshot = None
+    try:
+        ready_conn = get_db()
+        ready_row = ready_conn.execute(
+            "SELECT snapshot_json FROM tienda_tortas_listas_reservas WHERE event_id=? LIMIT 1",
+            (rid,),
+        ).fetchone()
+        if ready_row:
+            ready_cake_snapshot = json.loads(ready_row["snapshot_json"] or "{}")
+    except Exception:
+        ready_cake_snapshot = None
+    finally:
+        try:
+            ready_conn.close()
+        except Exception:
+            pass
     base_dir = os.path.join(static_dir, "tienda_pedidos_pdf")
     os.makedirs(base_dir, exist_ok=True)
     filename = f"reserva_agenda_{rid}_{uuid.uuid4().hex[:10]}.pdf"
@@ -4042,6 +4060,11 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     tamano_txt = _safe_text(size.get("nombre") or parsed_catalogo_txt.get("tamano") or _section_value(["tamano"], "Torta personalizada"))
     titulo_pedido = _safe_text(tamano_txt or reserva.get("titulo") or "Torta personalizada")
     subtitulo_pedido = categoria_txt
+    if ready_cake_snapshot:
+        categoria_txt = "Torta lista para agendar"
+        titulo_pedido = _safe_text(ready_cake_snapshot.get("model") or "Torta lista")
+        tamano_txt = _safe_text(ready_cake_snapshot.get("size") or "-")
+        subtitulo_pedido = "Modelo con receta y diseño definidos"
     total_reserva_db = _to_money_num(reserva.get("total"))
     subtotal_productos = float((catalog_data or {}).get("subtotal") or _money_from_text("subtotal estimado productos") or total_reserva_db or 0)
     descuento_total = float((catalog_data or {}).get("descuento") or _money_from_text("descuento aplicado") or 0)
@@ -4065,6 +4088,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     otros_cargos = [f"{x.get('descripcion')} ({_fmt_money(x.get('valor') or 0)})" for x in ((catalog_data or {}).get("otros_cargos") or [])]
     refs = (catalog_data or {}).get("referencias") or []
     nota_catalogo = _safe_text((catalog_data or {}).get("nota"), "-")
+    if ready_cake_snapshot:
+        nota_catalogo = _safe_text(ready_cake_snapshot.get("message") or "Sin mensaje de chocolate")
     if not sabores:
         sabores = _plain_lines(parsed_catalogo_txt.get("sabores") or [], "-")
     if not extras:
@@ -4312,7 +4337,13 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     # Resumen pedido y pago
     _draw_round(42, 222, 300, 154, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
     _draw_section_title(56, 358, "Detalle del pedido")
-    resumen_rows = [
+    resumen_rows = ([
+        ("Tipo", "Torta lista"),
+        ("Modelo", _safe_text(ready_cake_snapshot.get("model"))),
+        ("Tamano", _safe_text(ready_cake_snapshot.get("size"))),
+        ("Porciones", _safe_text(ready_cake_snapshot.get("servings"))),
+        ("Mensaje", nota_catalogo),
+    ] if ready_cake_snapshot else [
         ("Categoria", categoria_txt),
         ("Tamano", tamano_txt),
         ("Sabores", ", ".join(sabores) if sabores else "-"),
@@ -4322,7 +4353,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         ("Otros cargos", ", ".join(otros_cargos) if otros_cargos else "-"),
         ("Nota", nota_catalogo),
         ("Referencias", f"{len(refs)} archivo(s)" if refs else "-"),
-    ]
+    ])
     _draw_table(resumen_rows, 50, 233, 284, 110, label_w=82, max_rows=9)
     _draw_payment_summary(356, 222, 197, 154)
 
@@ -11172,6 +11203,7 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": "La agenda publica no esta habilitada"}), 403
 
         data = request.get_json(silent=True) or {}
+        tipo_reserva_original = str(data.get("tipo") or "").strip().lower()
         fecha = str(data.get("fecha") or "").strip()
         hora_inicio = str(data.get("hora_inicio") or "").strip()
         nombre = str(data.get("nombre") or "").strip()[:80]
@@ -11180,6 +11212,9 @@ def api_tienda_agenda_reservar():
         tipo_pedido = _normalizar_tipo_reserva_tienda(data.get("tipo"))
         detalle = str(data.get("detalle") or "").strip()[:400]
         catalogo_torta_payload = data.get("catalogo_torta") if isinstance(data.get("catalogo_torta"), dict) else {}
+        torta_lista_payload = data.get("torta_lista") if isinstance(data.get("torta_lista"), dict) else {}
+        ready_cake_snapshot = None
+        ready_request_key = str(data.get("request_key") or "").strip()[:100]
         pastel_catalogo_payload = data.get("pastel_catalogo") if isinstance(data.get("pastel_catalogo"), list) else []
         pastel_especial_payload = data.get("pastel_especial") if isinstance(data.get("pastel_especial"), dict) else {}
         pastel_modo = str(data.get("pastel_modo") or "catalogo").strip().lower()
@@ -11218,7 +11253,33 @@ def api_tienda_agenda_reservar():
         pastel_catalogo_resumen = []
         pastel_especial_detalle = None
         subtotal_estimado = 0.0
-        if tipo_pedido == "torta":
+        if tipo_pedido == "torta" and tipo_reserva_original in {"torta_lista", "torta-lista", "ready_cake"}:
+            ensure_ready_cakes_schema()
+            try:
+                ready_cake = get_published_ready_cake(torta_lista_payload.get("model_id"), torta_lista_payload.get("size_id"))
+                expected_price = int(torta_lista_payload.get("expected_price_clp"))
+            except (TypeError, ValueError):
+                ready_cake = None
+                expected_price = -1
+            if not ready_cake:
+                return jsonify({"success": False, "error": "La torta o el tamaño ya no están disponibles"}), 409
+            if expected_price != int(ready_cake["price_clp"]):
+                return jsonify({"success": False, "error": "El precio cambió. Recarga el catálogo antes de reservar."}), 409
+            message = str(torta_lista_payload.get("message") or "").strip()
+            max_chars = int(ready_cake.get("message_max_chars") or 60)
+            if message and not bool(ready_cake.get("allow_message")):
+                return jsonify({"success": False, "error": "Este modelo no permite mensaje de chocolate"}), 400
+            if len(message) > max_chars:
+                return jsonify({"success": False, "error": f"El mensaje supera el máximo de {max_chars} caracteres"}), 400
+            ready_cake_snapshot = {
+                "kind": "READY_CAKE", "model_id": int(ready_cake["model_id"]),
+                "size_id": int(ready_cake["size_id"]), "model": ready_cake["name"],
+                "size": ready_cake["size_label"], "servings": ready_cake["servings"],
+                "unit_price_clp": int(ready_cake["price_clp"]), "photo": ready_cake.get("photo") or "",
+                "message": message,
+            }
+            subtotal_estimado = int(ready_cake["price_clp"])
+        elif tipo_pedido == "torta":
             catalogo_publico = _catalogo_torta_publico((cfg_tienda or {}).get("catalogo_torta") or {})
             if not bool(catalogo_publico.get("enabled")):
                 return jsonify({"success": False, "error": "El armado de tortas no esta habilitado"}), 400
@@ -11383,8 +11444,19 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": msg}), 400
 
         conn = get_db()
+        if ready_cake_snapshot:
+            ensure_ready_cakes_schema(conn)
         cursor = conn.cursor()
         cursor.execute("BEGIN IMMEDIATE")
+        if ready_cake_snapshot and ready_request_key:
+            previous = cursor.execute("SELECT event_id FROM tienda_tortas_listas_reservas WHERE request_key=? LIMIT 1", (ready_request_key,)).fetchone()
+            if previous:
+                event_id = int(previous[0] or 0)
+                existing = cursor.execute("SELECT fecha,hora_inicio,cliente,telefono,codigo_pedido FROM agenda_eventos WHERE id=?", (event_id,)).fetchone()
+                conn.commit()
+                if existing:
+                    total = int(ready_cake_snapshot["unit_price_clp"])
+                    return jsonify({"success": True, "idempotent": True, "reserva": {"id": event_id, "fecha": existing["fecha"], "hora_inicio": existing["hora_inicio"], "cliente": existing["cliente"], "telefono": existing["telefono"], "codigo_pedido": existing["codigo_pedido"], "torta_lista": ready_cake_snapshot, "total_estimado": total}})
         disp = _calcular_disponibilidad_agenda_tienda(cursor, cfg, fecha, fecha)
         mapa_horas = ((disp.get("mapa") or {}).get(fecha) or {})
         slot = mapa_horas.get(hora_inicio)
@@ -11398,7 +11470,7 @@ def api_tienda_agenda_reservar():
         min_ini = _hhmm_a_minutos(hora_inicio)
         min_fin = (min_ini or 0) + int(cfg["slot_minutes"])
         hora_fin = _minutos_a_hhmm(min_fin)
-        titulo = f"Reserva tienda - {tipo_pedido.capitalize()}"
+        titulo = f"Torta lista - {ready_cake_snapshot['model']} ({ready_cake_snapshot['size']})" if ready_cake_snapshot else f"Reserva tienda - {tipo_pedido.capitalize()}"
         def _fmt_clp(value):
             try:
                 n = int(round(float(value or 0)))
@@ -11410,6 +11482,13 @@ def api_tienda_agenda_reservar():
             f"Email: {email}\n"
             f"Entrega: {'Despacho' if entrega_tipo == 'despacho' else 'Retiro'}"
         )
+        if ready_cake_snapshot:
+            ingredientes += (
+                f"\n--- Torta lista para agendar ---\nModelo: {ready_cake_snapshot['model']}"
+                f"\nTamaño: {ready_cake_snapshot['size']}\nPorciones: {ready_cake_snapshot['servings'] or '-'}"
+                f"\nPrecio tamaño: {_fmt_clp(ready_cake_snapshot['unit_price_clp'])}"
+                f"\nMensaje de chocolate: {ready_cake_snapshot['message'] or 'Sin mensaje'}"
+            )
         if catalogo_torta_resumen:
             categoria_row = catalogo_torta_resumen.get("categoria") or {}
             size_row = catalogo_torta_resumen.get("size") or {}
@@ -11522,7 +11601,7 @@ def api_tienda_agenda_reservar():
                 tipo, titulo, fecha, hora_inicio, hora_fin, hora_entrega,
                 cliente, telefono, cliente_email, cliente_telefono, es_envio, direccion, ingredientes,
                 total, abono, motivo, alerta_minutos, estado, codigo_operacion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1440, 'pendiente', ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 1440, 'pendiente', ?)
             """,
             (
                 tipo_pedido,
@@ -11538,11 +11617,16 @@ def api_tienda_agenda_reservar():
                 1 if entrega_tipo == "despacho" else 0,
                 direccion if entrega_tipo == "despacho" else None,
                 ingredientes,
+                round(max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) + float(shipping_quote.get("shipping_fee") or 0) if ready_cake_snapshot and shipping_quote else max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) if ready_cake_snapshot else 0, 2),
                 "Reserva cliente tienda online",
                 codigo_op,
             ),
         )
         reserva_id = int(cursor.lastrowid or 0)
+        if ready_cake_snapshot:
+            if not ready_request_key:
+                ready_request_key = f"ready-{uuid.uuid4().hex}"
+            cursor.execute("INSERT INTO tienda_tortas_listas_reservas(request_key,event_id,model_id,size_id,snapshot_json) VALUES(?,?,?,?,?)", (ready_request_key, reserva_id, ready_cake_snapshot["model_id"], ready_cake_snapshot["size_id"], json.dumps(ready_cake_snapshot, ensure_ascii=False)))
         if reserva_id > 0:
             fecha_codigo = re.sub(r"[^0-9]", "", str(fecha or "").strip())[:8] or datetime.now(ZoneInfo("America/Santiago")).strftime("%Y%m%d")
             codigo_pedido = f"AGD-{fecha_codigo}-{reserva_id:06d}"
@@ -11610,6 +11694,7 @@ def api_tienda_agenda_reservar():
                     "lat": latitud if entrega_tipo == "despacho" else None,
                     "lng": longitud if entrega_tipo == "despacho" else None,
                     "catalogo_torta": catalogo_torta_resumen,
+                    "torta_lista": ready_cake_snapshot,
                     "pastel_modo": pastel_modo if tipo_pedido == "pastel" else "",
                     "pastel_catalogo": pastel_catalogo_resumen if tipo_pedido == "pastel" else [],
                     "pastel_especial": pastel_especial_detalle if tipo_pedido == "pastel" else None,
