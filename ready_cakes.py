@@ -289,9 +289,10 @@ def api_admin_status(model_id):
             if not valid_sizes: missing.append("un tamaño activo con nombre y precio CLP válido")
             if not before.get("has_cover"):
                 # Recover a missing cover flag when the model already has an uploaded photo.
-                fallback=conn.execute("SELECT id FROM tienda_tortas_listas_imagenes WHERE model_id=? AND active=1 ORDER BY sort_order,id LIMIT 1",(model_id,)).fetchone()
+                fallback=conn.execute("SELECT id FROM tienda_tortas_listas_imagenes WHERE model_id=? ORDER BY CASE WHEN active=1 THEN 0 ELSE 1 END,is_cover DESC,sort_order,id LIMIT 1",(model_id,)).fetchone()
                 if fallback:
-                    conn.execute("UPDATE tienda_tortas_listas_imagenes SET is_cover=CASE WHEN id=? THEN 1 ELSE 0 END WHERE model_id=?",(fallback[0],model_id))
+                    conn.execute("UPDATE tienda_tortas_listas_imagenes SET is_cover=CASE WHEN id=? THEN 1 ELSE 0 END,active=CASE WHEN id=? THEN 1 ELSE active END WHERE model_id=?",(fallback[0],fallback[0],model_id))
+                    _write_audit(conn,model_id,str(session.get("admin_user_name") or session.get("admin_user_id") or "admin"),"cover_recovered",before,_model(conn,model_id))
                     conn.commit()
                     before=_model(conn,model_id)
                 else:
@@ -345,7 +346,7 @@ def api_admin_image(model_id):
         path=folder/filename;path.write_bytes(raw)
         order=conn.execute("SELECT COALESCE(MAX(sort_order),-1)+1 FROM tienda_tortas_listas_imagenes WHERE model_id=?",(model_id,)).fetchone()[0]
         cover=not bool(conn.execute("SELECT 1 FROM tienda_tortas_listas_imagenes WHERE model_id=? AND is_cover=1 AND active=1",(model_id,)).fetchone())
-        conn.execute("INSERT INTO tienda_tortas_listas_imagenes(model_id,path,alt,sort_order,is_cover) VALUES(?,?,?,?,?)",(model_id,f"/static/tortas_listas/{filename}",str(request.form.get("alt") or "")[:180],order,int(cover)))
+        conn.execute("INSERT INTO tienda_tortas_listas_imagenes(model_id,path,alt,sort_order,is_cover,active) VALUES(?,?,?,?,?,1)",(model_id,f"/static/tortas_listas/{filename}",str(request.form.get("alt") or "")[:180],order,int(cover)))
         _write_audit(conn, model_id, str(session.get("admin_user_name") or "admin"), "image_add", before, _model(conn, model_id))
         conn.commit();return jsonify(success=True,item=_model(conn,model_id))
     finally:conn.close()
