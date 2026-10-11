@@ -39,6 +39,108 @@
     .reservation-actions{display:flex;gap:10px;padding:0 26px 24px}.reservation-actions a,.reservation-actions button{flex:1;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center}.reservation-actions [hidden]{display:none}.reservation-actions .whatsapp{background:#159b57;color:#fff;border:0}.reservation-close{position:absolute;right:14px;top:14px;z-index:1;width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:#fff;font-size:22px;color:var(--ink)}
     @media(max-width:600px){.reservation-overlay{padding:0;align-items:flex-end}.reservation-dialog{width:100%;max-height:94dvh;border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom)}.reservation-head{padding:22px 70px 16px 20px}.reservation-head h2{font-size:24px;padding-right:0}.reservation-body{padding:18px 20px}.reservation-actions{padding:0 20px 20px;flex-direction:column}}
   </style>
+  <style>
+    @media (max-width: 700px) {
+      :root {
+        --ink: #382016;
+        --muted: #806f63;
+        --line: #eadbca;
+        --paper: #fffdf9;
+        --cream: #fbf5eb;
+        --orange: #eb6900;
+        --shadow: 0 8px 22px #6d3e1710;
+      }
+      body { background: #fbf5eb; }
+      .top {
+        position: sticky; top: 0; z-index: 5; min-height: 64px;
+        justify-content: center; padding: 8px 54px; background: #fffaf1ed;
+        backdrop-filter: blur(12px); border-color: #eadbca;
+      }
+      .brand { text-align: center; font: 500 25px/1 Georgia, "Palatino Linotype", serif; letter-spacing: -.055em; }
+      .brand small { margin-top: 4px; font-size: 8px; letter-spacing: .28em; }
+      .top > a:last-child {
+        position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+        padding: 9px 11px; border: 1px solid var(--line); border-radius: 999px;
+        background: #fff; color: #873b10; font-size: 10px;
+      }
+      main { max-width: 520px; padding: 18px 14px 40px; }
+      .intro { display: block; margin-bottom: 16px; }
+      .eyebrow { font-size: 9px; letter-spacing: .15em; }
+      h1 { margin: 6px 0 7px; font-size: 30px; line-height: 1.04; letter-spacing: -.035em; }
+      .intro p { max-width: 42ch; font-size: 12px; line-height: 1.45; }
+      .route { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; width: 100%; margin-top: 13px; padding: 4px; border: 1px solid #f0e4d5; border-radius: 999px; background: #fffaf2; }
+      .route a { padding: 9px 8px; border-radius: 999px; text-align: center; font-size: 11px; }
+      .route .active { color: #fff; background: var(--orange); box-shadow: none; }
+      .route a:not(.active) { color: #4d3325; }
+      .tools { margin: 0 0 12px; }
+      .tools input { width: 100%; min-height: 40px; padding: 10px 13px; border-color: #e9d9c8; border-radius: 999px; background: #fff; font-size: 12px; }
+      .tools span { display: none; }
+      .grid { grid-template-columns: 1fr; gap: 12px; }
+      .card { display: flex; flex-direction: column; border-color: #eadbca; border-radius: 15px; box-shadow: 0 8px 22px #70451b12; }
+      .card .photo { width: 100%; height: auto; min-height: 0; aspect-ratio: 1.7; background: #f1e8dc; }
+      .card-body { padding: 10px 12px 12px; }
+      .card h2 { margin-bottom: 4px; font-size: 16px; line-height: 1.15; letter-spacing: -.015em; }
+      .card p { margin-bottom: 8px; color: #827267; font-size: 10px; line-height: 1.35; }
+      .price { font-size: 9px; }
+      .price strong { margin-top: 1px; color: #b64d08; font-size: 17px; }
+      .primary, .secondary { min-height: 36px; padding: 8px 12px; border-radius: 999px; font-size: 11px; }
+      .card .primary { align-self: flex-end; min-width: 120px; margin-top: -32px; }
+      .modal { align-items: stretch; padding: 0; background: #20130fb8; }
+      .dialog { width: 100%; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; background: var(--cream); box-shadow: none; }
+      .dialog-head { min-height: 54px; padding: 7px 14px; background: #fffaf1f2; }
+      .dialog-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 16px Georgia, serif; }
+      .close { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; font-size: 21px; }
+      .detail { gap: 10px; padding: 10px 13px 15px; }
+      .hero-img { height: auto; aspect-ratio: 1.35; border-radius: 14px; background: #f0e4d6; }
+      .thumbs { gap: 6px; margin-top: 7px; }
+      .thumbs button { flex: 0 0 64px; height: 54px; border-radius: 9px; }
+      .copy h2 { margin: 2px 0 4px; font: 600 22px/1.1 Georgia, serif; letter-spacing: -.02em; }
+      .copy > p { margin: 0 0 10px; color: var(--muted); font: 11px/1.45 Arial, sans-serif; }
+      .copy h3, .booking h3 { margin: 10px 0 7px; font: 700 12px Arial, sans-serif; color: #40281c; }
+      .size-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .size-option { min-height: 54px; padding: 8px 9px; border-radius: 10px; }
+      .size-option span { font-size: 10px; }
+      .size-option small { font-size: 9px; }
+      .size-option b { font-size: 12px; color: #b64d08; }
+      .ingredient-panel { margin-top: 10px; padding: 10px; border-radius: 12px; }
+      .ingredient-panel h3 { margin: 0 0 7px !important; font-size: 10px !important; }
+      .ingredient-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+      .ingredient-list li { min-height: 31px; gap: 6px; padding: 4px 6px; font-size: 10px; }
+      .ingredient-icon { flex-basis: 20px; width: 20px; height: 20px; border-radius: 6px; }
+      .ingredient-icon svg { width: 13px; height: 13px; }
+      .booking { padding: 13px 13px calc(82px + env(safe-area-inset-bottom)); border-top: 1px solid #eadbca; background: #fffdf9; }
+      .booking h3 { margin: 0 0 9px; font: 600 18px Georgia, serif; }
+      .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .fields input, .fields select, .phone-field { min-height: 38px; padding: 8px; border-radius: 9px; font-size: 11px; }
+      .phone-field { padding: 0; }
+      .phone-field > span { padding: 0 8px; font-size: 10px; }
+      .fields .wide { grid-column: 1 / -1; }
+      .slots { margin-top: 9px; }
+      .dayline { gap: 6px; margin: 7px 0; font-size: 11px; }
+      .dayline button { padding: 7px 9px; border-radius: 999px; font-size: 10px; }
+      .hours { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .hours button { min-height: 34px; padding: 7px 5px; border-radius: 9px; font-size: 10px; }
+      .hours button.selected { background: #fff0dc; }
+      .delivery { flex-wrap: wrap; gap: 8px; margin: 9px 0; font-size: 11px; }
+      .note { font-size: 10px; }
+      .sticky { z-index: 2; min-height: 62px; padding: 8px 13px calc(8px + env(safe-area-inset-bottom)); background: #fffaf1f5; }
+      .sticky strong { font-size: 17px; }
+      .sticky .primary { min-height: 38px; }
+      .reservation-overlay { align-items: flex-end; padding: 0; }
+      .reservation-dialog { width: 100%; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+      .reservation-head { padding: 20px 54px 14px 18px; }
+      .reservation-head h2 { font-size: 22px; }
+      .reservation-body { padding: 16px 18px; }
+      .reservation-actions { flex-direction: column; padding: 0 18px 18px; }
+    }
+    @media (max-width: 380px) {
+      .top { padding-inline: 46px; }
+      .top > a:last-child { right: 9px; padding: 8px; font-size: 9px; }
+      main { padding-inline: 11px; }
+      .copy h2 { font-size: 20px; }
+      .size-list { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
   <header class="top"><a class="brand" href="/tienda" style="text-decoration:none">Sucrée<small>PASTELERÍA</small></a><a href="/tienda/agendapedidos">Agenda y pedidos</a></header>
