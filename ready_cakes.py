@@ -277,8 +277,28 @@ def api_admin_status(model_id):
         before=_model(conn,model_id)
         if not before: return jsonify(success=False,error="Modelo no encontrado"),404
         if status=="published":
-            if not before["name"].strip() or not before["description"].strip() or not before["has_cover"] or not any(int(s["active"]) and int(s["price_clp"])>=0 for s in before["sizes"]):
-                return jsonify(success=False,error="Para publicar se requiere nombre, descripción, foto de portada y al menos un tamaño activo con precio válido"),400
+            missing=[]
+            if not str(before.get("name") or "").strip(): missing.append("nombre")
+            if not str(before.get("description") or "").strip(): missing.append("descripción del modelo")
+            valid_sizes=[]
+            for size in before.get("sizes") or []:
+                try: price=int(size.get("price_clp"))
+                except (TypeError,ValueError): price=-1
+                if int(size.get("active") or 0) and str(size.get("label") or "").strip() and price>=0:
+                    valid_sizes.append(size)
+            if not valid_sizes: missing.append("un tamaño activo con nombre y precio CLP válido")
+            if not before.get("has_cover"):
+                # Recover a missing cover flag when the model already has an uploaded photo.
+                fallback=conn.execute("SELECT id FROM tienda_tortas_listas_imagenes WHERE model_id=? AND active=1 ORDER BY sort_order,id LIMIT 1",(model_id,)).fetchone()
+                if fallback:
+                    conn.execute("UPDATE tienda_tortas_listas_imagenes SET is_cover=CASE WHEN id=? THEN 1 ELSE 0 END WHERE model_id=?",(fallback[0],model_id))
+                    conn.commit()
+                    before=_model(conn,model_id)
+                else:
+                    missing.append("una foto subida para usar como portada")
+            if missing:
+                conn.rollback()
+                return jsonify(success=False,error="No se puede publicar. Falta: " + ", ".join(missing) + ". Revisa los datos guardados del modelo."),400
         actor=str(session.get("admin_user_name") or session.get("admin_user_id") or "admin")
         conn.execute("BEGIN IMMEDIATE")
         conn.execute("UPDATE tienda_tortas_listas SET status=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(status,actor,model_id))
