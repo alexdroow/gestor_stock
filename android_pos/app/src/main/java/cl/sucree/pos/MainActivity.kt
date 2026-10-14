@@ -147,7 +147,7 @@ class MainActivity : Activity() {
             mediaPlaybackRequiresUserGesture = true
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
         }
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        WebView.setWebContentsDebuggingEnabled(false)
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, progress: Int) {
                 loading.visibility = if (progress in 1..99) View.VISIBLE else View.GONE

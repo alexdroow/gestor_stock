@@ -226,7 +226,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/favicon.ico"}:
         return True
     if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):
         return True
@@ -1165,6 +1165,28 @@ def admin_logout():
     session.pop(_ADMIN_USER_ID_SESSION_KEY, None)
     session.pop(_ADMIN_USER_NAME_SESSION_KEY, None)
     return redirect(url_for('admin_login'))
+
+
+@app.route('/descargar-pos-android')
+def descargar_pos_android():
+    return render_template('descargar_pos_android.html')
+
+
+@app.route('/descargas/SucreePOS-Android-prueba.apk')
+def descargar_archivo_pos_android():
+    apk_path = os.path.join(static_dir, 'descargas', 'SucreePOS-Android-prueba.apk')
+    if not os.path.isfile(apk_path):
+        return 'La APK aún no está disponible.', 404
+    response = send_file(
+        apk_path,
+        as_attachment=True,
+        download_name='SucreePOS-Android-prueba.apk',
+        mimetype='application/vnd.android.package-archive',
+        max_age=0,
+    )
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 def _request_is_phone_mobile():
