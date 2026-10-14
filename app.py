@@ -2498,16 +2498,49 @@ def _cotizar_envio_checkout_tienda(lat, lng, cfg_tienda=None, hora_inicio=None):
     return quote
 
 
-def _flow_cfg():
-    api_key = str(os.environ.get("FLOW_API_KEY") or "").strip()
-    secret_key = str(os.environ.get("FLOW_SECRET_KEY") or "").strip()
-    api_url = str(os.environ.get("FLOW_API_URL") or "https://www.flow.cl/api").strip().rstrip("/")
-    enabled = bool(api_key and secret_key)
+def _flow_environment(value=None):
+    raw = str(value or os.environ.get("FLOW_ENV") or "").strip().lower()
+    if raw in {"simulation", "simulado", "simulacion"}:
+        return "simulation"
+    if raw in {"prod", "production", "live", "oficial", "oficiales"}:
+        return "production"
+    if raw in {"test", "testing", "sandbox", "pruebas"}:
+        return "sandbox"
+    return "production"
+
+
+def _flow_cfg(environment=None):
+    active_environment = _flow_environment()
+    target_environment = _flow_environment(environment) if environment else active_environment
+    if target_environment == "simulation":
+        return {"enabled": False, "api_key": "", "secret_key": "", "api_url": "", "environment": "simulation", "configuration_error": ""}
+    if target_environment == "production":
+        api_key = str(os.environ.get("FLOW_PRODUCTION_API_KEY") or "").strip()
+        secret_key = str(os.environ.get("FLOW_PRODUCTION_SECRET_KEY") or "").strip()
+        configured_url = str(os.environ.get("FLOW_API_URL") or "").strip().rstrip("/") if active_environment == target_environment else "https://www.flow.cl/api"
+    else:
+        api_key = str(os.environ.get("FLOW_SANDBOX_API_KEY") or (os.environ.get("FLOW_API_KEY") if active_environment == "sandbox" else "") or "").strip()
+        secret_key = str(os.environ.get("FLOW_SANDBOX_SECRET_KEY") or (os.environ.get("FLOW_SECRET_KEY") if active_environment == "sandbox" else "") or "").strip()
+        configured_url = str(os.environ.get("FLOW_API_URL") or "").strip().rstrip("/") if active_environment == target_environment else "https://sandbox.flow.cl/api"
+
+    expected_url = "https://www.flow.cl/api" if target_environment == "production" else "https://sandbox.flow.cl/api"
+    api_url = configured_url or expected_url
+    parsed_url = urlparse(api_url)
+    api_url_valid = (
+        parsed_url.scheme == "https"
+        and parsed_url.netloc.lower() == urlparse(expected_url).netloc
+        and parsed_url.path.rstrip("/") == "/api"
+        and not parsed_url.query
+        and not parsed_url.fragment
+    )
+    enabled = bool(api_key and secret_key and api_url_valid)
     return {
         "enabled": enabled,
         "api_key": api_key,
         "secret_key": secret_key,
         "api_url": api_url,
+        "environment": target_environment,
+        "configuration_error": "FLOW_API_URL no corresponde al ambiente Flow configurado." if not api_url_valid else "",
     }
 
 
@@ -2566,12 +2599,22 @@ def _flow_sign(params, secret_key):
     return hmac.new(str(secret_key).encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def _flow_payment_redirect_url(base_url, token):
+def _flow_payment_redirect_url(base_url, token, environment=None):
     """Flow entrega URL y token por separado; el checkout exige ambos en la redireccion."""
     parsed = urlparse(str(base_url or "").strip())
     flow_token = str(token or "").strip()
-    if parsed.scheme != "https" or (parsed.hostname or "").lower() != "sandbox.flow.cl" or not flow_token:
-        raise ValueError("URL o token de checkout Flow Sandbox invalido.")
+    target_environment = _flow_environment(environment)
+    allowed_hosts = {"sandbox.flow.cl"} if target_environment == "sandbox" else {"api.flow.cl", "www.flow.cl"}
+    if (
+        parsed.scheme != "https"
+        or (parsed.hostname or "").lower() not in allowed_hosts
+        or parsed.username
+        or parsed.password
+        or parsed.port
+        or parsed.fragment
+        or not flow_token
+    ):
+        raise ValueError("URL o token de checkout Flow invalido para el ambiente configurado.")
     query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key.lower() != "token"]
     query.append(("token", flow_token))
     return urlunparse(parsed._replace(query=urlencode(query)))
@@ -2679,6 +2722,20 @@ def _ensure_flow_pago_table(cursor):
         cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN confirm_attempts INTEGER DEFAULT 0")
     if "last_error" not in cols:
         cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN last_error TEXT")
+    if "flow_environment" not in cols:
+        cursor.execute("ALTER TABLE tienda_flow_pagos ADD COLUMN flow_environment TEXT")
+        cursor.execute(
+            """
+            UPDATE tienda_flow_pagos
+            SET flow_environment = CASE
+                WHEN UPPER(COALESCE(flow_token, '')) LIKE 'SIM-%' THEN 'simulation'
+                WHEN LOWER(COALESCE(flow_redirect_url, '')) LIKE '%sandbox.flow.cl%' THEN 'sandbox'
+                WHEN TRIM(COALESCE(flow_redirect_url, '')) <> '' THEN 'production'
+                ELSE 'sandbox'
+            END
+            WHERE flow_environment IS NULL OR TRIM(flow_environment) = ''
+            """
+        )
 
 
 def _ensure_ventas_metodo_pago_column():
@@ -2754,7 +2811,7 @@ def _normalizar_metodo_pago_flow_por_canal(cursor):
         pass
 
 
-def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redirect_url=None, checkout_backup=None):
+def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redirect_url=None, checkout_backup=None, flow_environment=None):
     conn = None
     try:
         conn = get_db()
@@ -2762,14 +2819,15 @@ def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redire
         _ensure_flow_pago_table(cur)
         cur.execute(
             """
-            INSERT INTO tienda_flow_pagos (venta_id, commerce_order, flow_token, amount, flow_redirect_url, checkout_backup_json, estado, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'pendiente', CURRENT_TIMESTAMP)
+            INSERT INTO tienda_flow_pagos (venta_id, commerce_order, flow_token, amount, flow_redirect_url, checkout_backup_json, flow_environment, estado, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente', CURRENT_TIMESTAMP)
             ON CONFLICT(venta_id) DO UPDATE SET
                 commerce_order = excluded.commerce_order,
                 flow_token = excluded.flow_token,
                 amount = excluded.amount,
                 flow_redirect_url = COALESCE(excluded.flow_redirect_url, tienda_flow_pagos.flow_redirect_url),
                 checkout_backup_json = COALESCE(excluded.checkout_backup_json, tienda_flow_pagos.checkout_backup_json),
+                flow_environment = excluded.flow_environment,
                 estado = 'pendiente',
                 updated_at = CURRENT_TIMESTAMP
             """,
@@ -2780,6 +2838,7 @@ def _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_redire
                 float(amount or 0),
                 (str(flow_redirect_url or "").strip() or None),
                 (json.dumps(checkout_backup, ensure_ascii=False) if isinstance(checkout_backup, dict) else None),
+                str(flow_environment or _flow_environment()).strip().lower(),
             ),
         )
         conn.commit()
@@ -3001,9 +3060,6 @@ def _flow_reconciliar_pendientes(limit=25, horas=72):
     conn = None
     reconciliados = 0
     try:
-        cfg = _flow_cfg()
-        if not cfg.get("enabled"):
-            return {"ok": True, "reconciliados": 0}
         conn = get_db()
         cur = conn.cursor()
         _ensure_flow_pago_table(cur)
@@ -3046,7 +3102,20 @@ def _flow_confirmar_token_y_actualizar(token):
     if not row:
         return {"success": False, "error": "Token Flow no registrado"}
 
-    cfg = _flow_cfg()
+    flow_environment = str(row.get("flow_environment") or "").strip().lower()
+    if flow_environment in {"simulation", "simulado", "simulacion"} or token.startswith("SIM-"):
+        simulated_status = {}
+        try:
+            simulated_status = json.loads(row.get("payment_data_json") or "{}")
+        except Exception:
+            pass
+        return {
+            "success": True,
+            "paid": str(row.get("estado") or "").lower() == "pagado",
+            "simulated": True,
+            "status": simulated_status.get("status"),
+        }
+    cfg = _flow_cfg(flow_environment or None)
     if not cfg.get("enabled"):
         return {"success": False, "error": "Flow no configurado"}
 
@@ -6333,6 +6402,7 @@ def api_tienda_productos():
                 "admin_mode": bool(session.get(_ADMIN_SESSION_KEY)),
                 "payment_pricing": {
                     "flow_enabled": bool(_flow_checkout_public_enabled() and _flow_cfg().get("enabled")),
+                    "flow_environment": _flow_environment(),
                     **_flow_fee_cfg(),
                 },
             }
@@ -14976,6 +15046,8 @@ def api_admin_pos_catalogo():
             "success": True,
             "productos": products,
             "card_fee_pct": _pos_admin_card_fee_pct(),
+            "flow_enabled": bool(_flow_checkout_public_enabled() and _flow_cfg().get("enabled")),
+            "flow_environment": _flow_environment(),
             "vendedor": str(session.get(_ADMIN_USER_NAME_SESSION_KEY) or "Administrador"),
         })
     except Exception as exc:
@@ -15268,10 +15340,6 @@ def api_admin_pos_whatsapp(venta_id):
             finally:
                 email_conn.close()
             cfg = _flow_cfg()
-            if not cfg.get("enabled") or not _flow_checkout_public_enabled():
-                raise RuntimeError("Flow no esta habilitado. Verifica las credenciales y la URL publica HTTPS.")
-            if urlparse(cfg.get("api_url") or "").hostname != "sandbox.flow.cl":
-                raise RuntimeError("Por seguridad, los cobros del POS solo se habilitan con FLOW_API_URL=https://sandbox.flow.cl/api.")
 
             _ensure_ventas_flow_return_column()
             flow_conn = get_db()
@@ -15287,7 +15355,8 @@ def api_admin_pos_whatsapp(venta_id):
             if (saved_flow and str(saved_flow.get("estado") or "").lower() == "pendiente"
                     and saved_flow.get("flow_redirect_url") and saved_flow.get("flow_token")):
                 old_flow_url = str(saved_flow["flow_redirect_url"])
-                flow_url = _flow_payment_redirect_url(old_flow_url, saved_flow["flow_token"])
+                saved_environment = saved_flow.get("flow_environment") or ("sandbox" if "sandbox.flow.cl" in old_flow_url.lower() else "production")
+                flow_url = _flow_payment_redirect_url(old_flow_url, saved_flow["flow_token"], saved_environment)
                 if flow_url != old_flow_url:
                     repair_conn = get_db()
                     try:
@@ -15299,6 +15368,8 @@ def api_admin_pos_whatsapp(venta_id):
                     finally:
                         repair_conn.close()
             else:
+                if not cfg.get("enabled") or not _flow_checkout_public_enabled():
+                    raise RuntimeError(cfg.get("configuration_error") or "Flow no esta habilitado. Verifica las credenciales del ambiente activo y la URL publica HTTPS.")
                 stage = "flow_create"
                 base_url = _public_base_url(request.url_root).rstrip("/")
                 commerce_order = f"POS-{venta_id}-{int(time.time())}"
@@ -15331,27 +15402,27 @@ def api_admin_pos_whatsapp(venta_id):
                     reason_type = network_reason.__class__.__name__
                     reason_errno = getattr(network_reason, "errno", None)
                     reason_text = str(network_reason).lower()
+                    flow_host_name = urlparse(cfg.get("api_url") or "").hostname or "Flow"
                     if isinstance(network_reason, socket.gaierror):
-                        network_message = "El servidor no pudo resolver sandbox.flow.cl (error DNS)."
+                        network_message = f"El servidor no pudo resolver {flow_host_name} (error DNS)."
                     elif isinstance(network_reason, (TimeoutError, socket.timeout)):
-                        network_message = "La conexion HTTPS con Flow Sandbox excedio el tiempo de espera."
+                        network_message = "La conexion HTTPS con Flow excedio el tiempo de espera."
                     elif reason_errno in {111, 113, 10061, 10065} or "403 forbidden" in reason_text or "connection refused" in reason_text:
                         network_message = "El servidor rechazo o bloqueo la conexion saliente a Flow. Revisa las restricciones de red del hosting."
                     else:
-                        network_message = "No fue posible establecer conexion HTTPS con Flow Sandbox desde el servidor."
+                        network_message = "No fue posible establecer conexion HTTPS con Flow desde el servidor."
                     _flow_log("pos_checkout_flow_network_error", venta_id, detail=f"type:{reason_type} errno:{reason_errno if reason_errno is not None else '-'}")
                     raise RuntimeError(network_message) from None
                 except Exception as flow_exc:
                     _flow_log("pos_checkout_flow_invalid_response", venta_id, detail=flow_exc.__class__.__name__)
-                    raise RuntimeError("Flow Sandbox devolvio una respuesta invalida. Revisa el registro del servidor.") from None
+                    raise RuntimeError("Flow devolvio una respuesta invalida. Revisa el registro del servidor.") from None
                 _flow_log("pos_checkout_flow_response", venta_id)
                 stage = "flow_response_validate"
                 flow_token = str(flow_response.get("token") or "").strip()
                 flow_base_url = str(flow_response.get("url") or "").strip()
-                flow_host = (urlparse(flow_base_url).hostname or "").lower()
-                if not flow_token or not flow_base_url or not flow_base_url.startswith("https://") or flow_host != "sandbox.flow.cl":
+                if not flow_token or not flow_base_url:
                     raise RuntimeError("Flow no devolvio un enlace de pago seguro.")
-                flow_url = _flow_payment_redirect_url(flow_base_url, flow_token)
+                flow_url = _flow_payment_redirect_url(flow_base_url, flow_token, cfg.get("environment"))
                 backup = {
                     "venta_id": venta_id,
                     "cliente_nombre": sale.get("cliente_nombre") or "",
@@ -15362,7 +15433,7 @@ def api_admin_pos_whatsapp(venta_id):
                     "canal_venta": "pos_admin",
                 }
                 stage = "flow_persist"
-                _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_url, backup)
+                _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_url, backup, cfg.get("environment"))
                 flow_conn = get_db()
                 try:
                     _ensure_ventas_flow_admin_alert_column()
@@ -15374,7 +15445,7 @@ def api_admin_pos_whatsapp(venta_id):
                 finally:
                     flow_conn.close()
                 _flow_log("pos_checkout_created", venta_id)
-            additions.append(f"Paga con debito o credito de forma segura en Flow (sandbox):\n{flow_url}")
+            additions.append(f"Paga con debito o credito de forma segura en Flow:\n{flow_url}")
 
         final_message = "\n\n".join(part for part in (base_message, *additions) if part)
         if len(final_message) > 1500:
@@ -18176,6 +18247,7 @@ def api_tienda_checkout():
                 amount=total_neto,
                 flow_redirect_url=f"{_public_base_url(request.url_root)}/tienda?flow={flow_sim_status}&venta_id={venta_id}",
                 checkout_backup=flow_backup,
+            flow_environment="simulation",
             )
             if flow_sim_status == "paid":
                 _actualizar_flow_pago(venta_id=venta_id, estado="pagado", flow_order=f"SIMPAID-{venta_id}", payment_data={"simulated": True, "status": "paid"})
@@ -18251,7 +18323,11 @@ def api_tienda_checkout():
             flow_url_base = str(flow_create.get("url") or "").strip().rstrip("/")
             if not flow_token or not flow_url_base:
                 return jsonify({'success': False, 'error': 'Flow no retorno URL de pago valida'}), 502
-            flow_redirect_url = f"{flow_url_base}?token={quote(flow_token)}"
+            try:
+                flow_redirect_url = _flow_payment_redirect_url(flow_url_base, flow_token, flow_cfg.get("environment"))
+            except ValueError:
+                _flow_log("checkout_unsafe_redirect_rejected", venta_id)
+                return jsonify({'success': False, 'error': 'Flow devolvio un dominio de pago no permitido para el ambiente configurado.'}), 502
             flow_backup = {
                 "venta_id": int(venta_id),
                 "cliente_nombre": cliente_nombre,
@@ -18274,6 +18350,7 @@ def api_tienda_checkout():
                 amount=total_neto,
                 flow_redirect_url=flow_redirect_url,
                 checkout_backup=flow_backup,
+                flow_environment=flow_cfg.get("environment"),
             )
             respuesta["flow_redirect_url"] = flow_redirect_url
             respuesta["flow_token"] = flow_token
