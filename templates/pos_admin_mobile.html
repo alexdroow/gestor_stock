@@ -21,9 +21,9 @@
     @media(max-width:359px){.app{padding-left:10px;padding-right:10px}.products{gap:7px}.photo{height:104px}.product-body{padding:7px}.product-price{font-size:12px}.metrics{gap:5px}.metric{padding:8px 6px}.metric span{font-size:8px}.field-row{grid-template-columns:1fr}}
     .order-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px}.order-actions .btn{min-height:42px;padding:0 8px;font-size:11px}.order-actions .wide{grid-column:1/-1}
     /* Keep the add-to-cart notice away from the fixed cart action. */
-    .toast{top:calc(env(safe-area-inset-top) + 76px);bottom:auto;z-index:30}
-    .product.just-added{animation:product-added .55s ease-out}.add-btn{transition:transform .18s,background .18s}.add-btn.just-added{background:var(--green);transform:scale(1.08)}.cartbar.just-added #cartbar-total{animation:cart-total-added .42s ease-out}
-    @keyframes product-added{0%{box-shadow:0 0 0 0 #0b9a5855}45%{box-shadow:0 0 0 5px #0b9a5833}100%{box-shadow:0 5px 14px #49230e0b}}
+    .toast{top:76px!important;bottom:auto!important;z-index:30}
+    .product.just-added{animation:product-added .9s ease-out}.add-btn{transition:transform .18s,background .18s}.add-btn.just-added{background:var(--green);transform:scale(1.12)}.cartbar.just-added #cartbar-total{animation:cart-total-added .55s ease-out}
+    @keyframes product-added{0%{transform:scale(1);border-color:var(--line);box-shadow:0 0 0 0 #0b9a5855}38%{transform:scale(1.025);border-color:var(--green);box-shadow:0 0 0 5px #0b9a5844}100%{transform:scale(1);border-color:var(--line);box-shadow:0 5px 14px #49230e0b}}
     @keyframes cart-total-added{0%{transform:scale(1)}45%{transform:scale(1.12);color:var(--green)}100%{transform:scale(1);color:var(--ink)}}
   </style>
 </head>
