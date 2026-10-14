@@ -2,15 +2,24 @@ package cl.sucree.pos
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.net.Uri
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.Manifest
+import android.content.pm.PackageManager
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -23,6 +32,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.JavascriptInterface
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -65,8 +75,10 @@ class MainActivity : Activity() {
 
         buildScreen()
         configureWebView()
+        createOrderNotificationChannel()
+        requestNotificationPermissionIfNeeded()
         if (savedInstanceState == null) {
-            webView.loadUrl(BuildConfig.POS_URL)
+            webView.loadUrl(posStartUrl(intent))
         } else {
             webView.restoreState(savedInstanceState)
         }
@@ -147,6 +159,7 @@ class MainActivity : Activity() {
             mediaPlaybackRequiresUserGesture = true
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) safeBrowsingEnabled = true
         }
+        webView.addJavascriptInterface(PosBridge(), "SucreePosAndroid")
         WebView.setWebContentsDebuggingEnabled(false)
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, progress: Int) {
@@ -297,6 +310,98 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun posStartUrl(source: Intent): String =
+        if (source.getBooleanExtra("show_orders", false)) "${BuildConfig.POS_URL}?tab=orders" else BuildConfig.POS_URL
+
+    private fun createOrderNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val audio = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        val channel = NotificationChannel(
+            ORDER_CHANNEL_ID,
+            "Nuevos pedidos Sucrée",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Avisos cuando ingresa un pedido al POS."
+            enableVibration(true)
+            setSound(sound, audio)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) return
+        val prefs = getSharedPreferences("pos_notifications", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("permission_asked", false)) {
+            prefs.edit().putBoolean("permission_asked", true).apply()
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+        }
+    }
+
+    private fun showNewOrderNotification(orderId: String, customerName: String) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val openOrders = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("show_orders", true)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            orderId.hashCode(),
+            openOrders,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = Notification.Builder(this, ORDER_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_sucree)
+            .setContentTitle("Nuevo pedido #$orderId")
+            .setContentText(customerName.ifBlank { "Pedido nuevo en el POS" })
+            .setCategory(Notification.CATEGORY_EVENT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        manager.notify(orderId.hashCode(), notification)
+    }
+
+    private inner class PosBridge {
+        @JavascriptInterface
+        fun printOrder(payload: String) {
+            runOnUiThread {
+                try {
+                    val json = JSONObject(payload)
+                    printer.print(
+                        ConfirmedSaleTicket(
+                            orderId = json.getString("orderId"),
+                            title = json.optString("title", "Pedido"),
+                            summary = json.optString("summary", ""),
+                        ),
+                    ) { status -> Toast.makeText(this@MainActivity, status, Toast.LENGTH_LONG).show() }
+                } catch (_: Exception) {
+                    Toast.makeText(this@MainActivity, "No se pudo preparar el ticket.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun onNewOrder(orderId: String, customerName: String) {
+            runOnUiThread { showNewOrderNotification(orderId.take(30), customerName.take(100)) }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("show_orders", false)) {
+            webView.loadUrl(posStartUrl(intent))
+        }
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         webView.saveState(outState)
         super.onSaveInstanceState(outState)
@@ -328,4 +433,9 @@ class MainActivity : Activity() {
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    companion object {
+        private const val ORDER_CHANNEL_ID = "sucree_pos_orders"
+        private const val NOTIFICATION_PERMISSION_REQUEST = 5102
+    }
 }

@@ -3,6 +3,7 @@ package cl.sucree.pos
 import android.content.Context
 import android.print.PrintAttributes
 import android.print.PrintManager
+import android.os.Build
 import android.webkit.WebView
 import android.webkit.WebViewClient
 
@@ -18,6 +19,11 @@ class AndroidSystemPrinterGateway(private val context: Context) {
         val countKey = "order_${ticket.orderId}_attempts"
         val attempt = preferences.getInt(countKey, 0) + 1
         val copyLabel = if (attempt == 1) "ORIGINAL" else "COPIA / REIMPRESIÓN #${attempt - 1}"
+        if (isIminSwift2()) {
+            IminSwift2PrinterGateway(context).print(ticket, copyLabel, onStatus)
+            preferences.edit().putInt(countKey, attempt).apply()
+            return
+        }
         val jobKey = "order_${ticket.orderId}_attempt_$attempt"
         val printView = WebView(context)
 
@@ -61,6 +67,13 @@ class AndroidSystemPrinterGateway(private val context: Context) {
             "UTF-8",
             null,
         )
+    }
+
+    private fun isIminSwift2(): Boolean {
+        val device = listOf(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.DEVICE)
+            .joinToString(" ") { it.orEmpty() }
+            .lowercase()
+        return "imin" in device && "swift" in device
     }
 
     private fun observeJob(

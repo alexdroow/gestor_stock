@@ -10381,7 +10381,7 @@ def api_tienda_admin_pedidos_chat_activos():
         _normalizar_metodo_pago_flow_por_canal(cursor)
         cursor.execute(
             """
-            SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono,
+            SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.canal_venta,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
                    CASE
@@ -14936,7 +14936,7 @@ def admin_pos_mobile():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261005-1'
+    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261014-1'
     return response
 
 
@@ -15092,6 +15092,38 @@ def api_admin_pos_guardar():
     except Exception as exc:
         print(f"[POS_ADMIN] guardar_error={exc.__class__.__name__}")
         return jsonify({"success": False, "error": "No se pudo guardar la venta POS."}), 500
+
+
+@app.route('/api/admin/pos/<int:venta_id>/eliminar', methods=['POST'])
+def api_admin_pos_eliminar(venta_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
+    conn = None
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT canal_venta, pedido_estado, metodo_pago FROM ventas WHERE id = ? LIMIT 1",
+            (int(venta_id),),
+        ).fetchone()
+        if not row or str(row["canal_venta"] or "").strip().lower() != "pos_admin":
+            return jsonify({"success": False, "error": "Solo se pueden eliminar pedidos creados desde el POS movil."}), 404
+        estado = str(row["pedido_estado"] or "recibido").strip().lower()
+        if estado not in {"recibido", "confirmado", "preparando"}:
+            return jsonify({"success": False, "error": "El pedido ya no esta activo y no se puede eliminar desde el POS."}), 409
+        metodo_pago = str(row["metodo_pago"] or "").strip().lower()
+        if metodo_pago in {"flow", "flow_pagado", "flow_pendiente", "flow_pending"}:
+            return jsonify({"success": False, "error": "El pedido tiene un pago Flow iniciado o confirmado. Rechazalo desde gestion y revisa el estado del pago antes de eliminarlo."}), 409
+    finally:
+        if conn:
+            conn.close()
+    try:
+        eliminar_venta(int(venta_id))
+        crear_backup()
+        return jsonify({"success": True, "venta_id": int(venta_id), "mensaje": "Pedido eliminado y stock repuesto."})
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"success": False, "error": "No se pudo eliminar el pedido POS."}), 500
 
 
 @app.route('/api/admin/pos/<int:venta_id>/whatsapp', methods=['POST'])

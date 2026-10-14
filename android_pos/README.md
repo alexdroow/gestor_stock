@@ -45,6 +45,8 @@ La APK debug sirve para instalación y validación interna. No distribuirla como
 
 ## Impresión
 
-Tras confirmar la venta, la APK permite imprimir una comanda por el servicio estándar de impresión de Android, con papel configurado a 58 mm cuando el servicio lo admite. El estado del trabajo se registra localmente separado de la venta; una reimpresión queda marcada como copia y nunca vuelve a crear el pedido. La app informa si Android completa, bloquea o falla el trabajo.
+En iMin Swift 2 se usa el SDK oficial iMin Printer v2 y papel de 58 mm. Otros Android conservan la ruta Android Print. Las reimpresiones se identifican como copia y no vuelven a crear la venta.
 
-Android no define una API universal para controlar la impresora térmica integrada en todos los terminales. Si un equipo no expone su impresora como servicio Android Print, se necesita identificar el fabricante/modelo e integrar su SDK/adaptador oficial. La venta no depende de que la impresora esté disponible.
+## Avisos de pedidos
+
+Con la APK abierta, el POS consulta los pedidos y puede emitir aviso/sonido local. Las notificaciones con la app cerrada necesitan Firebase Cloud Messaging y credenciales configuradas en el servidor. Sucrée aún no tiene un proyecto Firebase configurado, por lo que esa modalidad no está habilitada en esta versión.

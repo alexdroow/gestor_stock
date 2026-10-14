@@ -11,8 +11,8 @@ android {
         applicationId = "cl.sucree.pos"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.2.0"
         buildConfigField("String", "POS_URL", "\"https://pasteleriasucree.cl/admin/pos/mobile\"")
     }
 
@@ -28,4 +28,9 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+}
+
+dependencies {
+    implementation("com.github.iminsoftware:IminPrinterLibrary:V2.0.0.18")
 }
