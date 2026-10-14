@@ -1169,7 +1169,12 @@ def admin_logout():
 
 @app.route('/descargar-pos-android')
 def descargar_pos_android():
-    return render_template('descargar_pos_android.html')
+    response = make_response(render_template('descargar_pos_android.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['X-POS-APK-Version'] = '1.2.0'
+    return response
 
 
 @app.route('/descargas/SucreePOS-Android-prueba.apk')
