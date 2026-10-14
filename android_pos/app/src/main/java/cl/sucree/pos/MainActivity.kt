@@ -278,7 +278,8 @@ class MainActivity : Activity() {
         val extractTicket = """(() => {
             const screen = document.getElementById('success-screen');
             const title = document.getElementById('success-title')?.textContent?.trim() || '';
-            const summary = document.getElementById('success-summary')?.innerText?.trim() || '';
+            const summary = document.getElementById('success-ticket-summary')?.textContent?.trim()
+                || document.getElementById('success-summary')?.innerText?.trim() || '';
             const id = title.match(/#\s*(\d+)/)?.[1];
             if (!screen || screen.hidden || !id || !summary) return null;
             return JSON.stringify({ orderId: id, title, summary });

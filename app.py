@@ -1173,7 +1173,7 @@ def descargar_pos_android():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-APK-Version'] = '1.2.0'
+    response.headers['X-POS-APK-Version'] = '1.3.0'
     return response
 
 
@@ -10387,6 +10387,7 @@ def api_tienda_admin_pedidos_chat_activos():
         cursor.execute(
             """
             SELECT v.id, v.fecha_hora, v.total_monto, v.cliente_nombre, v.cliente_email, v.cliente_telefono, v.canal_venta,
+                   v.direccion_entrega, v.observaciones, v.descuento_monto, v.despacho_monto,
                    COALESCE(NULLIF(TRIM(v.pedido_estado), ''), 'recibido') AS pedido_estado,
                    v.pedido_estado_actualizado,
                    CASE
@@ -14941,7 +14942,7 @@ def admin_pos_mobile():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261014-1'
+    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261014-2'
     return response
 
 
@@ -15131,6 +15132,69 @@ def api_admin_pos_eliminar(venta_id):
         return jsonify({"success": False, "error": "No se pudo eliminar el pedido POS."}), 500
 
 
+def _pos_admin_whatsapp_transfer_message(sale, snapshot):
+    checkout = snapshot.get("checkout") if isinstance(snapshot.get("checkout"), dict) else {}
+    summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
+    lines = summary.get("lines") if isinstance(summary.get("lines"), list) else []
+
+    def clp(value):
+        try:
+            amount = int(round(float(value or 0)))
+        except (TypeError, ValueError):
+            amount = 0
+        return "$" + f"{amount:,}".replace(",", ".")
+
+    products = []
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        name = str(line.get("name") or "Producto").strip()[:120]
+        quantity = line.get("quantity") or 1
+        products.append(f"- {quantity} x {name}: {clp(line.get('line_total'))}")
+
+    customer_name = str(sale.get("cliente_nombre") or "").strip()
+    delivery = str(checkout.get("delivery_type") or "retiro").strip().lower()
+    delivery_text = "Despacho" if delivery == "despacho" else "Retiro en tienda"
+    address = str(checkout.get("delivery_address") or "").strip()
+    message = [
+        f"Hola{f' {customer_name}' if customer_name else ''}.",
+        f"Tu pedido #{int(sale.get('id') or snapshot.get('venta_id') or 0)} fue registrado y comenzamos a prepararlo.",
+        "",
+        "*Resumen del pedido:*",
+        *(products or ["- Detalle de productos no disponible"]),
+        "",
+        f"Subtotal: {clp(summary.get('subtotal'))}",
+    ]
+    if float(summary.get("discount") or 0) > 0:
+        message.append(f"Descuento: -{clp(summary.get('discount'))}")
+    if float(summary.get("card_fee") or 0) > 0:
+        message.append(f"Comision tarjeta: {clp(summary.get('card_fee'))}")
+    message.extend([
+        f"*TOTAL: {clp(summary.get('total') or sale.get('total_monto'))}*",
+        "Pago: transferencia pendiente de validacion.",
+        f"Entrega: {delivery_text}",
+    ])
+    if delivery == "despacho" and address:
+        message.append(f"Direccion: {address}")
+    note = str(checkout.get("note") or "").strip()
+    if note:
+        message.extend([f"Observacion: {note[:300]}"])
+    message.extend([
+        "",
+        "*Datos para transferencia*",
+        "Titular: Angello Gutierrez Salgado",
+        "RUT: 19.284.422-3",
+        "Banco: Banco Estado",
+        "Tipo de cuenta: Cuenta RUT / Cuenta vista",
+        "Numero de cuenta: 19284422",
+        "Correo: pasteleria.sucree@outlook.com",
+        "",
+        "Cuando realices la transferencia, envianos el comprobante por este mismo WhatsApp para validar el pago.",
+        "Gracias por preferir Pasteleria Sucree.",
+    ])
+    return "\n".join(message)
+
+
 @app.route('/api/admin/pos/<int:venta_id>/whatsapp', methods=['POST'])
 def api_admin_pos_whatsapp(venta_id):
     if not session.get(_ADMIN_SESSION_KEY):
@@ -15185,15 +15249,7 @@ def api_admin_pos_whatsapp(venta_id):
         flow_url = ""
 
         if mode == "transfer":
-            additions.append(
-                "DATOS PARA TRANSFERENCIA\n"
-                "Titular: Angello Gutierrez Salgado\n"
-                "RUT: 19.284.422-3\n"
-                "Banco: Banco Estado\n"
-                "Tipo de cuenta: Cuenta RUT / Cuenta vista\n"
-                "Numero de cuenta: 19284422\n"
-                "Correo: pasteleria.sucree@outlook.com"
-            )
+            base_message = _pos_admin_whatsapp_transfer_message(sale, snapshot)
         elif mode == "card":
             stage = "flow_config"
             customer_email = _pos_admin_email(payload.get("email") or sale.get("cliente_email"))
