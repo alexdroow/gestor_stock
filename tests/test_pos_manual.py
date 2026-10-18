@@ -108,9 +108,38 @@ class ManualPosTests(unittest.TestCase):
         whatsapp = self.client.post(f"/api/admin/pos/{sale_id}/whatsapp", json={})
         self.assertEqual(whatsapp.status_code, 200, whatsapp.get_json())
         message = whatsapp.get_json()["message"]
+        self.assertIn("Torta personalizada", message)
+        self.assertIn("$20.000", message)
+        self.assertIn("Decoracion adicional", message)
         self.assertIn("Datos para transferencia", message)
         self.assertIn("19284422", message)
         self.assertIn("venta manual", message.lower())
+        self.assertLess(message.index("Torta personalizada"), message.index("Datos para transferencia"))
+
+    def test_flow_manual_summary_contains_descriptions_and_amounts_before_link(self):
+        snapshot = {
+            "venta_id": 19,
+            "manual_sale": True,
+            "summary": {
+                "lines": [
+                    {"name": "Torta personalizada", "quantity": 1, "line_total": 20000},
+                    {"name": "Decoracion adicional", "quantity": 1, "line_total": 5000},
+                ],
+                "subtotal": 25000,
+                "discount": 2500,
+                "card_fee": 788,
+                "total": 23288,
+            },
+        }
+        message = app_module._pos_admin_whatsapp_manual_summary_message(
+            {"id": 19, "cliente_nombre": "Cliente Prueba"}, snapshot
+        )
+        message = f"{message}\n\nPaga con debito o credito de forma segura en Flow:\nhttps://flow.test/pagar"
+        self.assertIn("Torta personalizada: $20.000", message)
+        self.assertIn("Decoracion adicional: $5.000", message)
+        self.assertIn("Descuento: -$2.500", message)
+        self.assertIn("TOTAL: $23.288", message)
+        self.assertLess(message.index("Torta personalizada"), message.index("https://flow.test/pagar"))
 
     def test_manual_payment_method_can_change_before_flow_link_is_created(self):
         created = self.client.post("/api/admin/pos/manual/guardar", json=self._sale_payload())

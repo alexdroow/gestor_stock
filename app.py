@@ -15541,6 +15541,46 @@ def api_admin_pos_eliminar(venta_id):
         return jsonify({"success": False, "error": "No se pudo eliminar el pedido POS."}), 500
 
 
+def _pos_admin_whatsapp_manual_summary_message(sale, snapshot):
+    summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
+    lines = summary.get("lines") if isinstance(summary.get("lines"), list) else []
+
+    def clp(value):
+        try:
+            amount = int(round(float(value or 0)))
+        except (TypeError, ValueError):
+            amount = 0
+        return "$" + f"{amount:,}".replace(",", ".")
+
+    customer_name = str(sale.get("cliente_nombre") or "").strip()
+    products = []
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        name = str(line.get("name") or "Cargo manual").strip()[:120]
+        quantity = line.get("quantity") or 1
+        products.append(f"- {quantity} x {name}: {clp(line.get('line_total', line.get('amount')))}")
+
+    message = [
+        f"Hola{f' {customer_name}' if customer_name else ''}.",
+        f"Resumen de tu venta manual #{int(sale.get('id') or snapshot.get('venta_id') or 0)}:",
+        "",
+        "*Detalle de la compra:*",
+        *(products or ["- Detalle no disponible"]),
+        "",
+        f"Subtotal: {clp(summary.get('subtotal'))}",
+    ]
+    if float(summary.get("discount") or 0) > 0:
+        message.append(f"Descuento: -{clp(summary.get('discount'))}")
+    if float(summary.get("card_fee") or 0) > 0:
+        message.append(f"Comision debito: {clp(summary.get('card_fee'))}")
+    message.extend([
+        f"*TOTAL: {clp(summary.get('total') or sale.get('total_monto'))}*",
+        "Pago: pendiente de completar en Flow.",
+    ])
+    return "\n".join(message)
+
+
 def _pos_admin_whatsapp_transfer_message(sale, snapshot):
     checkout = snapshot.get("checkout") if isinstance(snapshot.get("checkout"), dict) else {}
     summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
@@ -15662,6 +15702,8 @@ def api_admin_pos_whatsapp(venta_id):
         if mode == "transfer":
             base_message = _pos_admin_whatsapp_transfer_message(sale, snapshot)
         elif mode == "card":
+            if snapshot.get("manual_sale"):
+                base_message = _pos_admin_whatsapp_manual_summary_message(sale, snapshot)
             stage = "flow_config"
             customer_email = _pos_admin_email(payload.get("email") or sale.get("cliente_email"))
             if not customer_email:
@@ -15787,7 +15829,8 @@ def api_admin_pos_whatsapp(venta_id):
             additions.append(f"Paga con debito o credito de forma segura en Flow:\n{flow_url}")
 
         final_message = "\n\n".join(part for part in (base_message, *additions) if part)
-        if len(final_message) > 1500:
+        max_message_length = 6000 if snapshot.get("manual_sale") else 1500
+        if len(final_message) > max_message_length:
             raise RuntimeError("El mensaje es demasiado largo; acorta el resumen del pedido antes de enviarlo.")
         whatsapp_url = f"https://wa.me/{destination.replace('+', '')}?text={quote(final_message, safe='')}"
         _flow_log("pos_whatsapp_ready", venta_id, detail=f"mode={mode} elapsed_ms={int((time.monotonic() - started_at) * 1000)}")
