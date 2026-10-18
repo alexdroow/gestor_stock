@@ -79,6 +79,13 @@ class ManualPosTests(unittest.TestCase):
         self.assertEqual(summary["total"], 23288)
         self.assertTrue(summary["manual_sale"])
 
+    def test_manual_page_exposes_history_edit_and_delete_controls(self):
+        response = self.client.get("/admin/pos/manual")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("X-POS-Manual-Version"), "manual-pos-20261018-2")
+        self.assertIn(b"Editar venta", response.data)
+        self.assertIn(b"Borrar del historial", response.data)
+
     def test_manual_sale_is_idempotent_and_does_not_change_catalog_stock(self):
         payload = self._sale_payload()
         first = self.client.post("/api/admin/pos/manual/guardar", json=payload)
@@ -159,6 +166,99 @@ class ManualPosTests(unittest.TestCase):
         self.assertEqual(sale["metodo_pago"], "flow_pendiente")
         self.assertEqual(sale["cliente_email"], "cliente@example.com")
         conn.close()
+
+    def test_history_sale_can_edit_customer_title_descriptions_and_recalculate_total(self):
+        created = self.client.post("/api/admin/pos/manual/guardar", json=self._sale_payload())
+        sale_id = created.get_json()["venta_id"]
+        edited = self.client.post(
+            f"/api/admin/pos/manual/{sale_id}/editar",
+            json={
+                "title": "Pedido actualizado",
+                "customer": {"name": "Nombre Nuevo", "phone": "+56987654321"},
+                "lines": [
+                    {"name": "Torta especial", "amount": 22000},
+                    {"name": "Decoracion nueva", "amount": 8000},
+                ],
+            },
+        )
+        self.assertEqual(edited.status_code, 200, edited.get_json())
+        self.assertTrue(edited.get_json()["financial_change"])
+        self.assertEqual(edited.get_json()["snapshot"]["title"], "Pedido actualizado")
+        self.assertEqual(edited.get_json()["snapshot"]["summary"]["subtotal"], 30000)
+        self.assertEqual(edited.get_json()["snapshot"]["summary"]["discount"], 3000)
+        self.assertEqual(edited.get_json()["snapshot"]["summary"]["total"], 27000)
+
+        conn = self._get_db()
+        sale = conn.execute("SELECT cliente_nombre, cliente_telefono, total_monto FROM ventas WHERE id=?", (sale_id,)).fetchone()
+        self.assertEqual(sale["cliente_nombre"], "Nombre Nuevo")
+        self.assertEqual(sale["cliente_telefono"], "+56987654321")
+        self.assertEqual(sale["total_monto"], 27000)
+        conn.close()
+
+    def test_delete_removes_manual_sale_from_history_but_keeps_audit_record(self):
+        created = self.client.post("/api/admin/pos/manual/guardar", json=self._sale_payload())
+        sale_id = created.get_json()["venta_id"]
+        deleted = self.client.post(f"/api/admin/pos/manual/{sale_id}/eliminar")
+        self.assertEqual(deleted.status_code, 200, deleted.get_json())
+        history = self.client.get("/api/admin/pos/manual/historial")
+        self.assertEqual(history.get_json()["ventas"], [])
+
+        conn = self._get_db()
+        sale = conn.execute("SELECT estado FROM ventas WHERE id=?", (sale_id,)).fetchone()
+        snapshot = conn.execute("SELECT deleted_at FROM pos_admin_snapshots WHERE venta_id=?", (sale_id,)).fetchone()
+        self.assertEqual(sale["estado"], "cancelado")
+        self.assertTrue(snapshot["deleted_at"])
+        conn.close()
+
+    def test_delete_rejects_manual_sale_with_flow_pending(self):
+        created = self.client.post("/api/admin/pos/manual/guardar", json=self._sale_payload())
+        sale_id = created.get_json()["venta_id"]
+        conn = self._get_db()
+        conn.execute("UPDATE ventas SET metodo_pago='flow_pendiente' WHERE id=?", (sale_id,))
+        conn.commit()
+        conn.close()
+
+        deleted = self.client.post(f"/api/admin/pos/manual/{sale_id}/eliminar")
+        self.assertEqual(deleted.status_code, 400)
+        self.assertIn("Flow", deleted.get_json()["error"])
+
+    def test_flow_pending_sale_allows_description_edits_but_not_amount_changes(self):
+        created = self.client.post("/api/admin/pos/manual/guardar", json=self._sale_payload())
+        sale_id = created.get_json()["venta_id"]
+        with patch.object(app_module, "_flow_cfg", return_value={"enabled": True}), patch.object(
+            app_module, "_flow_checkout_public_enabled", return_value=True
+        ):
+            changed = self.client.post(
+                f"/api/admin/pos/manual/{sale_id}/metodo",
+                json={"payment_method": "card", "email": "cliente@example.com"},
+            )
+        self.assertEqual(changed.status_code, 200, changed.get_json())
+
+        conn = self._get_db()
+        app_module._ensure_flow_pago_table(conn.cursor())
+        conn.execute(
+            "INSERT INTO tienda_flow_pagos (venta_id, commerce_order, flow_token, estado, amount) VALUES (?, ?, ?, 'pendiente', ?)",
+            (sale_id, f"TEST-{sale_id}", f"TOKEN-{sale_id}", 23288),
+        )
+        conn.commit()
+        conn.close()
+
+        payload = {
+            "title": "Titulo corregido",
+            "customer": {"name": "Cliente corregido", "phone": "+56912345678"},
+            "lines": [
+                {"name": "Descripcion corregida", "amount": 20000},
+                {"name": "Decoracion adicional", "amount": 5000},
+            ],
+        }
+        description_edit = self.client.post(f"/api/admin/pos/manual/{sale_id}/editar", json=payload)
+        self.assertEqual(description_edit.status_code, 200, description_edit.get_json())
+        self.assertFalse(description_edit.get_json()["financial_change"])
+
+        payload["lines"][0]["amount"] = 21000
+        amount_edit = self.client.post(f"/api/admin/pos/manual/{sale_id}/editar", json=payload)
+        self.assertEqual(amount_edit.status_code, 400)
+        self.assertIn("montos", amount_edit.get_json()["error"])
 
 
 if __name__ == "__main__":
