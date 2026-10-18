@@ -15801,57 +15801,9 @@
             }
         }
 
-        body.pos-agenda-embed {
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        body.pos-agenda-embed .beta-preview-ribbon,
-        body.pos-agenda-embed .desktop-store-ribbon,
-        body.pos-agenda-embed .topbar,
-        body.pos-agenda-embed .left-nav,
-        body.pos-agenda-embed .mobile-bottom-nav,
-        body.pos-agenda-embed .booking-header-cart,
-        body.pos-agenda-embed .mobile-menu-fab,
-        body.pos-agenda-embed .mobile-menu-modal,
-        body.pos-agenda-embed .mobile-cart-fab,
-        body.pos-agenda-embed .mobile-cats-bubble,
-        body.pos-agenda-embed .mobile-agenda-summary-fab,
-        body.pos-agenda-embed .wa-fab,
-        body.pos-agenda-embed #tienda-admin-pill,
-        body.pos-agenda-embed #agenda-beta-close {
-            display: none !important;
-        }
-        body.pos-agenda-embed .layout {
-            display: block !important;
-            min-height: 100vh;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        body.pos-agenda-embed.mobile-ui.tienda-preview-draft.tienda-preview-agenda .layout {
-            padding: 0 !important;
-        }
-        body.pos-agenda-embed .content {
-            width: 100% !important;
-            max-width: none !important;
-            min-height: 100vh;
-            padding: 0 10px 18px !important;
-            margin: 0 !important;
-        }
-        body.pos-agenda-embed.mobile-ui.tienda-preview-draft.tienda-preview-agenda .content {
-            padding: 0 10px 18px !important;
-        }
-        body.pos-agenda-embed .content > :not(#sec-agenda-reservas) {
-            display: none !important;
-        }
-        body.pos-agenda-embed #sec-agenda-reservas {
-            display: block !important;
-            width: 100% !important;
-            max-width: none !important;
-            margin: 0 auto !important;
-        }
     </style>
 </head>
-<body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if request.path == '/tienda/agendapedidos' %}{% set _ = _body_cls.append('tienda-agendapedidos-oficial') %}{% endif %}{% if force_agenda and (agenda_beta or request.path in ['/tienda/preview', '/tienda/agendapedidos']) %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if (request.path == '/tienda/preview' and request.args.get('mode') == 'draft') or request.path == '/tienda/agendapedidos' or (agenda_beta and mobile_detected) %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if request.args.get('pos_embed') == '1' %}{% set _ = _body_cls.append('pos-agenda-embed') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
+<body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if request.path == '/tienda/agendapedidos' %}{% set _ = _body_cls.append('tienda-agendapedidos-oficial') %}{% endif %}{% if force_agenda and (agenda_beta or request.path in ['/tienda/preview', '/tienda/agendapedidos']) %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if (request.path == '/tienda/preview' and request.args.get('mode') == 'draft') or request.path == '/tienda/agendapedidos' or (agenda_beta and mobile_detected) %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
     <script>
         (function () {
             try {

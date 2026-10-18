@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import patch
 
 import app as app_module
 
@@ -14,23 +13,19 @@ class PosCakesAgendaTests(unittest.TestCase):
         response = self.client.get('/admin/pos/mobile')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers['X-POS-Mobile-Version'], 'mobile-pos-20261018-7')
+        self.assertEqual(response.headers['X-POS-Mobile-Version'], 'mobile-pos-20261018-8')
         self.assertIn(b'data-tab="tortas"', response.data)
-        self.assertIn(b'data-src="/tienda/agendapedidos?pos_embed=1"', response.data)
+        self.assertIn(b'data-src="/agenda?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_embedded_agenda_renders_mobile_reservation_section_without_store_shell(self):
-        with patch.object(
-            app_module,
-            '_obtener_tienda_personalizacion',
-            return_value=app_module._default_tienda_personalizacion(),
-        ):
-            response = self.client.get('/tienda/agendapedidos?pos_embed=1')
+    def test_embedded_agenda_uses_sucreestock_mobile_view_and_returns_to_mobile_pos(self):
+        response = self.client.get('/agenda?pos_embed=1')
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'pos-agenda-embed', response.data)
-        self.assertIn(b'id="sec-agenda-reservas"', response.data)
-        self.assertIn(b'body.pos-agenda-embed .mobile-bottom-nav', response.data)
+        self.assertIn(b'@media (max-width: 760px)', response.data)
+        self.assertIn(b'class="agenda-mobile-bottom-nav"', response.data)
+        self.assertIn(b'href="/admin/pos/mobile?tab=home" target="_top"', response.data)
+        self.assertIn('Volver al POS'.encode(), response.data)
 
 
 if __name__ == '__main__':
