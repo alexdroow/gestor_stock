@@ -226,7 +226,9 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
+        return True
+    if ruta.startswith("/downloader/apk/"):
         return True
     if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):
         return True
@@ -1191,6 +1193,50 @@ def descargar_archivo_pos_android():
     )
     response.headers['Cache-Control'] = 'no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@app.route('/downloader/apk/', defaults={'filename': None}, strict_slashes=False)
+@app.route('/downloader/apk/<path:filename>', strict_slashes=False)
+def downloader_apk(filename):
+    apk_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk')
+    os.makedirs(apk_dir, exist_ok=True)
+    if filename is not None:
+        safe_name = secure_filename(filename)
+        if safe_name != filename or not safe_name.lower().endswith('.apk'):
+            return 'Archivo APK no encontrado.', 404
+        apk_path = os.path.join(apk_dir, safe_name)
+        if not os.path.isfile(apk_path):
+            return 'Archivo APK no encontrado.', 404
+        response = send_file(
+            apk_path,
+            as_attachment=True,
+            download_name=safe_name,
+            mimetype='application/vnd.android.package-archive',
+            max_age=0,
+        )
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+    apk_names = sorted(
+        (name for name in os.listdir(apk_dir) if name.lower().endswith('.apk') and secure_filename(name) == name),
+        key=lambda name: os.path.getmtime(os.path.join(apk_dir, name)),
+        reverse=True,
+    )
+    links = ''.join(
+        f'<li><a href="{url_for("downloader_apk", filename=name)}">{name}</a></li>'
+        for name in apk_names
+    ) or '<li>Todavia no hay archivos APK disponibles.</li>'
+    response = make_response(
+        '<!doctype html><html lang="es"><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<title>Descargas APK | Sucree</title>'
+        '<body style="font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 18px;color:#3b1b11">'
+        '<h1>Descargas APK</h1><p>Selecciona el instalador que deseas descargar.</p>'
+        f'<ul>{links}</ul></body></html>'
+    )
+    response.headers['Cache-Control'] = 'no-store'
     return response
 
 
