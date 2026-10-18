@@ -14,7 +14,7 @@ class PosCakesAgendaTests(unittest.TestCase):
         response = self.client.get('/admin/pos/mobile')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers['X-POS-Mobile-Version'], 'mobile-pos-20261018-9')
+        self.assertEqual(response.headers['X-POS-Mobile-Version'], 'mobile-pos-20261018-10')
         self.assertIn(b'data-tab="tortas"', response.data)
         self.assertIn(b'data-src="/agenda?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
