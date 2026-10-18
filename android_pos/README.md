@@ -14,7 +14,7 @@ Aplicación Android genérica para abrir el POS móvil oficial de Sucrée. Usa u
 - Solo permite navegación HTTPS dentro de `pasteleriasucree.cl` y `www.pasteleriasucree.cl`.
 - WhatsApp se abre como aplicación externa; los demás dominios no se cargan dentro de la APK.
 - Desactiva contenido mixto, acceso a archivos locales y cookies de terceros.
-- No contiene credenciales, tokens, claves de firma ni un puente JavaScript nativo.
+- No contiene credenciales, tokens ni claves de firma. El puente JavaScript nativo solo atiende impresión de tickets de Agenda y avisos de nuevos pedidos.
 - La venta continúa guardándose una sola vez en el backend actual.
 
 ## Compilar APK de prueba

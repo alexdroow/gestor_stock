@@ -14,6 +14,62 @@ data class ConfirmedSaleTicket(
 )
 
 class AndroidSystemPrinterGateway(private val context: Context) {
+    fun printAgendaTicket(orderId: String, html: String, onStatus: (String) -> Unit) {
+        if (isIminSwift2()) {
+            IminSwift2PrinterGateway(context).printHtmlTicket(orderId, html, onStatus)
+            return
+        }
+
+        val printView = WebView(context)
+        printView.settings.apply {
+            javaScriptEnabled = false
+            allowFileAccess = false
+            allowContentAccess = false
+        }
+        printView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                printView.webViewClient = WebViewClient()
+                try {
+                    val attributes = PrintAttributes.Builder()
+                        .setMediaSize(PrintAttributes.MediaSize("SU CREE_58MM", "58 mm", 2283, 11000))
+                        .setResolution(PrintAttributes.Resolution("SU CREE_203DPI", "203 dpi", 203, 203))
+                        .setMinMargins(PrintAttributes.Margins(0, 0, 0, 0))
+                        .setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME)
+                        .build()
+                    val job = (context.getSystemService(Context.PRINT_SERVICE) as PrintManager).print(
+                        "Sucree_Agenda_$orderId",
+                        printView.createPrintDocumentAdapter("Sucrée Agenda"),
+                        attributes,
+                    )
+                    onStatus("Ticket de Agenda enviado a Android Print.")
+                    val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                    val startedAt = System.currentTimeMillis()
+                    val poll = object : Runnable {
+                        override fun run() {
+                            when {
+                                job.isCompleted -> {
+                                    onStatus("Impresión del pedido #$orderId completada.")
+                                    printView.destroy()
+                                }
+                                job.isFailed || job.isCancelled -> {
+                                    onStatus("No se completó la impresión del pedido #$orderId.")
+                                    printView.destroy()
+                                }
+                                System.currentTimeMillis() - startedAt >= 120_000 -> printView.destroy()
+                                else -> handler.postDelayed(this, 1000)
+                            }
+                        }
+                    }
+                    handler.post(poll)
+                } catch (error: Exception) {
+                    printView.destroy()
+                    onStatus("No se pudo iniciar la impresión: ${error.localizedMessage ?: "error del sistema"}")
+                }
+            }
+        }
+        printView.loadDataWithBaseURL("https://pasteleriasucree.cl/", html, "text/html", "UTF-8", null)
+    }
+
     fun print(ticket: ConfirmedSaleTicket, onStatus: (String) -> Unit) {
         val preferences = context.getSharedPreferences("printer_jobs", Context.MODE_PRIVATE)
         val countKey = "order_${ticket.orderId}_attempts"

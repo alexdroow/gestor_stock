@@ -372,6 +372,26 @@ class MainActivity : Activity() {
 
     private inner class PosBridge {
         @JavascriptInterface
+        fun printAgendaTicket(orderId: String, html: String) {
+            runOnUiThread {
+                val page = Uri.parse(webView.url ?: "")
+                val safeId = orderId.filter(Char::isDigit).take(24)
+                val validHtml = html.trimStart().startsWith("<!doctype html", ignoreCase = true) &&
+                    html.contains("@page { size: 58mm", ignoreCase = true)
+                if (page.scheme != "https" || page.host !in setOf("pasteleriasucree.cl", "www.pasteleriasucree.cl") ||
+                    page.path != "/admin/pos/mobile" || safeId.isBlank() ||
+                    html.length > 512_000 || !validHtml
+                ) {
+                    Toast.makeText(this@MainActivity, "No se pudo validar el ticket de Agenda.", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                printer.printAgendaTicket(safeId, html) { status ->
+                    Toast.makeText(this@MainActivity, status, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        @JavascriptInterface
         fun printOrder(payload: String) {
             runOnUiThread {
                 try {

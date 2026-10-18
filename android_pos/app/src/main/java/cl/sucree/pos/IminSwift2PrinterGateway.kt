@@ -1,13 +1,148 @@
 package cl.sucree.pos
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import com.imin.printer.InitPrinterCallback
 import com.imin.printer.INeoPrinterCallback
 import com.imin.printer.PrinterHelper
+import org.json.JSONObject
+import org.json.JSONTokener
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 class IminSwift2PrinterGateway(context: Context) {
+    private val webViewContext = context
     private val appContext = context.applicationContext
     private val helper = PrinterHelper.getInstance()
+
+    fun printHtmlTicket(orderId: String, html: String, onStatus: (String) -> Unit) {
+        val density = appContext.resources.displayMetrics.density
+        val cssWidth = 58.0 * 96.0 / 25.4
+        val renderWidth = (cssWidth * density).roundToInt().coerceAtLeast(1)
+        val webView = WebView(webViewContext).apply {
+            setBackgroundColor(Color.WHITE)
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = false
+                allowFileAccess = false
+                allowContentAccess = false
+                blockNetworkLoads = true
+                useWideViewPort = false
+                loadWithOverviewMode = false
+                defaultTextEncodingName = "UTF-8"
+                textZoom = 100
+            }
+            layoutParams = ViewGroup.LayoutParams(renderWidth, 1)
+        }
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                webView.evaluateJavascript(
+                    "JSON.stringify({width:document.body.getBoundingClientRect().width,height:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)})",
+                ) { result ->
+                    try {
+                        val dimensionsJson = JSONTokener(result ?: "null").nextValue() as? String
+                            ?: throw IllegalStateException("No se pudo medir el ticket")
+                        val dimensions = JSONObject(dimensionsJson)
+                        val pageWidth = (dimensions.optDouble("width", cssWidth) * density).roundToInt().coerceAtLeast(1)
+                        val pageHeight = (dimensions.optDouble("height", 0.0) * density).roundToInt().coerceAtLeast(1)
+                        val outputWidth = 384
+                        val outputHeight = ceil(pageHeight * outputWidth.toDouble() / pageWidth).toInt().coerceAtLeast(1)
+                        if (outputHeight > 24_000) throw IllegalArgumentException("El ticket es demasiado largo para imprimir de una vez")
+
+                        webView.measure(
+                            View.MeasureSpec.makeMeasureSpec(pageWidth, View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(pageHeight, View.MeasureSpec.EXACTLY),
+                        )
+                        webView.layout(0, 0, pageWidth, pageHeight)
+                        val scale = outputWidth.toFloat() / pageWidth
+                        val chunks = mutableListOf<Bitmap>()
+                        var top = 0
+                        while (top < outputHeight) {
+                            val chunkHeight = minOf(1024, outputHeight - top)
+                            val bitmap = Bitmap.createBitmap(outputWidth, chunkHeight, Bitmap.Config.ARGB_8888)
+                            val canvas = Canvas(bitmap)
+                            canvas.drawColor(Color.WHITE)
+                            canvas.scale(scale, scale)
+                            canvas.translate(0f, -top / scale)
+                            webView.draw(canvas)
+                            chunks.add(bitmap)
+                            top += chunkHeight
+                        }
+                        webView.destroy()
+                        sendAgendaBitmap(orderId, chunks, onStatus)
+                    } catch (error: Exception) {
+                        webView.destroy()
+                        onStatus("No se pudo preparar el ticket 58 mm: ${error.localizedMessage ?: "error de formato"}")
+                    }
+                }
+            }
+        }
+        webView.loadDataWithBaseURL("https://pasteleriasucree.cl/", html, "text/html", "UTF-8", null)
+    }
+
+    private fun sendAgendaBitmap(orderId: String, bitmaps: List<Bitmap>, onStatus: (String) -> Unit) {
+        var finished = false
+        fun releaseBitmaps() {
+            if (finished) return
+            finished = true
+            bitmaps.forEach { if (!it.isRecycled) it.recycle() }
+        }
+        fun send() {
+            try {
+                helper.setConnectInternalPrinter(true)
+                helper.setPageFormat(1)
+                helper.printMultiBitmapWithAlign(bitmaps, 1, object : INeoPrinterCallback() {
+                    override fun onRunResult(isSuccess: Boolean) {
+                        onStatus(if (isSuccess) "Ticket 58 mm del pedido #$orderId enviado a la impresora integrada." else "La impresora integrada no pudo completar el ticket.")
+                        releaseBitmaps()
+                    }
+                    override fun onReturnString(result: String?) = Unit
+                    override fun onRaiseException(code: Int, message: String?) {
+                        onStatus("Error de impresora iMin ($code): ${message.orEmpty()}")
+                        releaseBitmaps()
+                    }
+                    override fun onPrintResult(code: Int, message: String?) {
+                        if (code !in setOf(0, 1, 48)) {
+                            onStatus("Estado de impresora iMin ($code): ${message.orEmpty()}")
+                        }
+                    }
+                })
+            } catch (error: Exception) {
+                releaseBitmaps()
+                onStatus("No se pudo enviar el ticket a la impresora iMin: ${error.localizedMessage ?: "error del servicio"}")
+            }
+        }
+
+        try {
+            if (PrinterHelper.getNeoPrinterService() != null) send()
+            else {
+                val bound = helper.initPrinterService(appContext, object : InitPrinterCallback {
+                    override fun onConnected() = send()
+                    override fun onDisconnected() {
+                        releaseBitmaps()
+                        onStatus("Se perdió la conexión con la impresora integrada iMin.")
+                    }
+                })
+                if (!bound) {
+                    releaseBitmaps()
+                    onStatus("No se pudo conectar con el servicio de impresora iMin.")
+                }
+            }
+        } catch (error: Exception) {
+            releaseBitmaps()
+            onStatus("Impresora iMin no disponible: ${error.localizedMessage ?: "verifica el dispositivo"}")
+        }
+    }
 
     fun print(ticket: ConfirmedSaleTicket, copyLabel: String, onStatus: (String) -> Unit) {
         val body = buildString {

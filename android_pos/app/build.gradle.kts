@@ -11,8 +11,8 @@ android {
         applicationId = "cl.sucree.pos"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.4.0"
+        versionCode = 6
+        versionName = "1.4.1"
         buildConfigField("String", "POS_URL", "\"https://pasteleriasucree.cl/admin/pos/mobile\"")
     }
 

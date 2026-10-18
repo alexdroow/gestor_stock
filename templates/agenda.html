@@ -8868,13 +8868,19 @@
                 return;
             }
             const evento = eventoVistaPanelAgenda(eventoBase);
+            const ticketHtml = construirHtmlImpresion58(evento);
+            const posEmbed = new URLSearchParams(window.location.search).get('pos_embed') === '1';
+            if (posEmbed && window.SucreePosAndroid && typeof window.SucreePosAndroid.printAgendaTicket === 'function') {
+                window.SucreePosAndroid.printAgendaTicket(String(idNum), ticketHtml);
+                return;
+            }
             const win = window.open('', '_blank', 'width=360,height=720');
             if (!win) {
                 alert('No se pudo abrir la ventana de impresion. Revisa el bloqueo de ventanas emergentes.');
                 return;
             }
             win.document.open();
-            win.document.write(construirHtmlImpresion58(evento));
+            win.document.write(ticketHtml);
             win.document.close();
             setTimeout(() => {
                 try {
