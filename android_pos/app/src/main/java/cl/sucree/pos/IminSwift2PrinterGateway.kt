@@ -12,7 +12,7 @@ class IminSwift2PrinterGateway(context: Context) {
     fun print(ticket: ConfirmedSaleTicket, copyLabel: String, onStatus: (String) -> Unit) {
         val body = buildString {
             appendLine("SUCRÉE PASTELERÍA")
-            appendLine("COMANDA DE PREPARACIÓN")
+            appendLine(if (ticket.title.contains("manual", ignoreCase = true)) "COMPROBANTE DE VENTA" else "COMANDA DE PREPARACIÓN")
             appendLine(ticket.title)
             appendLine(copyLabel)
             appendLine(java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale("es", "CL")).format(java.util.Date()))

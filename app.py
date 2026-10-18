@@ -1175,19 +1175,19 @@ def descargar_pos_android():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-APK-Version'] = '1.3.0'
+    response.headers['X-POS-APK-Version'] = '1.4.0'
     return response
 
 
 @app.route('/descargas/SucreePOS-Android-prueba.apk')
 def descargar_archivo_pos_android():
-    apk_path = os.path.join(static_dir, 'descargas', 'SucreePOS-Android-prueba.apk')
+    apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk', 'SucreePOS-Android-1.4.0-debug.apk')
     if not os.path.isfile(apk_path):
         return 'La APK aún no está disponible.', 404
     response = send_file(
         apk_path,
         as_attachment=True,
-        download_name='SucreePOS-Android-prueba.apk',
+        download_name='SucreePOS-Android-1.4.0-debug.apk',
         mimetype='application/vnd.android.package-archive',
         max_age=0,
     )
@@ -2975,7 +2975,7 @@ def _finalizar_venta_flow_pagada(venta_id, status_payload=None):
         _ensure_flow_pago_table(cur)
         row_canal = cur.execute("SELECT canal_venta FROM ventas WHERE id = ? LIMIT 1", (venta_id,)).fetchone()
         canal_original = str((row_canal["canal_venta"] if row_canal else "") or "").strip().lower()
-        es_pos_admin = canal_original == "pos_admin"
+        es_pos_admin = canal_original in {"pos_admin", "pos_admin_manual"}
         cur.execute(
             """
             UPDATE ventas
@@ -2984,7 +2984,7 @@ def _finalizar_venta_flow_pagada(venta_id, status_payload=None):
                 flow_admin_alertado = CASE WHEN metodo_pago = 'flow_pagado' THEN flow_admin_alertado ELSE 0 END
             WHERE id = ?
             """,
-            ("pos_admin" if es_pos_admin else "tienda_online", venta_id),
+            (canal_original if es_pos_admin else "tienda_online", venta_id),
         )
         cur.execute(
             """
@@ -3238,7 +3238,7 @@ def _marcar_flow_cliente_regreso(venta_id):
             """
             UPDATE ventas
             SET flow_cliente_regreso = 1
-            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin')
+            WHERE id = ? AND canal_venta IN ('tienda_online', 'tienda_online_flow_pendiente', 'pos_admin', 'pos_admin_manual')
             """,
             (vid,),
         )
@@ -15042,6 +15042,297 @@ def _pos_admin_sale_items(summary):
     return items
 
 
+def _pos_admin_manual_summary(payload):
+    raw_lines = payload.get("lines") or []
+    if not isinstance(raw_lines, list) or not raw_lines or len(raw_lines) > 30:
+        raise ValueError("Agrega entre 1 y 30 cargos manuales.")
+    lines = []
+    for raw in raw_lines:
+        if not isinstance(raw, dict):
+            raise ValueError("Hay un cargo manual invalido.")
+        name = str(raw.get("name") or "").strip()[:120]
+        if len(name) < 2:
+            raise ValueError("Cada cargo necesita una descripcion.")
+        try:
+            amount = int(math.floor(float(raw.get("amount") or 0) + 0.5))
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError("Ingresa un monto valido para cada cargo.")
+        if amount <= 0 or amount > 10000000:
+            raise ValueError("Cada cargo debe ser mayor a $0 y no superar $10.000.000.")
+        lines.append({"product_id": 0, "name": name, "quantity": 1, "unit_price": amount, "line_total": amount})
+
+    subtotal = sum(line["line_total"] for line in lines)
+    discount = payload.get("discount") if isinstance(payload.get("discount"), dict) else {}
+    discount_type = str(discount.get("type") or "fixed").strip().lower()
+    try:
+        discount_value = max(0.0, float(discount.get("value") or 0))
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("El descuento debe ser un monto o porcentaje valido.")
+    if discount_type == "percent":
+        discount_amount = int(math.floor(subtotal * min(100.0, discount_value) / 100.0 + 0.5))
+    elif discount_type == "fixed":
+        discount_amount = int(math.floor(discount_value + 0.5))
+    else:
+        raise ValueError("El tipo de descuento no es valido.")
+    discount_amount = min(subtotal, max(0, discount_amount))
+    method = str(payload.get("payment_method") or "transfer").strip().lower()
+    if method not in {"transfer", "card"}:
+        raise ValueError("Elige transferencia o debito / Flow.")
+    fee_pct = _pos_admin_card_fee_pct() if method == "card" else 0.0
+    card_fee = int(math.floor((subtotal - discount_amount) * fee_pct / 100.0 + 0.5)) if method == "card" else 0
+    total = subtotal - discount_amount + card_fee
+    if total <= 0:
+        raise ValueError("El total de la venta debe ser mayor a $0.")
+    return {
+        "manual_sale": True,
+        "mode": method,
+        "card_fee_pct": fee_pct,
+        "discount_type": discount_type,
+        "discount_value": discount_value,
+        "discount_reason": str(discount.get("reason") or "").strip()[:240],
+        "lines": lines,
+        "subtotal": subtotal,
+        "discount": discount_amount,
+        "card_fee": card_fee,
+        "total": total,
+    }
+
+
+def _pos_admin_ensure_manual_sale_columns(conn):
+    required = {
+        "cliente_nombre": "TEXT DEFAULT ''",
+        "cliente_email": "TEXT DEFAULT ''",
+        "cliente_telefono": "TEXT DEFAULT ''",
+        "metodo_pago": "TEXT DEFAULT 'efectivo'",
+        "descuento_monto": "REAL DEFAULT 0",
+        "observaciones": "TEXT DEFAULT ''",
+        "pedido_estado": "TEXT DEFAULT 'recibido'",
+        "pedido_estado_actualizado": "TEXT",
+        "entrega_tipo": "TEXT DEFAULT 'retiro'",
+        "direccion_entrega": "TEXT DEFAULT ''",
+        "despacho_monto": "REAL DEFAULT 0",
+    }
+    columns = {str(row["name"]).strip().lower() for row in conn.execute("PRAGMA table_info(ventas)").fetchall()}
+    for name, definition in required.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE ventas ADD COLUMN {name} {definition}")
+
+
+@app.route('/admin/pos/manual')
+def admin_pos_manual():
+    response = make_response(render_template('pos_admin_manual.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['X-POS-Manual-Version'] = 'manual-pos-20261018-1'
+    return response
+
+
+@app.route('/api/admin/pos/manual/guardar', methods=['POST'])
+def api_admin_pos_manual_guardar():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
+    conn = None
+    try:
+        payload = request.get_json(silent=True) or {}
+        request_id = str(payload.get("request_id") or "").strip()[:80]
+        if not request_id:
+            raise ValueError("No se pudo identificar esta venta; vuelve a intentar.")
+        customer = payload.get("customer") if isinstance(payload.get("customer"), dict) else {}
+        name = str(customer.get("name") or "").strip()[:120]
+        if len(name) < 2:
+            raise ValueError("Ingresa el nombre del cliente.")
+        phone_raw = str(customer.get("phone") or "").strip()
+        phone = _pos_admin_phone(phone_raw)
+        if not phone:
+            local_digits = re.sub(r"\D+", "", phone_raw)
+            if len(local_digits) == 8:
+                phone = _pos_admin_phone(f"9{local_digits}")
+        if not phone:
+            raise ValueError("Ingresa los 8 digitos del WhatsApp chileno.")
+        summary = _pos_admin_manual_summary(payload)
+        email = _pos_admin_email(customer.get("email"))
+        if summary["mode"] == "card":
+            email = email or _pos_admin_email("pasteleria.sucree@outlook.com")
+            cfg = _flow_cfg()
+            if not cfg.get("enabled") or not _flow_checkout_public_enabled():
+                raise ValueError(cfg.get("configuration_error") or "Flow no esta habilitado en este momento.")
+        if summary["mode"] == "card" and not email:
+            raise ValueError("Ingresa un correo valido para Flow.")
+
+        _ensure_pos_admin_tables()
+        conn = get_db()
+        _pos_admin_ensure_manual_sale_columns(conn)
+        existing = conn.execute(
+            "SELECT venta_id, snapshot_json FROM pos_admin_snapshots WHERE request_id = ? LIMIT 1",
+            (request_id,),
+        ).fetchone()
+        if existing:
+            conn.close()
+            conn = None
+            return jsonify({"success": True, "idempotent": True, "venta_id": int(existing["venta_id"]), "snapshot": json.loads(existing["snapshot_json"] or "{}")})
+
+        now = datetime.now(ZoneInfo("America/Santiago"))
+        created = now.strftime("%Y-%m-%d %H:%M:%S")
+        payment_method = "flow_pendiente" if summary["mode"] == "card" else "transferencia"
+        payment_status = "pendiente de Flow" if summary["mode"] == "card" else "pendiente de validacion"
+        manual_title = str(payload.get("title") or "Venta manual").strip()[:120] or "Venta manual"
+        observations = f"POS manual | {manual_title} | descuento: {summary['discount_reason'] or '-'}"
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """INSERT INTO ventas
+               (fecha_hora, codigo_pedido, canal_venta, codigo_operacion, total_items, total_monto, estado,
+                cliente_nombre, cliente_email, cliente_telefono, metodo_pago, descuento_monto, observaciones,
+                pedido_estado, pedido_estado_actualizado, entrega_tipo, direccion_entrega, despacho_monto)
+               VALUES (?, ?, 'pos_admin_manual', ?, ?, ?, 'completada', ?, ?, ?, ?, ?, ?, 'recibido', ?, 'retiro', '', 0)""",
+            (created, f"MAN-{request_id[:24]}", f"MAN-{uuid.uuid4().hex[:12].upper()}", len(summary["lines"]), summary["total"],
+             name, email, phone, payment_method, summary["discount"], observations, created),
+        )
+        sale_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+        snapshot = {
+            "venta_id": sale_id,
+            "manual_sale": True,
+            "title": manual_title,
+            "vendedor": str(session.get(_ADMIN_USER_NAME_SESSION_KEY) or "Administrador"),
+            "customer": {"name": name, "phone": phone, "email": email},
+            "checkout": {"payment_method": summary["mode"], "payment_status": payment_status, "delivery_type": "retiro", "note": "", "payment_reference": ""},
+            "summary": summary,
+            "created_at": now.isoformat(),
+        }
+        conn.execute(
+            "INSERT INTO pos_admin_snapshots (venta_id, request_id, vendedor, snapshot_json) VALUES (?, ?, ?, ?)",
+            (sale_id, request_id, snapshot["vendedor"], json.dumps(snapshot, ensure_ascii=False)),
+        )
+        conn.commit()
+        conn.close()
+        conn = None
+        crear_backup()
+        return jsonify({"success": True, "venta_id": sale_id, "snapshot": snapshot})
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except sqlite3.IntegrityError:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": "La venta ya fue registrada. Actualiza el historial antes de reintentar."}), 409
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        print(f"[POS_MANUAL] guardar_error={exc.__class__.__name__}")
+        return jsonify({"success": False, "error": "No se pudo registrar la venta manual."}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/admin/pos/manual/historial')
+def api_admin_pos_manual_historial():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
+    conn = None
+    try:
+        _ensure_pos_admin_tables()
+        conn = get_db()
+        rows = conn.execute(
+            """SELECT v.id, v.fecha_hora, v.cliente_nombre, v.cliente_email, v.cliente_telefono,
+                      v.total_monto, v.metodo_pago, v.descuento_monto, s.snapshot_json
+               FROM ventas v JOIN pos_admin_snapshots s ON s.venta_id = v.id
+               WHERE v.canal_venta = 'pos_admin_manual'
+               ORDER BY v.id DESC LIMIT 300"""
+        ).fetchall()
+        sales = []
+        for row in rows:
+            sale = dict(row)
+            sale["snapshot"] = json.loads(sale.pop("snapshot_json") or "{}")
+            sales.append(sale)
+        return jsonify({"success": True, "ventas": sales})
+    except Exception as exc:
+        print(f"[POS_MANUAL] historial_error={exc.__class__.__name__}")
+        return jsonify({"success": False, "error": "No se pudo cargar el historial manual."}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/api/admin/pos/manual/<int:venta_id>/metodo', methods=['POST'])
+def api_admin_pos_manual_metodo(venta_id):
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "Inicia sesion como administrador."}), 401
+    conn = None
+    try:
+        payload = request.get_json(silent=True) or {}
+        method = str(payload.get("payment_method") or "").strip().lower()
+        if method not in {"transfer", "card"}:
+            raise ValueError("Elige transferencia o debito / Flow.")
+        email = _pos_admin_email(payload.get("email"))
+        if method == "card":
+            email = email or _pos_admin_email("pasteleria.sucree@outlook.com")
+            cfg = _flow_cfg()
+            if not cfg.get("enabled") or not _flow_checkout_public_enabled():
+                raise ValueError(cfg.get("configuration_error") or "Flow no esta habilitado en este momento.")
+            if not email:
+                raise ValueError("Ingresa un correo valido para Flow.")
+        _ensure_pos_admin_tables()
+        _ensure_ventas_flow_admin_alert_column()
+        conn = get_db()
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """SELECT v.id, v.metodo_pago, s.snapshot_json FROM ventas v
+               JOIN pos_admin_snapshots s ON s.venta_id=v.id
+               WHERE v.id=? AND v.canal_venta='pos_admin_manual' LIMIT 1""",
+            (venta_id,),
+        ).fetchone()
+        if not row:
+            raise ValueError("No se encontro esa venta manual.")
+        snapshot = json.loads(row["snapshot_json"] or "{}")
+        current = str(row["metodo_pago"] or "").lower()
+        if current == "flow_pagado":
+            raise ValueError("El pago Flow ya fue confirmado; no se puede cambiar el metodo.")
+        flow_warning = False
+        if method == "transfer" and current in {"flow", "flow_pending", "flow_pendiente"}:
+            _ensure_flow_pago_table(conn.cursor())
+            flow = conn.execute("SELECT estado FROM tienda_flow_pagos WHERE venta_id=? LIMIT 1", (venta_id,)).fetchone()
+            flow_warning = bool(flow and str(flow["estado"] or "").lower() == "pendiente")
+        if flow_warning and not bool(payload.get("confirm_old_flow_link")):
+            conn.rollback()
+            return jsonify({
+                "success": False,
+                "warning_old_flow_link": True,
+                "error": "Hay un enlace Flow pendiente que podria seguir activo. Confirma el cambio antes de continuar.",
+            }), 409
+        checkout = snapshot.setdefault("checkout", {})
+        checkout["payment_method"] = method
+        checkout["payment_status"] = "pendiente de Flow" if method == "card" else "pendiente de validacion"
+        customer = snapshot.setdefault("customer", {})
+        if method == "card":
+            customer["email"] = email
+        summary = snapshot.setdefault("summary", {})
+        subtotal = max(0, int(math.floor(float(summary.get("subtotal") or 0) + 0.5)))
+        discount = min(subtotal, max(0, int(math.floor(float(summary.get("discount") or 0) + 0.5))))
+        fee_pct = _pos_admin_card_fee_pct() if method == "card" else 0.0
+        fee = int(math.floor((subtotal - discount) * fee_pct / 100.0 + 0.5)) if method == "card" else 0
+        summary.update({"mode": method, "card_fee_pct": fee_pct, "card_fee": fee, "total": subtotal - discount + fee})
+        conn.execute(
+            "UPDATE ventas SET metodo_pago=?, cliente_email=?, total_monto=?, descuento_monto=? WHERE id=? AND canal_venta='pos_admin_manual'",
+            ("flow_pendiente" if method == "card" else "transferencia", customer.get("email") or "", summary["total"], discount, venta_id),
+        )
+        conn.execute(
+            "UPDATE pos_admin_snapshots SET snapshot_json=? WHERE venta_id=?",
+            (json.dumps(snapshot, ensure_ascii=False), venta_id),
+        )
+        conn.commit()
+        return jsonify({"success": True, "warning_old_flow_link": flow_warning, "snapshot": snapshot})
+    except ValueError as exc:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        print(f"[POS_MANUAL] metodo_error={exc.__class__.__name__}")
+        return jsonify({"success": False, "error": "No se pudo cambiar el metodo de pago."}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/admin/pos')
 def admin_pos():
     response = make_response(render_template('pos_admin.html'))
@@ -15058,7 +15349,7 @@ def admin_pos_mobile():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261014-5'
+    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261018-6'
     return response
 
 
@@ -15274,11 +15565,13 @@ def _pos_admin_whatsapp_transfer_message(sale, snapshot):
     delivery = str(checkout.get("delivery_type") or "retiro").strip().lower()
     delivery_text = "Despacho" if delivery == "despacho" else "Retiro en tienda"
     address = str(checkout.get("delivery_address") or "").strip()
+    manual_sale = bool(snapshot.get("manual_sale"))
+    sale_label = "venta manual" if manual_sale else "pedido"
     message = [
         f"Hola{f' {customer_name}' if customer_name else ''}.",
-        f"Tu pedido #{int(sale.get('id') or snapshot.get('venta_id') or 0)} fue registrado y comenzamos a prepararlo.",
+        f"Tu {sale_label} #{int(sale.get('id') or snapshot.get('venta_id') or 0)} fue registrada.",
         "",
-        "*Resumen del pedido:*",
+        "*Detalle de la compra:*" if manual_sale else "*Resumen del pedido:*",
         *(products or ["- Detalle de productos no disponible"]),
         "",
         f"Subtotal: {clp(summary.get('subtotal'))}",
@@ -15330,7 +15623,7 @@ def api_admin_pos_whatsapp(venta_id):
             SELECT v.id, v.cliente_nombre, v.cliente_telefono, v.cliente_email, v.total_monto,
                    v.metodo_pago, v.canal_venta, v.pedido_estado, s.snapshot_json
             FROM ventas v JOIN pos_admin_snapshots s ON s.venta_id = v.id
-            WHERE v.id = ? AND v.canal_venta = 'pos_admin'
+            WHERE v.id = ? AND v.canal_venta IN ('pos_admin', 'pos_admin_manual')
             LIMIT 1
             """,
             (venta_id,),
@@ -15376,7 +15669,7 @@ def api_admin_pos_whatsapp(venta_id):
             snapshot.setdefault("customer", {})["email"] = customer_email
             email_conn = get_db()
             try:
-                email_conn.execute("UPDATE ventas SET cliente_email = ? WHERE id = ? AND canal_venta = 'pos_admin'", (customer_email, venta_id))
+                email_conn.execute("UPDATE ventas SET cliente_email = ? WHERE id = ? AND canal_venta IN ('pos_admin', 'pos_admin_manual')", (customer_email, venta_id))
                 email_conn.execute(
                     "UPDATE pos_admin_snapshots SET snapshot_json = ? WHERE venta_id = ?",
                     (json.dumps(snapshot, ensure_ascii=False), venta_id),
@@ -15424,7 +15717,7 @@ def api_admin_pos_whatsapp(venta_id):
                     raise RuntimeError("El total del pedido no permite crear un cobro Flow.")
                 params = {
                     "commerceOrder": commerce_order,
-                    "subject": _flow_subject_safe(f"Pedido Sucree POS #{venta_id}"),
+                    "subject": _flow_subject_safe(f"{'Venta manual' if snapshot.get('manual_sale') else 'Pedido'} Sucree POS #{venta_id}"),
                     "currency": "CLP",
                     "amount": amount,
                     "email": customer_email,
@@ -15476,7 +15769,7 @@ def api_admin_pos_whatsapp(venta_id):
                     "cliente_telefono": sale.get("cliente_telefono") or "",
                     "total": amount,
                     "items": summary.get("lines") or [],
-                    "canal_venta": "pos_admin",
+                    "canal_venta": "pos_admin_manual" if snapshot.get("manual_sale") else "pos_admin",
                 }
                 stage = "flow_persist"
                 _guardar_flow_pago(venta_id, commerce_order, flow_token, amount, flow_url, backup, cfg.get("environment"))
@@ -15484,8 +15777,8 @@ def api_admin_pos_whatsapp(venta_id):
                 try:
                     _ensure_ventas_flow_admin_alert_column()
                     flow_conn.execute(
-                        "UPDATE ventas SET metodo_pago = 'flow_pendiente', canal_venta = 'pos_admin', flow_admin_alertado = 1 WHERE id = ?",
-                        (venta_id,),
+                    "UPDATE ventas SET metodo_pago = 'flow_pendiente', canal_venta = ?, flow_admin_alertado = 1 WHERE id = ?",
+                    ("pos_admin_manual" if snapshot.get("manual_sale") else "pos_admin", venta_id),
                     )
                     flow_conn.commit()
                 finally:

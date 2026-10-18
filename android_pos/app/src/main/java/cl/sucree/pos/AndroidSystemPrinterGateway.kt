@@ -143,7 +143,7 @@ class AndroidSystemPrinterGateway(private val context: Context) {
               .summary { white-space: pre-wrap; }
               footer { border-top: 1px dashed #000; margin-top: 3mm; padding-top: 2mm; text-align: center; font-size: 8pt; }
             </style></head><body>
-            <header><h1>SUCRÉE PASTELERÍA</h1><div>COMANDA DE PREPARACIÓN</div>
+            <header><h1>SUCRÉE PASTELERÍA</h1><div>${if (ticket.title.contains("manual", ignoreCase = true)) "COMPROBANTE DE VENTA" else "COMANDA DE PREPARACIÓN"}</div>
             <h2>$escapedTitle</h2><div class="copy">$escapedCopy</div>
             <div>${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale("es", "CL")).format(java.util.Date())}</div></header>
             <main class="summary">$escapedSummary</main>
