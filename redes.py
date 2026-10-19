@@ -389,7 +389,7 @@ def admin_page():
     if not session.get(_ADMIN_SESSION_KEY):
         return redirect(url_for("admin_login", next=request.path))
     csrf = session.setdefault("redes_csrf", secrets.token_urlsafe(32))
-    return render_template("redes_admin.html", csrf_token=csrf)
+    return render_template("redes_admin.html", csrf_token=csrf, embedded=request.args.get("pos_embed") == "1")
 
 
 @redes_blueprint.get("/admin/redes/preview")

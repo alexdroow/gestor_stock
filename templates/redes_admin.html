@@ -8,8 +8,10 @@
 @media(max-width:600px){.topbar{padding:8px 12px}.brand{font-size:26px}.top-actions a{padding:8px;font-size:12px}.wrap{width:calc(100% - 20px);margin:18px auto 35px}.heading{align-items:flex-start;flex-direction:column}.heading h1{font-size:34px}.columns{gap:12px}.panel{border-radius:15px}.panel-head{padding:13px}.panel-body{padding:13px}.link-list{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.metric{padding:11px 9px}.metric strong{font-size:23px}.metric small{font-size:9px}.metric em{font-size:9px}.metric-bar{align-items:flex-start;flex-direction:column}.metric-filter{width:100%}.metric-filter select{flex:1}.form-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.date-range{width:100%}.date-range input{width:50%;min-width:0}.metric-filter .btn{flex:1}.editor-actions .btn{flex:1}.toolbar .btn{flex:1}.analytics-grid{gap:9px}.chart,.rank{padding:12px}.chart{overflow:hidden}.row-actions .icon-btn{width:31px;height:34px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
+<style>.embedded .wrap{width:calc(100% - 20px);margin:16px auto 28px}.embedded>header.topbar:not(.embedded-topbar){display:none}.embedded-topbar .brand small{font-size:8px}.embedded-topbar .top-actions a{min-height:40px;padding:7px;font-size:11px}</style>
 </head>
-<body>
+<body class="{{ 'embedded' if embedded else '' }}">
+{% if embedded %}<header class="topbar embedded-topbar"><a class="brand" href="/admin/pos/mobile?tab=home" target="_top">Sucr&eacute;e<small>Volver al POS</small></a><nav class="top-actions"><a href="/redes" target="_blank" rel="noopener">Ver p&aacute;gina &#8599;</a></nav></header>{% endif %}
 <header class="topbar"><a class="brand" href="/admin/redes">Sucrée<small>SucreeStock</small></a><nav class="top-actions"><a href="/redes" target="_blank" rel="noopener">Ver página ↗</a><a href="/">Volver al panel</a></nav></header>
 <main class="wrap">
     <div class="heading"><div><h1>Redes</h1><p>Administra el espacio que compartes con tus clientes.</p></div><div id="publish-state" class="state">Cargando publicación</div></div>

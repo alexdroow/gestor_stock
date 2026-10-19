@@ -14,10 +14,20 @@ class PosCakesAgendaTests(unittest.TestCase):
         response = self.client.get('/admin/pos/mobile')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers['X-POS-Mobile-Version'], 'mobile-pos-20261018-10')
+        self.assertEqual(response.headers['X-POS-Mobile-Version'], 'mobile-pos-20261019-11')
         self.assertIn(b'data-tab="tortas"', response.data)
         self.assertIn(b'data-src="/agenda?pos_embed=1"', response.data)
+        self.assertIn(b'data-tab="redes"', response.data)
+        self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
+
+    def test_redes_admin_can_render_embedded_inside_mobile_pos(self):
+        response = self.client.get('/admin/redes?pos_embed=1')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'class="embedded"', response.data)
+        self.assertIn(b'target="_top"', response.data)
+        self.assertIn(b'csrf-token', response.data)
 
     def test_embedded_agenda_uses_sucreestock_mobile_view_and_returns_to_mobile_pos(self):
         response = self.client.get('/agenda?pos_embed=1')

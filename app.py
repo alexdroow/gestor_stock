@@ -15671,7 +15671,7 @@ def admin_pos_mobile():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261018-10'
+    response.headers['X-POS-Mobile-Version'] = 'mobile-pos-20261019-11'
     return response
 
 
