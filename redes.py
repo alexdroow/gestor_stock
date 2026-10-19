@@ -281,7 +281,7 @@ def _csv_safe(value):
 def _is_bot_or_prefetch():
     ua = (request.user_agent.string or "").lower()
     purpose = " ".join((request.headers.get("Purpose", ""), request.headers.get("Sec-Purpose", ""))).lower()
-    return any(token in ua for token in ("bot", "spider", "crawler", "preview", "facebookexternalhit", "whatsapp")) or any(token in purpose for token in ("prefetch", "prerender"))
+    return bool(session.get("admin_autenticado")) or any(token in ua for token in ("bot", "spider", "crawler", "preview", "facebookexternalhit", "whatsapp")) or any(token in purpose for token in ("prefetch", "prerender"))
 
 
 def _allow_analytics_event():
@@ -695,6 +695,25 @@ def export_metrics():
         response.headers["Content-Disposition"] = "attachment; filename=metricas-redes.csv"
         response.headers["Cache-Control"] = "no-store"
         return response
+    finally:
+        conn.close()
+
+
+@redes_blueprint.post("/api/redes/admin/metrics/reset")
+def reset_metrics():
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    payload = request.get_json(silent=True) or {}
+    if payload.get("confirm") != "BORRAR ESTADISTICAS":
+        return jsonify({"success": False, "error": "La confirmaciÃ³n no coincide; las estadÃ­sticas no se borraron."}), 400
+    conn = _db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        deleted = conn.execute("SELECT COUNT(*) FROM redes_events").fetchone()[0]
+        conn.execute("DELETE FROM redes_events")
+        conn.commit()
+        return jsonify({"success": True, "deleted": deleted})
     finally:
         conn.close()
 

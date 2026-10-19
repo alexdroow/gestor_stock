@@ -87,11 +87,15 @@ class RedesTests(unittest.TestCase):
         _, data = self.create_link(layout="quick")
         link_id = data["link"]["id"]
         self.assertEqual(self.mutate("POST", "/api/redes/admin/publish", {}).status_code, 200)
+        with self.client.session_transaction() as session:
+            session.pop("admin_autenticado", None)
         view = self.client.post("/api/redes/view", json={"referrer": "https://www.instagram.com/story", "utm_source": "instagram"})
         self.assertEqual(view.get_json()["counted"], True)
         click = self.client.get(f"/redes/go/{link_id}")
         self.assertEqual(click.status_code, 302)
         self.assertEqual(click.location, "/tienda/agendapedidos")
+        with self.client.session_transaction() as session:
+            session["admin_autenticado"] = True
         stats = self.client.get("/api/redes/admin/state?period=30").get_json()["stats"]
         self.assertEqual(stats["views"], 1)
         self.assertEqual(stats["clicks"], 1)
@@ -101,6 +105,42 @@ class RedesTests(unittest.TestCase):
         self.assertEqual(export.status_code, 200)
         self.assertIn("text/csv", export.content_type)
         self.assertIn("instagram.com", export.get_data(as_text=True))
+
+    def test_admin_visits_and_clicks_are_excluded_from_metrics(self):
+        _, data = self.create_link(layout="quick")
+        link_id = data["link"]["id"]
+        self.assertEqual(self.mutate("POST", "/api/redes/admin/publish", {}).status_code, 200)
+        view = self.client.post("/api/redes/view", json={})
+        self.assertFalse(view.get_json()["counted"])
+        self.assertEqual(self.client.get(f"/redes/go/{link_id}").status_code, 302)
+        stats = self.client.get("/api/redes/admin/state?period=30").get_json()["stats"]
+        self.assertEqual(stats["views"], 0)
+        self.assertEqual(stats["clicks"], 0)
+
+    def test_metrics_reset_requires_csrf_and_explicit_confirmation(self):
+        _, data = self.create_link(layout="quick")
+        link_id = data["link"]["id"]
+        self.assertEqual(self.mutate("POST", "/api/redes/admin/publish", {}).status_code, 200)
+        with self.client.session_transaction() as session:
+            session.pop("admin_autenticado", None)
+        self.client.post("/api/redes/view", json={})
+        self.client.get(f"/redes/go/{link_id}")
+        with self.client.session_transaction() as session:
+            session["admin_autenticado"] = True
+        denied = self.client.post("/api/redes/admin/metrics/reset", json={"confirm": "BORRAR ESTADISTICAS"})
+        self.assertEqual(denied.status_code, 403)
+        wrong = self.mutate("POST", "/api/redes/admin/metrics/reset", {"confirm": "borrar"})
+        self.assertEqual(wrong.status_code, 400)
+        before = self.client.get("/api/redes/admin/state?period=30").get_json()["stats"]
+        self.assertEqual(before["views"], 1)
+        self.assertEqual(before["clicks"], 1)
+        reset = self.mutate("POST", "/api/redes/admin/metrics/reset", {"confirm": "BORRAR ESTADISTICAS"})
+        self.assertEqual(reset.status_code, 200)
+        self.assertEqual(reset.get_json()["deleted"], 2)
+        after = self.client.get("/api/redes/admin/state?period=30").get_json()["stats"]
+        self.assertEqual(after["views"], 0)
+        self.assertEqual(after["clicks"], 0)
+        self.assertEqual(self.client.get(f"/redes/go/{link_id}").status_code, 302)
 
     def test_draft_archive_does_not_change_live_link_until_publish(self):
         _, data = self.create_link()
