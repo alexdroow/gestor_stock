@@ -88,7 +88,7 @@ class SeguimientoPedidosTests(unittest.TestCase):
         photo.get_data()
         photo.close()
 
-    def test_payment_summary_has_no_amount_and_map_links_for_delivery(self):
+    def test_payment_summary_has_no_amount_or_provider_map_links(self):
         payload = app._seguimiento_agenda_payload({
             "codigo_pedido": "AGD-20261020-000001", "titulo": "Torta", "fecha": "2026-10-20",
             "seguimiento_estado": "espera_envio", "es_envio": 1, "direccion": "Calle 123, Santiago",
@@ -98,9 +98,9 @@ class SeguimientoPedidosTests(unittest.TestCase):
         self.assertEqual(payload["estado_pago"], "Abono registrado; saldo pendiente")
         self.assertNotIn("total", payload)
         self.assertNotIn("abono", payload)
-        self.assertIn("google.com/maps", payload["mapa_google"])
-        self.assertIn("maps.apple.com", payload["mapa_apple"])
-        self.assertIn("waze.com", payload["mapa_waze"])
+        self.assertNotIn("mapa_google", payload)
+        self.assertNotIn("mapa_apple", payload)
+        self.assertNotIn("mapa_waze", payload)
 
         self.assertEqual(app._seguimiento_agenda_payload({"total": 30000, "abono": 0})["estado_pago"], "Pago pendiente")
         self.assertEqual(app._seguimiento_agenda_payload({"total": 30000, "abono": 30000})["estado_pago"], "Pagado")
@@ -132,7 +132,12 @@ class SeguimientoPedidosTests(unittest.TestCase):
         self.assertIn('value="email"', html)
         self.assertIn('value="telefono"', html)
         self.assertIn("/api/seguimiento/buscar", html)
-        self.assertIn("Google Maps", html)
+        self.assertIn("data-map-address", html)
+        self.assertIn("geo:0,0?q=", html)
+        self.assertIn("maps.apple.com/?q=", html)
+        self.assertNotIn("Google Maps</a>", html)
+        self.assertNotIn("Apple Maps</a>", html)
+        self.assertNotIn("Waze</a>", html)
         self.assertIn("Asi quedo tu pedido", html)
         self.assertIn("Estado del pago", html)
 

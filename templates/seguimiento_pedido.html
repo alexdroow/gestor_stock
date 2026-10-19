@@ -322,8 +322,8 @@
             font-weight: 700;
             margin-top: 2px;
         }
-        .map-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-        .map-links a { min-height:36px; padding:0 11px; border:1px solid #cfe3d6; border-radius:999px; color:var(--green-dark); background:#f2faf5; font-size:13px; font-weight:900; text-decoration:none; }
+        .delivery-address-link { color:inherit; text-decoration:underline; text-decoration-color:#e88a19; text-decoration-thickness:1px; text-underline-offset:3px; overflow-wrap:anywhere; }
+        .delivery-address-link:focus-visible { outline:3px solid #e88a19; outline-offset:3px; border-radius:3px; }
         .payment-status { color:var(--green-dark) !important; }
         .lookup-results { display:grid; gap:9px; margin:0 0 14px; }
         .lookup-result { display:grid; gap:4px; width:100%; padding:13px; border:1px solid var(--line); border-radius:15px; color:var(--brown); background:#fff; text-align:left; }
@@ -580,6 +580,18 @@
                 .replace(/'/g, '&#039;');
         }
 
+        root.addEventListener('click', (event) => {
+            const link = event.target.closest('[data-map-address]');
+            if (!link) return;
+            const query = encodeURIComponent(link.dataset.mapAddress || '');
+            const ua = navigator.userAgent || '';
+            const appleMobile = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const android = /Android/i.test(ua);
+            link.href = appleMobile
+                ? `https://maps.apple.com/?q=${query}`
+                : (android ? `geo:0,0?q=${query}` : `https://www.google.com/maps/search/?api=1&query=${query}`);
+        });
+
         function firstFilled() {
             for (const value of arguments) {
                 const txt = String(value == null ? '' : value).trim();
@@ -663,7 +675,9 @@
             const titulo = firstFilled(pedido.titulo, pedido.categoria, 'Torta Sucrée');
             const lugar = firstFilled(pedido.lugar, modalidad === 'despacho' ? 'Dirección registrada' : 'Sucrée Pastelería');
             const waText = `Hola Pasteleria Sucree, tengo una consulta sobre mi pedido ${pedido.codigo_pedido || codigoPedidoActual || ''}.`;
-            const mapLinks = modalidad === 'despacho' && pedido.lugar ? `<div class="map-links"><a href="${escapeHtml(pedido.mapa_google || '#')}" target="_blank" rel="noopener">Google Maps</a><a href="${escapeHtml(pedido.mapa_apple || '#')}" target="_blank" rel="noopener">Apple Maps</a><a href="${escapeHtml(pedido.mapa_waze || '#')}" target="_blank" rel="noopener">Waze</a></div>` : '';
+            const lugarMarkup = modalidad === 'despacho' && pedido.lugar
+                ? `<a class="delivery-address-link" data-map-address="${escapeHtml(lugar)}" href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(lugar)}">${escapeHtml(lugar)}</a>`
+                : escapeHtml(lugar);
             const photoCard = pedido.foto_producto_url ? `<article class="card product-photo-card"><div class="section-label">Asi quedo tu pedido</div><img src="${escapeHtml(pedido.foto_producto_url)}" alt="Foto del producto final" loading="lazy"><p>Foto disponible durante 72 horas desde que fue cargada.</p></article>` : '';
 
             root.innerHTML = `
@@ -703,7 +717,7 @@
                         </div>
                         <div class="info-cell full">
                             <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16l-1 10H5L4 10Zm2-5h12l2 5H4l2-5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
-                            <div><small>${escapeHtml(pedido.modalidad || '-')}</small><strong>${escapeHtml(lugar)}</strong>${mapLinks}${extras.length ? `<span>Extras: ${escapeHtml(extras.slice(0, 3).join(', '))}</span>` : ''}</div>
+                            <div><small>${escapeHtml(pedido.modalidad || '-')}</small><strong>${lugarMarkup}</strong>${extras.length ? `<span>Extras: ${escapeHtml(extras.slice(0, 3).join(', '))}</span>` : ''}</div>
                         </div>
                         <div class="info-cell full"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/></svg></div><div><small>Estado del pago</small><strong class="payment-status">${escapeHtml(pedido.estado_pago || 'Pago pendiente')}</strong></div></div>
                     </div>
