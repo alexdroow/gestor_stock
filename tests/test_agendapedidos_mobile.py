@@ -44,6 +44,19 @@ class AgendaPedidosMobileTests(unittest.TestCase):
         self.assertIn("Enviar resumen por WhatsApp", html)
         self.assertNotIn("No se pudo enviar automaticamente por Twilio", html)
         self.assertNotIn("agendaCakeBuilderStep = Math.max(2, agendaCakeBuilderStep)", html)
+        self.assertIn('href="/tienda">Tienda Principal</a>', html)
+        self.assertIn('href="/tienda/tortas-listas">Catalogo Tortas</a>', html)
+        self.assertIn('mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;', html)
+        self.assertIn('mobileCatsBubbleListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;', html)
+        self.assertIn('return "/static/cake-category-placeholder.jpg";', html)
+        self.assertIn("this.dataset.fallbackApplied='1'", html)
+
+    def test_cake_category_placeholder_image_is_served(self):
+        response = self.client.get("/static/cake-category-placeholder.jpg")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.mimetype.startswith("image/"))
+        self.assertGreater(len(response.data), 1000)
 
     def test_desktop_agendapedidos_does_not_receive_mobile_body_class(self):
         response = self.client.get(

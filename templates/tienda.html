@@ -20522,7 +20522,10 @@
                     ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
                 const cakeCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/tortas-listas">Catalogo Tortas</a>`;
-                mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + all.map((c) => {
+                const storeHomeLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda">Tienda Principal</a>`;
+                if (document.body.classList.contains("tienda-agendapedidos-oficial")) {
+                    mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;
+                } else mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -20552,7 +20555,10 @@
                     ? `<button type="button" class="mobile-cat-chip agenda-entry ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
                 const cakeCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/tortas-listas">Catalogo Tortas</a>`;
-                mobileCatsBubbleListEl.innerHTML = authItems + cakeCatalogLink + agendaItem + all.map((c) => {
+                const storeHomeLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda">Tienda Principal</a>`;
+                if (document.body.classList.contains("tienda-agendapedidos-oficial")) {
+                    mobileCatsBubbleListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;
+                } else mobileCatsBubbleListEl.innerHTML = authItems + cakeCatalogLink + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -21431,7 +21437,7 @@
         }
 
         function _cakePlaceholderByName(nombre) {
-            return "https://placehold.co/600x360/f8fafc/334155?text=Torta";
+            return "/static/cake-category-placeholder.jpg";
         }
 
         function _agendaCatalogNorm(value) {
@@ -21513,7 +21519,7 @@
                 return `
                     <article class="agenda-cake-cat-card cake-card ${active ? "active" : ""}" data-cake-card="${esc(cid)}">
                         <div class="cake-card__media">
-                            <img src="${esc(img || _cakePlaceholderByName(c.nombre))}" alt="${esc(String(c.nombre || cid))}" loading="lazy">
+                            <img src="${esc(img || _cakePlaceholderByName(c.nombre))}" alt="${esc(String(c.nombre || cid))}" loading="lazy" onerror="if(this.dataset.fallbackApplied!=='1'){this.dataset.fallbackApplied='1';this.src='${_cakePlaceholderByName(c.nombre)}';this.classList.add('is-placeholder');}">
                             ${badge ? `<span class="agenda-cake-cat-badge cake-card__badge">${esc(badge)}</span>` : ""}
                             <button class="cake-card__favorite" type="button" aria-label="Favorito" onclick="event.stopPropagation();">
                                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20s-7.2-4.6-9-9.2C1.8 7.7 3.7 5 6.7 5c1.8 0 3.2.9 4.1 2.2C11.7 5.9 13.1 5 15 5c3 0 4.9 2.7 3.7 5.8C16.9 15.4 12 20 12 20Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
