@@ -29,6 +29,10 @@ class AgendaPedidosMobileTests(unittest.TestCase):
         self.assertIn("mobile-ui", classes)
         self.assertIn("agenda-cake-products-heading", html)
         self.assertIn("tienda-agendapedidos-oficial .agenda-cake-catalog-grid", html)
+        self.assertIn("#modal-agenda-cake-builder.active .cake-builder-stepper", html)
+        self.assertIn('class="agenda-cake-reference-details" open', html)
+        self.assertIn("#modal-agenda-cake-cart.active #agenda-days-list", html)
+        self.assertIn("Confirmar reserva", html)
 
     def test_desktop_agendapedidos_does_not_receive_mobile_body_class(self):
         response = self.client.get(
