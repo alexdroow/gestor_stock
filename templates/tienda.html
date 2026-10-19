@@ -4316,6 +4316,11 @@
             display: grid;
             gap: 8px;
         }
+        .mobile-menu-list .menu-route-link,
+        .mobile-cats-bubble-list .menu-route-link {
+            display: block;
+            text-decoration: none;
+        }
         .mobile-cats-bubble {
             position: fixed;
             left: 12px;
@@ -15310,7 +15315,7 @@
             }
 
             body.mobile-ui:not(.tienda-preview-agenda) .brand-with-logo::before {
-                content: "Sucr\00e9 e" !important;
+                content: "Sucr\00e9\65" !important;
                 font-family: Georgia, "Times New Roman", serif !important;
                 font-size: clamp(42px, 13vw, 58px) !important;
                 font-weight: 500 !important;
@@ -15655,7 +15660,7 @@
             }
 
             body.mobile-ui.tienda-preview-agenda .brand-with-logo::before {
-                content: "Sucr\00e9 e" !important;
+                content: "Sucr\00e9\65" !important;
                 font-family: Georgia, "Times New Roman", serif !important;
                 font-size: clamp(42px, 13vw, 58px) !important;
                 font-weight: 500 !important;
@@ -15842,7 +15847,7 @@
             }
 
             body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial .brand-with-logo::before {
-                content: "Sucr\00e9e" !important;
+                content: "Sucr\00e9\65" !important;
                 font-size: clamp(27px, 8vw, 32px) !important;
                 line-height: .9 !important;
             }
@@ -17018,7 +17023,7 @@
     <div id="tienda-admin-pill" class="admin-mode-pill">MODO ADMIN ACTIVO</div>
     <div class="desktop-store-ribbon">Un momento dulce, a tu manera</div>
     <header class="topbar">
-        <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="abrirMenuMobile()" aria-label="Abrir menu">
+        <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" aria-label="Abrir menu">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -20469,7 +20474,7 @@
                 productos.forEach((p) => cats.add(nombreCategoria(p)));
             }
             const all = Array.from(cats);
-            catListEl.innerHTML = all.map((c) => {
+            if (catListEl) catListEl.innerHTML = all.map((c) => {
                 const label = c === "TODOS"
                     ? "Todos"
                     : c === "DESTACADOS"
@@ -20516,7 +20521,8 @@
                 const agendaItem = agendaEnabled
                     ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
-                mobileMenuListEl.innerHTML = agendaItem + all.map((c) => {
+                const cakeCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/tortas-listas">Catalogo Tortas</a>`;
+                mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -20545,7 +20551,8 @@
                 const agendaItem = agendaEnabled
                     ? `<button type="button" class="mobile-cat-chip agenda-entry ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
-                mobileCatsBubbleListEl.innerHTML = authItems + agendaItem + all.map((c) => {
+                const cakeCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/tortas-listas">Catalogo Tortas</a>`;
+                mobileCatsBubbleListEl.innerHTML = authItems + cakeCatalogLink + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -26782,12 +26789,18 @@
         }
 
         function abrirMenuMobile() {
-            const isMobile = document.body.classList.contains("mobile-ui");
+            const isMobile = document.body.classList.contains("mobile-ui")
+                || Boolean(window.matchMedia?.("(max-width: 899px), (pointer: coarse)").matches);
             renderCategoriasMenu();
             if (isMobile) {
                 if (mobileMenuModalEl) {
                     mobileMenuModalEl.classList.add("active");
                     if (mobileMenuListEl) mobileMenuListEl.scrollTop = 0;
+                } else if (mobileCatsBubbleEl) {
+                    cerrarPanelesMobile();
+                    mobileCatsBubbleEl.classList.add("active");
+                    mobileCatsBubbleEl.setAttribute("aria-hidden", "false");
+                    if (mobileCatsBubbleListEl) mobileCatsBubbleListEl.scrollTop = 0;
                 } else {
                     if (leftNavEl) leftNavEl.classList.add("mobile-open");
                     if (mobileOverlayEl) mobileOverlayEl.classList.add("active");
@@ -27219,7 +27232,10 @@
             if (document.body.classList.contains("tienda-preview-draft")) return;
             if (ev.target === modalAgendaCakeCartEl) _cerrarModalAgendaCakeCart();
         });
-        if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", abrirMenuMobile);
+        if (btnMobileMenuEl) btnMobileMenuEl.addEventListener("click", (event) => {
+            event.preventDefault();
+            abrirMenuMobile();
+        });
         if (mobileCatsBubbleCloseEl) {
             mobileCatsBubbleCloseEl.addEventListener("click", () => {
                 if (mobileCatsBubbleEl) {
