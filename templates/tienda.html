@@ -16932,6 +16932,67 @@
             }
         }
 
+        @media (max-width: 899px) {
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial .agenda-mobile-step-btn.active,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial .agenda-mobile-step-btn.done {
+                border-color: var(--sucree-primary-600) !important;
+                background: var(--sucree-primary-600) !important;
+                color: #fff !important;
+                box-shadow: 0 8px 18px rgba(239, 125, 0, .18) !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-choice-card.active,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-size-option.active,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-extra-row.active,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-topper-option.active,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active .agenda-delivery-btn.active {
+                border-color: var(--sucree-primary-600) !important;
+                background: var(--sucree-primary-50) !important;
+                color: var(--sucree-chocolate-800) !important;
+                box-shadow: 0 0 0 1px var(--sucree-primary-600) inset !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-choice-card__check {
+                background: var(--sucree-primary-600) !important;
+                color: #fff !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-choice-card__check svg,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-choice-card__check svg path {
+                color: #fff !important;
+                stroke: #fff !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-step-help.is-complete,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active .agenda-cake-total {
+                border-color: rgba(239, 125, 0, .2) !important;
+                background: #fff1df !important;
+                color: var(--sucree-primary-700) !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-step-help.is-complete strong,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .agenda-cake-reference-details > summary span,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-builder.active .cake-topper-option span,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active .agenda-day-btn small,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active .agenda-hour-btn small {
+                color: var(--sucree-primary-700) !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active .agenda-day-btn.active,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active .agenda-hour-btn.active {
+                color: var(--sucree-chocolate-800) !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active .cake-flow-confirm-actions {
+                display: none !important;
+            }
+
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active #agenda-cake-clear-quote,
+            body.mobile-ui.tienda-preview-draft.tienda-preview-agenda.tienda-agendapedidos-oficial #modal-agenda-cake-cart.active #agenda-cake-close-cart {
+                display: none !important;
+            }
+        }
+
     </style>
 </head>
 <body{% set _body_cls = [] %}{% if agenda_beta %}{% set _ = _body_cls.append('agenda-beta-mode') %}{% endif %}{% if request.path == '/tienda/agendapedidos' %}{% set _ = _body_cls.append('tienda-agendapedidos-oficial') %}{% endif %}{% if force_agenda and (agenda_beta or request.path in ['/tienda/preview', '/tienda/agendapedidos']) %}{% set _ = _body_cls.append('tienda-preview-agenda') %}{% endif %}{% if mobile_detected %}{% set _ = _body_cls.append('mobile-ui') %}{% endif %}{% if (request.path == '/tienda/preview' and request.args.get('mode') == 'draft') or request.path == '/tienda/agendapedidos' or (agenda_beta and mobile_detected) %}{% set _ = _body_cls.append('tienda-preview-draft') %}{% endif %}{% if _body_cls %} class="{{ ' '.join(_body_cls) }}"{% endif %}>
@@ -23022,7 +23083,7 @@
             const waManual = String(extra.waManualUrl || "").trim();
             const waStatus = esc(String(extra.whatsappStatus || ""));
             w.document.open();
-            w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resumen reserva</title><style>body{font-family:Segoe UI,Tahoma,sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:18px}.card{max-width:760px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:grid;gap:10px}.ok{color:#166534;font-weight:700}.warn{color:#92400e;background:#fffbeb;border:1px solid #fed7aa;border-radius:8px;padding:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.btn{display:inline-block;text-decoration:none;border:1px solid #cbd5e1;border-radius:8px;padding:9px 12px;font-weight:700;color:#0f172a;background:#fff}.btnp{background:#2563eb;color:#fff;border-color:#2563eb}.btnw{background:#16a34a;color:#fff;border-color:#16a34a}@media(max-width:680px){.grid{grid-template-columns:1fr}}</style></head><body><div class="card"><h2 style="margin:0">Reserva enviada correctamente</h2><div class="ok">Espera la confirmacion por WhatsApp. Horario de atencion: 10:00 a 20:00.</div>${waStatus ? `<div class="warn">${waStatus}</div>` : ""}<div class="grid"><div><strong>Reserva:</strong> #${rid || "-"}</div><div><strong>Tipo:</strong> ${tipo}</div><div><strong>Fecha:</strong> ${fecha}</div><div><strong>Hora:</strong> ${hora}</div><div><strong>Entrega:</strong> ${entrega}</div><div><strong>Telefono:</strong> ${telefono}</div></div><div><strong>Cliente:</strong> ${nombre}</div><div><strong>Correo:</strong> ${correo}</div><div><strong>Direccion:</strong> ${direccion}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${pdfHref ? `<a class="btn btnp" href="${pdfHref}" download="${pdfName}">Descargar PDF nuevamente</a>` : ""}${waManual ? `<a class="btn btnw" href="${waManual}" target="_blank" rel="noopener">Abrir WhatsApp manual</a>` : ""}<a class="btn" href="/tienda">Volver a tienda</a></div></div></body></html>`);
+            w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Resumen reserva</title><style>*{box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#fffaf4;color:#3a2013;margin:0;padding:clamp(12px,4vw,24px)}.card{width:min(100%,760px);margin:0 auto;background:#fff;border:1px solid #f0d7bd;border-top:5px solid #ef7d00;border-radius:20px;padding:clamp(16px,4vw,24px);display:grid;gap:12px;box-shadow:0 16px 40px #4b28121a}.ok{color:#a65300;font-weight:750}.warn{color:#79400d;background:#fff1df;border:1px solid #f4d0a6;border-radius:12px;padding:10px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.grid>div,.data{min-width:0;overflow-wrap:anywhere;padding:10px;border:1px solid #f2e4d6;border-radius:11px;background:#fffdfb}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;text-align:center;text-decoration:none;border:1px solid #e8d8c8;border-radius:12px;padding:10px 14px;font-weight:800;color:#3a2013;background:#fff8ef}.btnp{background:#ef7d00;color:#fff;border-color:#ef7d00}.btnw{background:#d86600;color:#fff;border-color:#d86600}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1 1 180px}@media(max-width:560px){body{padding:12px}.card{border-radius:18px}.grid{grid-template-columns:1fr}.actions{display:grid;grid-template-columns:1fr}.actions .btn{width:100%}}</style></head><body><main class="card"><h2 style="margin:0;font-family:Georgia,serif">Reserva enviada correctamente</h2><div class="ok">Espera la confirmacion por WhatsApp. Horario de atencion: 10:00 a 20:00.</div>${waStatus ? `<div class="warn">${waStatus}</div>` : ""}<div class="grid"><div><strong>Reserva:</strong> #${rid || "-"}</div><div><strong>Tipo:</strong> ${tipo}</div><div><strong>Fecha:</strong> ${fecha}</div><div><strong>Hora:</strong> ${hora}</div><div><strong>Entrega:</strong> ${entrega}</div><div><strong>Telefono:</strong> ${telefono}</div></div><div class="data"><strong>Cliente:</strong> ${nombre}<br><strong>Correo:</strong> ${correo}<br><strong>Direccion:</strong> ${direccion}</div><div class="actions">${pdfHref ? `<a class="btn btnp" href="${pdfHref}" download="${pdfName}">Descargar PDF nuevamente</a>` : ""}${waManual ? `<a class="btn btnw" href="${waManual}" target="_blank" rel="noopener">Abrir WhatsApp manual</a>` : ""}<a class="btn" href="/tienda">Volver a tienda</a></div></main></body></html>`);
             w.document.close();
         }
 
@@ -23044,6 +23105,15 @@
             } finally {
                 clearTimeout(t);
             }
+        }
+
+        function _mostrarProcesandoReservaEnVentana(w) {
+            if (!w || w.closed) return;
+            try {
+                w.document.open();
+                w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Confirmando reserva</title><style>*{box-sizing:border-box}body{min-height:100vh;margin:0;padding:20px;display:grid;place-items:center;background:radial-gradient(circle at top,#fff0dc 0,transparent 42%),#fffaf4;color:#3a2013;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}.card{width:min(100%,420px);padding:30px 22px;border:1px solid #f0d7bd;border-top:5px solid #ef7d00;border-radius:24px;background:#fff;box-shadow:0 18px 48px #4b28121c;text-align:center}.spinner{width:48px;height:48px;margin:2px auto 18px;border:4px solid #ffe4c2;border-top-color:#ef7d00;border-radius:50%;animation:spin .85s linear infinite}h1{margin:0 0 10px;font-family:Georgia,serif;font-size:clamp(1.35rem,6vw,1.75rem)}p{margin:0;color:#735c4d;line-height:1.55;font-size:.96rem}.brand{margin-top:22px;color:#b65c00;font-size:.7rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spinner{animation:none;border-top-color:#ef7d00}}</style></head><body><main class="card" role="status" aria-live="polite"><div class="spinner" aria-hidden="true"></div><h1>Confirmando tu reserva</h1><p>Estamos guardando tu pedido y preparando el comprobante PDF. Esto puede tardar unos segundos.</p><div class="brand">Sucrée Pastelería</div></main></body></html>`);
+                w.document.close();
+            } catch (_) {}
         }
 
         async function _confirmarReservaAgendaPendiente(opts = {}) {
@@ -27015,6 +27085,8 @@
             _agendaCakeApplyFlowStep();
         });
         agendaCakeFlowNextEl?.addEventListener("click", () => {
+            const isOfficialMobileAgenda = document.body.classList.contains("tienda-agendapedidos-oficial")
+                && document.body.classList.contains("mobile-ui");
             if (agendaCakeFlowStep === 1) {
                 if (!agendaCakeFlowFechaElegida || !String(agendaFechaActiva || "").trim()) {
                     _agendaMsg("Selecciona primero una fecha.", "err");
@@ -27026,7 +27098,28 @@
                 }
             }
             if (agendaCakeFlowStep >= 2) {
-                reservarAgendaDesdeTienda({ inlineFlow: true }).catch(() => {});
+                if (!isOfficialMobileAgenda) {
+                    reservarAgendaDesdeTienda({ inlineFlow: true }).catch(() => {});
+                    return;
+                }
+                if (agendaCakeFlowNextEl.disabled) return;
+                agendaCakeFlowNextEl.disabled = true;
+                (async () => {
+                    const waWindow = window.open("", "_blank");
+                    _mostrarProcesandoReservaEnVentana(waWindow);
+                    try {
+                        const payload = await reservarAgendaDesdeTienda({ inlineFlow: true });
+                        if (!payload) {
+                            if (waWindow && !waWindow.closed) waWindow.close();
+                            return;
+                        }
+                        await _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
+                    } catch (_) {
+                        if (waWindow && !waWindow.closed) waWindow.close();
+                    } finally {
+                        agendaCakeFlowNextEl.disabled = false;
+                    }
+                })();
                 return;
             }
             agendaCakeFlowStep = Math.min(2, Number(agendaCakeFlowStep || 1) + 1);
@@ -27038,16 +27131,16 @@
         });
         agendaCakeCloseX2El?.addEventListener("click", _cerrarModalAgendaCakeCart);
         agendaCakeFlowConfirmEl?.addEventListener("click", async () => {
+            const isOfficialMobileAgenda = document.body.classList.contains("tienda-agendapedidos-oficial")
+                && document.body.classList.contains("mobile-ui");
+            if (isOfficialMobileAgenda) {
+                agendaCakeFlowNextEl?.click();
+                return;
+            }
             const payload = await reservarAgendaDesdeTienda({ inlineFlow: true });
             if (!payload) return;
             const waWindow = window.open("", "_blank");
-            try {
-                if (waWindow && !waWindow.closed) {
-                    waWindow.document.open();
-                    waWindow.document.write("<!doctype html><html><head><meta charset='utf-8'><title>Procesando reserva...</title></head><body style='font-family:Segoe UI,Tahoma,sans-serif;padding:20px;background:#f8fafc;color:#0f172a;'><h3 style='margin-top:0'>Procesando reserva...</h3><p>Estamos generando tu comprobante y enviando la solicitud a pasteleria.</p></body></html>");
-                    waWindow.document.close();
-                }
-            } catch (_) {}
+            _mostrarProcesandoReservaEnVentana(waWindow);
             _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
         });
         agendaCakeFlowPdfEl?.addEventListener("click", () => {
@@ -27293,13 +27386,7 @@
         });
         agendaConfirmarAceptarEnviarEl?.addEventListener("click", () => {
             const waWindow = window.open("", "_blank");
-            try {
-                if (waWindow && !waWindow.closed) {
-                    waWindow.document.open();
-                    waWindow.document.write("<!doctype html><html><head><meta charset='utf-8'><title>Procesando reserva...</title></head><body style='font-family:Segoe UI,Tahoma,sans-serif;padding:20px;background:#f8fafc;color:#0f172a;'><h3 style='margin-top:0'>Procesando reserva...</h3><p>Estamos generando tu comprobante y enviando la solicitud a pasteleria.</p></body></html>");
-                    waWindow.document.close();
-                }
-            } catch (_) {}
+            _mostrarProcesandoReservaEnVentana(waWindow);
             _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
         });
         modalAgendaConfirmarEl?.addEventListener("click", (ev) => {

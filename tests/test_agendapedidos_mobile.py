@@ -33,6 +33,11 @@ class AgendaPedidosMobileTests(unittest.TestCase):
         self.assertIn('class="agenda-cake-reference-details" open', html)
         self.assertIn("#modal-agenda-cake-cart.active #agenda-days-list", html)
         self.assertIn("Confirmar reserva", html)
+        self.assertIn(".cake-choice-card__check {\n                background: var(--sucree-primary-600) !important;\n                color: #fff !important;", html)
+        self.assertIn("#modal-agenda-cake-cart.active .cake-flow-confirm-actions {\n                display: none !important;", html)
+        self.assertIn("function _mostrarProcesandoReservaEnVentana(w)", html)
+        self.assertIn("Estamos guardando tu pedido y preparando el comprobante PDF", html)
+        self.assertIn("const isOfficialMobileAgenda = document.body.classList.contains(\"tienda-agendapedidos-oficial\")", html)
 
     def test_desktop_agendapedidos_does_not_receive_mobile_body_class(self):
         response = self.client.get(
