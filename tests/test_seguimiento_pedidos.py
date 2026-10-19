@@ -102,6 +102,10 @@ class SeguimientoPedidosTests(unittest.TestCase):
         self.assertNotIn("mapa_apple", payload)
         self.assertNotIn("mapa_waze", payload)
 
+        retiro = app._seguimiento_agenda_payload({"es_envio": 0})
+        self.assertEqual(retiro["modalidad"], "Retiro en tienda")
+        self.assertEqual(retiro["lugar"], "Rubidio 1815, 9271406 Maipú, Región Metropolitana")
+
         self.assertEqual(app._seguimiento_agenda_payload({"total": 30000, "abono": 0})["estado_pago"], "Pago pendiente")
         self.assertEqual(app._seguimiento_agenda_payload({"total": 30000, "abono": 30000})["estado_pago"], "Pagado")
 
@@ -135,6 +139,8 @@ class SeguimientoPedidosTests(unittest.TestCase):
         self.assertIn("data-map-address", html)
         self.assertIn("geo:0,0?q=", html)
         self.assertIn("maps.apple.com/?q=", html)
+        self.assertIn("Despacho / Retiro</small>", html)
+        self.assertIn("Rubidio 1815, 9271406 Maipú, Región Metropolitana", html)
         self.assertNotIn("Google Maps</a>", html)
         self.assertNotIn("Apple Maps</a>", html)
         self.assertNotIn("Waze</a>", html)

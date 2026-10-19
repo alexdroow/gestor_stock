@@ -1379,7 +1379,7 @@ def _seguimiento_agenda_payload(evento):
     cliente = str(ev.get("cliente") or "").strip()
     catalogo = _seguimiento_parse_catalogo(ev.get("ingredientes"))
     es_envio = bool(ev.get("es_envio"))
-    lugar = str(ev.get("direccion") or "").strip() if es_envio else "Sucree Pasteleria"
+    lugar = str(ev.get("direccion") or "").strip() if es_envio else "Rubidio 1815, 9271406 Maipú, Región Metropolitana"
     titulo = str(ev.get("titulo") or catalogo.get("categoria") or "Pedido Sucree").strip()
     tamano = str(catalogo.get("tamano") or "").strip()
     rellenos = [x for x in (catalogo.get("sabores") or []) if str(x or "").strip()]

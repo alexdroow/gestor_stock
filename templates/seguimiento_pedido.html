@@ -673,9 +673,9 @@
             const extras = Array.isArray(pedido.extras) ? pedido.extras.filter(Boolean) : [];
             const detalles = [firstFilled(pedido.tamano), rellenos.slice(0, 2).join(', ')].filter(Boolean).join(' · ');
             const titulo = firstFilled(pedido.titulo, pedido.categoria, 'Torta Sucrée');
-            const lugar = firstFilled(pedido.lugar, modalidad === 'despacho' ? 'Dirección registrada' : 'Sucrée Pastelería');
+            const lugar = firstFilled(pedido.lugar, modalidad === 'despacho' ? 'Dirección registrada' : 'Rubidio 1815, 9271406 Maipú, Región Metropolitana');
             const waText = `Hola Pasteleria Sucree, tengo una consulta sobre mi pedido ${pedido.codigo_pedido || codigoPedidoActual || ''}.`;
-            const lugarMarkup = modalidad === 'despacho' && pedido.lugar
+            const lugarMarkup = lugar
                 ? `<a class="delivery-address-link" data-map-address="${escapeHtml(lugar)}" href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(lugar)}">${escapeHtml(lugar)}</a>`
                 : escapeHtml(lugar);
             const photoCard = pedido.foto_producto_url ? `<article class="card product-photo-card"><div class="section-label">Asi quedo tu pedido</div><img src="${escapeHtml(pedido.foto_producto_url)}" alt="Foto del producto final" loading="lazy"><p>Foto disponible durante 72 horas desde que fue cargada.</p></article>` : '';
@@ -717,7 +717,7 @@
                         </div>
                         <div class="info-cell full">
                             <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16l-1 10H5L4 10Zm2-5h12l2 5H4l2-5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
-                            <div><small>${escapeHtml(pedido.modalidad || '-')}</small><strong>${lugarMarkup}</strong>${extras.length ? `<span>Extras: ${escapeHtml(extras.slice(0, 3).join(', '))}</span>` : ''}</div>
+                            <div><small>Despacho / Retiro</small><strong>${lugarMarkup}</strong>${extras.length ? `<span>Extras: ${escapeHtml(extras.slice(0, 3).join(', '))}</span>` : ''}</div>
                         </div>
                         <div class="info-cell full"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/></svg></div><div><small>Estado del pago</small><strong class="payment-status">${escapeHtml(pedido.estado_pago || 'Pago pendiente')}</strong></div></div>
                     </div>
