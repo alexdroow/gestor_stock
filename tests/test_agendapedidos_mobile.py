@@ -50,6 +50,9 @@ class AgendaPedidosMobileTests(unittest.TestCase):
         self.assertIn('mobileCatsBubbleListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;', html)
         self.assertIn('return "/static/cake-category-placeholder.jpg";', html)
         self.assertIn("this.dataset.fallbackApplied='1'", html)
+        self.assertIn('if (!src) return `<img class="is-placeholder" src="${placeholder}"', html)
+        self.assertIn('this.src=\'${placeholder}\';this.classList.add(\'is-placeholder\')', html)
+        self.assertIn('body.mobile-ui .item-photo img.is-placeholder', html)
 
     def test_cake_category_placeholder_image_is_served(self):
         response = self.client.get("/static/cake-category-placeholder.jpg")

@@ -2022,6 +2022,12 @@
             object-fit: cover;
             object-position: center;
         }
+        .item-photo img.is-placeholder,
+        .cake-card__media img.is-placeholder {
+            object-fit: contain;
+            padding: 14%;
+            background: #fff;
+        }
         .item-card.agotado .item-photo img {
             filter: grayscale(1) contrast(.88) brightness(.9);
         }
@@ -5420,6 +5426,12 @@
         }
         body.mobile-ui.tienda-preview-draft .item-photo img {
             object-fit: cover;
+        }
+        body.mobile-ui .item-photo img.is-placeholder,
+        body.mobile-ui .cake-card__media img.is-placeholder {
+            object-fit: contain !important;
+            padding: 14% !important;
+            background: #fff !important;
         }
         body.mobile-ui.tienda-preview-draft .photo-add {
             width: 38px !important;
@@ -19937,8 +19949,9 @@
             const srcDirect = String(p.foto_url || "").trim();
             const rel = String(p.foto || "").trim();
             const src = srcDirect || (rel ? `/static/${rel}` : "");
-            if (!src) return `<div class="fallback">*</div>`;
-            return `<img src="${esc(src)}?v=${Date.now()}" alt="${esc(p.nombre)}" style="${imgStyle(p)}">`;
+            const placeholder = _cakePlaceholderByName(p.nombre);
+            if (!src) return `<img class="is-placeholder" src="${placeholder}" alt="" loading="lazy">`;
+            return `<img src="${esc(src)}?v=${Date.now()}" alt="${esc(p.nombre)}" style="${imgStyle(p)}" loading="lazy" onerror="this.onerror=null;this.src='${placeholder}';this.classList.add('is-placeholder');this.alt='';">`;
         }
 
         function _productoImgSrc(p) {
