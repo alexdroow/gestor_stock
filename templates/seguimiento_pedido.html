@@ -144,9 +144,9 @@
             font-size: 20px;
             font-weight: 950;
             letter-spacing: -0.02em;
-            text-transform: uppercase;
             outline: none;
         }
+        .lookup select { width:100%; min-height:48px; border:1px solid #b9c8c0; border-radius:12px; padding:0 12px; color:var(--brown); background:#fff; font:inherit; font-weight:800; }
         .lookup input:focus {
             border-color: rgba(8, 120, 60, 0.65);
             box-shadow: 0 0 0 4px rgba(8, 120, 60, 0.12);
@@ -322,6 +322,14 @@
             font-weight: 700;
             margin-top: 2px;
         }
+        .map-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+        .map-links a { min-height:36px; padding:0 11px; border:1px solid #cfe3d6; border-radius:999px; color:var(--green-dark); background:#f2faf5; font-size:13px; font-weight:900; text-decoration:none; }
+        .payment-status { color:var(--green-dark) !important; }
+        .lookup-results { display:grid; gap:9px; margin:0 0 14px; }
+        .lookup-result { display:grid; gap:4px; width:100%; padding:13px; border:1px solid var(--line); border-radius:15px; color:var(--brown); background:#fff; text-align:left; }
+        .lookup-result small { color:var(--muted); font-weight:700; }
+        .product-photo-card img { display:block; width:100%; max-height:420px; object-fit:contain; border-radius:14px; background:#fffaf4; }
+        .product-photo-card p { margin:9px 0 0; color:var(--muted); font-size:13px; }
         .timeline-card h2 {
             margin: 0 0 18px;
             color: var(--brown);
@@ -504,14 +512,17 @@
                 <p class="subtitle">Consulta c&oacute;mo va tu torta.</p>
             </div>
 
-            <form class="lookup" onsubmit="buscarCodigoSeguimiento(event)">
-                <label for="codigo-input">C&oacute;digo de pedido</label>
+            <form class="lookup" onsubmit="buscarPedidoSeguimiento(event)">
+                <label for="search-type">Buscar pedido por</label>
+                <select id="search-type" aria-label="Tipo de busqueda"><option value="codigo">Codigo de pedido</option><option value="email">Correo electronico</option><option value="telefono">Numero de telefono</option></select>
+                <label id="search-value-label" for="codigo-input">C&oacute;digo de pedido</label>
                 <div class="lookup-row">
                     <input id="codigo-input" type="text" value="{{ codigo_pedido }}" placeholder="AGD-20260916-000103" autocomplete="off" inputmode="text">
                     <button class="btn-search" id="btn-search" type="submit">Ver</button>
                 </div>
             </form>
 
+            <div class="lookup-results" id="lookup-results" aria-live="polite"></div>
             <div id="status-root">
                 <div class="status-card">
                     <div class="status-head">
@@ -556,6 +567,9 @@
         const refreshButton = document.getElementById('btn-refresh');
         const contactRow = document.getElementById('contact-row');
         const contactLink = document.getElementById('contact-link');
+        const searchType = document.getElementById('search-type');
+        const searchValueLabel = document.getElementById('search-value-label');
+        const lookupResults = document.getElementById('lookup-results');
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -649,6 +663,8 @@
             const titulo = firstFilled(pedido.titulo, pedido.categoria, 'Torta Sucrée');
             const lugar = firstFilled(pedido.lugar, modalidad === 'despacho' ? 'Dirección registrada' : 'Sucrée Pastelería');
             const waText = `Hola Pasteleria Sucree, tengo una consulta sobre mi pedido ${pedido.codigo_pedido || codigoPedidoActual || ''}.`;
+            const mapLinks = modalidad === 'despacho' && pedido.lugar ? `<div class="map-links"><a href="${escapeHtml(pedido.mapa_google || '#')}" target="_blank" rel="noopener">Google Maps</a><a href="${escapeHtml(pedido.mapa_apple || '#')}" target="_blank" rel="noopener">Apple Maps</a><a href="${escapeHtml(pedido.mapa_waze || '#')}" target="_blank" rel="noopener">Waze</a></div>` : '';
+            const photoCard = pedido.foto_producto_url ? `<article class="card product-photo-card"><div class="section-label">Asi quedo tu pedido</div><img src="${escapeHtml(pedido.foto_producto_url)}" alt="Foto del producto final" loading="lazy"><p>Foto disponible durante 72 horas desde que fue cargada.</p></article>` : '';
 
             root.innerHTML = `
                 <article class="status-card" aria-live="polite">
@@ -687,10 +703,13 @@
                         </div>
                         <div class="info-cell full">
                             <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16l-1 10H5L4 10Zm2-5h12l2 5H4l2-5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
-                            <div><small>${escapeHtml(pedido.modalidad || '-')}</small><strong>${escapeHtml(lugar)}</strong>${extras.length ? `<span>Extras: ${escapeHtml(extras.slice(0, 3).join(', '))}</span>` : ''}</div>
+                            <div><small>${escapeHtml(pedido.modalidad || '-')}</small><strong>${escapeHtml(lugar)}</strong>${mapLinks}${extras.length ? `<span>Extras: ${escapeHtml(extras.slice(0, 3).join(', '))}</span>` : ''}</div>
                         </div>
+                        <div class="info-cell full"><div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/></svg></div><div><small>Estado del pago</small><strong class="payment-status">${escapeHtml(pedido.estado_pago || 'Pago pendiente')}</strong></div></div>
                     </div>
                 </article>
+
+                ${photoCard}
 
                 <article class="card timeline-card">
                     <h2>Avance del pedido</h2>
@@ -705,6 +724,7 @@
         }
 
         function renderError(message) {
+            if (lookupResults) lookupResults.innerHTML = '';
             if (!ultimoPedido) {
                 root.innerHTML = `<div class="error">${escapeHtml(message || 'No pudimos encontrar este pedido.')}</div>`;
             }
@@ -753,12 +773,66 @@
             cargarSeguimiento(true);
         }
 
+        function actualizarModoBusqueda() {
+            const tipo = searchType.value;
+            const config = { codigo: ['Codigo de pedido', 'AGD-20260916-000103', 'text'], email: ['Correo electronico', 'cliente@correo.cl', 'email'], telefono: ['Numero de telefono', '+56912345678', 'tel'] }[tipo];
+            searchValueLabel.textContent = config[0];
+            codigoInput.placeholder = config[1];
+            codigoInput.type = config[2];
+            codigoInput.inputMode = tipo === 'telefono' ? 'tel' : (tipo === 'email' ? 'email' : 'text');
+            codigoInput.value = '';
+            lookupResults.innerHTML = '';
+        }
+
+        function renderPedidosEncontrados(pedidos) {
+            const rows = Array.isArray(pedidos) ? pedidos : [];
+            if (!rows.length) { renderError('No encontramos pedidos activos asociados a ese correo o telefono.'); return; }
+            if (intervaloSeguimiento) { clearInterval(intervaloSeguimiento); intervaloSeguimiento = null; }
+            root.innerHTML = '';
+            lookupResults.innerHTML = `<div class="section-label">Encontramos ${rows.length} pedido${rows.length === 1 ? '' : 's'} activo${rows.length === 1 ? '' : 's'}</div>` + rows.map((pedido) => `<button class="lookup-result" type="button" data-track-code="${escapeHtml(pedido.codigo_pedido || '')}"><strong>${escapeHtml(firstFilled(pedido.titulo, 'Pedido Sucrée'))}</strong><small>${escapeHtml(pedido.codigo_pedido || '')} · ${escapeHtml(formatFecha(pedido.fecha))} · ${escapeHtml(pedido.estado_label || '')}</small><small>Pago: ${escapeHtml(pedido.estado_pago || 'Pago pendiente')}</small></button>`).join('');
+            updated.textContent = 'Selecciona un pedido para ver su seguimiento.';
+        }
+
+        async function buscarPedidoSeguimiento(event) {
+            if (event) event.preventDefault();
+            const value = String(codigoInput.value || '').trim();
+            if (searchType.value === 'codigo') return buscarCodigoSeguimiento(null);
+            if (!value) { renderError('Ingresa tu correo o numero de telefono.'); return; }
+            if (intervaloSeguimiento) { clearInterval(intervaloSeguimiento); intervaloSeguimiento = null; }
+            ultimoPedido = null;
+            root.innerHTML = '';
+            searchButton.disabled = true;
+            updated.textContent = 'Buscando pedidos activos...';
+            try {
+                const response = await fetch('/api/seguimiento/buscar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ tipo: searchType.value, valor: value }) });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo realizar la busqueda.');
+                renderPedidosEncontrados(data.pedidos);
+            } catch (error) { renderError(error.message || 'No se pudo realizar la busqueda.'); }
+            finally { searchButton.disabled = false; }
+        }
+
+        lookupResults.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-track-code]');
+            if (!button) return;
+            const code = String(button.getAttribute('data-track-code') || '').trim();
+            if (!code) return;
+            searchType.value = 'codigo';
+            actualizarModoBusqueda();
+            codigoInput.value = code;
+            codigoPedidoActual = code;
+            if (window.history && window.history.replaceState) window.history.replaceState({}, '', `/seguimiento/${encodeURIComponent(code)}`);
+            cargarSeguimiento(true);
+        });
+        searchType.addEventListener('change', actualizarModoBusqueda);
+
         function activarAutoRefresh() {
             if (intervaloSeguimiento) return;
             intervaloSeguimiento = setInterval(() => cargarSeguimiento(false), 30000);
         }
 
         if (codigoPedidoActual) {
+            searchType.value = 'codigo';
             cargarSeguimiento(false);
         }
     </script>

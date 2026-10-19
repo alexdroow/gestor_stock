@@ -12584,8 +12584,121 @@ def _normalizar_seguimiento_evento_agenda(estado, default="pendiente"):
 def _ensure_agenda_seguimiento_columns(conn):
     _ensure_column(conn, "agenda_eventos", "seguimiento_estado", "TEXT DEFAULT 'pendiente'")
     _ensure_column(conn, "agenda_eventos", "seguimiento_actualizado", "TEXT")
+    _ensure_column(conn, "agenda_eventos", "seguimiento_foto", "TEXT")
+    _ensure_column(conn, "agenda_eventos", "seguimiento_foto_subida", "TEXT")
     conn.execute("UPDATE agenda_eventos SET seguimiento_estado = COALESCE(NULLIF(TRIM(seguimiento_estado), ''), 'pendiente')")
     conn.execute("UPDATE agenda_eventos SET seguimiento_actualizado = COALESCE(NULLIF(TRIM(seguimiento_actualizado), ''), creado, datetime('now'))")
+
+
+def buscar_eventos_seguimiento_por_contacto(email="", telefono="", limite=8):
+    email_norm = str(email or "").strip().lower()
+    telefono_norm = re.sub(r"\D", "", str(telefono or ""))
+    if telefono_norm.startswith("56"):
+        telefono_norm = telefono_norm[2:]
+    if len(telefono_norm) == 8:
+        telefono_norm = "9" + telefono_norm
+    telefono_norm = telefono_norm[-9:]
+    if not email_norm and len(telefono_norm) < 8:
+        return []
+    conn = get_db()
+    try:
+        _ensure_agenda_seguimiento_columns(conn)
+        rows = conn.execute(
+            """
+            SELECT * FROM agenda_eventos
+            WHERE LOWER(TRIM(COALESCE(tipo, ''))) <> 'bloqueo'
+              AND LOWER(TRIM(COALESCE(estado, ''))) NOT IN ('cancelado', 'borrador')
+              AND LOWER(TRIM(COALESCE(seguimiento_estado, 'pendiente'))) <> 'entregado'
+            ORDER BY fecha DESC, hora_inicio DESC, id DESC
+            LIMIT 2000
+            """
+        ).fetchall()
+        matches = []
+        for row in rows:
+            event = dict(row)
+            email_match = bool(email_norm) and email_norm in {
+                str(event.get("cliente_email") or "").strip().lower(),
+            }
+            phones = [re.sub(r"\D", "", str(event.get(key) or "")) for key in ("cliente_telefono", "telefono")]
+            normalized_phones = []
+            for event_phone in phones:
+                if event_phone.startswith("56"):
+                    event_phone = event_phone[2:]
+                if len(event_phone) == 8:
+                    event_phone = "9" + event_phone
+                normalized_phones.append(event_phone[-9:])
+            phone_match = len(telefono_norm) >= 8 and telefono_norm in normalized_phones
+            if email_match or phone_match:
+                event["es_envio"] = bool(event.get("es_envio"))
+                matches.append(event)
+                if len(matches) >= max(1, min(int(limite or 8), 8)):
+                    break
+        return matches
+    finally:
+        conn.close()
+
+
+def actualizar_foto_seguimiento_evento_agenda(evento_id, filename, subida):
+    conn = get_db()
+    try:
+        _ensure_agenda_seguimiento_columns(conn)
+        cur = conn.execute(
+            """UPDATE agenda_eventos SET seguimiento_foto=?, seguimiento_foto_subida=?
+               WHERE id=? AND tipo <> 'bloqueo' AND seguimiento_estado='espera_envio'
+                 AND LOWER(TRIM(COALESCE(estado, ''))) NOT IN ('cancelado', 'borrador')""",
+            (str(filename or ""), str(subida or ""), int(evento_id)),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def obtener_foto_seguimiento_por_nombre(filename):
+    conn = get_db()
+    try:
+        _ensure_agenda_seguimiento_columns(conn)
+        row = conn.execute(
+            "SELECT seguimiento_foto, seguimiento_foto_subida FROM agenda_eventos WHERE seguimiento_foto=? LIMIT 1",
+            (str(filename or ""),),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def limpiar_fotos_seguimiento_expiradas(ahora=None):
+    ahora = ahora or datetime.now()
+    limite = ahora - timedelta(hours=72)
+    conn = get_db()
+    borradas = []
+    try:
+        _ensure_agenda_seguimiento_columns(conn)
+        rows = conn.execute(
+            "SELECT id, seguimiento_foto, seguimiento_foto_subida FROM agenda_eventos WHERE COALESCE(seguimiento_foto, '') <> ''"
+        ).fetchall()
+        for row in rows:
+            item = dict(row)
+            try:
+                subida = datetime.strptime(str(item.get("seguimiento_foto_subida") or ""), "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                subida = datetime.min
+            if subida <= limite:
+                borradas.append(str(item.get("seguimiento_foto") or ""))
+                conn.execute(
+                    "UPDATE agenda_eventos SET seguimiento_foto=NULL, seguimiento_foto_subida=NULL WHERE id=?",
+                    (int(item["id"]),),
+                )
+        conn.commit()
+        return borradas
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def actualizar_seguimiento_evento_agenda(evento_id, estado):

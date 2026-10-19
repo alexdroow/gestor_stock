@@ -1384,6 +1384,15 @@ def _seguimiento_agenda_payload(evento):
     tamano = str(catalogo.get("tamano") or "").strip()
     rellenos = [x for x in (catalogo.get("sabores") or []) if str(x or "").strip()]
     extras = [x for x in (catalogo.get("extras") or []) if str(x or "").strip()]
+    try:
+        total = max(0.0, float(ev.get("total") or 0))
+        abono = max(0.0, float(ev.get("abono") or 0))
+    except (TypeError, ValueError):
+        total, abono = 0.0, 0.0
+    estado_pago = "Pagado" if total > 0 and abono >= total else ("Abono registrado; saldo pendiente" if abono > 0 else "Pago pendiente")
+    foto = str(ev.get("seguimiento_foto") or "").strip()
+    foto_subida = str(ev.get("seguimiento_foto_subida") or "").strip()
+    foto_url = f"/seguimiento/foto/{quote(foto)}" if foto and re.fullmatch(r"[a-f0-9]{32}\.jpg", foto) else ""
     return {
         "codigo_pedido": str(ev.get("codigo_pedido") or "").strip(),
         "titulo": titulo,
@@ -1393,6 +1402,9 @@ def _seguimiento_agenda_payload(evento):
         "modalidad": "Despacho" if es_envio else "Retiro en tienda",
         "modalidad_key": "despacho" if es_envio else "retiro",
         "lugar": lugar,
+        "mapa_google": f"https://www.google.com/maps/search/?api=1&query={quote(lugar)}" if es_envio and lugar else "",
+        "mapa_apple": f"https://maps.apple.com/?q={quote(lugar)}" if es_envio and lugar else "",
+        "mapa_waze": f"https://waze.com/ul?q={quote(lugar)}&navigate=yes" if es_envio and lugar else "",
         "categoria": str(catalogo.get("categoria") or "").strip(),
         "tamano": tamano,
         "rellenos": rellenos,
@@ -1403,6 +1415,9 @@ def _seguimiento_agenda_payload(evento):
         "estado": estado,
         "estado_label": _seguimiento_agenda_label(estado),
         "estado_actualizado": str(ev.get("seguimiento_actualizado") or ev.get("creado") or "").strip(),
+        "estado_pago": estado_pago,
+        "foto_producto_url": foto_url,
+        "foto_producto_subida": foto_subida if foto_url else "",
         "paso_actual": indice + 1,
         "pasos_total": len(SEGUIMIENTO_AGENDA_ESTADOS),
         "estados": SEGUIMIENTO_AGENDA_ESTADOS,
@@ -1419,6 +1434,7 @@ def seguimiento_pedido(codigo_pedido=""):
 @app.route('/api/seguimiento/<codigo_pedido>')
 def api_seguimiento_pedido(codigo_pedido):
     try:
+        _limpiar_fotos_seguimiento()
         from database import obtener_evento_agenda_por_codigo
         evento = obtener_evento_agenda_por_codigo(codigo_pedido)
         if not evento or str(evento.get("tipo") or "").strip().lower() == "bloqueo":
@@ -1426,6 +1442,148 @@ def api_seguimiento_pedido(codigo_pedido):
         return jsonify({"success": True, "pedido": _seguimiento_agenda_payload(evento)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+_SEGUIMIENTO_BUSQUEDA_IP = {}
+
+
+@app.route('/api/seguimiento/buscar', methods=['POST'])
+def api_buscar_seguimiento_contacto():
+    ip = str(request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown").split(",", 1)[0].strip()
+    ahora = time.time()
+    intentos = [t for t in _SEGUIMIENTO_BUSQUEDA_IP.get(ip, []) if ahora - t < 60]
+    if len(intentos) >= 12:
+        return jsonify({"success": False, "error": "Demasiadas consultas. Intenta nuevamente en un minuto."}), 429
+    intentos.append(ahora)
+    _SEGUIMIENTO_BUSQUEDA_IP[ip] = intentos
+    data = request.get_json(silent=True) or {}
+    tipo = str(data.get("tipo") or "").strip().lower()
+    valor = str(data.get("valor") or "").strip()
+    email, telefono = "", ""
+    if tipo == "email":
+        email = valor.lower()[:254]
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+            return jsonify({"success": False, "error": "Ingresa un correo valido."}), 400
+    elif tipo == "telefono":
+        telefono = re.sub(r"\D", "", valor)
+        if not 8 <= len(telefono) <= 12:
+            return jsonify({"success": False, "error": "Ingresa un numero de telefono valido."}), 400
+    else:
+        return jsonify({"success": False, "error": "Selecciona correo o telefono para buscar."}), 400
+    try:
+        _limpiar_fotos_seguimiento()
+        from database import buscar_eventos_seguimiento_por_contacto
+        eventos = buscar_eventos_seguimiento_por_contacto(email=email, telefono=telefono)
+        pedidos = [_seguimiento_agenda_payload(ev) for ev in eventos]
+        return jsonify({"success": True, "pedidos": pedidos})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _directorio_fotos_seguimiento():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads", "seguimiento_pedidos")
+
+
+def _limpiar_fotos_seguimiento():
+    from database import limpiar_fotos_seguimiento_expiradas
+    for filename in limpiar_fotos_seguimiento_expiradas():
+        if re.fullmatch(r"[a-f0-9]{32}\.jpg", str(filename or "")):
+            try:
+                os.remove(os.path.join(_directorio_fotos_seguimiento(), filename))
+            except FileNotFoundError:
+                pass
+
+
+_TRACKING_PHOTO_CLEANUP_LAST = 0.0
+_TRACKING_PHOTO_CLEANUP_LOCK = threading.Lock()
+
+
+@app.before_request
+def _limpieza_periodica_fotos_seguimiento():
+    global _TRACKING_PHOTO_CLEANUP_LAST
+    ahora = time.time()
+    if ahora - _TRACKING_PHOTO_CLEANUP_LAST < 900:
+        return None
+    with _TRACKING_PHOTO_CLEANUP_LOCK:
+        if ahora - _TRACKING_PHOTO_CLEANUP_LAST < 900:
+            return None
+        try:
+            _limpiar_fotos_seguimiento()
+            _TRACKING_PHOTO_CLEANUP_LAST = ahora
+        except Exception:
+            pass
+    return None
+
+
+@app.route('/seguimiento/foto/<filename>')
+def seguimiento_foto_producto(filename):
+    if not re.fullmatch(r"[a-f0-9]{32}\.jpg", str(filename or "")):
+        return "No encontrado", 404
+    try:
+        _limpiar_fotos_seguimiento()
+        from database import obtener_foto_seguimiento_por_nombre
+        registro = obtener_foto_seguimiento_por_nombre(filename)
+        path = os.path.join(_directorio_fotos_seguimiento(), filename)
+        if not registro or not os.path.isfile(path):
+            return "No encontrado", 404
+        response = make_response(send_file(path, mimetype="image/jpeg", conditional=True))
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        return response
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agenda/evento/<int:id>/foto-seguimiento', methods=['POST'])
+def api_agenda_subir_foto_seguimiento(id):
+    upload_path = ""
+    try:
+        _limpiar_fotos_seguimiento()
+        from database import actualizar_foto_seguimiento_evento_agenda, obtener_evento_agenda_por_id
+        evento = obtener_evento_agenda_por_id(id)
+        if not evento or str(evento.get("tipo") or "").lower() == "bloqueo":
+            return jsonify({"success": False, "error": "Pedido no encontrado."}), 404
+        if str(evento.get("seguimiento_estado") or "").lower() != "espera_envio":
+            return jsonify({"success": False, "error": "Primero actualiza el pedido a Listo para despacho/retiro."}), 409
+        old_filename = str(evento.get("seguimiento_foto") or "").strip()
+        archivo = request.files.get("foto")
+        if not archivo or not archivo.filename:
+            return jsonify({"success": False, "error": "Selecciona una foto del producto."}), 400
+        raw = archivo.read(8 * 1024 * 1024 + 1)
+        if not raw or len(raw) > 8 * 1024 * 1024:
+            return jsonify({"success": False, "error": "La foto debe pesar menos de 8 MB."}), 400
+        from PIL import Image, ImageOps
+        with Image.open(BytesIO(raw)) as source:
+            if source.width * source.height > 35_000_000:
+                return jsonify({"success": False, "error": "La resolucion de la imagen es demasiado grande."}), 400
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((1800, 1800))
+            output = BytesIO()
+            image.save(output, format="JPEG", quality=84, optimize=True)
+        filename = f"{secrets.token_hex(16)}.jpg"
+        folder = _directorio_fotos_seguimiento()
+        os.makedirs(folder, exist_ok=True)
+        upload_path = os.path.join(folder, filename)
+        with open(upload_path, "wb") as target:
+            target.write(output.getvalue())
+        subida = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if not actualizar_foto_seguimiento_evento_agenda(id, filename, subida):
+            os.remove(upload_path)
+            upload_path = ""
+            return jsonify({"success": False, "error": "El pedido debe estar Listo para despacho/retiro para cargar la foto."}), 409
+        if old_filename and old_filename != filename and re.fullmatch(r"[a-f0-9]{32}\.jpg", old_filename):
+            try:
+                os.remove(os.path.join(_directorio_fotos_seguimiento(), old_filename))
+            except FileNotFoundError:
+                pass
+        crear_backup()
+        return jsonify({"success": True, "foto_url": f"/seguimiento/foto/{filename}", "disponible_hasta_horas": 72})
+    except Exception as e:
+        if upload_path and os.path.isfile(upload_path):
+            try:
+                os.remove(upload_path)
+            except OSError:
+                pass
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route('/tienda/presencial')
