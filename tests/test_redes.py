@@ -120,8 +120,16 @@ class RedesTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201)
         self.assertEqual(self.mutate("POST", "/api/redes/admin/publish", {}).status_code, 200)
         html = self.client.get("/redes").get_data(as_text=True)
+        self.assertIn("Más de Pastelería Sucrée", html)
         self.assertIn("Síguenos", html)
         self.assertIn("Instagram Sucrée", html)
+
+    def test_social_links_stay_in_three_columns_on_mobile(self):
+        _, _ = self.create_link(title="Facebook", url="https://facebook.com/pasteleria_sucree", layout="social")
+        self.assertEqual(self.mutate("POST", "/api/redes/admin/publish", {}).status_code, 200)
+        html = self.client.get("/redes").get_data(as_text=True)
+        self.assertIn(".social-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))", html)
+        self.assertIn('<div class="social-row"><a class="social-card"', html)
 
     def test_profile_version_conflict_and_publish_revision_restore(self):
         _, data = self.create_link(layout="quick")
