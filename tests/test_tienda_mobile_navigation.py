@@ -20,6 +20,7 @@ class TiendaMobileNavigationTests(unittest.TestCase):
         self.assertIn("mobile-ui", body.group(1) if body else "")
         self.assertIn('content: "Sucr\\00e9\\65" !important;', html)
         self.assertIn('href=\"/tienda/tortas-listas\">Catalogo Tortas</a>', html)
+        self.assertIn('href=\"/redes\">Redes Sucrée</a>', html)
         self.assertIn("function abrirMenuMobile()", html)
         self.assertIn("window.matchMedia?.(\"(max-width: 899px), (pointer: coarse)\")", html)
 

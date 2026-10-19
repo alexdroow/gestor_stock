@@ -655,6 +655,7 @@
             background: #fff7ed;
             color: #9a3412;
         }
+        .topbar-nav-link { display: inline-flex; align-items: center; text-decoration: none; }
         .search {
             width: min(460px, 100%);
         }
@@ -20512,7 +20513,7 @@
                             : c;
                     const active = c === categoriaActiva ? "active" : "";
                     return `<button type="button" class="topbar-nav-btn ${active}" onclick="cambiarCategoria('${esc(c)}')">${esc(label)}</button>`;
-                }).join("");
+                }).join("") + `<a class="topbar-nav-btn topbar-nav-link" href="/redes">Redes Sucrée</a>`;
             }
             if (mobileCatStripEl) {
                 const agendaChip = agendaEnabled
@@ -20536,8 +20537,9 @@
                     : "";
                 const cakeCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/tortas-listas">Catalogo Tortas</a>`;
                 const storeHomeLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda">Tienda Principal</a>`;
+                const redesLink = `<a class="mobile-cat-chip menu-route-link" href="/redes">Redes Sucrée</a>`;
                 if (document.body.classList.contains("tienda-agendapedidos-oficial")) {
-                    mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;
+                    mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink + redesLink;
                 } else mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
@@ -20548,7 +20550,7 @@
                             : c;
                     const active = c === categoriaActiva ? "active" : "";
                     return `<button type="button" class="mobile-cat-chip ${active}" onclick="cambiarCategoria('${esc(c)}');cerrarPanelesMobile();">${esc(label)}</button>`;
-                }).join("");
+                }).join("") + redesLink;
             }
             if (mobileCatsBubbleListEl) {
                 const nombreCliente = String(clienteRegistrado?.nombre || "").trim();

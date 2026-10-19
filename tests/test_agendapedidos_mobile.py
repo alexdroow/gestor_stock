@@ -46,7 +46,7 @@ class AgendaPedidosMobileTests(unittest.TestCase):
         self.assertNotIn("agendaCakeBuilderStep = Math.max(2, agendaCakeBuilderStep)", html)
         self.assertIn('href="/tienda">Tienda Principal</a>', html)
         self.assertIn('href="/tienda/tortas-listas">Catalogo Tortas</a>', html)
-        self.assertIn('mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;', html)
+        self.assertIn('mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink + redesLink;', html)
         self.assertIn('mobileCatsBubbleListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;', html)
         self.assertIn('return "/static/cake-category-placeholder.jpg";', html)
         self.assertIn("this.dataset.fallbackApplied='1'", html)

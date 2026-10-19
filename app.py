@@ -60,6 +60,8 @@ else:
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 from ready_cakes import ready_cakes, ensure_ready_cakes_schema, get_published_ready_cake
 app.register_blueprint(ready_cakes)
+from redes import redes_blueprint
+app.register_blueprint(redes_blueprint)
 CAMERA_HUB = CameraHub()
 app.secret_key = os.environ.get("GESTIONSTOCK_SECRET_KEY", "gestor_stock_dev_secret_change_me")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -226,7 +228,9 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/api/redes/view", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
+        return True
+    if ruta.startswith("/redes/go/"):
         return True
     if ruta.startswith("/downloader/apk/"):
         return True
