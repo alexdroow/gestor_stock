@@ -18601,7 +18601,7 @@
             if (!Array.isArray(rows) || !rows.length) return "";
             const safeProp = /^[a-z][a-z0-9\-]*$/;
             const safeSel = /^[#.\[:*a-zA-Z0-9_\-\s>,+~="'()]+$/;
-            const lines = [];
+            const lines = ["Hola, envio el resumen de mi reserva en Pasteleria Sucree.", ""];
             rows.forEach((r) => {
                 const selector = String(r?.selector || "").trim();
                 const prop = String(r?.property || "").trim().toLowerCase();
@@ -22230,8 +22230,6 @@
             const size = _catalogFind("sizes", agendaCakeSelection.size_id);
             const maxSabores = _agendaCakeMaxSaboresForSize(size);
             agendaCakeSelection.sabor_ids = (agendaCakeSelection.sabor_ids || []).slice(0, maxSabores);
-            if (Boolean(_agendaWizardFromServer) && document.body.classList.contains("mobile-ui")) agendaCakeBuilderStep = Math.max(2, agendaCakeBuilderStep);
-            if (_agendaIsMobileWizardEnabled() && _agendaPaso2Completo()) agendaMobileStep = Math.max(agendaMobileStep, 3);
             _renderAgendaCakeBuilder();
             _agendaCakeDraftSave();
         }
@@ -23066,6 +23064,64 @@
             return { fileName, blobUrl };
         }
 
+        function _agendaResumenReservaCliente(payload, reservaId = 0) {
+            const p = payload || {};
+            const lines = [];
+            const tipo = _labelTipoReserva(p.tipo);
+            lines.push(`Tipo de pedido: ${tipo}`);
+            if (String(p.tipo || "") === "torta" && p.catalogo_torta) {
+                const cake = p.catalogo_torta;
+                const category = _catalogFind("categorias", cake.categoria_id)?.nombre || "Torta";
+                const size = _catalogFind("sizes", cake.size_id)?.nombre || "No indicado";
+                const flavors = (Array.isArray(cake.sabor_ids) ? cake.sabor_ids : [])
+                    .map((id) => _catalogFind("sabores", id)?.nombre).filter(Boolean);
+                const extras = (Array.isArray(cake.extra_items) ? cake.extra_items : []).map((item) => {
+                    const name = _catalogFind("extras", item.id)?.nombre || String(item.id || "Extra");
+                    return `${name} x${Math.max(1, Number(item.qty || 1))}`;
+                });
+                const topper = _catalogFind("toppers", cake.topper_id)?.nombre || "Sin topper";
+                lines.push(`Torta: ${category}`);
+                lines.push(`Tamano: ${size}`);
+                lines.push(`Sabores/rellenos: ${flavors.join(", ") || "No indicados"}`);
+                if (extras.length) lines.push(`Extras: ${extras.join(", ")}`);
+                lines.push(`Topper: ${topper}`);
+                if (cake.nota) lines.push(`Indicaciones: ${String(cake.nota).trim()}`);
+            } else if (String(p.tipo || "") === "pastel") {
+                if (String(p.pastel_modo || "catalogo") === "especial") {
+                    const special = p.pastel_especial || {};
+                    lines.push(`Producto: ${String(special.nombre || "Solicitud especial")}`);
+                    if (special.detalle) lines.push(`Detalle: ${String(special.detalle).trim()}`);
+                } else {
+                    const products = (Array.isArray(p.pastel_catalogo) ? p.pastel_catalogo : []).map((item) => {
+                        const product = _pastelesDisponibles().find((row) => Number(row.id || 0) === Number(item.id || 0));
+                        return `${String(product?.nombre || `Producto #${Number(item.id || 0)}`)} x${Number(item.cantidad || 0)}`;
+                    });
+                    lines.push(`Productos: ${products.join(", ") || "No indicados"}`);
+                }
+            }
+            lines.push(`Fecha: ${_formatearFechaAgenda(p.fecha) || "-"}`);
+            lines.push(`Hora: ${String(p.hora_inicio || "-")}`);
+            lines.push(`Entrega: ${p.entrega_tipo === "despacho" ? "Despacho" : "Retiro en tienda"}`);
+            if (p.entrega_tipo === "despacho") lines.push(`Direccion: ${String(p.direccion || "No indicada")}`);
+            if (p.detalle && !(p.catalogo_torta?.nota && p.detalle === p.catalogo_torta.nota)) {
+                lines.push(`Mensaje: ${String(p.detalle).trim()}`);
+            }
+            lines.push(`Cliente: ${String(p.nombre || "-")}`);
+            lines.push(`Telefono: ${String(p.telefono || "-")}`);
+            if (Number(reservaId || 0) > 0) lines.push(`Reserva: #${Number(reservaId)}`);
+
+            const showPrice = String(p.tipo || "") !== "torta" || _isCakePricesVisible();
+            if (showPrice) {
+                const subtotal = Number(_agendaSubtotalEstimado(p) || 0);
+                const discount = Math.max(0, Number(p?.cupon_auto?.descuento_monto || agendaCuponAuto?.descuento_monto || 0));
+                const quote = p.shipping_quote || null;
+                const shipping = p.entrega_tipo === "despacho" && quote?.inside_maipu
+                    ? Math.max(0, Number(quote.shipping_fee || 0)) : 0;
+                lines.push(`Total estimado: ${money.format(Math.max(0, subtotal - discount) + shipping)}`);
+            }
+            return lines.join("\n");
+        }
+
         function _abrirResumenReservaEnVentana(extWin, payload, reserva, pdfInfo, extra = {}) {
             const w = extWin && !extWin.closed ? extWin : window.open("", "_blank");
             if (!w) return;
@@ -23076,14 +23132,15 @@
             const fecha = esc(_formatearFechaAgenda(payload?.fecha));
             const hora = esc(String(payload?.hora_inicio || "-"));
             const entrega = esc(String(payload?.entrega_tipo === "despacho" ? "Despacho" : "Retiro en tienda"));
-            const direccion = esc(String(payload?.direccion || "Retiro en local Sucree"));
+            const direccion = payload?.entrega_tipo === "despacho" ? esc(String(payload?.direccion || "-")) : "";
             const rid = Number(reserva?.id || 0);
             const pdfHref = String((pdfInfo && pdfInfo.blobUrl) || "");
             const pdfName = esc(String((pdfInfo && pdfInfo.fileName) || "reserva_agenda.pdf"));
             const waManual = String(extra.waManualUrl || "").trim();
-            const waStatus = esc(String(extra.whatsappStatus || ""));
+            const pedidoHtml = _agendaResumenReservaCliente(payload, rid).split("\n")
+                .map((line) => `<div>${esc(line)}</div>`).join("");
             w.document.open();
-            w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Resumen reserva</title><style>*{box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#fffaf4;color:#3a2013;margin:0;padding:clamp(12px,4vw,24px)}.card{width:min(100%,760px);margin:0 auto;background:#fff;border:1px solid #f0d7bd;border-top:5px solid #ef7d00;border-radius:20px;padding:clamp(16px,4vw,24px);display:grid;gap:12px;box-shadow:0 16px 40px #4b28121a}.ok{color:#a65300;font-weight:750}.warn{color:#79400d;background:#fff1df;border:1px solid #f4d0a6;border-radius:12px;padding:10px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.grid>div,.data{min-width:0;overflow-wrap:anywhere;padding:10px;border:1px solid #f2e4d6;border-radius:11px;background:#fffdfb}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;text-align:center;text-decoration:none;border:1px solid #e8d8c8;border-radius:12px;padding:10px 14px;font-weight:800;color:#3a2013;background:#fff8ef}.btnp{background:#ef7d00;color:#fff;border-color:#ef7d00}.btnw{background:#d86600;color:#fff;border-color:#d86600}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1 1 180px}@media(max-width:560px){body{padding:12px}.card{border-radius:18px}.grid{grid-template-columns:1fr}.actions{display:grid;grid-template-columns:1fr}.actions .btn{width:100%}}</style></head><body><main class="card"><h2 style="margin:0;font-family:Georgia,serif">Reserva enviada correctamente</h2><div class="ok">Espera la confirmacion por WhatsApp. Horario de atencion: 10:00 a 20:00.</div>${waStatus ? `<div class="warn">${waStatus}</div>` : ""}<div class="grid"><div><strong>Reserva:</strong> #${rid || "-"}</div><div><strong>Tipo:</strong> ${tipo}</div><div><strong>Fecha:</strong> ${fecha}</div><div><strong>Hora:</strong> ${hora}</div><div><strong>Entrega:</strong> ${entrega}</div><div><strong>Telefono:</strong> ${telefono}</div></div><div class="data"><strong>Cliente:</strong> ${nombre}<br><strong>Correo:</strong> ${correo}<br><strong>Direccion:</strong> ${direccion}</div><div class="actions">${pdfHref ? `<a class="btn btnp" href="${pdfHref}" download="${pdfName}">Descargar PDF nuevamente</a>` : ""}${waManual ? `<a class="btn btnw" href="${waManual}" target="_blank" rel="noopener">Abrir WhatsApp manual</a>` : ""}<a class="btn" href="/tienda">Volver a tienda</a></div></main></body></html>`);
+            w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Resumen reserva</title><style>*{box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#fffaf4;color:#3a2013;margin:0;padding:clamp(12px,4vw,24px)}.card{width:min(100%,760px);margin:0 auto;background:#fff;border:1px solid #f0d7bd;border-top:5px solid #ef7d00;border-radius:20px;padding:clamp(16px,4vw,24px);display:grid;gap:12px;box-shadow:0 16px 40px #4b28121a}.ok{color:#a65300;font-weight:750}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.grid>div,.data,.order{min-width:0;overflow-wrap:anywhere;padding:10px;border:1px solid #f2e4d6;border-radius:11px;background:#fffdfb}.order{display:grid;gap:7px}.order h3{margin:0 0 2px;font-size:1rem}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;text-align:center;text-decoration:none;border:1px solid #e8d8c8;border-radius:12px;padding:10px 14px;font-weight:800;color:#3a2013;background:#fff8ef}.btnp{background:#ef7d00;color:#fff;border-color:#ef7d00}.btnw{background:#d86600;color:#fff;border-color:#d86600}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1 1 180px}@media(max-width:560px){body{padding:12px}.card{border-radius:18px}.grid{grid-template-columns:1fr}.actions{display:grid;grid-template-columns:1fr}.actions .btn{width:100%}}</style></head><body><main class="card"><h2 style="margin:0;font-family:Georgia,serif">Reserva enviada correctamente</h2><div class="ok">Espera la confirmacion por WhatsApp. Horario de atencion: 10:00 a 20:00.</div><div class="grid"><div><strong>Reserva:</strong> #${rid || "-"}</div><div><strong>Tipo:</strong> ${tipo}</div><div><strong>Fecha:</strong> ${fecha}</div><div><strong>Hora:</strong> ${hora}</div><div><strong>Entrega:</strong> ${entrega}</div><div><strong>Telefono:</strong> ${telefono}</div></div><section class="order"><h3>Resumen del pedido</h3>${pedidoHtml}</section><div class="data"><strong>Cliente:</strong> ${nombre}<br><strong>Correo:</strong> ${correo}${direccion ? `<br><strong>Direccion de despacho:</strong> ${direccion}` : ""}</div><div class="actions">${pdfHref ? `<a class="btn btnp" href="${pdfHref}" download="${pdfName}">Descargar PDF nuevamente</a>` : ""}${waManual ? `<a class="btn btnw" href="${waManual}" target="_blank" rel="noopener">Enviar resumen por WhatsApp</a>` : ""}<a class="btn" href="/tienda">Volver a tienda</a></div></main></body></html>`);
             w.document.close();
         }
 
@@ -23119,11 +23176,8 @@
         async function _confirmarReservaAgendaPendiente(opts = {}) {
             const payload = agendaReservaPendiente;
             if (!payload) return;
-            const sendToPasteleria = Boolean(opts && opts.sendToPasteleria);
             const waWindow = opts && opts.waWindow ? opts.waWindow : null;
-            let sentPdfToPasteleria = false;
             let waManualUrl = "";
-            let waStatusText = "";
             _agendaMsg("Reservando horario...");
             if (agendaConfirmarAceptarEnviarEl) agendaConfirmarAceptarEnviarEl.disabled = true;
             try {
@@ -23149,31 +23203,9 @@
                         telefono: String(payloadFinal.telefono || "").trim(),
                     }));
                 } catch (_) {}
-                if (!pdfInfo || !pdfInfo.blobUrl) {
-                    waStatusText = "No se pudo preparar la vista previa del PDF en esta pestaña, pero puedes descargarlo nuevamente desde aqui o reintentar.";
-                }
-                const contacto = String(payloadFinal.nombre || payloadFinal.email || "cliente").trim();
-                const msgWa = `Hola mi nombre ${contacto} envio mi cotizacion para una pronta revision.`;
-                waManualUrl = `https://wa.me/56964330546?text=${encodeURIComponent(msgWa)}`;
-                if (sendToPasteleria) {
-                    try {
-                        await _fetchJsonWithTimeout(`/api/tienda/agenda/reserva/${Number(reserva.id || 0)}/whatsapp-pasteleria`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json", Accept: "application/json" },
-                            body: JSON.stringify({
-                                nombre: String(payloadFinal.nombre || "").trim(),
-                                email: String(payloadFinal.email || "").trim(),
-                            }),
-                        }, 9000);
-                        sentPdfToPasteleria = true;
-                        waStatusText = "PDF enviado automaticamente a Pasteleria Sucree por WhatsApp.";
-                    } catch (errWa) {
-                        waStatusText = `No se pudo enviar automaticamente por Twilio (${String(errWa?.message || "sin detalle")}). Puedes enviarlo manualmente con el boton de WhatsApp.`;
-                    }
-                }
+                waManualUrl = `https://wa.me/56964330546?text=${encodeURIComponent(_agendaResumenReservaCliente(payloadFinal, Number(reserva.id || 0)))}`;
                 _abrirResumenReservaEnVentana(waWindow, payloadFinal, reserva, pdfInfo, {
                     waManualUrl,
-                    whatsappStatus: waStatusText,
                 });
                 if (agendaDetalleEl) agendaDetalleEl.value = "";
                 if (String(payload.tipo || "") === "torta") {
@@ -23189,9 +23221,7 @@
                 _resetAgendaShippingQuote();
                 agendaReservaPendiente = null;
                 _cerrarModalAgendaConfirmar();
-                if (sentPdfToPasteleria) {
-                    _agendaMsg("Reserva confirmada. PDF enviado a Pasteleria Sucree por WhatsApp.", "ok");
-                } else if (payloadFinal.entrega_tipo === "despacho" && payloadFinal.shipping_quote && !payloadFinal.shipping_quote.inside_maipu) {
+                if (payloadFinal.entrega_tipo === "despacho" && payloadFinal.shipping_quote && !payloadFinal.shipping_quote.inside_maipu) {
                     _agendaMsg("Reserva enviada. Direccion fuera de Maipu: el valor de despacho sera cotizado internamente y te contactaremos por WhatsApp (10:00 a 20:00).", "ok");
                 } else {
                     _agendaMsg("Reserva enviada. Espera la confirmacion que sera enviada al WhatsApp. Horario de atencion: 10:00 a 20:00.", "ok");
@@ -23201,8 +23231,7 @@
                 _renderPedidoActivoTienda();
             } catch (e) {
                 _agendaMsg(e.message || "No se pudo reservar", "err");
-                const contactoErr = String(payload?.nombre || payload?.email || "cliente").trim();
-                const msgWaErr = `Hola mi nombre ${contactoErr} envio mi cotizacion para una pronta revision.`;
+                const msgWaErr = _agendaResumenReservaCliente(payload || {}, 0);
                 _abrirResumenReservaEnVentana(waWindow, payload || {}, { id: 0 }, null, {
                     waManualUrl: `https://wa.me/56964330546?text=${encodeURIComponent(msgWaErr)}`,
                     whatsappStatus: `No se pudo completar la reserva: ${String(e?.message || "sin detalle")}`,
@@ -27113,7 +27142,7 @@
                             if (waWindow && !waWindow.closed) waWindow.close();
                             return;
                         }
-                        await _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
+                        await _confirmarReservaAgendaPendiente({ waWindow });
                     } catch (_) {
                         if (waWindow && !waWindow.closed) waWindow.close();
                     } finally {
@@ -27141,7 +27170,7 @@
             if (!payload) return;
             const waWindow = window.open("", "_blank");
             _mostrarProcesandoReservaEnVentana(waWindow);
-            _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
+            _confirmarReservaAgendaPendiente({ waWindow });
         });
         agendaCakeFlowPdfEl?.addEventListener("click", () => {
             try {
@@ -27387,7 +27416,7 @@
         agendaConfirmarAceptarEnviarEl?.addEventListener("click", () => {
             const waWindow = window.open("", "_blank");
             _mostrarProcesandoReservaEnVentana(waWindow);
-            _confirmarReservaAgendaPendiente({ sendToPasteleria: true, waWindow });
+            _confirmarReservaAgendaPendiente({ waWindow });
         });
         modalAgendaConfirmarEl?.addEventListener("click", (ev) => {
             if (ev.target === modalAgendaConfirmarEl) _cerrarModalAgendaConfirmar();

@@ -38,6 +38,12 @@ class AgendaPedidosMobileTests(unittest.TestCase):
         self.assertIn("function _mostrarProcesandoReservaEnVentana(w)", html)
         self.assertIn("Estamos guardando tu pedido y preparando el comprobante PDF", html)
         self.assertIn("const isOfficialMobileAgenda = document.body.classList.contains(\"tienda-agendapedidos-oficial\")", html)
+        self.assertIn("function _agendaResumenReservaCliente(payload, reservaId = 0)", html)
+        self.assertIn("Sabores/rellenos:", html)
+        self.assertIn("if (p.entrega_tipo === \"despacho\") lines.push(`Direccion:", html)
+        self.assertIn("Enviar resumen por WhatsApp", html)
+        self.assertNotIn("No se pudo enviar automaticamente por Twilio", html)
+        self.assertNotIn("agendaCakeBuilderStep = Math.max(2, agendaCakeBuilderStep)", html)
 
     def test_desktop_agendapedidos_does_not_receive_mobile_body_class(self):
         response = self.client.get(
