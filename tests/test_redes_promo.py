@@ -245,6 +245,15 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertIn("promoMessage.textContent=''", public_html)
         self.assertIn(".promo-code[hidden],.promo-copy[hidden],.promo-store-link[hidden]{display:none}", public_html)
 
+    def test_mobile_promo_fields_move_above_the_keyboard(self):
+        self.assertEqual(self.enable_promo().status_code, 200)
+        html = self.client.get("/redes").get_data(as_text=True)
+        self.assertIn(".promo-overlay.keyboard-open", html)
+        self.assertIn("visualViewport", html)
+        self.assertIn("active.scrollIntoView({block:'center'", html)
+        self.assertIn("const showPromo=()=>{promoModal.hidden=false};", html)
+        self.assertNotIn("promo-email').focus({preventScroll:true)", html)
+
     def test_campaign_can_be_disabled_and_codes_are_marked_used(self):
         self.assertEqual(self.enable_promo().status_code, 200)
         created = self.register().get_json()
