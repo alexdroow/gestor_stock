@@ -551,7 +551,6 @@ def register_welcome_promo():
                     "success": True,
                     "already_registered": True,
                     "active_code": True,
-                    "codigo": str(existing["codigo"]),
                     "discount_pct": float(existing["discount_pct"]),
                     "expires_on": str(existing["expires_on"]),
                     "remaining_days": remaining_days,

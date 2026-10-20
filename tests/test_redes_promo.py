@@ -169,7 +169,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertTrue(repeated["active_code"])
         self.assertEqual(repeated["expires_on"], first["expires_on"])
         self.assertGreaterEqual(repeated["remaining_days"], 0)
-        self.assertEqual(repeated["codigo"], first["codigo"])
+        self.assertNotIn("codigo", repeated)
         conn = database.get_db()
         try:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM redes_promo_codes").fetchone()[0], 1)
@@ -229,6 +229,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertFalse(used_response.get_json()["pending"])
 
     def test_cart_has_pending_promo_reminder_and_account_paths_refresh_it(self):
+        self.assertEqual(self.enable_promo().status_code, 200)
         html = self.client.get("/tienda").get_data(as_text=True)
         self.assertIn("Tienes un descuento de bienvenida pendiente", html)
         self.assertIn("Aplicar mi código", html)
@@ -236,9 +237,13 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertGreaterEqual(html.count("await cargarPromoPendienteTienda()"), 2)
         public_html = self.client.get("/redes").get_data(as_text=True)
         self.assertIn("Tu cuenta ya está creada", public_html)
+        self.assertIn("Ya tienes un código activo", public_html)
+        self.assertIn('href="/tienda"', public_html)
+        self.assertIn("promo-store-link", public_html)
+        self.assertIn("Arma tu carrito en la tienda", public_html)
         self.assertIn("Te quedan ${days}", public_html)
         self.assertIn("promoMessage.textContent=''", public_html)
-        self.assertIn(".promo-code[hidden],.promo-copy[hidden]{display:none}", public_html)
+        self.assertIn(".promo-code[hidden],.promo-copy[hidden],.promo-store-link[hidden]{display:none}", public_html)
 
     def test_campaign_can_be_disabled_and_codes_are_marked_used(self):
         self.assertEqual(self.enable_promo().status_code, 200)
