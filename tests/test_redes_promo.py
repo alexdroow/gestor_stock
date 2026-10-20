@@ -154,6 +154,9 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertEqual(first.status_code, 200)
         duplicate = self.register(email="otro@example.cl", phone="12345678")
         self.assertEqual(duplicate.status_code, 409)
+        self.assertNotIn("\u00c3", duplicate.get_json()["error"])
+        public_html = self.client.get("/redes").get_data(as_text=True)
+        self.assertIn("fixPromoText(data.error", public_html)
 
     def test_campaign_can_be_disabled_and_codes_are_marked_used(self):
         self.assertEqual(self.enable_promo().status_code, 200)

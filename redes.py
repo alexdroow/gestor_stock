@@ -160,7 +160,7 @@ def _promo_admin_codes(conn, limit=150):
         elif item.get("expires_on", "") < today:
             item["status"] = "Vencido"
         elif not _promo_window_open(config, today):
-            item["status"] = "PromociÃ³n inactiva"
+            item["status"] = "Promoción inactiva"
         else:
             item["status"] = "Disponible"
         result.append(item)
@@ -170,7 +170,7 @@ def _promo_admin_codes(conn, limit=150):
 def _normalise_promo_email(value):
     email = str(value or "").strip().lower()
     if len(email) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-        raise ValueError("Ingresa un correo electrÃ³nico vÃ¡lido.")
+        raise ValueError("Ingresa un correo electrónico válido.")
     return email
 
 
@@ -181,7 +181,7 @@ def _normalise_promo_phone(value):
     if digits.startswith("9") and len(digits) == 9:
         digits = digits[1:]
     if len(digits) != 8:
-        raise ValueError("El telÃ©fono debe incluir +569 y 8 dÃ­gitos.")
+        raise ValueError("El teléfono debe incluir +569 y 8 dígitos.")
     return "+569" + digits
 
 
@@ -229,13 +229,13 @@ def redes_promo_validate_checkout(code, cliente_ref):
         config = _promo_config(conn)
         today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
         if not _promo_window_open(config, today):
-            return {"ok": False, "error": "La promociÃ³n de bienvenida no estÃ¡ activa."}
+            return {"ok": False, "error": "La promoción de bienvenida no está activa."}
         if str(row["expires_on"] or "") < today:
-            return {"ok": False, "error": "El cÃ³digo de bienvenida venciÃ³."}
+            return {"ok": False, "error": "El código de bienvenida venció."}
         if row["used_sale_id"]:
-            return {"ok": False, "error": "Este cÃ³digo ya fue utilizado."}
+            return {"ok": False, "error": "Este código ya fue utilizado."}
         if not cliente_ref or not secrets.compare_digest(str(row["cliente_ref"]), str(cliente_ref)):
-            return {"ok": False, "error": "Este cÃ³digo pertenece a otro correo o telÃ©fono."}
+            return {"ok": False, "error": "Este código pertenece a otro correo o teléfono."}
         return {"ok": True, "id": int(row["id"]), "coupon_id": int(row["cupon_id"])}
     finally:
         conn.close()
@@ -499,14 +499,14 @@ def register_welcome_promo():
     expected = str(session.get("redes_promo_csrf") or "")
     supplied = str(request.headers.get("X-CSRF-Token") or "")
     if not expected or not supplied or not secrets.compare_digest(expected, supplied):
-        return jsonify({"success": False, "error": "Recarga la pÃ¡gina e intenta nuevamente."}), 403
+        return jsonify({"success": False, "error": "Recarga la página e intenta nuevamente."}), 403
     if not _promo_rate_allowed():
-        return jsonify({"success": False, "error": "Demasiados intentos. Vuelve a probar mÃ¡s tarde."}), 429
+        return jsonify({"success": False, "error": "Demasiados intentos. Vuelve a probar más tarde."}), 429
     data = request.get_json(silent=True) or {}
     if str(data.get("website") or "").strip():
         return jsonify({"success": True})
     if not bool(data.get("consent")):
-        return jsonify({"success": False, "error": "Debes aceptar el uso de tus datos para participar en la promociÃ³n."}), 400
+        return jsonify({"success": False, "error": "Debes aceptar el uso de tus datos para participar en la promoción."}), 400
     try:
         email = _normalise_promo_email(data.get("email"))
         phone = _normalise_promo_phone(data.get("telefono"))
@@ -521,14 +521,14 @@ def register_welcome_promo():
         today = now_local.date().isoformat()
         if not _promo_window_open(promo, today):
             conn.rollback()
-            return jsonify({"success": False, "error": "La promociÃ³n de bienvenida no estÃ¡ disponible ahora."}), 410
+            return jsonify({"success": False, "error": "La promoción de bienvenida no está disponible ahora."}), 410
         existing = conn.execute(
             "SELECT id FROM redes_promo_codes WHERE email=? COLLATE NOCASE OR telefono=? LIMIT 1",
             (email, phone),
         ).fetchone()
         if existing:
             conn.rollback()
-            return jsonify({"success": False, "error": "Ya se generÃ³ una promociÃ³n con alguno de estos datos. El cÃ³digo es de una sola asignaciÃ³n; contÃ¡ctanos si necesitas ayuda."}), 409
+            return jsonify({"success": False, "error": "Ya se generó una promoción con alguno de estos datos. El código es de una sola asignación; contáctanos si necesitas ayuda."}), 409
 
         # Reuse SucreeStock's customer and coupon tables so the code works in the existing cart.
         from app import _ensure_adm_pagina_tables, _nombre_desde_email, _normalizar_cliente_ref, _upsert_cliente_tienda_cursor
@@ -570,14 +570,14 @@ def register_welcome_promo():
                 continue
         if not code:
             conn.rollback()
-            return jsonify({"success": False, "error": "No se pudo crear el cÃ³digo. Intenta nuevamente."}), 500
+            return jsonify({"success": False, "error": "No se pudo crear el código. Intenta nuevamente."}), 500
 
         client_ref = _normalizar_cliente_ref(email, phone)
         cursor.execute(
             """INSERT INTO tienda_cliente_cupones
                (cliente_id,cliente_ref,cupon_id,activo,usado,usos_realizados,usos_max,nota,asignado_por,fecha_vencimiento,fecha_asignado)
                VALUES (?,?,?,1,0,0,1,?,'redes_promo',?,CURRENT_TIMESTAMP)""",
-            (int(cliente.get("id") or 0), client_ref, coupon_id, f"PromociÃ³n bienvenida Redes: {promo['discount_pct']:g}%", expiry_text),
+            (int(cliente.get("id") or 0), client_ref, coupon_id, f"Promoción bienvenida Redes: {promo['discount_pct']:g}%", expiry_text),
         )
         cursor.execute(
             """INSERT INTO redes_promo_codes
@@ -594,8 +594,8 @@ def register_welcome_promo():
         return jsonify({"success": False, "error": "Ya existe un registro promocional para uno de estos datos."}), 409
     except Exception:
         conn.rollback()
-        current_app.logger.exception("No se pudo crear el cÃ³digo de bienvenida de Redes.")
-        return jsonify({"success": False, "error": "No se pudo crear el cÃ³digo en este momento. Intenta nuevamente."}), 500
+        current_app.logger.exception("No se pudo crear el código de bienvenida de Redes.")
+        return jsonify({"success": False, "error": "No se pudo crear el código en este momento. Intenta nuevamente."}), 500
     finally:
         conn.close()
 
@@ -712,14 +712,14 @@ def save_promo_config():
         if not 1 <= discount_pct <= 100:
             raise ValueError("El descuento debe estar entre 1% y 100%.")
         if not 1 <= validity_days <= 365:
-            raise ValueError("La vigencia de cada cÃ³digo debe ser de 1 a 365 dÃ­as.")
+            raise ValueError("La vigencia de cada código debe ser de 1 a 365 días.")
         for value in (starts_on, ends_on):
             if value:
                 datetime.strptime(value, "%Y-%m-%d")
         if starts_on and ends_on and ends_on < starts_on:
-            raise ValueError("La fecha de tÃ©rmino no puede ser anterior a la fecha de inicio.")
+            raise ValueError("La fecha de término no puede ser anterior a la fecha de inicio.")
     except (TypeError, ValueError) as exc:
-        return jsonify({"success": False, "error": str(exc) or "Revisa la configuraciÃ³n de la promociÃ³n."}), 400
+        return jsonify({"success": False, "error": str(exc) or "Revisa la configuración de la promoción."}), 400
     conn = _db()
     try:
         conn.execute(
@@ -1003,7 +1003,7 @@ def reset_metrics():
         return denied
     payload = request.get_json(silent=True) or {}
     if payload.get("confirm") != "BORRAR ESTADISTICAS":
-        return jsonify({"success": False, "error": "La confirmaciÃ³n no coincide; las estadÃ­sticas no se borraron."}), 400
+        return jsonify({"success": False, "error": "La confirmación no coincide; las estadísticas no se borraron."}), 400
     conn = _db()
     try:
         conn.execute("BEGIN IMMEDIATE")
