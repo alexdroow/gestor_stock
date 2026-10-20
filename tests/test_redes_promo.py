@@ -169,7 +169,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertTrue(repeated["active_code"])
         self.assertEqual(repeated["expires_on"], first["expires_on"])
         self.assertGreaterEqual(repeated["remaining_days"], 0)
-        self.assertNotIn("codigo", repeated)
+        self.assertEqual(repeated["codigo"], first["codigo"])
         conn = database.get_db()
         try:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM redes_promo_codes").fetchone()[0], 1)
@@ -237,6 +237,8 @@ class RedesWelcomePromoTests(unittest.TestCase):
         public_html = self.client.get("/redes").get_data(as_text=True)
         self.assertIn("Tu cuenta ya está creada", public_html)
         self.assertIn("Te quedan ${days}", public_html)
+        self.assertIn("promoMessage.textContent=''", public_html)
+        self.assertIn(".promo-code[hidden],.promo-copy[hidden]{display:none}", public_html)
 
     def test_campaign_can_be_disabled_and_codes_are_marked_used(self):
         self.assertEqual(self.enable_promo().status_code, 200)
