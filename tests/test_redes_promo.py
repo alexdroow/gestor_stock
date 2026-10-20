@@ -178,6 +178,14 @@ class RedesWelcomePromoTests(unittest.TestCase):
         response = self.enable_promo(validity_days=0)
         self.assertEqual(response.status_code, 400)
 
+    def test_admin_history_uses_wrapping_layout_for_contact_details(self):
+        with self.client.session_transaction() as session:
+            session["admin_autenticado"] = True
+        html = self.client.get("/admin/redes").get_data(as_text=True)
+        self.assertIn(".promo-code-row{grid-template-columns:minmax(0,1fr) auto", html)
+        self.assertIn("overflow-wrap:anywhere", html)
+        self.assertIn("promo-code-info", html)
+
 
 if __name__ == "__main__":
     unittest.main()
