@@ -228,7 +228,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/api/redes/view", "/api/redes/promo/register", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/api/redes/view", "/api/redes/promo/register", "/api/redes/promo/pending", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
         return True
     if ruta.startswith("/redes/go/"):
         return True
@@ -2053,6 +2053,21 @@ def _upsert_cliente_tienda_cursor(
         _actualizar_nivel_cliente_cursor(cursor, int(cli["id"]))
         cli = _obtener_cliente_por_contacto_cursor(cursor, em, te)
     return cli
+
+
+def _buscar_cliente_por_contacto_cursor(cursor, email, telefono):
+    email_norm = str(email or "").strip().lower()
+    phone_digits = re.sub(r"\D+", "", str(telefono or ""))[-8:]
+    phone_sql = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefono,''),'+',''),' ',''),'-',''),'(',''),')',''),'.','')"
+    cursor.execute(
+        f"""SELECT id,email,telefono FROM tienda_clientes
+            WHERE LOWER(TRIM(COALESCE(email,'')))=?
+               OR SUBSTR({phone_sql},-8)=?
+            LIMIT 1""",
+        (email_norm, phone_digits),
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
 
 
 def _registrar_puntos_cliente_cursor(cursor, *, cliente_id, puntos, tipo, origen_tipo, origen_id, detalle):
@@ -6652,6 +6667,10 @@ def api_tienda_clientes_registrar():
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("BEGIN IMMEDIATE")
+        cliente_existente = _buscar_cliente_por_contacto_cursor(cursor, email, telefono)
+        if cliente_existente:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Ya existe una cuenta con ese correo o telefono. Inicia sesion en Mi cuenta."}), 409
         cliente = _upsert_cliente_tienda_cursor(
             cursor,
             nombre=nombre,

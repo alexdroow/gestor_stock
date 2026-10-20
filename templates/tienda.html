@@ -18203,6 +18203,7 @@
             localStorage.setItem(CAT_STORAGE_KEY, "TODOS");
         }
         let cuponAplicado = { codigo: "", descuento_monto: 0 };
+        let promoPendienteCarrito = null;
         let agendaCuponAuto = null;
         let tiendaAbierta = true;
         let tiendaEstadoMensaje = "";
@@ -23623,6 +23624,7 @@
                     bookingHeaderCartCountEl.style.display = "none";
                 }
                 if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(0);
+                _renderPromoPendingReminder();
                 _trackTienda("cart");
                 return;
             }
@@ -23665,7 +23667,50 @@
                 }
             }
             if (mobileCartTotalEl) mobileCartTotalEl.textContent = money.format(total);
+            _renderPromoPendingReminder();
             _trackTienda("cart");
+        }
+
+        function _renderPromoPendingReminder() {
+            document.querySelectorAll(".welcome-promo-cart-reminder").forEach((node) => node.remove());
+            if (!promoPendienteCarrito || !carrito.length || cuponAplicado.codigo) return;
+            const days = Math.max(0, Number(promoPendienteCarrito.remaining_days || 0));
+            const expiryText = days === 0 ? "Vence hoy" : `Te quedan ${days} ${days === 1 ? "día" : "días"}`;
+            const targets = [
+                document.querySelector("#desktop-cart-panel .cart-meta"),
+                document.querySelector("#mobile-cart-modal .cart-meta"),
+            ].filter(Boolean);
+            targets.forEach((target) => {
+                const notice = document.createElement("div");
+                notice.className = "welcome-promo-cart-reminder";
+                notice.style.cssText = "display:grid;gap:7px;margin:0 0 10px;padding:11px 12px;border:1px solid #f2c894;border-radius:12px;background:#fff4e4;color:#6f390b;font-size:13px;line-height:1.4";
+                notice.innerHTML = `<strong>Tienes un descuento de bienvenida pendiente</strong><span>${Number(promoPendienteCarrito.discount_pct).toLocaleString("es-CL")}% de descuento · ${expiryText} (${esc(promoPendienteCarrito.expires_on)}).</span><button type="button" style="min-height:38px;border:0;border-radius:9px;background:#f47a00;color:#fff;font-weight:800">Aplicar mi código</button>`;
+                notice.querySelector("button").addEventListener("click", () => {
+                    if (codigoDescuentoEl) codigoDescuentoEl.value = promoPendienteCarrito.codigo;
+                    if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = promoPendienteCarrito.codigo;
+                    aplicarCupon();
+                });
+                target.prepend(notice);
+            });
+        }
+
+        async function cargarPromoPendienteTienda() {
+            try {
+                const res = await fetch("/api/redes/promo/pending", {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
+                        telefono: String(clienteRegistrado?.telefono || "").trim(),
+                    }),
+                });
+                const data = await res.json();
+                promoPendienteCarrito = res.ok && data.success && data.pending ? data : null;
+            } catch (_) {
+                promoPendienteCarrito = null;
+            }
+            _renderPromoPendingReminder();
         }
 
         function _catalogoProductosActivos(rows) {
@@ -24450,6 +24495,7 @@
                 _setCuentaModo("account");
                 renderEstadoCuenta();
                 await cargarHistorialCliente();
+                await cargarPromoPendienteTienda();
                 setCuentaMsg("Cuenta registrada correctamente.");
                 msg("Cuenta de cliente registrada.");
             } catch (e) {
@@ -24492,6 +24538,7 @@
                 _setCuentaModo("account");
                 renderEstadoCuenta();
                 await cargarHistorialCliente();
+                await cargarPromoPendienteTienda();
                 setCuentaMsg("Sesion iniciada correctamente.");
                 msg("Sesion iniciada correctamente.");
                 cerrarModalCuenta();
@@ -27508,6 +27555,7 @@
         _notificarRetornoFlowDesdeUrl();
         _aplicarEscalaMovilDinamica();
         renderCart();
+        cargarPromoPendienteTienda();
         _toggleMobileAgendaSummaryFab();
         cargarProductos();
         _trackTienda("view");

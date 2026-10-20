@@ -7,11 +7,14 @@ from unittest.mock import patch
 
 import app
 import database
+import redes
 from redes import redes_promo_validate_checkout
 
 
 class RedesWelcomePromoTests(unittest.TestCase):
     def setUp(self):
+        with redes._PROMO_RATE_LOCK:
+            redes._PROMO_RATE_BUCKETS.clear()
         self.temp = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp.name, "promo.sqlite")
         self.db_patch = patch.object(database, "DB_PATH", self.db_path)
@@ -157,6 +160,83 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertNotIn("\u00c3", duplicate.get_json()["error"])
         public_html = self.client.get("/redes").get_data(as_text=True)
         self.assertIn("fixPromoText(data.error", public_html)
+
+    def test_same_active_registration_reports_expiry_without_issuing_another_code(self):
+        self.assertEqual(self.enable_promo().status_code, 200)
+        first = self.register().get_json()
+        repeated = self.register().get_json()
+        self.assertTrue(repeated["already_registered"])
+        self.assertTrue(repeated["active_code"])
+        self.assertEqual(repeated["expires_on"], first["expires_on"])
+        self.assertGreaterEqual(repeated["remaining_days"], 0)
+        self.assertNotIn("codigo", repeated)
+        conn = database.get_db()
+        try:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM redes_promo_codes").fetchone()[0], 1)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_clientes").fetchone()[0], 1)
+        finally:
+            conn.close()
+
+    def test_any_existing_customer_contact_blocks_promo_and_store_signup(self):
+        self.assertEqual(self.enable_promo().status_code, 200)
+        conn = database.get_db()
+        try:
+            conn.execute(
+                "INSERT INTO tienda_clientes(nombre,email,telefono) VALUES(?,?,?)",
+                ("Cliente existente", "registrado@example.cl", "+56912345678"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        promo_email_duplicate = self.register(email="nuevo@example.cl", phone="12345678")
+        self.assertEqual(promo_email_duplicate.status_code, 409)
+        promo_phone_duplicate = self.register(email="registrado@example.cl", phone="87654321")
+        self.assertEqual(promo_phone_duplicate.status_code, 409)
+
+        registration = self.client.post("/api/tienda/clientes/registrar", json={
+            "nombre": "Otro Cliente", "email": "otro@example.cl", "email_confirm": "otro@example.cl",
+            "telefono": "+56912345678", "fecha_nacimiento": "1990-01-01",
+        })
+        self.assertEqual(registration.status_code, 409)
+        conn = database.get_db()
+        try:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM redes_promo_codes").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_clientes").fetchone()[0], 1)
+        finally:
+            conn.close()
+
+    def test_pending_code_endpoint_returns_coupon_for_registered_contact(self):
+        self.assertEqual(self.enable_promo().status_code, 200)
+        created = self.register().get_json()
+        response = self.client.post("/api/redes/promo/pending", json={
+            "email": "cliente@example.cl", "telefono": "+56912345678",
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data["pending"])
+        self.assertEqual(data["codigo"], created["codigo"])
+
+        conn = database.get_db()
+        try:
+            conn.execute("UPDATE redes_promo_codes SET used_sale_id=55 WHERE codigo=?", (created["codigo"],))
+            conn.commit()
+        finally:
+            conn.close()
+        used_response = self.client.post("/api/redes/promo/pending", json={
+            "email": "cliente@example.cl", "telefono": "+56912345678",
+        })
+        self.assertFalse(used_response.get_json()["pending"])
+
+    def test_cart_has_pending_promo_reminder_and_account_paths_refresh_it(self):
+        html = self.client.get("/tienda").get_data(as_text=True)
+        self.assertIn("Tienes un descuento de bienvenida pendiente", html)
+        self.assertIn("Aplicar mi código", html)
+        self.assertIn("/api/redes/promo/pending", html)
+        self.assertGreaterEqual(html.count("await cargarPromoPendienteTienda()"), 2)
+        public_html = self.client.get("/redes").get_data(as_text=True)
+        self.assertIn("Tu cuenta ya está creada", public_html)
+        self.assertIn("Te quedan ${days}", public_html)
 
     def test_campaign_can_be_disabled_and_codes_are_marked_used(self):
         self.assertEqual(self.enable_promo().status_code, 200)

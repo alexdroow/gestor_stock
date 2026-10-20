@@ -522,19 +522,47 @@ def register_welcome_promo():
         if not _promo_window_open(promo, today):
             conn.rollback()
             return jsonify({"success": False, "error": "La promoción de bienvenida no está disponible ahora."}), 410
-        existing = conn.execute(
-            "SELECT id FROM redes_promo_codes WHERE email=? COLLATE NOCASE OR telefono=? LIMIT 1",
-            (email, phone),
-        ).fetchone()
-        if existing:
-            conn.rollback()
-            return jsonify({"success": False, "error": "Ya se generó una promoción con alguno de estos datos. El código es de una sola asignación; contáctanos si necesitas ayuda."}), 409
-
         # Reuse SucreeStock's customer and coupon tables so the code works in the existing cart.
-        from app import _ensure_adm_pagina_tables, _nombre_desde_email, _normalizar_cliente_ref, _upsert_cliente_tienda_cursor
+        from app import _buscar_cliente_por_contacto_cursor, _ensure_adm_pagina_tables, _nombre_desde_email, _normalizar_cliente_ref, _upsert_cliente_tienda_cursor
 
         cursor = conn.cursor()
         _ensure_adm_pagina_tables(cursor)
+        existing = conn.execute(
+            """SELECT p.*,c.activo AS coupon_active
+               FROM redes_promo_codes p LEFT JOIN tienda_cupones c ON c.id=p.cupon_id
+               WHERE p.email=? COLLATE NOCASE OR p.telefono=? LIMIT 1""",
+            (email, phone),
+        ).fetchone()
+        if existing:
+            same_account = str(existing["email"]).strip().lower() == email and str(existing["telefono"]).strip() == phone
+            expiry_date = datetime.strptime(str(existing["expires_on"]), "%Y-%m-%d").date()
+            code_is_active = (
+                same_account
+                and not existing["used_sale_id"]
+                and int(existing["coupon_active"] or 0) == 1
+                and expiry_date >= now_local.date()
+                and _promo_window_open(promo, today)
+            )
+            if code_is_active:
+                conn.commit()
+                session["redes_promo_registration_id"] = int(existing["id"])
+                remaining_days = (expiry_date - now_local.date()).days
+                return jsonify({
+                    "success": True,
+                    "already_registered": True,
+                    "active_code": True,
+                    "discount_pct": float(existing["discount_pct"]),
+                    "expires_on": str(existing["expires_on"]),
+                    "remaining_days": remaining_days,
+                })
+            conn.rollback()
+            return jsonify({"success": False, "error": "El correo o telefono ya esta asociado a una cuenta. Inicia sesion con tus datos registrados; no se creara otra cuenta ni otro codigo."}), 409
+
+        cliente_existente = _buscar_cliente_por_contacto_cursor(cursor, email, phone)
+        if cliente_existente:
+            conn.rollback()
+            return jsonify({"success": False, "error": "El correo o telefono ya esta asociado a una cuenta. Inicia sesion con tus datos registrados; no se creara otra cuenta ni otro codigo."}), 409
+
         cliente = _upsert_cliente_tienda_cursor(
             cursor,
             nombre=_nombre_desde_email(email),
@@ -596,6 +624,61 @@ def register_welcome_promo():
         conn.rollback()
         current_app.logger.exception("No se pudo crear el código de bienvenida de Redes.")
         return jsonify({"success": False, "error": "No se pudo crear el código en este momento. Intenta nuevamente."}), 500
+    finally:
+        conn.close()
+
+
+@redes_blueprint.post("/api/redes/promo/pending")
+def pending_welcome_promo():
+    data = request.get_json(silent=True) or {}
+    registration_id = session.get("redes_promo_registration_id")
+    email = str(data.get("email") or "").strip().lower()
+    try:
+        phone = _normalise_promo_phone(data.get("telefono")) if data.get("telefono") else ""
+    except ValueError:
+        phone = ""
+    conn = _db()
+    try:
+        if email and phone:
+            row = conn.execute(
+                """SELECT p.*,c.activo AS coupon_active FROM redes_promo_codes p
+                   LEFT JOIN tienda_cupones c ON c.id=p.cupon_id
+                   WHERE p.email=? COLLATE NOCASE AND p.telefono=? LIMIT 1""",
+                (email, phone),
+            ).fetchone()
+        elif registration_id:
+            row = conn.execute(
+                """SELECT p.*,c.activo AS coupon_active FROM redes_promo_codes p
+                   LEFT JOIN tienda_cupones c ON c.id=p.cupon_id WHERE p.id=? LIMIT 1""",
+                (int(registration_id),),
+            ).fetchone()
+        else:
+            row = None
+        if not row:
+            return jsonify({"success": True, "pending": False})
+
+        today = datetime.now(ZoneInfo("America/Santiago")).date()
+        expires = datetime.strptime(str(row["expires_on"]), "%Y-%m-%d").date()
+        config = _promo_config(conn)
+        is_pending = (
+            not row["used_sale_id"]
+            and int(row["coupon_active"] or 0) == 1
+            and expires >= today
+            and _promo_window_open(config, today.isoformat())
+        )
+        if not is_pending:
+            return jsonify({"success": True, "pending": False})
+        session["redes_promo_registration_id"] = int(row["id"])
+        return jsonify({
+            "success": True,
+            "pending": True,
+            "codigo": str(row["codigo"]),
+            "discount_pct": float(row["discount_pct"]),
+            "expires_on": str(row["expires_on"]),
+            "remaining_days": (expires - today).days,
+        })
+    except (TypeError, ValueError):
+        return jsonify({"success": True, "pending": False})
     finally:
         conn.close()
 
