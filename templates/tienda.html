@@ -23684,7 +23684,7 @@
                 const notice = document.createElement("div");
                 notice.className = "welcome-promo-cart-reminder";
                 notice.style.cssText = "display:grid;gap:7px;margin:0 0 10px;padding:11px 12px;border:1px solid #f2c894;border-radius:12px;background:#fff4e4;color:#6f390b;font-size:13px;line-height:1.4";
-                notice.innerHTML = `<strong>Tienes un descuento de bienvenida pendiente</strong><span>${Number(promoPendienteCarrito.discount_pct).toLocaleString("es-CL")}% de descuento · ${expiryText} (${esc(promoPendienteCarrito.expires_on)}).</span><button type="button" style="min-height:38px;border:0;border-radius:9px;background:#f47a00;color:#fff;font-weight:800">Aplicar mi código</button>`;
+                notice.innerHTML = `<strong>Tienes un descuento pendiente</strong><span>${Number(promoPendienteCarrito.discount_pct).toLocaleString("es-CL")}% de descuento · ${Math.max(1,Number(promoPendienteCarrito.usos_restantes||1))} uso(s) disponible(s) · ${expiryText} (${esc(promoPendienteCarrito.expires_on)}).</span><button type="button" style="min-height:38px;border:0;border-radius:9px;background:#f47a00;color:#fff;font-weight:800">Aplicar mi código</button>`;
                 notice.querySelector("button").addEventListener("click", () => {
                     if (codigoDescuentoEl) codigoDescuentoEl.value = promoPendienteCarrito.codigo;
                     if (mobileCodigoDescuentoEl) mobileCodigoDescuentoEl.value = promoPendienteCarrito.codigo;

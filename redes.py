@@ -103,7 +103,10 @@ def _db():
             expires_on TEXT NOT NULL,
             consented_at TEXT NOT NULL,
             used_sale_id INTEGER,
-            used_at TEXT
+            used_at TEXT,
+            tipo TEXT NOT NULL DEFAULT 'welcome',
+            alcance TEXT NOT NULL DEFAULT 'tienda',
+            usos_max INTEGER NOT NULL DEFAULT 1
         );
         CREATE INDEX IF NOT EXISTS idx_redes_promo_codes_created ON redes_promo_codes(created_at DESC);
         """
@@ -113,6 +116,10 @@ def _db():
         conn.execute("ALTER TABLE redes_links ADD COLUMN draft_archived INTEGER NOT NULL DEFAULT 0")
     if "published_archived" not in columns:
         conn.execute("ALTER TABLE redes_links ADD COLUMN published_archived INTEGER NOT NULL DEFAULT 0")
+    promo_columns = {row["name"] for row in conn.execute("PRAGMA table_info(redes_promo_codes)").fetchall()}
+    for name, ddl in (("tipo", "TEXT NOT NULL DEFAULT 'welcome'"), ("alcance", "TEXT NOT NULL DEFAULT 'tienda'"), ("usos_max", "INTEGER NOT NULL DEFAULT 1")):
+        if name not in promo_columns:
+            conn.execute(f"ALTER TABLE redes_promo_codes ADD COLUMN {name} {ddl}")
     conn.execute(
         "INSERT OR IGNORE INTO redes_profile(id, draft_json, published_json) VALUES(1, ?, ?)",
         (json.dumps(_BRAND_PROFILE, ensure_ascii=False), json.dumps({}, ensure_ascii=False)),
@@ -146,20 +153,39 @@ def _promo_window_open(config, today=None):
 
 def _promo_admin_codes(conn, limit=150):
     today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
-    rows = conn.execute(
-        """SELECT id,email,telefono,codigo,discount_pct,created_at,expires_on,used_sale_id,used_at
-           FROM redes_promo_codes ORDER BY id DESC LIMIT ?""",
-        (int(limit),),
-    ).fetchall()
+    assignment_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tienda_cliente_cupones'"
+    ).fetchone()
+    if assignment_table:
+        rows = conn.execute(
+            """SELECT p.id,p.email,p.telefono,p.codigo,p.discount_pct,p.created_at,p.expires_on,p.used_sale_id,p.used_at,
+                      p.tipo,p.alcance,p.usos_max,COALESCE(cc.usos_realizados,0) AS usos_realizados,
+                      COALESCE(cc.usos_max,p.usos_max,1) AS asignacion_usos_max
+               FROM redes_promo_codes p
+               LEFT JOIN tienda_cliente_cupones cc ON cc.cupon_id=p.cupon_id
+               ORDER BY p.id DESC LIMIT ?""",
+            (int(limit),),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """SELECT id,email,telefono,codigo,discount_pct,created_at,expires_on,used_sale_id,used_at,
+                      tipo,alcance,usos_max,0 AS usos_realizados,usos_max AS asignacion_usos_max
+               FROM redes_promo_codes ORDER BY id DESC LIMIT ?""",
+            (int(limit),),
+        ).fetchall()
     config = _promo_config(conn)
     result = []
     for row in rows:
         item = dict(row)
-        if item.get("used_sale_id"):
+        item["usos_realizados"] = int(item.get("usos_realizados") or 0)
+        item["usos_max"] = max(1, int(item.get("asignacion_usos_max") or item.get("usos_max") or 1))
+        item["alcance"] = str(item.get("alcance") or "tienda")
+        item["tipo"] = str(item.get("tipo") or "welcome")
+        if item["usos_realizados"] >= item["usos_max"] or (item["tipo"] != "manual" and item.get("used_sale_id")):
             item["status"] = "Usado"
         elif item.get("expires_on", "") < today:
             item["status"] = "Vencido"
-        elif not _promo_window_open(config, today):
+        elif item["tipo"] == "welcome" and not _promo_window_open(config, today):
             item["status"] = "Promoción inactiva"
         else:
             item["status"] = "Disponible"
@@ -205,7 +231,8 @@ def redes_promo_registration_contact(registration_id, code):
     """Resolve the current browser's registration for coupon validation without storing PII in its cookie."""
     if not registration_id or not code:
         return None
-    conn = _db()
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
     try:
         row = conn.execute("SELECT email,telefono,codigo FROM redes_promo_codes WHERE id=?", (int(registration_id),)).fetchone()
         if not row or str(row["codigo"]).upper() != str(code).strip().upper():
@@ -218,25 +245,62 @@ def redes_promo_registration_contact(registration_id, code):
 
 
 def redes_promo_validate_checkout(code, cliente_ref):
-    """Return None for ordinary coupons or a validation result for a welcome code."""
+    """Return None for ordinary coupons or a validation result for a Redes code."""
     if not code:
         return None
-    conn = _db()
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
     try:
-        row = conn.execute("SELECT * FROM redes_promo_codes WHERE codigo=? COLLATE NOCASE", (str(code).strip().upper(),)).fetchone()
+        row = conn.execute(
+            """SELECT p.*,c.activo AS coupon_active,
+                      cc.activo AS assignment_active,COALESCE(cc.usos_realizados,0) AS usos_realizados,
+                      COALESCE(cc.usos_max,p.usos_max,1) AS assignment_uses_max
+               FROM redes_promo_codes p
+               LEFT JOIN tienda_cupones c ON c.id=p.cupon_id
+               LEFT JOIN tienda_cliente_cupones cc ON cc.cupon_id=p.cupon_id
+               WHERE p.codigo=? COLLATE NOCASE""",
+            (str(code).strip().upper(),),
+        ).fetchone()
         if not row:
             return None
-        config = _promo_config(conn)
         today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
-        if not _promo_window_open(config, today):
-            return {"ok": False, "error": "La promoción de bienvenida no está activa."}
+        is_manual = str(row["tipo"] or "welcome") == "manual"
+        if not is_manual and not _promo_window_open(_promo_config(conn), today):
+            return {"ok": False, "error": "La promoci\u00f3n de bienvenida no est\u00e1 activa."}
         if str(row["expires_on"] or "") < today:
-            return {"ok": False, "error": "El código de bienvenida venció."}
-        if row["used_sale_id"]:
-            return {"ok": False, "error": "Este código ya fue utilizado."}
+            return {"ok": False, "error": "El c\u00f3digo de descuento venci\u00f3."}
+        if is_manual:
+            if not int(row["coupon_active"] or 0) or not int(row["assignment_active"] or 0):
+                return {"ok": False, "error": "Este c\u00f3digo ya no est\u00e1 disponible."}
+            if int(row["usos_realizados"] or 0) >= int(row["assignment_uses_max"] or 1):
+                return {"ok": False, "error": "Este c\u00f3digo ya agot\u00f3 sus usos disponibles."}
+        elif row["used_sale_id"]:
+            return {"ok": False, "error": "Este c\u00f3digo ya fue utilizado."}
         if not cliente_ref or not secrets.compare_digest(str(row["cliente_ref"]), str(cliente_ref)):
-            return {"ok": False, "error": "Este código pertenece a otro correo o teléfono."}
+            return {"ok": False, "error": "Este c\u00f3digo pertenece a otro correo o tel\u00e9fono."}
         return {"ok": True, "id": int(row["id"]), "coupon_id": int(row["cupon_id"])}
+    except sqlite3.OperationalError as exc:
+        message = str(exc).lower()
+        if "no such column" in message:
+            legacy = conn.execute(
+                "SELECT * FROM redes_promo_codes WHERE codigo=? COLLATE NOCASE",
+                (str(code).strip().upper(),),
+            ).fetchone()
+            if not legacy:
+                return None
+            today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
+            if not _promo_window_open(_promo_config(conn), today):
+                return {"ok": False, "error": "La promocion de bienvenida no esta activa."}
+            if str(legacy["expires_on"] or "") < today:
+                return {"ok": False, "error": "El codigo de bienvenida vencio."}
+            if legacy["used_sale_id"]:
+                return {"ok": False, "error": "Este codigo ya fue utilizado."}
+            if not cliente_ref or not secrets.compare_digest(str(legacy["cliente_ref"]), str(cliente_ref)):
+                return {"ok": False, "error": "Este codigo pertenece a otro correo o telefono."}
+            return {"ok": True, "id": int(legacy["id"]), "coupon_id": int(legacy["cupon_id"])}
+        if "no such table" in message:
+            return None
+        raise
     finally:
         conn.close()
 
@@ -641,15 +705,26 @@ def pending_welcome_promo():
     try:
         if email and phone:
             row = conn.execute(
-                """SELECT p.*,c.activo AS coupon_active FROM redes_promo_codes p
+                """SELECT p.*,c.activo AS coupon_active,
+                          COALESCE(cc.usos_realizados,0) AS usos_realizados,
+                          COALESCE(cc.usos_max,p.usos_max,1) AS asignacion_usos_max,
+                          cc.activo AS assignment_active
+                   FROM redes_promo_codes p
                    LEFT JOIN tienda_cupones c ON c.id=p.cupon_id
+                   LEFT JOIN tienda_cliente_cupones cc ON cc.cupon_id=p.cupon_id
                    WHERE p.email=? COLLATE NOCASE AND p.telefono=? LIMIT 1""",
                 (email, phone),
             ).fetchone()
         elif registration_id:
             row = conn.execute(
-                """SELECT p.*,c.activo AS coupon_active FROM redes_promo_codes p
-                   LEFT JOIN tienda_cupones c ON c.id=p.cupon_id WHERE p.id=? LIMIT 1""",
+                """SELECT p.*,c.activo AS coupon_active,
+                          COALESCE(cc.usos_realizados,0) AS usos_realizados,
+                          COALESCE(cc.usos_max,p.usos_max,1) AS asignacion_usos_max,
+                          cc.activo AS assignment_active
+                   FROM redes_promo_codes p
+                   LEFT JOIN tienda_cupones c ON c.id=p.cupon_id
+                   LEFT JOIN tienda_cliente_cupones cc ON cc.cupon_id=p.cupon_id
+                   WHERE p.id=? LIMIT 1""",
                 (int(registration_id),),
             ).fetchone()
         else:
@@ -660,11 +735,16 @@ def pending_welcome_promo():
         today = datetime.now(ZoneInfo("America/Santiago")).date()
         expires = datetime.strptime(str(row["expires_on"]), "%Y-%m-%d").date()
         config = _promo_config(conn)
+        is_manual = str(row["tipo"] or "welcome") == "manual"
+        remaining = int(row["asignacion_usos_max"] or 1) - int(row["usos_realizados"] or 0)
         is_pending = (
-            not row["used_sale_id"]
+            (is_manual or not row["used_sale_id"])
             and int(row["coupon_active"] or 0) == 1
+            and int(row["assignment_active"] or 0) == 1
+            and remaining > 0
             and expires >= today
-            and _promo_window_open(config, today.isoformat())
+            and (is_manual or _promo_window_open(config, today.isoformat()))
+            and str(row["alcance"] or "tienda") in {"tienda", "ambos"}
         )
         if not is_pending:
             return jsonify({"success": True, "pending": False})
@@ -676,6 +756,8 @@ def pending_welcome_promo():
             "discount_pct": float(row["discount_pct"]),
             "expires_on": str(row["expires_on"]),
             "remaining_days": (expires - today).days,
+            "alcance": str(row["alcance"] or "tienda"),
+            "usos_restantes": remaining,
         })
     except (TypeError, ValueError):
         return jsonify({"success": True, "pending": False})
@@ -811,6 +893,134 @@ def save_promo_config():
         )
         conn.commit()
         return jsonify({"success": True, "promo": _promo_config(conn)})
+    finally:
+        conn.close()
+
+
+@redes_blueprint.post("/api/redes/admin/promo/create-code")
+def create_manual_promo_code():
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    try:
+        email = _normalise_promo_email(data.get("email"))
+        phone = _normalise_promo_phone(data.get("telefono"))
+        discount_pct = float(data.get("discount_pct"))
+        validity_days = int(data.get("validity_days"))
+        uses_max = int(data.get("uses_max"))
+        alcance = str(data.get("alcance") or "tienda").strip().lower()
+        if not 1 <= discount_pct <= 100:
+            raise ValueError("El descuento debe estar entre 1% y 100%.")
+        if not 1 <= validity_days <= 3650:
+            raise ValueError("La vigencia debe ser de 1 a 3650 dias.")
+        if not 1 <= uses_max <= 1000:
+            raise ValueError("Los usos deben ser de 1 a 1000.")
+        if alcance not in {"tienda", "agenda_torta", "ambos"}:
+            raise ValueError("Selecciona un alcance valido para el codigo.")
+    except (TypeError, ValueError) as exc:
+        return jsonify({"success": False, "error": str(exc) or "Revisa los datos del codigo."}), 400
+
+    from app import (
+        _buscar_cliente_por_contacto_cursor,
+        _ensure_adm_pagina_tables,
+        _nombre_desde_email,
+        _normalizar_cliente_ref,
+        _normalizar_email,
+        _normalizar_telefono_cl,
+        _obtener_cliente_por_contacto_cursor,
+        _upsert_cliente_tienda_cursor,
+    )
+
+    conn = _db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        existing_code = conn.execute(
+            "SELECT id FROM redes_promo_codes WHERE email=? COLLATE NOCASE OR telefono=? LIMIT 1",
+            (email, phone),
+        ).fetchone()
+        if existing_code:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Ya existe un codigo de Redes asociado a ese correo o telefono."}), 409
+
+        existing_client = _buscar_cliente_por_contacto_cursor(cursor, email, phone)
+        if existing_client:
+            exact_email = _normalizar_email(existing_client.get("email")) == email
+            exact_phone = _normalizar_telefono_cl(existing_client.get("telefono")) == phone
+            if not (exact_email and exact_phone):
+                conn.rollback()
+                return jsonify({"success": False, "error": "El correo o telefono ya pertenece a una cuenta con otros datos."}), 409
+            cliente = _obtener_cliente_por_contacto_cursor(cursor, email, phone)
+        else:
+            cliente = _upsert_cliente_tienda_cursor(
+                cursor,
+                nombre=_nombre_desde_email(email),
+                email=email,
+                telefono=phone,
+                email_confirmado=0,
+            )
+        if not cliente:
+            conn.rollback()
+            return jsonify({"success": False, "error": "No se pudo crear o encontrar la cuenta del cliente."}), 500
+
+        today = datetime.now(ZoneInfo("America/Santiago")).date()
+        expires = today + timedelta(days=validity_days)
+        expiry_text = expires.isoformat()
+        code = ""
+        coupon_id = 0
+        for _ in range(8):
+            candidate = "SU" + secrets.token_hex(6).upper()
+            try:
+                cursor.execute(
+                    """INSERT INTO tienda_cupones
+                       (codigo,nombre,tipo_descuento,valor_descuento,activo,fecha_inicio,fecha_fin,
+                        usos_max_total,usos_max_por_cliente,monto_minimo,solo_sin_oferta,alcance)
+                       VALUES (?,?,'porcentaje',?,1,?,?,?, ?,0,0,?)""",
+                    (candidate, "Descuento manual Redes", discount_pct, today.isoformat(), expiry_text, uses_max, uses_max, alcance),
+                )
+                coupon_id = int(cursor.lastrowid or 0)
+                code = candidate
+                break
+            except sqlite3.IntegrityError:
+                continue
+        if not code:
+            conn.rollback()
+            return jsonify({"success": False, "error": "No se pudo generar un codigo unico."}), 500
+
+        cliente_id = int(cliente.get("id") or 0)
+        client_ref = _normalizar_cliente_ref(email, phone)
+        cursor.execute(
+            """INSERT INTO tienda_cliente_cupones
+               (cliente_id,cliente_ref,cupon_id,activo,usado,usos_realizados,usos_max,nota,asignado_por,fecha_vencimiento,fecha_asignado)
+               VALUES (?,?,?,1,0,0,?,?,'redes_manual',?,CURRENT_TIMESTAMP)""",
+            (cliente_id, client_ref, coupon_id, uses_max, f"Codigo manual Redes: {discount_pct:g}% - {alcance}", expiry_text),
+        )
+        cursor.execute(
+            """INSERT INTO redes_promo_codes
+               (cliente_id,email,telefono,cliente_ref,codigo,cupon_id,discount_pct,created_at,expires_on,consented_at,tipo,alcance,usos_max)
+               VALUES (?,?,?,?,?,?,?,?,?,?, 'manual', ?, ?)""",
+            (cliente_id, email, phone, client_ref, code, coupon_id, discount_pct, _now_utc(), expiry_text, _now_utc(), alcance, uses_max),
+        )
+        conn.commit()
+        return jsonify({
+            "success": True,
+            "codigo": code,
+            "email": email,
+            "telefono": phone,
+            "discount_pct": discount_pct,
+            "expires_on": expiry_text,
+            "alcance": alcance,
+            "usos_max": uses_max,
+        })
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return jsonify({"success": False, "error": "Ese correo o telefono ya recibio un codigo de Redes."}), 409
+    except Exception:
+        conn.rollback()
+        current_app.logger.exception("No se pudo crear un código manual de Redes.")
+        return jsonify({"success": False, "error": "No se pudo generar el codigo manual."}), 500
     finally:
         conn.close()
 

@@ -62,6 +62,10 @@ class RedesWelcomePromoTests(unittest.TestCase):
                     nota TEXT DEFAULT '', asignado_por TEXT NOT NULL DEFAULT 'admin',
                     fecha_asignado TEXT DEFAULT CURRENT_TIMESTAMP, fecha_vencimiento TEXT, fecha_usado TEXT
                 );
+                CREATE TABLE IF NOT EXISTS tienda_cupon_usos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, cupon_id INTEGER NOT NULL, venta_id INTEGER,
+                    cliente_ref TEXT, descuento_aplicado REAL DEFAULT 0
+                );
                 """
             )
             conn.commit()
@@ -231,7 +235,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
     def test_cart_has_pending_promo_reminder_and_account_paths_refresh_it(self):
         self.assertEqual(self.enable_promo().status_code, 200)
         html = self.client.get("/tienda").get_data(as_text=True)
-        self.assertIn("Tienes un descuento de bienvenida pendiente", html)
+        self.assertIn("Tienes un descuento pendiente", html)
         self.assertIn("Aplicar mi código", html)
         self.assertIn("/api/redes/promo/pending", html)
         self.assertGreaterEqual(html.count("await cargarPromoPendienteTienda()"), 2)
@@ -253,6 +257,90 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertIn("active.scrollIntoView({block:'center'", html)
         self.assertIn("const showPromo=()=>{promoModal.hidden=false};", html)
         self.assertNotIn("promo-email').focus({preventScroll:true)", html)
+
+    def create_manual_code(self, **overrides):
+        payload = {
+            "email": "manual@example.cl",
+            "telefono": "+56987654321",
+            "discount_pct": 20,
+            "validity_days": 40,
+            "uses_max": 3,
+            "alcance": "ambos",
+        }
+        payload.update(overrides)
+        return self.admin_post("/api/redes/admin/promo/create-code", payload)
+
+    def test_admin_manually_creates_multiuse_code_and_customer(self):
+        response = self.create_manual_code()
+        self.assertEqual(response.status_code, 200, response.get_json())
+        result = response.get_json()
+        self.assertTrue(re.fullmatch(r"SU[A-F0-9]{12}", result["codigo"]))
+        self.assertEqual(result["usos_max"], 3)
+        client_ref = app._normalizar_cliente_ref("manual@example.cl", "+56987654321")
+        self.assertTrue(redes_promo_validate_checkout(result["codigo"], client_ref)["ok"])
+        self.assertFalse(redes_promo_validate_checkout(result["codigo"], app._normalizar_cliente_ref("other@example.cl", "+56911111111"))["ok"])
+
+        conn = database.get_db()
+        try:
+            customer = conn.execute("SELECT id,email,telefono FROM tienda_clientes WHERE email=?", ("manual@example.cl",)).fetchone()
+            coupon = conn.execute("SELECT * FROM tienda_cupones WHERE codigo=?", (result["codigo"],)).fetchone()
+            assignment = conn.execute("SELECT * FROM tienda_cliente_cupones WHERE cupon_id=?", (coupon["id"],)).fetchone()
+        finally:
+            conn.close()
+        self.assertIsNotNone(customer)
+        self.assertEqual(coupon["valor_descuento"], 20)
+        self.assertEqual(coupon["alcance"], "ambos")
+        self.assertEqual(coupon["usos_max_total"], 3)
+        self.assertEqual(assignment["usos_max"], 3)
+        history = self.client.get("/api/redes/admin/state?period=30").get_json()["promo_codes"][0]
+        self.assertEqual(history["tipo"], "manual")
+        self.assertEqual(history["usos_max"], 3)
+        admin_html = self.client.get("/admin/redes").get_data(as_text=True)
+        self.assertIn("id=\"manual-promo-form\"", admin_html)
+        self.assertIn("/api/redes/admin/promo/create-code", admin_html)
+
+    def test_manual_coupon_pending_and_use_limits_are_respected(self):
+        created = self.create_manual_code().get_json()
+        pending = self.client.post("/api/redes/promo/pending", json={
+            "email": "manual@example.cl", "telefono": "+56987654321",
+        }).get_json()
+        self.assertTrue(pending["pending"])
+        self.assertEqual(pending["codigo"], created["codigo"])
+        self.assertEqual(pending["usos_restantes"], 3)
+
+        conn = database.get_db()
+        try:
+            coupon = conn.execute("SELECT id FROM tienda_cupones WHERE codigo=?", (created["codigo"],)).fetchone()
+            conn.execute("UPDATE tienda_cliente_cupones SET usos_realizados=2, usado=0 WHERE cupon_id=?", (coupon["id"],))
+            conn.commit()
+        finally:
+            conn.close()
+        self.assertTrue(redes_promo_validate_checkout(created["codigo"], app._normalizar_cliente_ref("manual@example.cl", "+56987654321"))["ok"])
+        left = self.client.post("/api/redes/promo/pending", json={
+            "email": "manual@example.cl", "telefono": "+56987654321",
+        }).get_json()
+        self.assertEqual(left["usos_restantes"], 1)
+
+        conn = database.get_db()
+        try:
+            conn.execute("UPDATE tienda_cliente_cupones SET usos_realizados=3, usado=1 WHERE cupon_id=?", (coupon["id"],))
+            conn.commit()
+        finally:
+            conn.close()
+        self.assertFalse(self.client.post("/api/redes/promo/pending", json={
+            "email": "manual@example.cl", "telefono": "+56987654321",
+        }).get_json()["pending"])
+
+    def test_manual_agenda_scope_is_not_offered_in_store_pending_endpoint(self):
+        response = self.create_manual_code(email="agenda@example.cl", telefono="+56976543210", alcance="agenda_torta")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        pending = self.client.post("/api/redes/promo/pending", json={
+            "email": "agenda@example.cl", "telefono": "+56976543210",
+        }).get_json()
+        self.assertFalse(pending["pending"])
+        coupon = app._buscar_cupon_valoracion_agenda_torta("agenda@example.cl", "+56976543210", 50000)
+        self.assertIsNotNone(coupon)
+        self.assertEqual(coupon["codigo"], response.get_json()["codigo"])
 
     def test_campaign_can_be_disabled_and_codes_are_marked_used(self):
         self.assertEqual(self.enable_promo().status_code, 200)

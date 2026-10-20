@@ -9280,7 +9280,7 @@ def _buscar_cupon_valoracion_agenda_torta(email, telefono, subtotal):
                 continue
             asignado_por = str(cup.get("asignado_por") or "").strip().lower()
             nota = str(cup.get("nota") or "").strip().lower()
-            if not (asignado_por.startswith("valoracion") or "valoracion" in nota or "agradecimiento" in nota):
+            if not (asignado_por.startswith(("valoracion", "redes_manual")) or "valoracion" in nota or "agradecimiento" in nota):
                 continue
             valid = _validar_cupon_y_calcular_descuento(
                 cup,
