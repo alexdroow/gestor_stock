@@ -27,6 +27,8 @@ _ALLOWED_STATES = {"active", "hidden"}
 _MAX_IMAGE_BYTES = 5 * 1024 * 1024
 _EVENT_RATE_LOCK = threading.Lock()
 _EVENT_RATE_BUCKETS = {}
+_PROMO_RATE_LOCK = threading.Lock()
+_PROMO_RATE_BUCKETS = {}
 _BRAND_PROFILE = {
     "title": "Todo el universo Sucrée en un lugar",
     "description": "Descubre la tienda, agenda tu torta y encuentra todos nuestros canales oficiales.",
@@ -79,6 +81,31 @@ def _db():
             author TEXT NOT NULL DEFAULT 'Administrador',
             created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS redes_promo_config (
+            id INTEGER PRIMARY KEY CHECK(id=1),
+            active INTEGER NOT NULL DEFAULT 0,
+            discount_pct REAL NOT NULL DEFAULT 10,
+            validity_days INTEGER NOT NULL DEFAULT 30,
+            starts_on TEXT NOT NULL DEFAULT '',
+            ends_on TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS redes_promo_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cliente_id INTEGER,
+            email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            telefono TEXT NOT NULL UNIQUE,
+            cliente_ref TEXT NOT NULL,
+            codigo TEXT NOT NULL UNIQUE,
+            cupon_id INTEGER NOT NULL UNIQUE,
+            discount_pct REAL NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_on TEXT NOT NULL,
+            consented_at TEXT NOT NULL,
+            used_sale_id INTEGER,
+            used_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_redes_promo_codes_created ON redes_promo_codes(created_at DESC);
         """
     )
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(redes_links)").fetchall()}
@@ -90,12 +117,128 @@ def _db():
         "INSERT OR IGNORE INTO redes_profile(id, draft_json, published_json) VALUES(1, ?, ?)",
         (json.dumps(_BRAND_PROFILE, ensure_ascii=False), json.dumps({}, ensure_ascii=False)),
     )
+    conn.execute("INSERT OR IGNORE INTO redes_promo_config(id) VALUES(1)")
     conn.commit()
     return conn
 
 
 def _now_utc():
     return datetime.now(timezone.utc).isoformat(timespec="microseconds")
+
+
+def _promo_config(conn):
+    row = conn.execute("SELECT * FROM redes_promo_config WHERE id=1").fetchone()
+    data = dict(row) if row else {}
+    return {
+        "active": bool(data.get("active")),
+        "discount_pct": max(1.0, min(100.0, float(data.get("discount_pct") or 10))),
+        "validity_days": max(1, min(365, int(data.get("validity_days") or 30))),
+        "starts_on": str(data.get("starts_on") or ""),
+        "ends_on": str(data.get("ends_on") or ""),
+        "updated_at": str(data.get("updated_at") or ""),
+    }
+
+
+def _promo_window_open(config, today=None):
+    today = today or datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
+    return bool(config.get("active")) and (not config.get("starts_on") or today >= config["starts_on"]) and (not config.get("ends_on") or today <= config["ends_on"])
+
+
+def _promo_admin_codes(conn, limit=150):
+    today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
+    rows = conn.execute(
+        """SELECT id,email,telefono,codigo,discount_pct,created_at,expires_on,used_sale_id,used_at
+           FROM redes_promo_codes ORDER BY id DESC LIMIT ?""",
+        (int(limit),),
+    ).fetchall()
+    config = _promo_config(conn)
+    result = []
+    for row in rows:
+        item = dict(row)
+        if item.get("used_sale_id"):
+            item["status"] = "Usado"
+        elif item.get("expires_on", "") < today:
+            item["status"] = "Vencido"
+        elif not _promo_window_open(config, today):
+            item["status"] = "PromociÃ³n inactiva"
+        else:
+            item["status"] = "Disponible"
+        result.append(item)
+    return result
+
+
+def _normalise_promo_email(value):
+    email = str(value or "").strip().lower()
+    if len(email) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise ValueError("Ingresa un correo electrÃ³nico vÃ¡lido.")
+    return email
+
+
+def _normalise_promo_phone(value):
+    digits = re.sub(r"\D+", "", str(value or ""))
+    if digits.startswith("56"):
+        digits = digits[2:]
+    if digits.startswith("9") and len(digits) == 9:
+        digits = digits[1:]
+    if len(digits) != 8:
+        raise ValueError("El telÃ©fono debe incluir +569 y 8 dÃ­gitos.")
+    return "+569" + digits
+
+
+def _promo_rate_allowed():
+    key = str(request.remote_addr or "unknown")
+    now = time.monotonic()
+    with _PROMO_RATE_LOCK:
+        start, count = _PROMO_RATE_BUCKETS.get(key, (now, 0))
+        if now - start >= 600:
+            start, count = now, 0
+        count += 1
+        _PROMO_RATE_BUCKETS[key] = (start, count)
+        if len(_PROMO_RATE_BUCKETS) > 4000:
+            for address, bucket in list(_PROMO_RATE_BUCKETS.items()):
+                if now - bucket[0] > 600:
+                    _PROMO_RATE_BUCKETS.pop(address, None)
+        return count <= 8
+
+
+def redes_promo_registration_contact(registration_id, code):
+    """Resolve the current browser's registration for coupon validation without storing PII in its cookie."""
+    if not registration_id or not code:
+        return None
+    conn = _db()
+    try:
+        row = conn.execute("SELECT email,telefono,codigo FROM redes_promo_codes WHERE id=?", (int(registration_id),)).fetchone()
+        if not row or str(row["codigo"]).upper() != str(code).strip().upper():
+            return None
+        return {"email": row["email"], "telefono": row["telefono"]}
+    except (TypeError, ValueError):
+        return None
+    finally:
+        conn.close()
+
+
+def redes_promo_validate_checkout(code, cliente_ref):
+    """Return None for ordinary coupons or a validation result for a welcome code."""
+    if not code:
+        return None
+    conn = _db()
+    try:
+        row = conn.execute("SELECT * FROM redes_promo_codes WHERE codigo=? COLLATE NOCASE", (str(code).strip().upper(),)).fetchone()
+        if not row:
+            return None
+        config = _promo_config(conn)
+        today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
+        if not _promo_window_open(config, today):
+            return {"ok": False, "error": "La promociÃ³n de bienvenida no estÃ¡ activa."}
+        if str(row["expires_on"] or "") < today:
+            return {"ok": False, "error": "El cÃ³digo de bienvenida venciÃ³."}
+        if row["used_sale_id"]:
+            return {"ok": False, "error": "Este cÃ³digo ya fue utilizado."}
+        if not cliente_ref or not secrets.compare_digest(str(row["cliente_ref"]), str(cliente_ref)):
+            return {"ok": False, "error": "Este cÃ³digo pertenece a otro correo o telÃ©fono."}
+        return {"ok": True, "id": int(row["id"]), "coupon_id": int(row["cupon_id"])}
+    finally:
+        conn.close()
 
 
 def _json(value, fallback=None):
@@ -333,7 +476,126 @@ def public_page():
     conn = _db()
     try:
         profile, links = _published_state(conn)
-        return render_template("redes_publica.html", profile=profile, links=links, preview=False)
+        promo = _promo_config(conn)
+        promo_token = session.setdefault("redes_promo_csrf", secrets.token_urlsafe(32))
+        response = make_response(render_template(
+            "redes_publica.html",
+            profile=profile,
+            links=links,
+            preview=False,
+            promo=promo,
+            promo_available=_promo_window_open(promo),
+            promo_csrf=promo_token,
+        ))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        return response
+    finally:
+        conn.close()
+
+
+@redes_blueprint.post("/api/redes/promo/register")
+def register_welcome_promo():
+    expected = str(session.get("redes_promo_csrf") or "")
+    supplied = str(request.headers.get("X-CSRF-Token") or "")
+    if not expected or not supplied or not secrets.compare_digest(expected, supplied):
+        return jsonify({"success": False, "error": "Recarga la pÃ¡gina e intenta nuevamente."}), 403
+    if not _promo_rate_allowed():
+        return jsonify({"success": False, "error": "Demasiados intentos. Vuelve a probar mÃ¡s tarde."}), 429
+    data = request.get_json(silent=True) or {}
+    if str(data.get("website") or "").strip():
+        return jsonify({"success": True})
+    if not bool(data.get("consent")):
+        return jsonify({"success": False, "error": "Debes aceptar el uso de tus datos para participar en la promociÃ³n."}), 400
+    try:
+        email = _normalise_promo_email(data.get("email"))
+        phone = _normalise_promo_phone(data.get("telefono"))
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+    conn = _db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        promo = _promo_config(conn)
+        now_local = datetime.now(ZoneInfo("America/Santiago"))
+        today = now_local.date().isoformat()
+        if not _promo_window_open(promo, today):
+            conn.rollback()
+            return jsonify({"success": False, "error": "La promociÃ³n de bienvenida no estÃ¡ disponible ahora."}), 410
+        existing = conn.execute(
+            "SELECT id FROM redes_promo_codes WHERE email=? COLLATE NOCASE OR telefono=? LIMIT 1",
+            (email, phone),
+        ).fetchone()
+        if existing:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Ya se generÃ³ una promociÃ³n con alguno de estos datos. El cÃ³digo es de una sola asignaciÃ³n; contÃ¡ctanos si necesitas ayuda."}), 409
+
+        # Reuse SucreeStock's customer and coupon tables so the code works in the existing cart.
+        from app import _ensure_adm_pagina_tables, _nombre_desde_email, _normalizar_cliente_ref, _upsert_cliente_tienda_cursor
+
+        cursor = conn.cursor()
+        _ensure_adm_pagina_tables(cursor)
+        cliente = _upsert_cliente_tienda_cursor(
+            cursor,
+            nombre=_nombre_desde_email(email),
+            email=email,
+            telefono=phone,
+            email_confirmado=0,
+        )
+        if not cliente:
+            conn.rollback()
+            return jsonify({"success": False, "error": "No se pudo registrar el contacto. Intenta nuevamente."}), 500
+
+        expiry = now_local.date() + timedelta(days=promo["validity_days"])
+        if promo["ends_on"]:
+            campaign_end = datetime.strptime(promo["ends_on"], "%Y-%m-%d").date()
+            expiry = min(expiry, campaign_end)
+        expiry_text = expiry.isoformat()
+        code = ""
+        coupon_id = 0
+        for _ in range(8):
+            candidate = "SU" + secrets.token_hex(6).upper()
+            try:
+                cursor.execute(
+                    """INSERT INTO tienda_cupones
+                       (codigo,nombre,tipo_descuento,valor_descuento,activo,fecha_inicio,fecha_fin,
+                        usos_max_total,usos_max_por_cliente,monto_minimo,solo_sin_oferta,alcance)
+                       VALUES (?,?, 'porcentaje', ?,1,?,?,1,1,0,0,'tienda')""",
+                    (candidate, "Descuento bienvenida Redes", promo["discount_pct"], today, expiry_text),
+                )
+                coupon_id = int(cursor.lastrowid or 0)
+                code = candidate
+                break
+            except sqlite3.IntegrityError:
+                continue
+        if not code:
+            conn.rollback()
+            return jsonify({"success": False, "error": "No se pudo crear el cÃ³digo. Intenta nuevamente."}), 500
+
+        client_ref = _normalizar_cliente_ref(email, phone)
+        cursor.execute(
+            """INSERT INTO tienda_cliente_cupones
+               (cliente_id,cliente_ref,cupon_id,activo,usado,usos_realizados,usos_max,nota,asignado_por,fecha_vencimiento,fecha_asignado)
+               VALUES (?,?,?,1,0,0,1,?,'redes_promo',?,CURRENT_TIMESTAMP)""",
+            (int(cliente.get("id") or 0), client_ref, coupon_id, f"PromociÃ³n bienvenida Redes: {promo['discount_pct']:g}%", expiry_text),
+        )
+        cursor.execute(
+            """INSERT INTO redes_promo_codes
+               (cliente_id,email,telefono,cliente_ref,codigo,cupon_id,discount_pct,created_at,expires_on,consented_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (int(cliente.get("id") or 0), email, phone, client_ref, code, coupon_id, promo["discount_pct"], _now_utc(), expiry_text, _now_utc()),
+        )
+        registration_id = int(cursor.lastrowid or 0)
+        conn.commit()
+        session["redes_promo_registration_id"] = registration_id
+        return jsonify({"success": True, "codigo": code, "discount_pct": promo["discount_pct"], "expires_on": expiry_text})
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return jsonify({"success": False, "error": "Ya existe un registro promocional para uno de estos datos."}), 409
+    except Exception:
+        conn.rollback()
+        current_app.logger.exception("No se pudo crear el cÃ³digo de bienvenida de Redes.")
+        return jsonify({"success": False, "error": "No se pudo crear el cÃ³digo en este momento. Intenta nuevamente."}), 500
     finally:
         conn.close()
 
@@ -428,9 +690,44 @@ def admin_state():
         revisions = [dict(item) for item in conn.execute("SELECT id,author,created_at FROM redes_revisions ORDER BY id DESC LIMIT 8").fetchall()]
         for link in links:
             link["clicks"] = next((item["clicks"] for item in stats["by_link"] if item["id"] == link["id"]), 0)
-        return jsonify({"success": True, "profile": profile, "published_profile": published_profile, "links": links, "version": row["draft_version"], "published_at": row["published_at"], "updated_at": row["updated_at"], "published": bool(row["published_at"]), "has_changes": has_changes, "stats": stats, "period": period, "revisions": revisions})
+        return jsonify({"success": True, "profile": profile, "published_profile": published_profile, "links": links, "version": row["draft_version"], "published_at": row["published_at"], "updated_at": row["updated_at"], "published": bool(row["published_at"]), "has_changes": has_changes, "stats": stats, "period": period, "revisions": revisions, "promo": _promo_config(conn), "promo_codes": _promo_admin_codes(conn)})
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
+    finally:
+        conn.close()
+
+
+@redes_blueprint.post("/api/redes/admin/promo")
+def save_promo_config():
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    try:
+        active = 1 if data.get("active") is True else 0
+        discount_pct = float(data.get("discount_pct"))
+        validity_days = int(data.get("validity_days"))
+        starts_on = str(data.get("starts_on") or "").strip()
+        ends_on = str(data.get("ends_on") or "").strip()
+        if not 1 <= discount_pct <= 100:
+            raise ValueError("El descuento debe estar entre 1% y 100%.")
+        if not 1 <= validity_days <= 365:
+            raise ValueError("La vigencia de cada cÃ³digo debe ser de 1 a 365 dÃ­as.")
+        for value in (starts_on, ends_on):
+            if value:
+                datetime.strptime(value, "%Y-%m-%d")
+        if starts_on and ends_on and ends_on < starts_on:
+            raise ValueError("La fecha de tÃ©rmino no puede ser anterior a la fecha de inicio.")
+    except (TypeError, ValueError) as exc:
+        return jsonify({"success": False, "error": str(exc) or "Revisa la configuraciÃ³n de la promociÃ³n."}), 400
+    conn = _db()
+    try:
+        conn.execute(
+            """UPDATE redes_promo_config SET active=?,discount_pct=?,validity_days=?,starts_on=?,ends_on=?,updated_at=? WHERE id=1""",
+            (active, discount_pct, validity_days, starts_on, ends_on, _now_utc()),
+        )
+        conn.commit()
+        return jsonify({"success": True, "promo": _promo_config(conn)})
     finally:
         conn.close()
 

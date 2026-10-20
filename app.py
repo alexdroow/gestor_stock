@@ -60,7 +60,7 @@ else:
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 from ready_cakes import ready_cakes, ensure_ready_cakes_schema, get_published_ready_cake
 app.register_blueprint(ready_cakes)
-from redes import redes_blueprint
+from redes import redes_blueprint, redes_promo_registration_contact, redes_promo_validate_checkout
 app.register_blueprint(redes_blueprint)
 CAMERA_HUB = CameraHub()
 app.secret_key = os.environ.get("GESTIONSTOCK_SECRET_KEY", "gestor_stock_dev_secret_change_me")
@@ -228,7 +228,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/api/redes/view", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/api/redes/view", "/api/redes/promo/register", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
         return True
     if ruta.startswith("/redes/go/"):
         return True
@@ -6411,6 +6411,9 @@ def _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cli
         return {"ok": False, "error": "Cupon inactivo"}
     if not _cupon_alcance_permite(cupon, contexto):
         return {"ok": False, "error": f"Este cupon aplica para {_cupon_alcance_label(cupon.get('alcance'))}"}
+    promo_valid = redes_promo_validate_checkout(cupon.get("codigo"), cliente_ref)
+    if promo_valid is not None and not promo_valid.get("ok"):
+        return promo_valid
 
     now_dt = datetime.now()
     hoy = now_dt.date().isoformat()
@@ -12205,7 +12208,14 @@ def api_tienda_validar_cupon():
                 }
             )
 
-        cliente_ref = _normalizar_cliente_ref(data.get("cliente_email"), data.get("cliente_telefono"))
+        cliente_email = _normalizar_email(data.get("cliente_email"))
+        cliente_telefono = _normalizar_telefono_cl(data.get("cliente_telefono"))
+        if not cliente_email or not cliente_telefono:
+            promo_identity = redes_promo_registration_contact(session.get("redes_promo_registration_id"), cupon_codigo)
+            if promo_identity:
+                cliente_email = promo_identity["email"]
+                cliente_telefono = promo_identity["telefono"]
+        cliente_ref = _normalizar_cliente_ref(cliente_email, cliente_telefono)
         cupon = _obtener_cupon_por_codigo(cupon_codigo)
         valid = _validar_cupon_y_calcular_descuento(cupon, subtotal, items_serializados, cliente_ref, contexto="tienda")
         if not valid.get("ok"):
@@ -18878,6 +18888,10 @@ def api_tienda_checkout():
                     VALUES (?, ?, ?, ?)
                     """,
                     (int(cupon_aplicado["id"]), venta_id, (cliente_ref or None), descuento_monto),
+                )
+                cursor.execute(
+                    "UPDATE redes_promo_codes SET used_sale_id=?,used_at=CURRENT_TIMESTAMP WHERE cupon_id=? AND used_sale_id IS NULL",
+                    (venta_id, int(cupon_aplicado["id"])),
                 )
             cliente = _upsert_cliente_tienda_cursor(
                 cursor,
