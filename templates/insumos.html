@@ -342,6 +342,7 @@
             #modal-boleta-insumos #boleta-lineas td:nth-child(4)::before { content:"Presentación"; }
             #modal-boleta-insumos #boleta-lineas td:nth-child(5)::before { content:"Impuesto"; }
             #modal-boleta-insumos #boleta-lineas td:nth-child(6)::before { content:"Decisión"; }
+            #modal-boleta-insumos #boleta-lineas td:nth-child(7)::before { content:"Acción"; }
         }
 
         .search-empty {
@@ -2737,7 +2738,8 @@
                                 <div><strong>Documento original</strong><iframe id="boleta-vista-previa" title="Boleta original" style="width:100%;height:260px;margin-top:6px;border:1px solid #d5dfed;border-radius:12px;"></iframe><a id="boleta-abrir-original" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;">Abrir original</a></div>
                             </div>
                             <div style="margin:18px 0 10px;padding:12px;background:#edf4ff;border-radius:12px;">Verifica cada coincidencia, importe y presentación. Las líneas sin producto o con dudas no se aplican.</div>
-                            <div style="overflow-x:auto;"><table class="data-table" style="min-width:800px;"><thead><tr><th>Texto de boleta</th><th>Insumo</th><th>Precio</th><th>Cantidad / unidad</th><th>IVA</th><th>Decisión</th></tr></thead><tbody id="boleta-lineas"></tbody></table></div>
+                            <div id="boleta-omitidas-panel" style="display:none;margin:12px 0;padding:12px;background:#fff7e8;border:1px solid #f3d5a8;border-radius:10px;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span id="boleta-omitidas-resumen"></span><button type="button" class="btn btn-secondary" onclick="alternarLineasOmitidasBoleta()">Ver líneas omitidas</button></div><div id="boleta-lineas-omitidas" style="display:none;margin-top:10px;"></div></div>
+<div style="overflow-x:auto;"><table class="data-table" style="min-width:880px;"><thead><tr><th>Texto de boleta</th><th>Insumo</th><th>Precio</th><th>Cantidad / unidad</th><th>IVA</th><th>Decisión</th><th>Acción</th></tr></thead><tbody id="boleta-lineas"></tbody></table></div>
                             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;"><button type="button" class="btn btn-secondary" onclick="volverCargaBoleta()">Volver</button><button type="button" class="btn btn-success" onclick="confirmarCambiosBoleta()">Confirmar cambios seleccionados</button></div>
                         </section>
                         <section id="boleta-paso-resultado" style="display:none;margin-top:22px;"></section>
@@ -6495,8 +6497,20 @@ function obtenerTotalesListaCalculo(items) {
             return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
         }
 
+        let boletaLineasOmitidas = [];
+
+        function lineaBoletaPareceMetadato(line) {
+            const text = String(line || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (!text || /^[-_=*\s]*pagina\s*\d+[-_=*\s]*$/.test(text) || /^[-_=*\s]*\d+\s*[-_=*\s]*$/.test(text)) return true;
+            return /\b(rut|r\.u\.t|razon social|distribuidora|comercializadora|factura electronica|boleta electronica|numero de factura|folio|sii|giro|casa matriz|sucursal|direccion|domicilio|telefono|fono|correo|fecha de emision|fecha emision|vendedor|cliente|forma de pago|efectivo|debito|credito|vuelto|subtotal|monto neto|iva|total a pagar|total factura|total documento|descuento|exento|pagina)\b/.test(text)
+                || /^(producto|descripcion|detalle|cantidad|cant\.?|precio unitario|valor unitario|importe|total)\s*[:|]*$/i.test(text);
+        }
+
         function generarLineasBoleta() {
-            const lines = document.getElementById('boleta-texto-ocr').value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+            const allLines = document.getElementById('boleta-texto-ocr').value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+            boletaLineasOmitidas = allLines.filter(lineaBoletaPareceMetadato);
+            let lines = allLines.filter(line => !lineaBoletaPareceMetadato(line));
+            if (!lines.length && allLines.length) { lines = allLines; boletaLineasOmitidas = []; }
             const tbody = document.getElementById('boleta-lineas');
             const options = ['<option value="">Sin coincidencia · elegir</option>'].concat(boletaInsumosCatalogo.map(item =>
                 `<option value="${Number(item.id)}">${escaparHtmlBoleta(item.nombre)} · ${escaparHtmlBoleta(item.unidad_compra || item.unidad || 'unidad')}</option>`
@@ -6508,10 +6522,33 @@ function obtenerTotalesListaCalculo(items) {
                 <td><div style="display:flex;gap:4px;"><input class="boleta-line-quantity" type="number" min="0.001" step="0.001" placeholder="Cant." value="1" style="width:82px;" oninput="actualizarEstadoLineaBoleta(this)"><input class="boleta-line-unit" type="text" placeholder="kg, g, L..." style="width:82px;" oninput="actualizarEstadoLineaBoleta(this)"></div></td>
                 <td><label><input class="boleta-line-tax" type="checkbox" checked onchange="actualizarEstadoLineaBoleta(this)"> Incluye</label></td>
                 <td><label><input class="boleta-line-apply" type="checkbox"> Revisar</label></td>
+                <td><button type="button" class="btn btn-secondary" onclick="quitarLineaBoleta(this)">Quitar</button></td>
             </tr>`).join('');
-            if (!lines.length) tbody.innerHTML = '<tr><td colspan="6">No hay texto detectado. Pega o transcribe las líneas desde la imagen original.</td></tr>';
+            const panel = document.getElementById('boleta-omitidas-panel');
+            panel.style.display = boletaLineasOmitidas.length ? '' : 'none';
+            document.getElementById('boleta-omitidas-resumen').textContent = boletaLineasOmitidas.length ? `Se omitieron ${boletaLineasOmitidas.length} líneas que parecen encabezados o datos administrativos. Puedes revisarlas y restaurar cualquier producto.` : '';
+            document.getElementById('boleta-lineas-omitidas').style.display = 'none';
+            document.getElementById('boleta-lineas-omitidas').innerHTML = boletaLineasOmitidas.map((line, index) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #f3d5a8;"><span>${escaparHtmlBoleta(line)}</span><button type="button" class="btn btn-secondary" onclick="restaurarLineaOmitidaBoleta(${index})">Restaurar</button></div>`).join('');
+            if (!lines.length) tbody.innerHTML = '<tr><td colspan="7">No hay texto detectado. Pega o transcribe las líneas desde la imagen original.</td></tr>';
         }
 
+        function alternarLineasOmitidasBoleta() {
+            const list = document.getElementById('boleta-lineas-omitidas');
+            list.style.display = list.style.display === 'none' ? '' : 'none';
+        }
+
+        function restaurarLineaOmitidaBoleta(index) {
+            const line = boletaLineasOmitidas.splice(index, 1)[0];
+            if (!line) return;
+            const textarea = document.getElementById('boleta-texto-ocr');
+            textarea.value = `${textarea.value}\n${line}`;
+            generarLineasBoleta();
+        }
+
+        function quitarLineaBoleta(button) {
+            const row = button.closest('tr');
+            if (row) row.remove();
+        }
         function actualizarFilaBoleta(select) {
             const row = select.closest('tr');
             const item = boletaInsumosCatalogo.find(entry => Number(entry.id) === Number(select.value));
