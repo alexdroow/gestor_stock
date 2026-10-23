@@ -24405,18 +24405,10 @@ AGENDA_WHATSAPP_DEFAULTS = {
         "-Total a pagar: {total}",
         "",
         "Para confirmar la reserva solicitamos un abono del *50%* del total el cual debe ser transferido a la siguiente cuenta",
-        "Datos de Transferencia",
-        "",
         "*TOTAL ABONO {abono_50}*",
         "",
         "DATOS DE TRANSFERENCIA",
-        "",
-        "ANGELLO GUTIERREZ SALGADO",
-        "19.284.422-3",
-        "Banco Estado",
-        "Cuenta RUT / Cuenta vista",
-        "19284422",
-        "pasteleria.sucree@outlook.com",
+        "{datos_transferencia}",
         "",
         "Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.",
         "*La boleta es enviada el dia de la entrega por este mismo medio en formato digital, si necesita en formato fisico lo puede solicitar antes de hacer el envio o de retirar*",
@@ -24430,6 +24422,11 @@ AGENDA_WHATSAPP_DEFAULTS = {
     ]),
 }
 
+AGENDA_WHATSAPP_DEFAULT_BANK_ACCOUNTS = [{
+    "nombre": "Banco Estado - Cuenta RUT",
+    "datos": "Titular: ANGELLO GUTIERREZ SALGADO\nRUT: 19.284.422-3\nBanco: Banco Estado\nTipo de cuenta: Cuenta RUT / Cuenta vista\nNumero de cuenta: 19284422\nCorreo: pasteleria.sucree@outlook.com",
+}]
+
 
 def _ensure_agenda_whatsapp_config(cursor):
     cursor.execute(
@@ -24438,10 +24435,12 @@ def _ensure_agenda_whatsapp_config(cursor):
             id INTEGER PRIMARY KEY CHECK (id = 1),
             mensaje_confirmacion TEXT NOT NULL,
             mensaje_pdf TEXT NOT NULL,
+            cuentas_transferencia TEXT NOT NULL DEFAULT '[]',
             actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    _ensure_column_cursor(cursor, "agenda_whatsapp_config", "cuentas_transferencia", "TEXT NOT NULL DEFAULT '[]'")
     cursor.execute(
         """
         INSERT OR IGNORE INTO agenda_whatsapp_config (id, mensaje_confirmacion, mensaje_pdf, actualizado_en)
@@ -24484,6 +24483,22 @@ def _ensure_agenda_whatsapp_config(cursor):
           )
         """
     )
+    cursor.execute(
+        """
+        UPDATE agenda_whatsapp_config
+        SET mensaje_confirmacion = REPLACE(
+            mensaje_confirmacion,
+            'ANGELLO GUTIERREZ SALGADO' || char(10) ||
+            '19.284.422-3' || char(10) ||
+            'Banco Estado' || char(10) ||
+            'Cuenta RUT / Cuenta vista' || char(10) ||
+            '19284422' || char(10) ||
+            'pasteleria.sucree@outlook.com',
+            '{datos_transferencia}'
+        )
+        WHERE id = 1 AND mensaje_confirmacion LIKE '%ANGELLO GUTIERREZ SALGADO%'
+        """
+    )
 
 
 def _obtener_agenda_whatsapp_templates():
@@ -24494,7 +24509,7 @@ def _obtener_agenda_whatsapp_templates():
         _ensure_agenda_whatsapp_config(cursor)
         cursor.execute(
             """
-            SELECT mensaje_confirmacion, mensaje_pdf
+            SELECT mensaje_confirmacion, mensaje_pdf, cuentas_transferencia
             FROM agenda_whatsapp_config
             WHERE id = 1
             LIMIT 1
@@ -24503,10 +24518,17 @@ def _obtener_agenda_whatsapp_templates():
         row = cursor.fetchone()
         conn.commit()
         if not row:
-            return dict(AGENDA_WHATSAPP_DEFAULTS)
+            return {**AGENDA_WHATSAPP_DEFAULTS, "cuentas_transferencia": AGENDA_WHATSAPP_DEFAULT_BANK_ACCOUNTS}
+        try:
+            cuentas = json.loads(str(row["cuentas_transferencia"] or "[]"))
+        except (TypeError, ValueError):
+            cuentas = []
+        if not isinstance(cuentas, list) or not cuentas:
+            cuentas = AGENDA_WHATSAPP_DEFAULT_BANK_ACCOUNTS
         return {
             "confirmacion": str(row["mensaje_confirmacion"] or "").strip() or AGENDA_WHATSAPP_DEFAULTS["confirmacion"],
             "pdf": str(row["mensaje_pdf"] or "").strip() or AGENDA_WHATSAPP_DEFAULTS["pdf"],
+            "cuentas_transferencia": cuentas,
         }
     finally:
         if conn:
@@ -24526,26 +24548,43 @@ def api_agenda_whatsapp_mensajes():
     conn = None
     try:
         if request.method == 'GET':
-            return jsonify({'success': True, 'templates': _obtener_agenda_whatsapp_templates()})
+            templates = _obtener_agenda_whatsapp_templates()
+            if not session.get(_ADMIN_SESSION_KEY):
+                templates.pop('cuentas_transferencia', None)
+            return jsonify({'success': True, 'templates': templates})
 
         data = request.get_json(silent=True) or {}
+        if isinstance(data.get('cuentas_transferencia'), list) and not session.get(_ADMIN_SESSION_KEY):
+            return jsonify({'success': False, 'error': 'No autorizado para modificar cuentas bancarias.'}), 401
         confirmacion = str(data.get('confirmacion') or '').strip()[:6000] or AGENDA_WHATSAPP_DEFAULTS["confirmacion"]
         pdf = str(data.get('pdf') or '').strip()[:3000] or AGENDA_WHATSAPP_DEFAULTS["pdf"]
 
         conn = get_db()
         cursor = conn.cursor()
         _ensure_agenda_whatsapp_config(cursor)
+        cuentas = data.get("cuentas_transferencia")
+        if isinstance(cuentas, list):
+            cuentas_norm = []
+            for cuenta in cuentas[:20]:
+                if not isinstance(cuenta, dict):
+                    continue
+                nombre = str(cuenta.get("nombre") or "").strip()[:80]
+                datos = str(cuenta.get("datos") or "").strip()[:1200]
+                if nombre and datos:
+                    cuentas_norm.append({"nombre": nombre, "datos": datos})
+            if not cuentas_norm:
+                return jsonify({'success': False, 'error': 'Debes guardar al menos una cuenta con nombre y datos.'}), 400
+            cursor.execute(
+                "UPDATE agenda_whatsapp_config SET cuentas_transferencia = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = 1",
+                (json.dumps(cuentas_norm, ensure_ascii=False),),
+            )
         cursor.execute(
-            """
-            UPDATE agenda_whatsapp_config
-            SET mensaje_confirmacion = ?, mensaje_pdf = ?, actualizado_en = CURRENT_TIMESTAMP
-            WHERE id = 1
-            """,
+            "UPDATE agenda_whatsapp_config SET mensaje_confirmacion = ?, mensaje_pdf = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = 1",
             (confirmacion, pdf),
         )
         conn.commit()
         crear_backup()
-        return jsonify({'success': True, 'templates': {'confirmacion': confirmacion, 'pdf': pdf}})
+        return jsonify({'success': True, 'templates': {'confirmacion': confirmacion, 'pdf': pdf}, 'cuentas_transferencia': _obtener_agenda_whatsapp_templates().get('cuentas_transferencia', [])})
     except Exception as e:
         if conn:
             conn.rollback()

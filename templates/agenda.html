@@ -2195,6 +2195,14 @@
             text-align: center;
             font-weight: 700;
         }
+        #modal-transferencia-agenda .modal { width:min(720px,calc(100% - 24px)); }
+        #modal-transferencia-agenda .bank-account-form { display:grid; gap:12px; }
+        #modal-transferencia-agenda .bank-account-form label { display:grid; gap:6px; font-weight:700; }
+        #modal-transferencia-agenda .bank-account-form input,
+        #modal-transferencia-agenda .bank-account-form textarea,
+        #modal-transferencia-agenda .bank-account-form select { width:100%; padding:10px 12px; border:1px solid var(--sucree-border); border-radius:10px; background:#fff; color:var(--sucree-text); }
+        #modal-transferencia-agenda .bank-account-form textarea { min-height:150px; resize:vertical; }
+        #modal-transferencia-agenda .bank-account-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
         #modal-whatsapp-mensajes .modal {
             width: min(96vw, 1120px);
             max-width: 1120px;
@@ -4429,6 +4437,34 @@
                 <button onclick="restaurarMensajesWhatsAppDefault()" class="btn btn-secondary">Restaurar textos</button>
                 <button onclick="cerrarEditorMensajesWhatsApp()" class="btn btn-secondary">Cancelar</button>
                 <button onclick="guardarMensajesWhatsApp()" class="btn btn-success">Guardar mensajes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-transferencia-agenda">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Cuenta para el abono</h3>
+                <button type="button" onclick="cerrarSelectorCuentaTransferencia()" class="modal-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Selecciona la cuenta que se incluirá en el resumen de esta torta. Puedes editarla o agregar otra antes de abrir WhatsApp.</p>
+                <div class="bank-account-form">
+                    <label>Cuenta bancaria guardada
+                        <select id="agenda-cuenta-transferencia-select" onchange="seleccionarCuentaTransferenciaAgenda()"></select>
+                    </label>
+                    <label>Nombre para identificarla
+                        <input id="agenda-cuenta-transferencia-nombre" maxlength="80" placeholder="Ej. Banco Estado - Cuenta RUT">
+                    </label>
+                    <label>Datos que recibirá el cliente
+                        <textarea id="agenda-cuenta-transferencia-datos" maxlength="1200" placeholder="Titular, RUT, banco, tipo y número de cuenta, correo..."></textarea>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer bank-account-actions">
+                <button type="button" onclick="nuevaCuentaTransferenciaAgenda()" class="btn btn-secondary">Nueva cuenta</button>
+                <button type="button" onclick="guardarCuentaTransferenciaAgenda()" class="btn btn-secondary">Guardar cuenta</button>
+                <button type="button" onclick="enviarResumenTortaWhatsApp()" class="btn btn-whatsapp">Abrir WhatsApp</button>
             </div>
         </div>
     </div>
@@ -7237,18 +7273,10 @@
                 '-Total a pagar: {total}',
                 '',
                 'Para confirmar la reserva solicitamos un abono del *50%* del total el cual debe ser transferido a la siguiente cuenta',
-                'Datos de Transferencia',
-                '',
                 '*TOTAL ABONO {abono_50}*',
                 '',
                 'DATOS DE TRANSFERENCIA',
-                '',
-                'ANGELLO GUTIERREZ SALGADO',
-                '19.284.422-3',
-                'Banco Estado',
-                'Cuenta RUT / Cuenta vista',
-                '19284422',
-                'pasteleria.sucree@outlook.com',
+                '{datos_transferencia}',
                 '',
                 'Enviar el comprobante por este mismo medio luego se le enviara un PDF con la cotizacion actualizada.',
                 '*La boleta es enviada el dia de la entrega por este mismo medio en formato digital, si necesita en formato fisico lo puede solicitar antes de hacer el envio o de retirar*',
@@ -7262,6 +7290,8 @@
             ].join('\n')
         };
         let agendaWhatsAppTemplates = null;
+        let agendaCuentasTransferencia = [];
+        let agendaCuentaTransferenciaNueva = false;
 
         function obtenerPlantillasWhatsAppAgenda() {
             if (agendaWhatsAppTemplates && agendaWhatsAppTemplates.confirmacion && agendaWhatsAppTemplates.pdf) {
@@ -7288,11 +7318,13 @@
                     confirmacion: String(data.templates?.confirmacion || AGENDA_WHATSAPP_DEFAULTS.confirmacion),
                     pdf: String(data.templates?.pdf || AGENDA_WHATSAPP_DEFAULTS.pdf),
                 };
+                agendaCuentasTransferencia = Array.isArray(data.templates?.cuentas_transferencia) ? data.templates.cuentas_transferencia : [];
                 try {
                     localStorage.setItem(AGENDA_WHATSAPP_TEMPLATES_KEY, JSON.stringify(agendaWhatsAppTemplates));
                 } catch (_) {}
             } catch (error) {
                 agendaWhatsAppTemplates = obtenerPlantillasWhatsAppAgenda();
+                if (!agendaCuentasTransferencia.length) agendaCuentasTransferencia = [{ nombre: 'Banco Estado - Cuenta RUT', datos: 'Titular: ANGELLO GUTIERREZ SALGADO\nRUT: 19.284.422-3\nBanco: Banco Estado\nTipo de cuenta: Cuenta RUT / Cuenta vista\nNumero de cuenta: 19284422\nCorreo: pasteleria.sucree@outlook.com' }];
                 console.warn('Usando mensajes WhatsApp locales:', error);
             }
         }
@@ -7391,6 +7423,111 @@
             const plantillas = obtenerPlantillasWhatsAppAgenda();
             const key = tipoMensaje === 'pdf' ? 'pdf' : 'confirmacion';
             return aplicarPlantillaWhatsAppAgenda(plantillas[key], obtenerContextoWhatsAppAgenda(extra));
+        }
+
+        function renderizarSelectorCuentaTransferenciaAgenda() {
+            const select = document.getElementById('agenda-cuenta-transferencia-select');
+            if (!select) return;
+            const selectedIndex = Number(select.value || 0);
+            select.innerHTML = '';
+            agendaCuentasTransferencia.forEach((cuenta, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = String(cuenta.nombre || `Cuenta ${index + 1}`);
+                select.appendChild(option);
+            });
+            select.disabled = !agendaCuentasTransferencia.length || agendaCuentaTransferenciaNueva;
+            if (!agendaCuentaTransferenciaNueva && agendaCuentasTransferencia.length) {
+                const index = Math.max(0, Math.min(selectedIndex, agendaCuentasTransferencia.length - 1));
+                select.value = String(index);
+                document.getElementById('agenda-cuenta-transferencia-nombre').value = agendaCuentasTransferencia[index].nombre || '';
+                document.getElementById('agenda-cuenta-transferencia-datos').value = agendaCuentasTransferencia[index].datos || '';
+            }
+        }
+
+        function abrirSelectorCuentaTransferenciaAgenda() {
+            agendaCuentaTransferenciaNueva = !agendaCuentasTransferencia.length;
+            renderizarSelectorCuentaTransferenciaAgenda();
+            if (agendaCuentaTransferenciaNueva) nuevaCuentaTransferenciaAgenda();
+            document.getElementById('modal-transferencia-agenda')?.classList.add('active');
+        }
+
+        function cerrarSelectorCuentaTransferencia() {
+            document.getElementById('modal-transferencia-agenda')?.classList.remove('active');
+        }
+
+        function seleccionarCuentaTransferenciaAgenda() {
+            agendaCuentaTransferenciaNueva = false;
+            renderizarSelectorCuentaTransferenciaAgenda();
+        }
+
+        function nuevaCuentaTransferenciaAgenda() {
+            agendaCuentaTransferenciaNueva = true;
+            const select = document.getElementById('agenda-cuenta-transferencia-select');
+            if (select) select.disabled = true;
+            document.getElementById('agenda-cuenta-transferencia-nombre').value = '';
+            document.getElementById('agenda-cuenta-transferencia-datos').value = '';
+            document.getElementById('agenda-cuenta-transferencia-nombre').focus();
+        }
+
+        async function persistirCuentasTransferenciaAgenda(cuentas) {
+            const templates = obtenerPlantillasWhatsAppAgenda();
+            const response = await fetch('/api/agenda/whatsapp-mensajes', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirmacion: templates.confirmacion, pdf: templates.pdf, cuentas_transferencia: cuentas })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || 'No se pudieron guardar las cuentas bancarias.');
+            agendaCuentasTransferencia = Array.isArray(data.cuentas_transferencia) ? data.cuentas_transferencia : cuentas;
+            return agendaCuentasTransferencia;
+        }
+
+        async function guardarCuentaTransferenciaAgenda() {
+            const nombre = String(document.getElementById('agenda-cuenta-transferencia-nombre')?.value || '').trim();
+            const datos = String(document.getElementById('agenda-cuenta-transferencia-datos')?.value || '').trim();
+            if (!nombre || !datos) { alert('Completa el nombre y los datos de la cuenta.'); return; }
+            const next = agendaCuentasTransferencia.map((cuenta) => ({ ...cuenta }));
+            const index = Number(document.getElementById('agenda-cuenta-transferencia-select')?.value || 0);
+            if (agendaCuentaTransferenciaNueva || !next[index]) next.push({ nombre, datos });
+            else next[index] = { nombre, datos };
+            try {
+                await persistirCuentasTransferenciaAgenda(next);
+                agendaCuentaTransferenciaNueva = false;
+                renderizarSelectorCuentaTransferenciaAgenda();
+                alert('Cuenta bancaria guardada.');
+            } catch (error) { alert(error.message || 'No se pudo guardar la cuenta.'); }
+        }
+
+        async function enviarResumenTortaWhatsApp() {
+            const telefono = normalizarTelefonoWhatsApp(document.getElementById('evento-telefono')?.value || '');
+            const nombre = String(document.getElementById('agenda-cuenta-transferencia-nombre')?.value || '').trim();
+            const datos = String(document.getElementById('agenda-cuenta-transferencia-datos')?.value || '').trim();
+            if (!telefono) { alert('Ingresa un telefono valido para contactar por WhatsApp.'); return; }
+            if (!nombre || !datos) { alert('Selecciona o completa una cuenta bancaria para el resumen.'); return; }
+            const popup = window.open('about:blank', '_blank');
+            if (!popup) { alert('Permite las ventanas emergentes para abrir WhatsApp.'); return; }
+            const next = agendaCuentasTransferencia.map((cuenta) => ({ ...cuenta }));
+            const index = Number(document.getElementById('agenda-cuenta-transferencia-select')?.value || 0);
+            if (agendaCuentaTransferenciaNueva || !next[index]) next.push({ nombre, datos });
+            else next[index] = { nombre, datos };
+            try {
+                await persistirCuentasTransferenciaAgenda(next);
+                let mensaje = construirMensajeWhatsAppAgenda('confirmacion', { datos_transferencia: datos });
+                if (mensaje.includes('{datos_transferencia}')) mensaje = mensaje.split('{datos_transferencia}').join(datos);
+                else if (!mensaje.includes(datos)) {
+                    const marker = 'DATOS DE TRANSFERENCIA';
+                    const start = mensaje.indexOf(marker);
+                    const end = mensaje.indexOf('Enviar el comprobante', start);
+                    if (start >= 0 && end > start) mensaje = `${mensaje.slice(0, start + marker.length)}\n${datos}\n\n${mensaje.slice(end)}`;
+                    else mensaje = `${mensaje.trim()}\n\n${marker}\n${datos}`;
+                }
+                popup.location.href = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+                cerrarSelectorCuentaTransferencia();
+                agendaCuentaTransferenciaNueva = false;
+            } catch (error) {
+                popup.close();
+                alert(error.message || 'No se pudo preparar el resumen.');
+            }
         }
 
         function abrirEditorMensajesWhatsApp() {
@@ -7494,6 +7631,10 @@
             const telefono = normalizarTelefonoWhatsApp(document.getElementById('evento-telefono').value);
             if (!telefono) {
                 alert('Ingresa un telefono valido para contactar por WhatsApp.');
+                return;
+            }
+            if (tipo === 'torta') {
+                abrirSelectorCuentaTransferenciaAgenda();
                 return;
             }
             const mensaje = construirMensajeWhatsAppAgenda('confirmacion');

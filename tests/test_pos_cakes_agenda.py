@@ -1,7 +1,11 @@
 import unittest
+import os
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import app as app_module
+import database
 
 
 class PosCakesAgendaTests(unittest.TestCase):
@@ -70,6 +74,39 @@ class PosCakesAgendaTests(unittest.TestCase):
 
         self.assertEqual([row['id'] for row in catalog['categorias']], ['bizcocho', 'panqueque'])
         self.assertEqual([row['id'] for row in catalog['sizes']], ['b-30', 'p-15', 'b-15'])
+
+    def test_agenda_torta_whatsapp_lets_admin_choose_and_save_transfer_accounts(self):
+        template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
+        self.assertIn('id="modal-transferencia-agenda"', template)
+        self.assertIn('function enviarResumenTortaWhatsApp()', template)
+        self.assertIn("if (tipo === 'torta')", template)
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(database, 'DB_PATH', os.path.join(temp_dir, 'agenda.sqlite')):
+            initial = self.client.get('/api/agenda/whatsapp-mensajes').get_json()
+            self.assertTrue(initial['templates']['cuentas_transferencia'])
+            accounts = [
+                {'nombre': 'Cuenta empresa', 'datos': 'Titular: Sucree SpA\nBanco: BCI\nCuenta corriente: 123456'}
+            ]
+            saved = self.client.post('/api/agenda/whatsapp-mensajes', json={
+                'confirmacion': initial['templates']['confirmacion'],
+                'pdf': initial['templates']['pdf'],
+                'cuentas_transferencia': accounts,
+            })
+            self.assertEqual(saved.status_code, 200)
+            self.assertEqual(saved.get_json()['cuentas_transferencia'], accounts)
+            reloaded = self.client.get('/api/agenda/whatsapp-mensajes').get_json()
+            self.assertEqual(reloaded['templates']['cuentas_transferencia'], accounts)
+
+    def test_transfer_accounts_are_not_publicly_disclosed_or_editable(self):
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(database, 'DB_PATH', os.path.join(temp_dir, 'agenda.sqlite')):
+            with self.client.session_transaction() as session:
+                session.pop(app_module._ADMIN_SESSION_KEY, None)
+            response = self.client.get('/api/agenda/whatsapp-mensajes')
+            self.assertEqual(response.status_code, 401)
+            denied = self.client.post('/api/agenda/whatsapp-mensajes', json={
+                'cuentas_transferencia': [{'nombre': 'No autorizado', 'datos': 'Datos'}]
+            })
+            self.assertEqual(denied.status_code, 401)
 
 
 if __name__ == '__main__':
