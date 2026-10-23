@@ -12899,8 +12899,19 @@ def guardar_evento_agenda(evento):
                 evento_id = int(row_operacion["id"] or 0)
 
         if evento_id:
-            cursor.execute("SELECT codigo_operacion, codigo_pedido, estado FROM agenda_eventos WHERE id = ?", (evento_id,))
+            cursor.execute("SELECT codigo_operacion, codigo_pedido, estado, fecha FROM agenda_eventos WHERE id = ?", (evento_id,))
             row_actual = cursor.fetchone()
+            fecha_actual = str(row_actual["fecha"] or "").strip() if row_actual else ""
+            fecha_solicitada = str(evento.get("fecha") or "").strip()
+            if fecha_actual and fecha_solicitada != fecha_actual and evento.get("confirmar_cambio_fecha") is not True:
+                conn.rollback()
+                return {
+                    "success": False,
+                    "requiere_confirmacion_fecha": True,
+                    "fecha_actual": fecha_actual,
+                    "fecha_solicitada": fecha_solicitada,
+                    "error": "La fecha del pedido es distinta a la registrada. Confirma el cambio de fecha para continuar.",
+                }
             codigo_actual = str(row_actual["codigo_operacion"] or "").strip() if row_actual else ""
             codigo_pedido_actual = _normalizar_codigo_pedido_agenda(row_actual["codigo_pedido"]) if row_actual else ""
             estado_actual = _normalizar_estado_evento_agenda(row_actual["estado"] if row_actual else None, default="pendiente")

@@ -4615,6 +4615,7 @@
         let eventos = [];
         let notasAgenda = [];
         let eventoEditando = null;
+        let fechaOriginalEventoEdicion = '';
         let modoAgendarTorta = false;
         let modoAdminManualTorta = false;
         let tortaCatalogoPublico = null;
@@ -6601,6 +6602,16 @@
                 return;
             }
 
+            const fechaOriginal = String(fechaOriginalEventoEdicion || (eventoEditando && eventoEditando.fecha) || '').trim();
+            const fechaModificada = Boolean(idEventoActual > 0 && fechaOriginal && fecha !== fechaOriginal);
+            let confirmarCambioFecha = false;
+            if (fechaModificada) {
+                const fechaAnteriorTexto = formatearFechaLarga(fechaOriginal);
+                const fechaNuevaTexto = formatearFechaLarga(fecha);
+                confirmarCambioFecha = confirm(`La fecha del pedido cambiará de ${fechaAnteriorTexto} a ${fechaNuevaTexto}. ¿Confirmas este cambio?`);
+                if (!confirmarCambioFecha) return;
+            }
+
             if (tipo !== 'bloqueo' && !guardadoBorrador && esEnvio && !direccionEntrega) {
                 alert('Ingresa la direccion de entrega para pedidos a domicilio.');
                 return;
@@ -6692,7 +6703,8 @@
                     ? 'recepcionado'
                     : normalizarEstadoSeguimientoAgenda(document.getElementById('evento-seguimiento-estado')?.value || (eventoEditando && eventoEditando.seguimiento_estado)),
                 codigo_pedido: (document.getElementById('evento-codigo-pedido').value || '').trim() || null,
-                codigo_operacion: (eventoEditando && eventoEditando.codigo_operacion) ? String(eventoEditando.codigo_operacion).trim() : null
+                codigo_operacion: (eventoEditando && eventoEditando.codigo_operacion) ? String(eventoEditando.codigo_operacion).trim() : null,
+                confirmar_cambio_fecha: confirmarCambioFecha
             };
 
             const btnGuardar = document.getElementById('btn-guardar-evento');
@@ -8732,13 +8744,19 @@
         async function guardarEdicionRapidaAgenda() {
             if (!agendaQuickEditDraft || !agendaQuickEditDirty) return;
             if (agendaQuickSaving) return;
+            const eventoOriginalFecha = eventos.find((item) => Number(item.id || 0) === Number(agendaQuickEditId || 0));
+            const fechaAntes = String(eventoOriginalFecha?.fecha || '').trim();
+            const fechaDespues = String(agendaQuickEditDraft.fecha || '').trim();
+            if (!fechaDespues) { alert('Selecciona una fecha para guardar el pedido.'); return; }
+            const fechaModificada = Boolean(fechaAntes && fechaDespues && fechaAntes !== fechaDespues);
+            if (fechaModificada && !confirm(`La fecha del pedido cambiará de ${formatearFechaLarga(fechaAntes)} a ${formatearFechaLarga(fechaDespues)}. ¿Confirmas este cambio?`)) return;
             agendaQuickSaving = true;
             const payload = {
                 ...agendaQuickEditDraft,
                 id: Number(agendaQuickEditDraft.id || agendaQuickEditId || 0),
                 tipo: agendaQuickEditDraft.tipo || 'torta',
                 titulo: agendaQuickEditDraft.titulo || 'Pedido',
-                fecha: agendaQuickEditDraft.fecha || formatearFecha(new Date()),
+                fecha: fechaDespues || fechaAntes,
                 hora_inicio: agendaQuickEditDraft.hora_inicio || agendaQuickEditDraft.hora_entrega || '00:00',
                 hora_entrega: agendaQuickEditDraft.hora_entrega || agendaQuickEditDraft.hora_inicio || '',
                 hora_fin: agendaQuickEditDraft.hora_fin || '',
@@ -8754,7 +8772,8 @@
                 estado: agendaQuickEditDraft.estado || 'pendiente',
                 codigo_operacion: agendaQuickEditDraft.codigo_operacion || '',
                 codigo_pedido: agendaQuickEditDraft.codigo_pedido || '',
-                seguimiento_estado: normalizarEstadoSeguimientoAgenda(agendaQuickEditDraft.seguimiento_estado)
+                seguimiento_estado: normalizarEstadoSeguimientoAgenda(agendaQuickEditDraft.seguimiento_estado),
+                confirmar_cambio_fecha: fechaModificada
             };
             if (!payload.id) {
                 agendaQuickSaving = false;
@@ -9880,6 +9899,7 @@
             renderizarCalendario();
             renderizarDetalleHorarioDia();
             eventoEditando = null;
+            fechaOriginalEventoEdicion = '';
             document.getElementById('btn-eliminar').style.display = 'none';
             document.getElementById('evento-codigo-pedido').value = '';
             document.getElementById('evento-fecha').value = fecha;
@@ -9989,6 +10009,7 @@
             document.getElementById('modal-evento')?.classList.remove('agenda-mobile-footer-final');
             document.querySelectorAll('#modal-evento .agenda-mobile-step-hidden').forEach((el) => el.classList.remove('agenda-mobile-step-hidden'));
             eventoEditando = null;
+            fechaOriginalEventoEdicion = '';
             modoAgendarTorta = false;
             modoAdminManualTorta = false;
             document.getElementById('evento-id').value = '';
@@ -10298,6 +10319,7 @@
             document.body.classList.remove('agenda-mobile-detail-open');
 
             eventoEditando = evento;
+            fechaOriginalEventoEdicion = String(evento.fecha || '').trim();
             modoAgendarTorta = false;
             modoAdminManualTorta = false;
             document.getElementById('modal-titulo').textContent = esEventoBorrador(evento) ? 'Editar Borrador' : 'Editar Evento';

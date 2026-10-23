@@ -1,5 +1,6 @@
 import unittest
 import os
+import sqlite3
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -107,6 +108,48 @@ class PosCakesAgendaTests(unittest.TestCase):
                 'cuentas_transferencia': [{'nombre': 'No autorizado', 'datos': 'Datos'}]
             })
             self.assertEqual(denied.status_code, 401)
+
+    def test_existing_agenda_event_date_cannot_change_without_explicit_confirmation(self):
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(database, 'DB_PATH', os.path.join(temp_dir, 'agenda.sqlite')):
+            conn = sqlite3.connect(database.DB_PATH)
+            conn.executescript('''
+                CREATE TABLE agenda_eventos (
+                    id INTEGER PRIMARY KEY, tipo TEXT, titulo TEXT, fecha TEXT, hora_inicio TEXT,
+                    hora_fin TEXT, hora_entrega TEXT, cliente TEXT, telefono TEXT, es_envio INTEGER,
+                    direccion TEXT, ingredientes TEXT, total REAL, abono REAL, motivo TEXT,
+                    alerta_minutos INTEGER, estado TEXT, codigo_operacion TEXT, codigo_pedido TEXT
+                );
+                CREATE TABLE agenda_recordatorios_descartados (evento_id INTEGER);
+            ''')
+            for event_id, state, original_date in [(1, 'pendiente', '2026-10-30'), (2, 'completado', '2026-10-18')]:
+                conn.execute(
+                    '''INSERT INTO agenda_eventos (id, tipo, titulo, fecha, hora_inicio, hora_fin, hora_entrega,
+                       cliente, telefono, es_envio, total, abono, alerta_minutos, estado, codigo_operacion, codigo_pedido)
+                       VALUES (?, 'torta', ?, ?, '12:00', '13:00', '12:00', 'Cliente', '+56912345678', 0,
+                               30000, 10000, 1440, ?, ?, ?)''',
+                    (event_id, f'Torta {state}', original_date, state, f'OPA-{event_id}', f'AGD-{event_id}'),
+                )
+            conn.commit()
+            conn.close()
+            for event_id, state, original_date in [(1, 'pendiente', '2026-10-30'), (2, 'completado', '2026-10-18')]:
+                event = {
+                    'tipo': 'torta', 'titulo': f'Torta {state}', 'fecha': original_date,
+                    'hora_inicio': '12:00', 'hora_fin': '13:00', 'hora_entrega': '12:00',
+                    'cliente': 'Cliente', 'telefono': '+56912345678', 'estado': state,
+                    'total': 30000, 'abono': 10000, 'codigo_operacion': f'OPA-{event_id}', 'codigo_pedido': f'AGD-{event_id}',
+                }
+                changed = {**event, 'id': event_id, 'fecha': '2026-11-02'}
+                rejected = database.guardar_evento_agenda(dict(changed))
+                self.assertFalse(rejected['success'])
+                self.assertTrue(rejected['requiere_confirmacion_fecha'])
+                confirmed = database.guardar_evento_agenda({**changed, 'confirmar_cambio_fecha': True})
+                self.assertTrue(confirmed['success'])
+
+    def test_agenda_edit_prompts_before_changing_active_or_past_order_date(self):
+        template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
+        self.assertIn('La fecha del pedido cambiará de', template)
+        self.assertIn('confirmar_cambio_fecha: confirmarCambioFecha', template)
+        self.assertIn('confirmar_cambio_fecha: fechaModificada', template)
 
 
 if __name__ == '__main__':

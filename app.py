@@ -24343,6 +24343,8 @@ def api_agenda_guardar():
         data = request.get_json()
         
         resultado = guardar_evento_agenda(data)
+        if resultado.get('requiere_confirmacion_fecha'):
+            return jsonify(resultado), 409
         if resultado.get('success'):
             seguimiento_estado = str((data or {}).get('seguimiento_estado') or '').strip()
             if seguimiento_estado and resultado.get('id'):
