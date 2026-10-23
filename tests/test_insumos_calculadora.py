@@ -57,6 +57,20 @@ class CalculadoraInsumosTests(unittest.TestCase):
         self.assertAlmostEqual(net_when_excluded, 4974.79)
         self.assertAlmostEqual(payable_when_excluded, 4974.79 * 1.19)
 
+    def test_mixed_tax_lines_reproduce_calculator_net_iva_and_gross(self):
+        included_net, included_gross = database._totales_compra(1, 25087, True)
+        excluded_net, excluded_gross = database._totales_compra(1, 50331, False)
+
+        rows_sum = included_gross + excluded_net
+        net = included_net + excluded_net
+        gross = included_gross + excluded_gross
+        iva = gross - net
+
+        self.assertEqual(round(rows_sum), 75418)
+        self.assertEqual(round(net), 71413)
+        self.assertEqual(round(iva), 13568)
+        self.assertEqual(round(gross), 84981)
+
     def test_pending_rows_merge_only_when_unit_price_and_tax_snapshot_match(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pending.sqlite"

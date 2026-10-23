@@ -1351,9 +1351,10 @@
             padding: 24px;
             margin-top: 24px;
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 24px;
             text-align: center;
+            cursor: pointer;
         }
         
         body.dark-mode .calculadora-totales {
@@ -1961,6 +1962,7 @@
 
         @media (max-width: 760px) {
             .calc-row-head { display: none; }
+            .calculadora-totales { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 16px; }
             .pendientes-resumen {
                 grid-template-columns: repeat(2, minmax(120px, 1fr));
             }
@@ -2868,7 +2870,7 @@
                                 </button>
                             </div>
 
-                            <div class="calculadora-totales">
+                            <div class="calculadora-totales" title="Doble clic para revisar los productos, cantidades y precios" ondblclick="abrirResumenListaCalculo()" role="button" tabindex="0" aria-label="Doble clic para ver el detalle de productos y precios">
                                 <div class="total-item">
                                     <span class="total-label">Items</span>
                                     <span class="total-valor" id="total-items">0</span>
@@ -2878,10 +2880,15 @@
                                     <span class="total-valor" id="total-sin-iva">$0</span>
                                 </div>
                                 <div class="total-item">
+                                    <span class="total-label">IVA (19%)</span>
+                                    <span class="total-valor" id="total-iva">$0</span>
+                                </div>
+                                <div class="total-item">
                                     <span class="total-label">Total con IVA</span>
                                     <span class="total-valor" id="total-con-iva">$0</span>
                                 </div>
                             </div>
+                            <div style="display:flex;justify-content:flex-end;margin-top:6px;"><button type="button" class="btn btn-secondary" onclick="abrirResumenListaCalculo()">Ver detalle de productos y precios</button></div>
 
                             <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
                                 <button onclick="agregarActivosAPendientes()" class="btn btn-warning" style="flex: 1;">
@@ -2960,6 +2967,13 @@
             </div> <!-- FIN TABS-CONTAINER -->
         </main>
    </div>    
+
+    <div id="modal-resumen-lista-calculo" role="dialog" aria-modal="true" aria-labelledby="modal-resumen-lista-titulo" style="display:none;position:fixed;inset:0;z-index:2999;background:rgba(15,23,42,.48);padding:18px;align-items:center;justify-content:center;" onclick="if(event.target===this)cerrarResumenListaCalculo()">
+        <div style="width:min(900px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(15,23,42,.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><div><h2 id="modal-resumen-lista-titulo" style="margin:0;color:#172b50;">Detalle de productos y precios</h2><p style="margin:5px 0 0;color:#64748b;">Revisa la cantidad, el precio exacto y el tratamiento de IVA de cada fila.</p></div><button type="button" class="btn btn-secondary" onclick="cerrarResumenListaCalculo()">Cerrar</button></div>
+            <div id="resumen-lista-calculo-contenido" style="margin-top:16px;"></div>
+        </div>
+    </div>
 
     <div id="modal-precio-calculo" role="dialog" aria-modal="true" aria-labelledby="modal-precio-titulo" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(15,23,42,.48);padding:18px;align-items:center;justify-content:center;">
         <div style="width:min(760px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid #93c5fd;border-radius:18px;padding:24px;box-shadow:0 24px 70px rgba(15,23,42,.25);">
@@ -4158,22 +4172,11 @@
         }
         const listaCalculoEl = document.getElementById('lista-calculo');
         if (listaCalculoEl) {
-            listaCalculoEl.addEventListener('dblclick', function(e) {
-                if (e.target.closest('button, input, select, textarea, a, label')) return;
-                const fila = e.target.closest('.insumo-calc-row[id^="fila-calc-"]');
-                if (!fila) return;
-                const idx = Number(String(fila.id || '').replace('fila-calc-', '') || -1);
-                if (idx < 0) return;
-                const hidden = document.getElementById('insumo-id-' + idx);
-                const insumoId = Number((hidden && hidden.value) || 0);
-                if (!insumoId) {
-                    alert('Selecciona un insumo en la fila para poder editar su ficha maestra.');
-                    return;
-                }
-                abrirModalEditarInsumo(insumoId, true);
+            listaCalculoEl.addEventListener('dblclick', function(event) {
+                if (event.target.closest('button, input, select, textarea, a, label')) return;
+                if (event.target.closest('.insumo-calc-row[id^="fila-calc-"]')) abrirResumenListaCalculo();
             });
         }
-
         document.getElementById('modal-descuento-rapido').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalDescuentoRapido();
         });
@@ -6022,12 +6025,13 @@ function calcularTotales() {
 
     document.getElementById('total-items').textContent = activas.length;
     document.getElementById('total-sin-iva').textContent = formatearCLP(totales.sinIva);
+    document.getElementById('total-iva').textContent = formatearCLP(totales.iva);
     document.getElementById('total-con-iva').textContent = formatearCLP(totales.conIva);
     guardarEstadoCalculadora();
 }
 
 function obtenerTotalesListaCalculo(items) {
-    return (items || []).reduce((acc, f) => {
+    const totals = (items || []).reduce((acc, f) => {
         const bruto = Number(f.total || 0);
         if (f.precio_incluye_iva) {
             acc.conIva += bruto;
@@ -6038,6 +6042,52 @@ function obtenerTotalesListaCalculo(items) {
         }
         return acc;
     }, { sinIva: 0, conIva: 0 });
+    totals.iva = totals.conIva - totals.sinIva;
+    return totals;
+}
+
+function formatearPrecioDetalle(valor) {
+    return '$' + Number(valor || 0).toLocaleString('es-CL', {minimumFractionDigits: 2, maximumFractionDigits: 6});
+}
+
+function abrirResumenListaCalculo() {
+    const items = filasCalculo.filter(item => item && item.insumoId !== null && Number(item.cantidad || 0) > 0);
+    const container = document.getElementById('resumen-lista-calculo-contenido');
+    if (!items.length) {
+        container.innerHTML = '<p style="padding:16px;background:#fff7e8;border-radius:10px;color:#735b4e;">Agrega productos y cantidades para ver el detalle.</p>';
+    } else {
+        const rows = items.map(item => {
+            const bruto = Number(item.total || 0);
+            const tratamiento = item.precio_incluye_iva ? 'Incluye IVA' : 'Sin IVA; agrega 19%';
+            return `<tr>
+                <td><strong>${escapeHtml(item.nombre || 'Insumo')}</strong></td>
+                <td>${Number(item.cantidad || 0).toLocaleString('es-CL', {maximumFractionDigits: 4})} ${escapeHtml(item.unidad || 'unidad')}</td>
+                <td>${formatearPrecioDetalle(item.precio || 0)} / ${escapeHtml(item.unidad || 'unidad')}</td>
+                <td>${tratamiento}</td>
+                <td style="text-align:right;font-weight:700;">${formatearCLPDetalle(bruto)}</td>
+                <td>${item.insumoId ? `<button type="button" class="btn btn-secondary" onclick="editarFichaDesdeResumen(${Number(item.insumoId)})">Editar ficha</button>` : ''}</td>
+            </tr>`;
+        }).join('');
+        const totals = obtenerTotalesListaCalculo(items);
+        const subtotalFilas = items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+        container.innerHTML = `<div style="overflow-x:auto;"><table class="data-table" style="min-width:760px;"><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario exacto</th><th>Tratamiento</th><th>Subtotal fila</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:14px;">
+                <div style="padding:12px;background:#f8fafc;border-radius:10px;">Suma de filas<strong style="display:block;margin-top:4px;">${formatearCLP(subtotalFilas)}</strong></div>
+                <div style="padding:12px;background:#f8fafc;border-radius:10px;">Neto<strong style="display:block;margin-top:4px;">${formatearCLP(totals.sinIva)}</strong></div>
+                <div style="padding:12px;background:#fff7e8;border-radius:10px;">IVA regular (19%)<strong style="display:block;margin-top:4px;">${formatearCLP(totals.conIva - totals.sinIva)}</strong></div>
+                <div style="padding:12px;background:#e4f8ef;border-radius:10px;">Total con IVA<strong style="display:block;margin-top:4px;">${formatearCLP(totals.conIva)}</strong></div>
+            </div><p style="margin:10px 0 0;color:#64748b;font-size:12px;">Los precios unitarios se muestran con decimales para revisar la precisión; los subtotales de la calculadora se presentan redondeados a pesos.</p>`;
+    }
+    document.getElementById('modal-resumen-lista-calculo').style.display = 'flex';
+}
+
+function cerrarResumenListaCalculo() {
+    document.getElementById('modal-resumen-lista-calculo').style.display = 'none';
+}
+
+function editarFichaDesdeResumen(insumoId) {
+    cerrarResumenListaCalculo();
+    abrirModalEditarInsumo(Number(insumoId), true);
 }
 
     function imprimirLista() {
