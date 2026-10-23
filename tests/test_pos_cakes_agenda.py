@@ -47,6 +47,30 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('window.SucreePosAndroid.printAgendaTicket(String(idNum), ticketHtml);', template)
         self.assertIn('win.document.write(ticketHtml);', template)
 
+    def test_cake_catalog_admin_has_category_and_per_category_size_order_controls(self):
+        response = self.client.get('/ventas/admin-catalogo-torta')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('data-move-record', response.get_data(as_text=True))
+        self.assertIn('de las categorías', response.get_data(as_text=True))
+        self.assertIn('de los tamaños dentro de su categoría', response.get_data(as_text=True))
+
+    def test_public_cake_catalog_keeps_saved_category_and_size_order(self):
+        catalog = app_module._catalogo_torta_publico({
+            'categorias': [
+                {'id': 'bizcocho', 'nombre': 'Bizcocho', 'activo': True},
+                {'id': 'panqueque', 'nombre': 'Panqueque', 'activo': True},
+            ],
+            'sizes': [
+                {'id': 'b-30', 'categoria_id': 'bizcocho', 'nombre': '30 personas', 'activo': True},
+                {'id': 'p-15', 'categoria_id': 'panqueque', 'nombre': '15 personas', 'activo': True},
+                {'id': 'b-15', 'categoria_id': 'bizcocho', 'nombre': '15 personas', 'activo': True},
+            ],
+        })
+
+        self.assertEqual([row['id'] for row in catalog['categorias']], ['bizcocho', 'panqueque'])
+        self.assertEqual([row['id'] for row in catalog['sizes']], ['b-30', 'p-15', 'b-15'])
+
 
 if __name__ == '__main__':
     unittest.main()
