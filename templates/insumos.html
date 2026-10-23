@@ -2966,11 +2966,15 @@
             <h2 id="modal-precio-titulo" style="margin:0 0 8px;color:#172b50;">Cambiar precio / presentación</h2>
             <h3 id="modal-precio-nombre" style="margin:0 0 18px;color:#172b50;"></h3>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
-                <label>Precio registrado ($)<input id="modal-precio-compra" type="number" min="0" step="1" style="display:block;width:100%;margin-top:6px;padding:12px;border:1px solid #cbd5e1;border-radius:9px;"></label>
+                <label>Precio de la presentación ($)<input id="modal-precio-compra" type="number" min="0" step="any" style="display:block;width:100%;margin-top:6px;padding:12px;border:1px solid #cbd5e1;border-radius:9px;"></label>
                 <label>Contenido de la presentación<input id="modal-precio-cantidad" type="number" min="0.0001" step="any" style="display:block;width:100%;margin-top:6px;padding:12px;border:1px solid #cbd5e1;border-radius:9px;"></label>
                 <label>Unidad de compra<select id="modal-precio-unidad" style="display:block;width:100%;margin-top:6px;padding:12px;border:1px solid #cbd5e1;border-radius:9px;"><option value="unidad">unidad</option><option value="kg">kg</option><option value="g">g</option><option value="l">L</option><option value="ml">ml</option><option value="docena">docena</option></select></label>
-                <label style="display:flex;align-items:center;gap:8px;padding-top:20px;"><input id="modal-precio-incluye-iva" type="checkbox"> El precio ya incluye IVA</label>
             </div>
+            <div style="display:flex;align-items:flex-start;gap:9px;margin-top:16px;padding:12px;background:#fff7e8;border:1px solid #f2d4a5;border-radius:10px;color:#59311c;font-size:14px;">
+                <input id="modal-precio-incluye-iva" type="checkbox" style="margin-top:3px;">
+                <label for="modal-precio-incluye-iva"><strong>El precio ingresado ya incluye IVA</strong><br><span style="color:#735b4e;">Si lo desmarcas, se considerará precio neto y se agregará el 19%.</span></label>
+            </div>
+            <div id="modal-precio-iva-comparacion" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;"></div>
             <div id="modal-precio-calculo-preview" style="margin-top:18px;padding:16px;border-radius:12px;background:#e4f8ef;color:#00845d;font-size:18px;font-weight:700;"></div>
             <p style="color:#64748b;font-size:13px;">Este cambio se aplica solo a esta línea de la lista; no modifica el catálogo maestro.</p>
             <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px;">
@@ -4309,6 +4313,12 @@ let insumosData = [
 
         function formatearCLP(valor) {
             return '$' + Math.round(Number(valor || 0)).toLocaleString('es-CL');
+        }
+
+        function formatearPrecioUnidadCalculo(valor) {
+            const precio = Number(valor || 0);
+            const aproximado = Math.abs(precio - Math.round(precio)) > 0.000001;
+            return `${aproximado ? '≈ ' : ''}${formatearCLP(precio)}`;
         }
 
         function precioUnitarioEfectivoCalculo(insumo) {
@@ -5800,7 +5810,8 @@ filasCalculo[index] = {
 
             if (precio > 0) {
                 if (infoEl) {
-                    infoEl.textContent = `Valor: ${formatearCLP(precioEfectivo || precio)} / ${unidadCompra || 'unidad'} · Cambiar`;
+                    infoEl.textContent = `Valor ${formatearPrecioUnidadCalculo(precioEfectivo || precio)} / ${unidadCompra || 'unidad'} · Cambiar`;
+                    infoEl.title = `Costo unitario exacto: $${Number(precioEfectivo || precio).toLocaleString('es-CL', {minimumFractionDigits: 2, maximumFractionDigits: 6})} / ${unidadCompra || 'unidad'}. La tabla redondea a pesos.`;
                     infoEl.classList.toggle('warn', Boolean(warning));
                     infoEl.onclick = () => abrirModalPrecioCalculo(index);
                     infoEl.setAttribute('role', 'button');
@@ -5824,7 +5835,7 @@ filasCalculo[index] = {
             }
             
 document.getElementById('unidad-' + index).textContent = unidadCompra;
-            document.getElementById('precio-unidad-' + index).textContent = precio > 0 ? formatearCLP(precio) : 'Revisar precio';
+            document.getElementById('precio-unidad-' + index).textContent = precio > 0 ? formatearPrecioUnidadCalculo(precio) : 'Revisar precio';
             guardarEstadoCalculadora();
         }
 
@@ -5845,7 +5856,7 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
             }
             unidadSelect.value = unidad.toLowerCase();
             document.getElementById('modal-precio-incluye-iva').checked = fila.precio_incluye_iva !== false;
-            ['modal-precio-compra', 'modal-precio-cantidad', 'modal-precio-unidad'].forEach(id => {
+            ['modal-precio-compra', 'modal-precio-cantidad', 'modal-precio-unidad', 'modal-precio-incluye-iva'].forEach(id => {
                 document.getElementById(id).oninput = actualizarPreviewPrecioModalCalculo;
                 document.getElementById(id).onchange = actualizarPreviewPrecioModalCalculo;
             });
@@ -5853,22 +5864,37 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
             document.getElementById('modal-precio-calculo').style.display = 'flex';
         }
 
+        function formatearCLPDetalle(valor) {
+            return '$' + Number(valor || 0).toLocaleString('es-CL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
         function actualizarPreviewPrecioModalCalculo() {
             const precioCompra = Number(document.getElementById('modal-precio-compra').value);
             const cantidad = Number(document.getElementById('modal-precio-cantidad').value);
             const unidad = document.getElementById('modal-precio-unidad').value || 'unidad';
             const fila = filasCalculo[filaModalPrecioCalculo];
-            const cantidadLista = fila ? _leerCantidadFila(filaModalPrecioCalculo) : 0;
-            const precioUnidad = precioCompra / cantidad;
-            const subtotal = cantidadLista * precioUnidad;
-            document.getElementById('modal-precio-calculo-preview').textContent =
-                !Number.isFinite(precioUnidad) || precioUnidad <= 0
-                    ? 'Ingresa un precio y contenido de presentación válidos.'
-                    : cantidadLista <= 0
-                        ? `Precio calculado: ${formatearCLP(precioUnidad)} / ${unidad}. Ingresa la cantidad para ver el subtotal.`
-                        : `${cantidadLista} ${unidad} × ${formatearCLP(precioUnidad)} / ${unidad} = ${formatearCLP(subtotal)}`;
-        }
+            const cantidadListaActual = fila ? _leerCantidadFila(filaModalPrecioCalculo) : 0;
+            const cantidadLista = fila ? convertirCantidadLista(cantidadListaActual, fila.unidad || unidad, unidad) : 0;
+            const incluido = document.getElementById('modal-precio-incluye-iva').checked;
+            const comparison = document.getElementById('modal-precio-iva-comparacion');
+            const preview = document.getElementById('modal-precio-calculo-preview');
+            if (!Number.isFinite(precioCompra) || precioCompra < 0 || !Number.isFinite(cantidad) || cantidad <= 0) {
+                comparison.innerHTML = '';
+                preview.textContent = 'Ingresa un precio y una cantidad de presentación válidos.';
+                return;
+            }
 
+            const precioUnidad = precioCompra / cantidad;
+            const subtotalBase = cantidadLista > 0 ? cantidadLista * precioUnidad : precioCompra;
+            const baseConIva = subtotalBase / 1.19;
+            const ivaIncluido = subtotalBase - baseConIva;
+            const ivaAgregado = subtotalBase * 0.19;
+            const escenarioIncluido = `<div style="padding:12px;border:2px solid ${incluido ? '#ed7800' : '#d7e2f1'};border-radius:10px;background:${incluido ? '#fff7e8' : '#fff'};"><strong>Si el valor ya incluye IVA</strong><div style="margin-top:7px;font-size:13px;line-height:1.65;">Neto: ${formatearCLPDetalle(baseConIva)}<br>IVA incluido (19%): ${formatearCLPDetalle(ivaIncluido)}<br><strong>Total: ${formatearCLPDetalle(subtotalBase)}</strong></div></div>`;
+            const escenarioExcluido = `<div style="padding:12px;border:2px solid ${!incluido ? '#ed7800' : '#d7e2f1'};border-radius:10px;background:${!incluido ? '#fff7e8' : '#fff'};"><strong>Si el valor es sin IVA</strong><div style="margin-top:7px;font-size:13px;line-height:1.65;">Neto: ${formatearCLPDetalle(subtotalBase)}<br>IVA agregado (19%): ${formatearCLPDetalle(ivaAgregado)}<br><strong>Total: ${formatearCLPDetalle(subtotalBase + ivaAgregado)}</strong></div></div>`;
+            comparison.innerHTML = escenarioIncluido + escenarioExcluido;
+            const quantityLabel = cantidadLista > 0 ? `${cantidadLista} ${unidad} en esta línea` : 'por presentación';
+            preview.textContent = `Precio unitario exacto: ${formatearCLPDetalle(precioUnidad)} / ${unidad}. Comparación calculada ${quantityLabel}; el borde naranjo indica el tratamiento que se aplicará.`;
+        }
         function factorUnidadListaCompra(unidad) {
             const u = String(unidad || '').trim().toLowerCase();
             const unidades = {
@@ -5917,8 +5943,9 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
             const cantidadInput = document.getElementById('cantidad-' + index);
             if (cantidadInput) cantidadInput.value = String(Math.round(cantidadConvertida * 10000) / 10000);
             document.getElementById('unidad-' + index).textContent = unidad;
-            document.getElementById('precio-unidad-' + index).textContent = formatearCLP(fila.precio);
-            document.getElementById('precio-info-' + index).textContent = `Valor: ${formatearCLP(fila.precio)} / ${unidad} · Cambiar`;
+            document.getElementById('precio-unidad-' + index).textContent = formatearPrecioUnidadCalculo(fila.precio);
+            document.getElementById('precio-info-' + index).textContent = `Valor ${formatearPrecioUnidadCalculo(fila.precio)} / ${unidad} · Cambiar`;
+            document.getElementById('precio-info-' + index).title = `Costo unitario exacto: $${Number(fila.precio).toLocaleString('es-CL', {minimumFractionDigits: 2, maximumFractionDigits: 6})} / ${unidad}. La tabla redondea a pesos.`;
             calcularTotalFila(index);
             consolidarFilaCalculo(index);
             cerrarModalPrecioCalculo();

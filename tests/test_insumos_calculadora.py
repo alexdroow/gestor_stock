@@ -28,6 +28,35 @@ class CalculadoraInsumosTests(unittest.TestCase):
         self.assertEqual(net_excluded, gross_total)
         self.assertAlmostEqual(gross_excluded, gross_total * 1.19)
 
+    def test_price_editor_comparison_for_both_iva_treatments(self):
+        package_price = 15992
+
+        net_when_included, payable_when_included = database._totales_compra(
+            1, package_price, True
+        )
+        net_when_excluded, payable_when_excluded = database._totales_compra(
+            1, package_price, False
+        )
+
+        self.assertAlmostEqual(net_when_included, 15992 / 1.19)
+        self.assertEqual(payable_when_included, 15992)
+        self.assertEqual(net_when_excluded, 15992)
+        self.assertAlmostEqual(payable_when_excluded, 19030.48)
+
+    def test_price_editor_preserves_decimal_purchase_values(self):
+        price = 1243.6975
+        net_when_included, payable_when_included = database._totales_compra(
+            4, price, True
+        )
+        net_when_excluded, payable_when_excluded = database._totales_compra(
+            4, price, False
+        )
+
+        self.assertAlmostEqual(payable_when_included, 4974.79)
+        self.assertAlmostEqual(net_when_included, 4974.79 / 1.19)
+        self.assertAlmostEqual(net_when_excluded, 4974.79)
+        self.assertAlmostEqual(payable_when_excluded, 4974.79 * 1.19)
+
     def test_pending_rows_merge_only_when_unit_price_and_tax_snapshot_match(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "pending.sqlite"
