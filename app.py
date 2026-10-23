@@ -13174,6 +13174,150 @@ def insumos():
         return f"Error: {str(e)}", 500
 
 
+@app.route('/api/insumos/boletas/cargar', methods=['POST'])
+def api_cargar_boleta_insumos():
+    """Store a receipt privately and return OCR text for human review only."""
+    import insumos_boletas
+
+    upload = request.files.get('archivo')
+    if not upload or not upload.filename:
+        return jsonify({'success': False, 'error': 'Selecciona una foto o PDF de boleta'}), 400
+    original = secure_filename(upload.filename) or 'boleta'
+    extension = os.path.splitext(original)[1].lower()
+    if extension not in {'.pdf', '.png', '.jpg', '.jpeg', '.webp'}:
+        return jsonify({'success': False, 'error': 'Formato no permitido. Usa PDF o una imagen.'}), 400
+    raw = upload.read(12 * 1024 * 1024 + 1)
+    if not raw or len(raw) > 12 * 1024 * 1024:
+        return jsonify({'success': False, 'error': 'El archivo debe pesar menos de 12 MB'}), 400
+    if extension == '.pdf' and not raw.startswith(b'%PDF-'):
+        return jsonify({'success': False, 'error': 'El archivo no parece ser un PDF válido'}), 400
+    if extension != '.pdf':
+        detected = _detectar_tipo_imagen(raw)
+        extension_map = {'jpg': 'jpeg', 'tif': 'tiff'}
+        expected = extension_map.get(extension.lstrip('.'), extension.lstrip('.'))
+        if not detected or detected != expected:
+            return jsonify({'success': False, 'error': 'El contenido del archivo no coincide con una imagen admitida'}), 400
+
+    insumos_boletas.ensure_schema()
+    insumos_boletas.purge_expired_files()
+    digest = insumos_boletas.receipt_digest(raw)
+    conn = get_db()
+    try:
+        duplicate = conn.execute('SELECT id, estado FROM insumos_boletas WHERE sha256=?', (digest,)).fetchone()
+    finally:
+        conn.close()
+    if duplicate:
+        return jsonify({'success': False, 'duplicate': True, 'error': 'Esta boleta ya fue cargada. No se puede aplicar dos veces.', 'boleta_id': duplicate['id'], 'estado': duplicate['estado']}), 409
+
+    receipt_id = insumos_boletas.make_receipt_id()
+    directory = os.path.join(DATA_DIR, 'insumos_boletas')
+    os.makedirs(directory, mode=0o700, exist_ok=True)
+    path = os.path.abspath(os.path.join(directory, receipt_id + extension))
+    try:
+        with open(path, 'wb') as output:
+            output.write(raw)
+        text, engine = insumos_boletas.extract_receipt_text(path, extension)
+        insumos_boletas.create_receipt(
+            receipt_id, digest, original, path, text,
+            session.get(_ADMIN_USER_ID_SESSION_KEY), session.get(_ADMIN_USER_NAME_SESSION_KEY)
+        )
+    except Exception as exc:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return jsonify({'success': False, 'error': 'No se pudo preparar la boleta: ' + str(exc)}), 500
+    return jsonify({
+        'success': True, 'boleta_id': receipt_id, 'texto': text,
+        'motor': engine, 'nombre_archivo': original,
+        'ocr_disponible': bool(text.strip()),
+        'mensaje': '' if text.strip() else 'El servidor no tiene OCR local disponible para esta imagen. Transcribe las líneas manualmente; el archivo permanece solo para revisión.'
+    })
+
+
+@app.route('/api/insumos/boletas/<receipt_id>')
+def api_detalle_boleta_insumos(receipt_id):
+    import insumos_boletas
+    insumos_boletas.ensure_schema()
+    receipt = insumos_boletas.get_receipt(receipt_id)
+    if not receipt:
+        return jsonify({'success': False, 'error': 'Boleta no encontrada'}), 404
+    conn = get_db()
+    try:
+        rows = conn.execute('SELECT id, nombre, codigo_barra, unidad, precio_unitario, cantidad_comprada, unidad_compra, precio_incluye_iva FROM insumos ORDER BY nombre COLLATE NOCASE').fetchall()
+    finally:
+        conn.close()
+    return jsonify({'success': True, 'boleta': {
+        'id': receipt['id'], 'nombre_archivo': receipt['nombre_archivo'],
+        'texto': receipt['texto_lectura'], 'estado': receipt['estado'],
+        'archivo_url': url_for('api_archivo_boleta_insumos', receipt_id=receipt_id)
+    }, 'insumos': [dict(row) for row in rows]})
+
+
+@app.route('/api/insumos/boletas')
+def api_listado_boletas_insumos():
+    import insumos_boletas
+    insumos_boletas.ensure_schema()
+    insumos_boletas.purge_expired_files()
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT id, nombre_archivo, estado, usuario_nombre, creado, confirmado, revertida_en, lineas_json FROM insumos_boletas ORDER BY creado DESC LIMIT 100").fetchall()
+    finally:
+        conn.close()
+    records = []
+    for row in rows:
+        data = dict(row)
+        try:
+            lineas = json.loads(data.pop('lineas_json') or '[]')
+        except (TypeError, ValueError):
+            lineas = []
+        data['lineas'] = lineas
+        data['cantidad_cambios'] = sum(1 for line in lineas if isinstance(line, dict) and line.get('confirmar'))
+        records.append(data)
+    return jsonify({'success': True, 'boletas': records})
+
+
+@app.route('/api/insumos/boletas/<receipt_id>/archivo')
+def api_archivo_boleta_insumos(receipt_id):
+    import insumos_boletas
+    receipt = insumos_boletas.get_receipt(receipt_id)
+    if not receipt or not os.path.isfile(receipt['ruta_archivo']):
+        return 'No encontrado', 404
+    response = make_response(send_file(receipt['ruta_archivo'], conditional=True))
+    response.headers['Cache-Control'] = 'private, no-store, max-age=0'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@app.route('/api/insumos/boletas/<receipt_id>/confirmar', methods=['POST'])
+def api_confirmar_boleta_insumos(receipt_id):
+    import insumos_boletas
+    try:
+        data = request.get_json(silent=True) or {}
+        updated = insumos_boletas.confirm_receipt(
+            receipt_id, data.get('lineas'), session.get(_ADMIN_USER_NAME_SESSION_KEY)
+        )
+        crear_backup()
+        return jsonify({'success': True, 'actualizados': updated, 'cantidad': len(updated)})
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 409
+    except Exception as exc:
+        return jsonify({'success': False, 'error': 'No se pudieron guardar los cambios de precio: ' + str(exc)}), 500
+
+
+@app.route('/api/insumos/boletas/<receipt_id>/revertir', methods=['POST'])
+def api_revertir_boleta_insumos(receipt_id):
+    import insumos_boletas
+    try:
+        updated = insumos_boletas.reverse_receipt(receipt_id, session.get(_ADMIN_USER_NAME_SESSION_KEY))
+        crear_backup()
+        return jsonify({'success': True, 'revertidos': updated, 'cantidad': len(updated)})
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 409
+    except Exception as exc:
+        return jsonify({'success': False, 'error': 'No se pudieron revertir los precios: ' + str(exc)}), 500
+
+
 def _factor_unidad_calculadora(unidad):
     u = str(unidad or '').strip().lower().split('(')[0].strip()
     aliases = {

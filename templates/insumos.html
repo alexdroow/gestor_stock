@@ -319,6 +319,31 @@
             white-space: nowrap;
         }
 
+        #modal-boleta-insumos .boleta-current-price { display:block; color:#64748b; margin-top:4px; }
+        #modal-boleta-insumos #boleta-lineas input:not([type="checkbox"]),
+        #modal-boleta-insumos #boleta-lineas select,
+        #modal-boleta-insumos #boleta-lineas textarea { max-width:100%; box-sizing:border-box; }
+        @media (max-width: 760px) {
+            #modal-boleta-insumos .modal { width:96vw !important; max-width:96vw !important; padding:16px !important; }
+            #modal-boleta-insumos #boleta-paso-revision > div:first-child { grid-template-columns:1fr !important; }
+            #modal-boleta-insumos iframe { height:220px !important; }
+            #modal-boleta-insumos #boleta-paso-revision > div:last-child { flex-direction:column; }
+            #modal-boleta-insumos #boleta-paso-revision > div:last-child button { width:100%; }
+            #modal-boleta-insumos #boleta-lineas { min-width:0 !important; }
+            #modal-boleta-insumos #boleta-lineas thead { display:none; }
+            #modal-boleta-insumos #boleta-lineas, #modal-boleta-insumos #boleta-lineas tbody,
+            #modal-boleta-insumos #boleta-lineas tr, #modal-boleta-insumos #boleta-lineas td { display:block; width:100%; box-sizing:border-box; }
+            #modal-boleta-insumos #boleta-lineas tr { padding:10px; margin-bottom:10px; border:1px solid #d7e2f1; border-radius:12px; }
+            #modal-boleta-insumos #boleta-lineas td { padding:6px 0; border:0; }
+            #modal-boleta-insumos #boleta-lineas td::before { display:block; margin-bottom:4px; color:#64748b; font-size:12px; font-weight:700; }
+            #modal-boleta-insumos #boleta-lineas td:nth-child(1)::before { content:"Texto de boleta"; }
+            #modal-boleta-insumos #boleta-lineas td:nth-child(2)::before { content:"Insumo y precio vigente"; }
+            #modal-boleta-insumos #boleta-lineas td:nth-child(3)::before { content:"Precio propuesto"; }
+            #modal-boleta-insumos #boleta-lineas td:nth-child(4)::before { content:"Presentación"; }
+            #modal-boleta-insumos #boleta-lineas td:nth-child(5)::before { content:"Impuesto"; }
+            #modal-boleta-insumos #boleta-lineas td:nth-child(6)::before { content:"Decisión"; }
+        }
+
         .search-empty {
             display: none;
             margin: 14px 16px 16px;
@@ -1103,6 +1128,15 @@
             .form-group { min-width: 100%; }
             .inventario-tools { align-items: stretch; }
             .inventario-tools .search-wrapper { min-width: 100%; max-width: none; }
+            #tabla-insumos thead { display: none; }
+            #tabla-insumos, #tabla-insumos tbody, #tabla-insumos tr, #tabla-insumos td { display: block; width: 100%; box-sizing: border-box; }
+            #tabla-insumos tbody tr { margin: 0 0 12px; padding: 12px; border: 1px solid #d7e2f1; border-radius: 14px; background: #fff; }
+            #tabla-insumos tbody td { border: 0; padding: 5px 0; text-align: left !important; }
+            #tabla-insumos tbody td:nth-child(2)::before { content: "Código: "; color: #64748b; font-weight: 600; }
+            #tabla-insumos tbody td:nth-child(3)::before { content: "Stock: "; color: #64748b; font-weight: 600; }
+            #tabla-insumos tbody td:nth-child(4)::before { content: "Mínimo: "; color: #64748b; font-weight: 600; }
+            #tabla-insumos tbody td:nth-child(5)::before { content: "Estado: "; color: #64748b; font-weight: 600; }
+            #tabla-insumos tbody td:last-child .stock-input-group { justify-content: flex-start !important; flex-wrap: wrap; }
             .edit-form-grid { grid-template-columns: 1fr; }
             .edit-form-grid .form-group.full { grid-column: auto; }
         }
@@ -2580,6 +2614,8 @@
                             <span class="search-icon"></span>
                             <input type="text" id="buscador" placeholder="Buscar por nombre o código..." oninput="buscarInsumos()">
                         </div>
+                        <button type="button" class="btn btn-warning" onclick="abrirCargaBoleta()">Cargar boleta</button>
+                        <button type="button" class="btn btn-secondary" onclick="abrirHistorialBoletas()">Historial de boletas</button>
                         <div class="inventario-count">
                             <span id="insumos-visibles">{{ insumos|length }}</span> de {{ insumos|length }} insumos
                         </div>
@@ -2673,6 +2709,45 @@
                         </div>
                     </div>
                 </div> <!-- FIN TAB-INVENTARIO -->
+
+                <div class="modal-overlay" id="modal-boleta-insumos" style="z-index:1200;">
+                    <div class="modal modal-lg" style="max-width:1080px;max-height:92vh;overflow:auto;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                            <div><h2 style="margin:0;color:#1e3557;">Cargar boleta de compra</h2><p id="boleta-paso-label" style="margin:6px 0 0;color:#64748b;">Paso 1 de 3 · Selecciona una foto o PDF</p></div>
+                            <button type="button" class="btn btn-secondary" onclick="cerrarCargaBoleta()">Cerrar</button>
+                        </div>
+                        <section id="boleta-paso-carga" style="margin-top:18px;">
+                            <label for="boleta-archivo" style="display:block;padding:30px 16px;text-align:center;border:2px dashed #9bb9e4;border-radius:16px;background:#f6f9ff;cursor:pointer;">
+                                <strong style="display:block;font-size:20px;color:#1e3557;">Sube una imagen o PDF</strong>
+                                <span style="display:block;margin-top:8px;color:#64748b;">En móvil puedes tomar una foto. Admite PDF y varias páginas (máx. 12 MB).</span>
+                                <span class="btn btn-primary" style="display:inline-flex;margin-top:16px;">Seleccionar archivo</span>
+                                <input id="boleta-archivo" type="file" accept="image/*,.pdf,application/pdf" capture="environment" style="display:none;" onchange="cargarArchivoBoleta(this.files[0])">
+                            </label>
+                            <div id="boleta-carga-mensaje" role="status" style="margin-top:12px;color:#64748b;"></div>
+                            <p style="padding:14px;background:#fff5df;border-radius:12px;color:#744700;">La lectura solo prepara una propuesta. Ningún precio ni stock cambia hasta que confirmes las líneas revisadas.</p>
+                        </section>
+                        <section id="boleta-paso-revision" style="display:none;margin-top:16px;">
+                            <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.8fr);gap:14px;">
+                                <div><label for="boleta-texto-ocr"><strong>Texto detectado · corrige antes de crear líneas</strong></label>
+                                    <textarea id="boleta-texto-ocr" rows="9" style="width:100%;margin-top:6px;" placeholder="Corrige o pega aquí el texto leído de la boleta"></textarea>
+                                    <button type="button" class="btn btn-secondary" style="margin-top:8px;" onclick="generarLineasBoleta()">Preparar líneas para revisar</button>
+                                    <div id="boleta-aviso-ocr" style="margin-top:8px;color:#9a5a00;"></div></div>
+                                <div><strong>Documento original</strong><iframe id="boleta-vista-previa" title="Boleta original" style="width:100%;height:260px;margin-top:6px;border:1px solid #d5dfed;border-radius:12px;"></iframe><a id="boleta-abrir-original" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;">Abrir original</a></div>
+                            </div>
+                            <div style="margin:18px 0 10px;padding:12px;background:#edf4ff;border-radius:12px;">Verifica cada coincidencia, importe y presentación. Las líneas sin producto o con dudas no se aplican.</div>
+                            <div style="overflow-x:auto;"><table class="data-table" style="min-width:800px;"><thead><tr><th>Texto de boleta</th><th>Insumo</th><th>Precio</th><th>Cantidad / unidad</th><th>IVA</th><th>Decisión</th></tr></thead><tbody id="boleta-lineas"></tbody></table></div>
+                            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;"><button type="button" class="btn btn-secondary" onclick="volverCargaBoleta()">Volver</button><button type="button" class="btn btn-success" onclick="confirmarCambiosBoleta()">Confirmar cambios seleccionados</button></div>
+                        </section>
+                        <section id="boleta-paso-resultado" style="display:none;margin-top:22px;"></section>
+                    </div>
+                </div>
+
+                <div class="modal-overlay" id="modal-historial-boletas" style="z-index:1200;">
+                    <div class="modal modal-lg" style="max-width:900px;max-height:90vh;overflow:auto;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;"><h2 style="margin:0;color:#1e3557;">Historial de boletas</h2><button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-historial-boletas').classList.remove('active')">Cerrar</button></div>
+                        <div id="historial-boletas-lista" style="margin-top:16px;"></div>
+                    </div>
+                </div>
 
                 <!-- TAB 2: CALCULADORA DE COMPRAS -->
                 <div id="tab-calculadora" class="tab-content">
@@ -6220,6 +6295,218 @@ function obtenerTotalesListaCalculo(items) {
     }
     buscarInsumos();
     cargarComprasPendientes();
+        let boletaInsumosActual = null;
+        let boletaInsumosCatalogo = [];
+
+        function abrirCargaBoleta() {
+            document.getElementById('modal-boleta-insumos').classList.add('active');
+            document.getElementById('boleta-paso-carga').style.display = '';
+            document.getElementById('boleta-paso-revision').style.display = 'none';
+            document.getElementById('boleta-paso-resultado').style.display = 'none';
+            document.getElementById('boleta-carga-mensaje').textContent = '';
+            document.getElementById('boleta-archivo').value = '';
+        }
+
+        function cerrarCargaBoleta() {
+            document.getElementById('modal-boleta-insumos').classList.remove('active');
+        }
+
+        async function abrirHistorialBoletas() {
+            const modal = document.getElementById('modal-historial-boletas');
+            const lista = document.getElementById('historial-boletas-lista');
+            modal.classList.add('active');
+            lista.textContent = 'Cargando historial...';
+            try {
+                const response = await fetch('/api/insumos/boletas');
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo cargar');
+                if (!data.boletas.length) {
+                    lista.innerHTML = '<p>Aún no hay boletas cargadas.</p>';
+                    return;
+                }
+                lista.innerHTML = data.boletas.map(receipt => `<article style="padding:14px;margin-bottom:10px;border:1px solid #d7e2f1;border-radius:12px;">
+                    <strong>${escaparHtmlBoleta(receipt.nombre_archivo)}</strong>
+                    <span style="float:right;font-weight:700;color:${receipt.estado === 'confirmada' ? '#009b72' : receipt.estado === 'revertida' ? '#64748b' : '#ed7800'};">${escaparHtmlBoleta(receipt.estado)}</span>
+                    <div style="margin-top:5px;color:#64748b;">${escaparHtmlBoleta(receipt.creado)} · ${Number(receipt.cantidad_cambios || 0)} líneas aplicadas ${receipt.usuario_nombre ? '· ' + escaparHtmlBoleta(receipt.usuario_nombre) : ''}</div>
+                    ${receipt.estado === 'confirmada' ? `<button class="btn btn-warning" style="margin-top:10px;" onclick="revertirBoleta('${escaparHtmlBoleta(receipt.id)}')">Revertir cambios</button>` : ''}
+                </article>`).join('');
+            } catch (error) {
+                lista.textContent = error.message || 'No se pudo cargar el historial.';
+            }
+        }
+
+        async function revertirBoleta(receiptId) {
+            if (!confirm('Se restaurarán solo precios y presentaciones. Si alguno cambió después, la reversión se cancelará para evitar sobrescribirlo. ¿Continuar?')) return;
+            try {
+                const response = await fetch(`/api/insumos/boletas/${encodeURIComponent(receiptId)}/revertir`, {method: 'POST'});
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo revertir');
+                alert(`Se revirtieron ${data.cantidad} cambios. El stock no se modificó.`);
+                abrirHistorialBoletas();
+            } catch (error) {
+                alert(error.message || 'No se pudo revertir la boleta.');
+            }
+        }
+
+        function volverCargaBoleta() {
+            document.getElementById('boleta-paso-label').textContent = 'Paso 1 de 3 · Selecciona una foto o PDF';
+            document.getElementById('boleta-paso-carga').style.display = '';
+            document.getElementById('boleta-paso-revision').style.display = 'none';
+        }
+
+        async function cargarArchivoBoleta(file) {
+            if (!file) return;
+            const status = document.getElementById('boleta-carga-mensaje');
+            status.textContent = 'Cargando y leyendo el documento de forma segura...';
+            const body = new FormData();
+            body.append('archivo', file);
+            try {
+                const response = await fetch('/api/insumos/boletas/cargar', {method: 'POST', body});
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo leer la boleta');
+                boletaInsumosActual = data;
+                const detailResponse = await fetch(`/api/insumos/boletas/${encodeURIComponent(data.boleta_id)}`);
+                const detail = await detailResponse.json();
+                if (!detailResponse.ok || !detail.success) throw new Error(detail.error || 'No se pudo abrir la revisión');
+                boletaInsumosCatalogo = detail.insumos || [];
+                const pdfUrl = detail.boleta.archivo_url;
+                document.getElementById('boleta-vista-previa').src = pdfUrl;
+                document.getElementById('boleta-abrir-original').href = pdfUrl;
+                document.getElementById('boleta-texto-ocr').value = data.texto || '';
+                document.getElementById('boleta-aviso-ocr').textContent = data.mensaje || 'Comprueba visualmente cada dato frente a la boleta original.';
+                document.getElementById('boleta-paso-label').textContent = 'Paso 2 de 3 · Revisa coincidencias y precios';
+                document.getElementById('boleta-paso-carga').style.display = 'none';
+                document.getElementById('boleta-paso-revision').style.display = '';
+                if (data.texto) generarLineasBoleta();
+            } catch (error) {
+                status.textContent = error.message || 'No se pudo procesar el archivo.';
+            }
+        }
+
+        function escaparHtmlBoleta(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+        }
+
+        function generarLineasBoleta() {
+            const lines = document.getElementById('boleta-texto-ocr').value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+            const tbody = document.getElementById('boleta-lineas');
+            const options = ['<option value="">Sin coincidencia · elegir</option>'].concat(boletaInsumosCatalogo.map(item =>
+                `<option value="${Number(item.id)}">${escaparHtmlBoleta(item.nombre)} · ${escaparHtmlBoleta(item.unidad_compra || item.unidad || 'unidad')}</option>`
+            )).join('');
+            tbody.innerHTML = lines.map((line, index) => `<tr data-row="${index}">
+                <td><textarea class="boleta-line-source" rows="2" style="min-width:180px;width:100%;">${escaparHtmlBoleta(line)}</textarea></td>
+                <td><select class="boleta-line-item" onchange="actualizarFilaBoleta(this)" style="min-width:190px;width:100%;">${options}</select><small class="boleta-current-price"></small></td>
+                <td><input class="boleta-line-price" type="number" min="0" step="1" placeholder="Precio envase" style="width:110px;" oninput="actualizarEstadoLineaBoleta(this)"><small class="boleta-price-diff" style="display:block;color:#009b72;margin-top:4px;"></small></td>
+                <td><div style="display:flex;gap:4px;"><input class="boleta-line-quantity" type="number" min="0.001" step="0.001" placeholder="Cant." value="1" style="width:82px;" oninput="actualizarEstadoLineaBoleta(this)"><input class="boleta-line-unit" type="text" placeholder="kg, g, L..." style="width:82px;" oninput="actualizarEstadoLineaBoleta(this)"></div></td>
+                <td><label><input class="boleta-line-tax" type="checkbox" checked onchange="actualizarEstadoLineaBoleta(this)"> Incluye</label></td>
+                <td><label><input class="boleta-line-apply" type="checkbox"> Revisar</label></td>
+            </tr>`).join('');
+            if (!lines.length) tbody.innerHTML = '<tr><td colspan="6">No hay texto detectado. Pega o transcribe las líneas desde la imagen original.</td></tr>';
+        }
+
+        function actualizarFilaBoleta(select) {
+            const row = select.closest('tr');
+            const item = boletaInsumosCatalogo.find(entry => Number(entry.id) === Number(select.value));
+            const current = row.querySelector('.boleta-current-price');
+            if (!item) {
+                current.textContent = '';
+                row.dataset.priceCurrent = '';
+                return;
+            }
+            row.dataset.priceCurrent = Number(item.precio_unitario || 0);
+            row.dataset.quantityCurrent = Number(item.cantidad_comprada || 1);
+            row.dataset.unitCurrent = item.unidad_compra || item.unidad || 'unidad';
+            row.dataset.taxCurrent = item.precio_incluye_iva === false || item.precio_incluye_iva === 0 ? '0' : '1';
+            current.textContent = `Actual: $${Math.round(Number(item.precio_unitario || 0)).toLocaleString('es-CL')} / ${item.cantidad_comprada || 1} ${item.unidad_compra || item.unidad || 'unidad'}`;
+            const unitField = row.querySelector('.boleta-line-unit');
+            unitField.value = item.unidad_compra || item.unidad || 'unidad';
+            row.querySelector('.boleta-line-quantity').value = item.cantidad_comprada || 1;
+            row.querySelector('.boleta-line-price').value = Number(item.precio_unitario || 0);
+            actualizarEstadoLineaBoleta(unitField);
+        }
+
+        function actualizarEstadoLineaBoleta(control) {
+            const row = control.closest('tr');
+            if (!row || row.dataset.priceCurrent === undefined) return;
+            const price = Number(row.querySelector('.boleta-line-price').value);
+            const quantity = Number(row.querySelector('.boleta-line-quantity').value);
+            const unit = row.querySelector('.boleta-line-unit').value.trim().toLowerCase();
+            const same = Number.isFinite(price) && Math.abs(price - Number(row.dataset.priceCurrent)) < 0.001
+                && Math.abs(quantity - Number(row.dataset.quantityCurrent)) < 0.001
+                && unit === String(row.dataset.unitCurrent || '').toLowerCase()
+                && row.querySelector('.boleta-line-tax').checked === (row.dataset.taxCurrent === '1');
+            const decision = row.querySelector('.boleta-line-apply').parentElement;
+            decision.lastChild.textContent = same ? ' Mantener' : ' Actualizar';
+            decision.style.color = same ? '#009b72' : '#ed7800';
+            const priceNote = row.querySelector('.boleta-price-diff');
+            const oldPrice = Number(row.dataset.priceCurrent);
+            const currentBase = costoBaseBoleta(oldPrice, Number(row.dataset.quantityCurrent), row.dataset.unitCurrent, row.dataset.taxCurrent === '1');
+            const nextBase = costoBaseBoleta(price, quantity, unit, row.querySelector('.boleta-line-tax').checked);
+            if (currentBase && nextBase && currentBase.tipo === nextBase.tipo) {
+                const delta = nextBase.valor - currentBase.valor;
+                const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
+                priceNote.textContent = `Costo base: $${Math.round(currentBase.valor).toLocaleString('es-CL')} / ${currentBase.tipo} → $${Math.round(nextBase.valor).toLocaleString('es-CL')} / ${nextBase.tipo} (${sign}$${Math.round(Math.abs(delta)).toLocaleString('es-CL')})`;
+            } else {
+                priceNote.textContent = row.dataset.priceCurrent === '' ? 'Selecciona un insumo para comparar' : 'Revisa que la unidad y el impuesto sean correctos';
+            }
+        }
+
+        function costoBaseBoleta(precio, cantidad, unidad, incluyeIva) {
+            if (!Number.isFinite(precio) || !Number.isFinite(cantidad) || cantidad <= 0) return null;
+            const u = String(unidad || '').trim().toLowerCase();
+            let factor = 1;
+            let tipo = 'unidad';
+            if (['kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos'].includes(u)) { factor = 1; tipo = 'kg'; }
+            else if (['g', 'gr', 'gramo', 'gramos'].includes(u)) { factor = 0.001; tipo = 'kg'; }
+            else if (['mg', 'miligramo', 'miligramos'].includes(u)) { factor = 0.000001; tipo = 'kg'; }
+            else if (['l', 'lt', 'litro', 'litros'].includes(u)) { factor = 1; tipo = 'L'; }
+            else if (['ml', 'mililitro', 'mililitros', 'cc', 'cm3'].includes(u)) { factor = 0.001; tipo = 'L'; }
+            const bruto = precio * (incluyeIva ? 1 : 1.19);
+            return {valor: bruto / (cantidad * factor), tipo};
+        }
+
+        async function confirmarCambiosBoleta() {
+            const rows = [...document.querySelectorAll('#boleta-lineas tr[data-row]')];
+            const lineas = rows.map(row => {
+                const itemId = Number(row.querySelector('.boleta-line-item').value || 0);
+                const item = boletaInsumosCatalogo.find(entry => Number(entry.id) === itemId);
+                return {
+                    confirmar: row.querySelector('.boleta-line-apply').checked,
+                    texto_original: row.querySelector('.boleta-line-source').value,
+                    insumo_id: itemId,
+                    precio_actual: row.dataset.priceCurrent === '' ? null : Number(row.dataset.priceCurrent),
+                    cantidad_actual: row.dataset.quantityCurrent === undefined ? null : Number(row.dataset.quantityCurrent),
+                    unidad_actual: row.dataset.unitCurrent || '',
+                    iva_actual: row.dataset.taxCurrent === undefined ? null : row.dataset.taxCurrent === '1',
+                    precio_unitario: Number(row.querySelector('.boleta-line-price').value),
+                    cantidad_comprada: Number(row.querySelector('.boleta-line-quantity').value),
+                    unidad_compra: row.querySelector('.boleta-line-unit').value.trim(),
+                    precio_incluye_iva: row.querySelector('.boleta-line-tax').checked,
+                    nombre_insumo: item?.nombre || ''
+                };
+            });
+            const selected = lineas.filter(line => line.confirmar);
+            if (!selected.length || selected.some(line => !line.insumo_id || !line.precio_actual && line.precio_actual !== 0 || !Number.isFinite(line.precio_unitario) || !Number.isFinite(line.cantidad_comprada) || !line.unidad_compra)) {
+                alert('Completa para cada línea seleccionada el insumo, el precio de compra y la presentación. Desmarca las líneas que no actualizarás.');
+                return;
+            }
+            if (!confirm(`Se actualizarán ${selected.length} precios. El stock y las compras existentes no cambiarán. ¿Confirmas?`)) return;
+            try {
+                const response = await fetch(`/api/insumos/boletas/${encodeURIComponent(boletaInsumosActual.boleta_id)}/confirmar`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({lineas})
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || 'No se pudieron guardar los precios');
+                document.getElementById('boleta-paso-label').textContent = 'Paso 3 de 3 · Cambios confirmados';
+                document.getElementById('boleta-paso-revision').style.display = 'none';
+                const result = document.getElementById('boleta-paso-resultado');
+                result.style.display = '';
+                result.innerHTML = `<div style="padding:20px;background:#e3f7ee;border-radius:14px;color:#006b50;"><h3>Precios actualizados</h3><p>${data.cantidad} cambios registrados en el historial.</p><ul>${data.actualizados.map(name => `<li>${escaparHtmlBoleta(name)}</li>`).join('')}</ul><p>El inventario y el stock no fueron modificados.</p><button class="btn btn-success" type="button" onclick="location.reload()">Volver al inventario</button></div>`;
+            } catch (error) {
+                alert(error.message || 'Error al confirmar');
+            }
+        }
+
 </script>
 
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
