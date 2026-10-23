@@ -1,3 +1,4 @@
+from io import BytesIO
 import sqlite3
 import tempfile
 import unittest
@@ -5,6 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 import insumos_boletas
+import app as app_module
+import database
+from PIL import Image
 
 
 class InsumosBoletasTests(unittest.TestCase):
@@ -129,6 +133,45 @@ class InsumosBoletasTests(unittest.TestCase):
         self.assertEqual(insumos_boletas.candidate_matches("azucar flor justo 1kg", items), [])
         exact = insumos_boletas.candidate_matches("Azucar Flor Justo", items)
         self.assertEqual(exact[0]["id"], 2)
+
+
+class InsumosBoletasUploadRouteTests(unittest.TestCase):
+    def test_same_pending_pdf_can_be_reopened_to_run_browser_ocr(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "upload.sqlite"
+            with patch.object(database, "DB_PATH", str(db_path)), patch.object(app_module, "DATA_DIR", temp_dir):
+                client = app_module.app.test_client()
+                with client.session_transaction() as session:
+                    session[app_module._ADMIN_SESSION_KEY] = True
+                    session[app_module._ADMIN_USER_NAME_SESSION_KEY] = "Admin"
+                image = Image.new("RGB", (8, 8), color="white")
+                uploaded_image = BytesIO()
+                image.save(uploaded_image, format="JPEG")
+                image_bytes = uploaded_image.getvalue()
+                first = client.post(
+                    "/api/insumos/boletas/cargar",
+                    data={"archivo": (BytesIO(image_bytes), "factura-escaneada.jpg")},
+                    content_type="multipart/form-data",
+                )
+                self.assertEqual(first.status_code, 200)
+                first_data = first.get_json()
+                self.assertTrue(first_data["success"])
+
+                second = client.post(
+                    "/api/insumos/boletas/cargar",
+                    data={"archivo": (BytesIO(image_bytes), "factura-escaneada.jpg")},
+                    content_type="multipart/form-data",
+                )
+                self.assertEqual(second.status_code, 200)
+                second_data = second.get_json()
+                self.assertTrue(second_data["duplicate_pending"])
+                self.assertEqual(second_data["boleta_id"], first_data["boleta_id"])
+
+                conn = sqlite3.connect(db_path)
+                try:
+                    self.assertEqual(conn.execute("SELECT COUNT(*) FROM insumos_boletas").fetchone()[0], 1)
+                finally:
+                    conn.close()
 
 
 if __name__ == "__main__":

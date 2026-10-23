@@ -6,7 +6,7 @@ import os
 import re
 import unicodedata
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from database import (
     get_db,
@@ -132,7 +132,7 @@ def purge_expired_files(retention_days=None):
         except (TypeError, ValueError):
             retention_days = 180
     retention_days = min(max(int(retention_days), 30), 3650)
-    cutoff = (datetime.utcnow() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db()
     removed = 0
     try:
@@ -158,7 +158,7 @@ def purge_expired_files(retention_days=None):
         conn.close()
 
 
-def confirm_receipt(receipt_id, lines, user_name=None):
+def confirm_receipt(receipt_id, lines, user_name=None, receipt_text=None):
     """Atomically apply explicitly selected lines and record price history."""
     if not isinstance(lines, list) or not lines:
         raise ValueError("Selecciona al menos un cambio de precio")
@@ -237,8 +237,8 @@ def confirm_receipt(receipt_id, lines, user_name=None):
             )
             updated.append(item["nombre"])
         conn.execute(
-            "UPDATE insumos_boletas SET estado='confirmada', confirmado=CURRENT_TIMESTAMP, usuario_nombre=COALESCE(?, usuario_nombre), lineas_json=? WHERE id=?",
-            (user_name, json.dumps(lines, ensure_ascii=False), receipt_id),
+            "UPDATE insumos_boletas SET estado='confirmada', confirmado=CURRENT_TIMESTAMP, usuario_nombre=COALESCE(?, usuario_nombre), lineas_json=?, texto_lectura=COALESCE(?, texto_lectura) WHERE id=?",
+            (user_name, json.dumps(lines, ensure_ascii=False), receipt_text, receipt_id),
         )
         conn.commit()
         return updated

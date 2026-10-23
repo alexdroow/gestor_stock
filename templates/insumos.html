@@ -2724,14 +2724,16 @@
                                 <input id="boleta-archivo" type="file" accept="image/*,.pdf,application/pdf" capture="environment" style="display:none;" onchange="cargarArchivoBoleta(this.files[0])">
                             </label>
                             <div id="boleta-carga-mensaje" role="status" style="margin-top:12px;color:#64748b;"></div>
-                            <p style="padding:14px;background:#fff5df;border-radius:12px;color:#744700;">La lectura solo prepara una propuesta. Ningún precio ni stock cambia hasta que confirmes las líneas revisadas.</p>
+                            <div id="boleta-ocr-progreso-carga" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#edf4ff;border-radius:10px;color:#254c88;"></div>
+                            <p style="padding:14px;background:#fff5df;border-radius:12px;color:#744700;">La lectura solo prepara una propuesta. Ningún precio ni stock cambia hasta que confirmes las líneas revisadas. Si el PDF es escaneado, el OCR se ejecuta en tu navegador y no se envía a un servicio externo de reconocimiento.</p>
                         </section>
                         <section id="boleta-paso-revision" style="display:none;margin-top:16px;">
                             <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.8fr);gap:14px;">
                                 <div><label for="boleta-texto-ocr"><strong>Texto detectado · corrige antes de crear líneas</strong></label>
                                     <textarea id="boleta-texto-ocr" rows="9" style="width:100%;margin-top:6px;" placeholder="Corrige o pega aquí el texto leído de la boleta"></textarea>
                                     <button type="button" class="btn btn-secondary" style="margin-top:8px;" onclick="generarLineasBoleta()">Preparar líneas para revisar</button>
-                                    <div id="boleta-aviso-ocr" style="margin-top:8px;color:#9a5a00;"></div></div>
+                                    <div id="boleta-aviso-ocr" style="margin-top:8px;color:#9a5a00;"></div>
+                                    <div id="boleta-ocr-progreso" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#edf4ff;border-radius:10px;color:#254c88;"></div></div>
                                 <div><strong>Documento original</strong><iframe id="boleta-vista-previa" title="Boleta original" style="width:100%;height:260px;margin-top:6px;border:1px solid #d5dfed;border-radius:12px;"></iframe><a id="boleta-abrir-original" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;">Abrir original</a></div>
                             </div>
                             <div style="margin:18px 0 10px;padding:12px;background:#edf4ff;border-radius:12px;">Verifica cada coincidencia, importe y presentación. Las líneas sin producto o con dudas no se aplican.</div>
@@ -6304,6 +6306,7 @@ function obtenerTotalesListaCalculo(items) {
             document.getElementById('boleta-paso-revision').style.display = 'none';
             document.getElementById('boleta-paso-resultado').style.display = 'none';
             document.getElementById('boleta-carga-mensaje').textContent = '';
+            document.getElementById('boleta-ocr-progreso-carga').style.display = 'none';
             document.getElementById('boleta-archivo').value = '';
         }
 
@@ -6356,6 +6359,7 @@ function obtenerTotalesListaCalculo(items) {
 
         async function cargarArchivoBoleta(file) {
             if (!file) return;
+            boletaFileActual = file;
             const status = document.getElementById('boleta-carga-mensaje');
             status.textContent = 'Cargando y leyendo el documento de forma segura...';
             const body = new FormData();
@@ -6372,14 +6376,118 @@ function obtenerTotalesListaCalculo(items) {
                 const pdfUrl = detail.boleta.archivo_url;
                 document.getElementById('boleta-vista-previa').src = pdfUrl;
                 document.getElementById('boleta-abrir-original').href = pdfUrl;
-                document.getElementById('boleta-texto-ocr').value = data.texto || '';
-                document.getElementById('boleta-aviso-ocr').textContent = data.mensaje || 'Comprueba visualmente cada dato frente a la boleta original.';
+                let receiptText = String(data.texto || '').trim();
+                const textLooksIncomplete = receiptText.replace(/\s/g, '').length < 80;
+                const aviso = document.getElementById('boleta-aviso-ocr');
+                const progreso = document.getElementById('boleta-ocr-progreso');
+                if (!receiptText || textLooksIncomplete) {
+                    try {
+                        status.textContent = receiptText ? 'La lectura del PDF parece incompleta. Buscando texto en la imagen de sus páginas...' : 'El PDF no contiene texto seleccionable. Iniciando OCR de sus páginas...';
+                        progreso.style.display = '';
+                        const browserText = await reconocerBoletaLocal(file, message => {
+                            progreso.textContent = message;
+                            document.getElementById('boleta-ocr-progreso-carga').textContent = message;
+                            document.getElementById('boleta-ocr-progreso-carga').style.display = '';
+                            status.textContent = 'Reconociendo el texto del documento...';
+                        });
+                        if (browserText.trim().length > receiptText.length) receiptText = browserText.trim();
+                        if (browserText.trim()) {
+                            aviso.textContent = 'OCR completado en este dispositivo. Verifica nombres, cantidades e importes contra el original antes de confirmar.';
+                            aviso.style.color = '#087b5c';
+                        }
+                    } catch (ocrError) {
+                        aviso.textContent = `No se pudo iniciar el OCR automático (${ocrError.message || 'error de carga'}). Puedes transcribir la factura en el cuadro. El archivo original está disponible al lado.`;
+                        aviso.style.color = '#9a5a00';
+                    } finally {
+                        progreso.style.display = 'none';
+                        document.getElementById('boleta-ocr-progreso-carga').style.display = 'none';
+                    }
+                } else {
+                    aviso.textContent = 'Texto digital extraído. Verifica nombres, cantidades e importes contra el original antes de confirmar.';
+                    aviso.style.color = '#087b5c';
+                }
+                document.getElementById('boleta-texto-ocr').value = receiptText;
                 document.getElementById('boleta-paso-label').textContent = 'Paso 2 de 3 · Revisa coincidencias y precios';
                 document.getElementById('boleta-paso-carga').style.display = 'none';
                 document.getElementById('boleta-paso-revision').style.display = '';
-                if (data.texto) generarLineasBoleta();
+                if (receiptText) generarLineasBoleta();
             } catch (error) {
                 status.textContent = error.message || 'No se pudo procesar el archivo.';
+            }
+        }
+
+        let boletaFileActual = null;
+
+        const promesasLibreriasBoleta = {};
+
+        function cargarScriptBoleta(src, disponible) {
+            if (disponible()) return Promise.resolve();
+            if (promesasLibreriasBoleta[src]) return promesasLibreriasBoleta[src];
+            promesasLibreriasBoleta[src] = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = () => {
+                    delete promesasLibreriasBoleta[src];
+                    script.remove();
+                    reject(new Error('No se pudieron cargar las librerías OCR. Revisa la conexión a internet.'));
+                };
+                document.head.appendChild(script);
+            });
+            return promesasLibreriasBoleta[src];
+        }
+
+        async function reconocerBoletaLocal(file, onProgress) {
+            const pdfUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            const tesseractUrl = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+            await Promise.all([
+                cargarScriptBoleta(pdfUrl, () => Boolean(window.pdfjsLib)),
+                cargarScriptBoleta(tesseractUrl, () => Boolean(window.Tesseract))
+            ]);
+            if (!window.Tesseract || !window.Tesseract.createWorker) throw new Error('El motor OCR no quedó disponible');
+            const pdfjs = window.pdfjsLib;
+            if (pdfjs) pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            onProgress('Preparando reconocimiento en español en este dispositivo...');
+            const worker = await window.Tesseract.createWorker('spa', 1, {
+                workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',
+                langPath: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/spa@1.0.0/4.0.0_best_int',
+                logger: event => {
+                    if (event.status === 'recognizing text') onProgress(`Reconociendo texto: ${Math.round((event.progress || 0) * 100)}%`);
+                    else if (event.status) onProgress(`Preparando OCR: ${event.status}...`);
+                }
+            });
+            try {
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    if (!pdfjs) throw new Error('No se pudo abrir el PDF en el navegador');
+                    const pdf = await pdfjs.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+                    if (pdf.numPages > 20) throw new Error('La factura tiene más de 20 páginas; divídela en archivos más pequeños');
+                    const pages = [];
+                    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+                        onProgress(`Preparando página ${pageNumber} de ${pdf.numPages}...`);
+                        const page = await pdf.getPage(pageNumber);
+                        const baseViewport = page.getViewport({scale: 1});
+                        const scale = Math.min(2.4, 3200 / Math.max(baseViewport.width, baseViewport.height));
+                        const viewport = page.getViewport({scale: Math.max(scale, 1.5)});
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.ceil(viewport.width);
+                        canvas.height = Math.ceil(viewport.height);
+                        await page.render({canvasContext: canvas.getContext('2d', {willReadFrequently: true}), viewport}).promise;
+                        onProgress(`Leyendo texto de la página ${pageNumber} de ${pdf.numPages}...`);
+                        const result = await worker.recognize(canvas);
+                        pages.push(`--- Página ${pageNumber} ---\n${result.data.text || ''}`);
+                        canvas.width = 0;
+                        canvas.height = 0;
+                        page.cleanup();
+                    }
+                    return pages.join('\n\n').trim();
+                }
+                onProgress('Reconociendo el texto de la imagen...');
+                const imageResult = await worker.recognize(file);
+                return String(imageResult.data.text || '').trim();
+            } finally {
+                await worker.terminate();
             }
         }
 
@@ -6493,7 +6601,10 @@ function obtenerTotalesListaCalculo(items) {
             if (!confirm(`Se actualizarán ${selected.length} precios. El stock y las compras existentes no cambiarán. ¿Confirmas?`)) return;
             try {
                 const response = await fetch(`/api/insumos/boletas/${encodeURIComponent(boletaInsumosActual.boleta_id)}/confirmar`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({lineas})
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+                        lineas,
+                        texto_lectura: document.getElementById('boleta-texto-ocr').value
+                    })
                 });
                 const data = await response.json();
                 if (!response.ok || !data.success) throw new Error(data.error || 'No se pudieron guardar los precios');

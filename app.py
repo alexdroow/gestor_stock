@@ -13207,7 +13207,16 @@ def api_cargar_boleta_insumos():
     finally:
         conn.close()
     if duplicate:
-        return jsonify({'success': False, 'duplicate': True, 'error': 'Esta boleta ya fue cargada. No se puede aplicar dos veces.', 'boleta_id': duplicate['id'], 'estado': duplicate['estado']}), 409
+        if duplicate['estado'] == 'revision':
+            pending = insumos_boletas.get_receipt(duplicate['id'])
+            return jsonify({
+                'success': True, 'duplicate_pending': True, 'boleta_id': duplicate['id'],
+                'texto': pending.get('texto_lectura', '') if pending else '',
+                'motor': 'revision-pendiente', 'nombre_archivo': pending.get('nombre_archivo', original) if pending else original,
+                'ocr_disponible': bool(pending and pending.get('texto_lectura')),
+                'mensaje': 'Esta misma boleta ya estaba cargada y sigue pendiente. Puedes continuar con su revisión.'
+            })
+        return jsonify({'success': False, 'duplicate': True, 'error': 'Esta boleta ya fue confirmada o revertida; no se puede aplicar otra vez.', 'boleta_id': duplicate['id'], 'estado': duplicate['estado']}), 409
 
     receipt_id = insumos_boletas.make_receipt_id()
     directory = os.path.join(DATA_DIR, 'insumos_boletas')
@@ -13295,7 +13304,8 @@ def api_confirmar_boleta_insumos(receipt_id):
     try:
         data = request.get_json(silent=True) or {}
         updated = insumos_boletas.confirm_receipt(
-            receipt_id, data.get('lineas'), session.get(_ADMIN_USER_NAME_SESSION_KEY)
+            receipt_id, data.get('lineas'), session.get(_ADMIN_USER_NAME_SESSION_KEY),
+            str(data.get('texto_lectura') or '')[:200000]
         )
         crear_backup()
         return jsonify({'success': True, 'actualizados': updated, 'cantidad': len(updated)})
