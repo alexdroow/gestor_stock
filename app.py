@@ -13174,6 +13174,33 @@ def insumos():
         return f"Error: {str(e)}", 500
 
 
+def _factor_unidad_calculadora(unidad):
+    u = str(unidad or '').strip().lower().split('(')[0].strip()
+    aliases = {
+        'mg': (0.001, 'masa'), 'miligramo': (0.001, 'masa'), 'miligramos': (0.001, 'masa'),
+        'g': (1.0, 'masa'), 'gr': (1.0, 'masa'), 'grs': (1.0, 'masa'), 'gramo': (1.0, 'masa'), 'gramos': (1.0, 'masa'),
+        'kg': (1000.0, 'masa'), 'kgs': (1000.0, 'masa'), 'kilo': (1000.0, 'masa'), 'kilos': (1000.0, 'masa'), 'kilogramo': (1000.0, 'masa'), 'kilogramos': (1000.0, 'masa'),
+        'ml': (1.0, 'volumen'), 'mililitro': (1.0, 'volumen'), 'mililitros': (1.0, 'volumen'), 'cc': (1.0, 'volumen'), 'cm3': (1.0, 'volumen'),
+        'l': (1000.0, 'volumen'), 'lt': (1000.0, 'volumen'), 'litro': (1000.0, 'volumen'), 'litros': (1000.0, 'volumen'),
+        'unidad': (1.0, 'conteo'), 'unidades': (1.0, 'conteo'), 'un': (1.0, 'conteo'), 'und': (1.0, 'conteo'), 'unid': (1.0, 'conteo'), 'docena': (12.0, 'conteo'), 'docenas': (12.0, 'conteo'),
+    }
+    return aliases.get(u, (1.0, f'custom:{u}' if u else ''))
+
+
+def _convertir_unidad_calculadora(cantidad, unidad_origen, unidad_destino):
+    try:
+        cantidad = float(cantidad)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(cantidad) or cantidad <= 0:
+        return None
+    factor_origen, dimension_origen = _factor_unidad_calculadora(unidad_origen)
+    factor_destino, dimension_destino = _factor_unidad_calculadora(unidad_destino)
+    if not dimension_origen or dimension_origen != dimension_destino or factor_destino <= 0:
+        return None
+    return cantidad * factor_origen / factor_destino
+
+
 @app.route('/api/insumos/calculo-recetas', methods=['POST'])
 def api_insumos_calculo_recetas():
     """
@@ -13186,48 +13213,6 @@ def api_insumos_calculo_recetas():
       ]
     }
     """
-    def _factor_unidad_local(unidad):
-        u = str(unidad or '').strip().lower().split('(')[0].strip()
-        if not u:
-            return 1.0, 'unidad'
-        if u in {'mg', 'miligramo', 'miligramos'}:
-            return 0.001, 'g'
-        if u in {'g', 'gr', 'gramo', 'gramos'}:
-            return 1.0, 'g'
-        if u in {'kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos'}:
-            return 1000.0, 'g'
-        if u in {'ml', 'mililitro', 'mililitros', 'cc', 'cm3'}:
-            return 1.0, 'ml'
-        if u in {'l', 'lt', 'litro', 'litros'}:
-            return 1000.0, 'ml'
-        if u in {'docena', 'docenas'}:
-            return 12.0, 'unidad'
-        return 1.0, 'unidad'
-
-    def _convertir_a_unidad_costeo(cantidad_receta, unidad_receta, unidad_costeo):
-        """
-        Convierte cantidad de receta a la unidad de costeo/compra del insumo.
-        Ej: 3960 gr -> 3.96 kg, 1200 cc -> 1.2 l
-        """
-        try:
-            qty = float(cantidad_receta or 0)
-        except Exception:
-            return 0.0
-        if qty <= 0:
-            return 0.0
-
-        f_receta, base_receta = _factor_unidad_local(unidad_receta)
-        f_costeo, base_costeo = _factor_unidad_local(unidad_costeo)
-
-        # Si no son compatibles, mantenemos cantidad original.
-        if base_receta != base_costeo:
-            return qty
-
-        cantidad_base = qty * f_receta
-        if f_costeo <= 0:
-            return cantidad_base
-        return cantidad_base / f_costeo
-
     try:
         data = request.get_json(silent=True) or {}
         seleccion = data.get('seleccion')
@@ -13254,7 +13239,7 @@ def api_insumos_calculo_recetas():
             except Exception:
                 return jsonify({'success': False, 'error': f'Lotes inválidos en fila {idx}'}), 400
 
-            if lotes <= 0:
+            if not math.isfinite(lotes) or lotes <= 0:
                 return jsonify({'success': False, 'error': f'Los lotes deben ser mayores a 0 (fila {idx})'}), 400
 
             receta = mapa_recetas.get(receta_id)
@@ -13275,9 +13260,9 @@ def api_insumos_calculo_recetas():
                     insumo_id = int(insumo_id)
                     cantidad_base = float(item.get('cantidad') or 0)
                 except Exception:
-                    continue
-                if cantidad_base <= 0:
-                    continue
+                    return jsonify({'success': False, 'error': f"Cantidad inválida en receta {receta.get('nombre') or receta_id}."}), 400
+                if not math.isfinite(cantidad_base) or cantidad_base <= 0:
+                    return jsonify({'success': False, 'error': f"La cantidad de un insumo en {receta.get('nombre') or receta_id} debe ser mayor a 0."}), 400
 
                 row = acumulado.setdefault(
                     insumo_id,
@@ -13323,11 +13308,17 @@ def api_insumos_calculo_recetas():
                 unidad_costeo = dbrow['unidad_compra'] or dbrow['unidad'] or acumulado[iid]['unidad']
                 cantidad_convertida = 0.0
                 for comp in (acumulado[iid].get('componentes') or []):
-                    cantidad_convertida += _convertir_a_unidad_costeo(
+                    cantidad_item = _convertir_unidad_calculadora(
                         comp.get('cantidad') or 0,
                         comp.get('unidad') or 'unidad',
                         unidad_costeo,
                     )
+                    if cantidad_item is None:
+                        return jsonify({
+                            'success': False,
+                            'error': f"No se pueden convertir {comp.get('unidad') or 'unidad'} a {unidad_costeo} para {dbrow['nombre']}. Revisa las unidades de la receta y del insumo.",
+                        }), 400
+                    cantidad_convertida += cantidad_item
 
                 acumulado[iid]['nombre'] = dbrow['nombre'] or acumulado[iid]['nombre']
                 acumulado[iid]['unidad'] = unidad_costeo

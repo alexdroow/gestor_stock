@@ -1203,7 +1203,7 @@
     
 .insumo-calc-row {
     display: grid;
-    grid-template-columns: minmax(280px, 2fr) 120px 80px 120px 92px 44px 44px;
+    grid-template-columns: minmax(240px, 2fr) minmax(130px, 1fr) minmax(140px, 1fr) minmax(130px, 1fr) 88px;
     align-items: center;
     gap: 12px;
     padding: 12px 16px;
@@ -1212,6 +1212,16 @@
     margin-bottom: 12px;
     transition: all 0.2s ease;
     min-height: 68px;
+}
+
+.calc-row-head {
+    display: grid;
+    grid-template-columns: minmax(240px, 2fr) minmax(130px, 1fr) minmax(140px, 1fr) minmax(130px, 1fr) 88px;
+    gap: 12px;
+    padding: 0 16px 6px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
 }
         
         body.dark-mode .insumo-calc-row {
@@ -1238,6 +1248,7 @@
         .insumo-calc-precio {
             font-size: 13px;
             color: #64748b;
+            cursor: pointer;
         }
 
         .insumo-calc-precio.warn {
@@ -1274,6 +1285,8 @@
             text-align: right;
             font-size: 16px;
         }
+
+        .insumo-calc-total strong.warn { color: #b91c1c; font-size: 13px; }
         
 .btn-remove-calc {
     background: #fee2e2;
@@ -1895,8 +1908,9 @@
         }
 
         @media (max-width: 1200px) {
+            .calc-row-head { grid-template-columns: minmax(180px, 1.5fr) minmax(105px, .9fr) minmax(115px, 1fr) minmax(110px, 1fr) 78px; gap: 8px; }
             .insumo-calc-row {
-                grid-template-columns: minmax(200px, 1fr) 90px 52px 80px 78px 36px 36px;
+                grid-template-columns: minmax(180px, 1.5fr) minmax(105px, .9fr) minmax(115px, 1fr) minmax(110px, 1fr) 78px;
                 gap: 8px;
                 padding: 10px 12px;
             }
@@ -1911,6 +1925,7 @@
         }
 
         @media (max-width: 760px) {
+            .calc-row-head { display: none; }
             .pendientes-resumen {
                 grid-template-columns: repeat(2, minmax(120px, 1fr));
             }
@@ -1920,20 +1935,27 @@
             }
 
             .insumo-calc-row {
-                grid-template-columns: 1fr;
-                gap: 8px;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: 10px 12px;
                 min-height: auto;
+                align-items: end;
             }
 
+            .insumo-calc-row > div:first-child { grid-column: 1 / -1; }
+            .insumo-calc-row > div:nth-child(2) { grid-column: 1; }
+            .insumo-calc-row > div:nth-child(3) { display: none !important; }
+            .insumo-calc-row > div:nth-child(4) { grid-column: 2; justify-content: flex-end !important; height: auto !important; }
+            .insumo-calc-row > div:nth-child(5) { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+
             .btn-fila-pendiente {
-                width: 100%;
+                width: 42px;
                 height: 36px;
-                min-width: 0;
+                min-width: 42px;
             }
 
             .btn-fila-pendiente.btn-fila-pendiente-compact {
-                width: 100%;
-                min-width: 0;
+                width: 42px;
+                min-width: 42px;
             }
         }
     </style>
@@ -2753,6 +2775,7 @@
                                 <div id="calc-recetas-msg" class="recetas-calc-msg"></div>
                             </div>
 
+                            <div class="calc-row-head" aria-hidden="true"><span>INSUMO</span><span>CANTIDAD</span><span>PRECIO / UNIDAD</span><span>SUBTOTAL</span><span></span></div>
                             <div id="lista-calculo">
                                     <!-- Las filas se agregan dinámicamente aquí -->
                                 </div>
@@ -2772,7 +2795,7 @@
                                     <span class="total-valor" id="total-items">0</span>
                                 </div>
                                 <div class="total-item">
-                                    <span class="total-label">Sin IVA (19%)</span>
+                                    <span class="total-label">Total sin IVA</span>
                                     <span class="total-valor" id="total-sin-iva">$0</span>
                                 </div>
                                 <div class="total-item">
@@ -2858,6 +2881,25 @@
             </div> <!-- FIN TABS-CONTAINER -->
         </main>
    </div>    
+
+    <div id="modal-precio-calculo" role="dialog" aria-modal="true" aria-labelledby="modal-precio-titulo" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(15,23,42,.48);padding:18px;align-items:center;justify-content:center;">
+        <div style="width:min(760px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid #93c5fd;border-radius:18px;padding:24px;box-shadow:0 24px 70px rgba(15,23,42,.25);">
+            <h2 id="modal-precio-titulo" style="margin:0 0 8px;color:#172b50;">Cambiar precio / presentación</h2>
+            <h3 id="modal-precio-nombre" style="margin:0 0 18px;color:#172b50;"></h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+                <label>Precio registrado ($)<input id="modal-precio-compra" type="number" min="0" step="1" style="display:block;width:100%;margin-top:6px;padding:12px;border:1px solid #cbd5e1;border-radius:9px;"></label>
+                <label>Contenido de la presentación<input id="modal-precio-cantidad" type="number" min="0.0001" step="any" style="display:block;width:100%;margin-top:6px;padding:12px;border:1px solid #cbd5e1;border-radius:9px;"></label>
+                <label>Unidad de compra<select id="modal-precio-unidad" style="display:block;width:100%;margin-top:6px;padding:12px;border:1px solid #cbd5e1;border-radius:9px;"><option value="unidad">unidad</option><option value="kg">kg</option><option value="g">g</option><option value="l">L</option><option value="ml">ml</option><option value="docena">docena</option></select></label>
+                <label style="display:flex;align-items:center;gap:8px;padding-top:20px;"><input id="modal-precio-incluye-iva" type="checkbox"> El precio ya incluye IVA</label>
+            </div>
+            <div id="modal-precio-calculo-preview" style="margin-top:18px;padding:16px;border-radius:12px;background:#e4f8ef;color:#00845d;font-size:18px;font-weight:700;"></div>
+            <p style="color:#64748b;font-size:13px;">Este cambio se aplica solo a esta línea de la lista; no modifica el catálogo maestro.</p>
+            <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalPrecioCalculo()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="aplicarPrecioModalCalculo()">Aplicar a esta línea</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         let filasCalculo = [];
@@ -4081,8 +4123,8 @@ let insumosData = [
         unidad: {{ i.unidad|tojson }},
         unidad_compra: {{ (i.unidad_compra or i.unidad)|tojson }},
         precio_unitario: {{ (i.precio_unitario or 0)|tojson }},
-        cantidad_comprada: {{ (i.cantidad_comprada or 1)|tojson }},
-        precio_incluye_iva: {{ (true if i.precio_incluye_iva else false)|tojson }},
+        cantidad_comprada: {{ (i.cantidad_comprada if i.cantidad_comprada is not none else 0)|tojson }},
+        precio_incluye_iva: {{ (true if i.precio_incluye_iva is none or i.precio_incluye_iva else false)|tojson }},
         codigo_barra: {{ (i.codigo_barra or '')|tojson }}
     }{% if not loop.last %},{% endif %}
     {% endfor %}
@@ -4193,10 +4235,10 @@ let insumosData = [
         function precioUnitarioEfectivoCalculo(insumo) {
             if (!insumo) return 0;
             const precioCompra = Number(insumo.precio_unitario || 0);
-            const cantidadCompra = Number(insumo.cantidad_comprada || 1);
+            const cantidadCompra = Number(insumo.cantidad_comprada);
             if (!Number.isFinite(precioCompra) || precioCompra <= 0) return 0;
-            const divisor = Number.isFinite(cantidadCompra) && cantidadCompra > 0 ? cantidadCompra : 1;
-            return precioCompra / divisor;
+            if (!Number.isFinite(cantidadCompra) || cantidadCompra <= 0) return 0;
+            return precioCompra / cantidadCompra;
         }
 
         function etiquetaPrecioInsumoCalculo(insumo) {
@@ -4585,13 +4627,14 @@ let insumosData = [
         function construirPayloadDesdeFilaCalculo(fila) {
             if (!fila || fila === null || !fila.insumoId) return null;
             const cantidad = Number(fila.cantidad || 0);
-            if (!Number.isFinite(cantidad) || cantidad <= 0) return null;
+            const precio = Number(fila.precio || 0);
+            if (!Number.isFinite(cantidad) || cantidad <= 0 || !Number.isFinite(precio) || precio <= 0) return null;
             return {
                 insumo_id: fila.insumoId,
                 nombre: fila.nombre || 'Insumo',
                 cantidad: cantidad,
                 unidad: fila.unidad || 'unidad',
-                precio_unitario: Number(fila.precio || 0),
+                precio_unitario: precio,
                 precio_incluye_iva: fila.precio_incluye_iva !== false,
                 estado: 'pendiente'
             };
@@ -4675,12 +4718,17 @@ let insumosData = [
             setMensajeRecetasCalculo('Planificacion limpia.');
         }
 
-        function buscarFilaActivaPorInsumo(insumoId) {
+        function buscarFilaActivaPorInsumo(insumoId, presentacion = null) {
             const idBuscado = Number(insumoId || 0);
             if (!idBuscado) return -1;
             for (let i = 0; i < filasCalculo.length; i += 1) {
                 const fila = filasCalculo[i];
-                if (fila && Number(fila.insumoId || 0) === idBuscado) return i;
+                if (!fila || Number(fila.insumoId || 0) !== idBuscado) continue;
+                if (!presentacion) return i;
+                const mismaUnidad = String(fila.unidad || '').trim().toLowerCase() === String(presentacion.unidad || '').trim().toLowerCase();
+                const mismoPrecio = Math.abs(Number(fila.precio || 0) - Number(presentacion.precio_unitario || 0)) < 0.000001;
+                const mismoIva = Boolean(fila.precio_incluye_iva) === Boolean(presentacion.precio_incluye_iva);
+                if (mismaUnidad && mismoPrecio && mismoIva) return i;
             }
             return -1;
         }
@@ -4688,10 +4736,19 @@ let insumosData = [
         function upsertFilaCalculoDesdeInsumo(item) {
             const insumoId = Number(item.insumo_id || 0);
             if (!insumoId) return;
-            let idx = buscarFilaActivaPorInsumo(insumoId);
+            let idx = buscarFilaActivaPorInsumo(insumoId, item);
             if (idx < 0) {
                 idx = agregarFilaCalculo();
                 seleccionarInsumoFila(idx, insumoId);
+                filasCalculo[idx].precio = Number(item.precio_unitario || filasCalculo[idx].precio || 0);
+                filasCalculo[idx].unidad = String(item.unidad || filasCalculo[idx].unidad || 'unidad');
+                filasCalculo[idx].precio_incluye_iva = Boolean(item.precio_incluye_iva);
+                filasCalculo[idx].snapshot = true;
+                const insumoCatalogo = insumosData.find(i => Number(i.id) === insumoId) || {};
+                filasCalculo[idx].precio_compra = Number(insumoCatalogo.precio_unitario || 0);
+                filasCalculo[idx].cantidad_presentacion = Number(insumoCatalogo.cantidad_comprada || 0);
+                document.getElementById('unidad-' + idx).textContent = filasCalculo[idx].unidad;
+                document.getElementById('precio-unidad-' + idx).textContent = filasCalculo[idx].precio > 0 ? formatearCLP(filasCalculo[idx].precio) : 'Revisar precio';
             }
             const cantidadInput = document.getElementById('cantidad-' + idx);
             if (!cantidadInput) return;
@@ -4793,16 +4850,17 @@ let insumosData = [
 
         function agregarFilaCalculoAPendientes(index) {
             const fila = filasCalculo[index];
-            const payload = construirPayloadDesdeFilaCalculo(fila);
-            if (!payload) {
-                alert('Selecciona un insumo y una cantidad mayor a 0.');
+            const error = validarFilaCalculo(fila, index);
+            if (error) {
+                alert(error);
                 return;
             }
+            const payload = construirPayloadDesdeFilaCalculo(fila);
 
             fetch('/api/compras-pendientes', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ items: [payload] })
             })
             .then(r => r.json())
             .then(data => {
@@ -4813,6 +4871,11 @@ let insumosData = [
         }
 
         function agregarActivosAPendientes() {
+            const error = validarListaCalculo();
+            if (error) {
+                alert(error);
+                return;
+            }
             const items = filasCalculo
                 .map(f => construirPayloadDesdeFilaCalculo(f))
                 .filter(Boolean);
@@ -4833,6 +4896,25 @@ let insumosData = [
                 renderComprasPendientes(data.items || [], data.resumen || resumenPendientesVacio());
             })
             .catch(err => alert('[ERROR] ' + err.message));
+        }
+
+        function validarFilaCalculo(fila, index) {
+            if (!fila || !fila.insumoId) return `Selecciona un insumo en la fila ${Number(index) + 1}.`;
+            const cantidad = Number(fila.cantidad || 0);
+            if (!Number.isFinite(cantidad) || cantidad <= 0) return `Ingresa una cantidad mayor a 0 para ${fila.nombre || 'el insumo'}.`;
+            if (/^(unidad|unidades)$/i.test(String(fila.unidad || '')) && !Number.isInteger(cantidad)) return `La cantidad de ${fila.nombre || 'este insumo'} debe ser un número entero.`;
+            if (!Number.isFinite(Number(fila.precio)) || Number(fila.precio) <= 0) return `Revisa el precio y la presentación de ${fila.nombre || 'el insumo'} antes de continuar.`;
+            return '';
+        }
+
+        function validarListaCalculo() {
+            const seleccionadas = filasCalculo.map((fila, index) => ({ fila, index })).filter(({ fila }) => fila && fila.insumoId);
+            if (!seleccionadas.length) return 'Agrega al menos un insumo a la lista.';
+            for (const { fila, index } of seleccionadas) {
+                const error = validarFilaCalculo(fila, index);
+                if (error) return error;
+            }
+            return '';
         }
 
         function actualizarCompraPendiente(id, campo, valor) {
@@ -5313,7 +5395,7 @@ let insumosData = [
                 const hidden = document.getElementById('insumo-id-' + i);
                 const cantidadEl = document.getElementById('cantidad-' + i);
                 const insumoId = Number((hidden && hidden.value) || fila.insumoId || 0);
-                const cantidad = Number((cantidadEl && cantidadEl.value) || fila.cantidad || 0);
+                const cantidad = cantidadEl ? _leerCantidadFila(i) : Number(fila.cantidad || 0);
                 if (!insumoId && !cantidad) continue;
                 items.push({
                     insumoId: insumoId || null,
@@ -5321,7 +5403,10 @@ let insumosData = [
                     precio: Number(fila.precio || 0),
                     unidad: String(fila.unidad || ''),
                     nombre: String(fila.nombre || ''),
-                    precio_incluye_iva: Boolean(fila.precio_incluye_iva)
+                    precio_incluye_iva: Boolean(fila.precio_incluye_iva),
+                    precio_compra: Number(fila.precio_compra || 0),
+                    cantidad_presentacion: Number(fila.cantidad_presentacion || 1),
+                    snapshot: Boolean(fila.snapshot)
                 });
             }
             return { items };
@@ -5399,10 +5484,26 @@ let insumosData = [
                     const cantidadEl = document.getElementById('cantidad-' + idx);
                     if (hidden) hidden.value = String(Number(it.insumoId || 0) || '');
                     if (input) input.value = String(it.nombre || '');
-                    actualizarFilaCalculo(idx);
+                    if (Number(it.insumoId || 0)) {
+                        filasCalculo[idx] = {
+                            ...filasCalculo[idx],
+                            insumoId: Number(it.insumoId),
+                            precio: Number(it.precio || 0),
+                            unidad: String(it.unidad || ''),
+                            nombre: String(it.nombre || ''),
+                            precio_incluye_iva: it.precio_incluye_iva !== false,
+                            precio_compra: Number(it.precio_compra || 0),
+                            cantidad_presentacion: Number(it.cantidad_presentacion || 1),
+                            snapshot: Number(it.precio || 0) > 0
+                        };
+                    }
+                    actualizarFilaCalculo(idx, true);
                     if (cantidadEl) cantidadEl.value = String(Number(it.cantidad || 0) || '');
                     calcularTotalFila(idx);
                 });
+                for (let idx = 0; idx < filasCalculo.length; idx += 1) {
+                    consolidarFilaCalculo(idx);
+                }
                 calculadoraStateEnRestauracion = false;
                 return true;
             } catch (_) {
@@ -5549,20 +5650,23 @@ fila.innerHTML = `
         <div class="insumo-calc-precio" id="precio-info-${index}" style="margin-top: 2px; font-size: 11px; line-height: 1.2;">Selecciona un insumo</div>
     </div>
 
-<div style="display: flex; flex-direction: column; justify-content: center; height: 44px;">
-    <input type="number" class="insumo-calc-input" id="cantidad-${index}" placeholder="Cant" min="0.01" step="0.01" onchange="calcularTotalFila(${index})" oninput="calcularTotalFila(${index})">
-    <div style="margin-top: 2px; font-size: 11px; line-height: 1.2; visibility: hidden;">.</div>
+<div style="display: flex; flex-direction: column; justify-content: center; min-height: 58px;">
+    <span style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;">Cantidad</span>
+    <input type="number" class="insumo-calc-input" id="cantidad-${index}" placeholder="Cant" min="0.01" step="0.01" onchange="calcularTotalFila(${index}); consolidarFilaCalculo(${index})" oninput="calcularTotalFila(${index})">
 </div>
 
-    <div style="display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 13px; height: 44px;" id="unidad-${index}">
-        -
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:4px;color:#64748b;font-size:13px;min-height:44px;">
+        <span id="precio-unidad-${index}" style="font-weight:700;color:#172b50;">-</span>
+        <span id="unidad-${index}">-</span>
     </div>
-    <div style="display: flex; align-items: center; justify-content: flex-end; height: 44px;" class="insumo-calc-total" id="total-${index}">
-        $0
+    <div style="display:flex;flex-direction:column;align-items:flex-end;justify-content:center;min-height:58px;gap:4px;" class="insumo-calc-total">
+        <span style="font-size:11px;font-weight:600;color:#64748b;">Subtotal</span>
+        <strong id="total-${index}">$0</strong>
     </div>
-    <button onclick="limpiarInsumoFila(${index})" class="btn-fila-pendiente" title="Cambiar insumo">Cambiar</button>
-    <button onclick="agregarFilaCalculoAPendientes(${index})" class="btn-fila-pendiente btn-fila-pendiente-compact" title="Agregar a pendientes">+</button>
-    <button onclick="eliminarFilaCalculo(${index})" class="btn-remove-calc" title="Eliminar">&#215;</button>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+        <button onclick="agregarFilaCalculoAPendientes(${index})" class="btn-fila-pendiente btn-fila-pendiente-compact" title="Agregar a pendientes">+</button>
+        <button onclick="eliminarFilaCalculo(${index})" class="btn-remove-calc" title="Eliminar">&#215;</button>
+    </div>
 `;
             
             container.appendChild(fila);
@@ -5571,7 +5675,7 @@ fila.innerHTML = `
             return index;
         }
 
-        function actualizarFilaCalculo(index) {
+        function actualizarFilaCalculo(index, conservarSnapshot = false) {
             const hidden = document.getElementById('insumo-id-' + index);
             const infoEl = document.getElementById('precio-info-' + index);
 
@@ -5581,34 +5685,49 @@ fila.innerHTML = `
                 if (infoEl) {
                     infoEl.textContent = 'Selecciona un insumo';
                     infoEl.classList.remove('warn');
+                    infoEl.onclick = null;
+                    infoEl.onkeydown = null;
+                    infoEl.removeAttribute('role');
+                    infoEl.removeAttribute('tabindex');
                 }
                 document.getElementById('unidad-' + index).textContent = '-';
+                document.getElementById('precio-unidad-' + index).textContent = '-';
                 filasCalculo[index] = { ...filasCalculo[index], insumoId: null, precio: 0, unidad: '', nombre: '' };
                 calcularTotales();
                 return;
             }
-            const precio = Number(precioUnitarioEfectivoCalculo(insumo) || 0);
-            const unidadCompra = insumo.unidad_compra || insumo.unidad || '';
+            const anterior = filasCalculo[index] || {};
+            const usarSnapshot = conservarSnapshot && Number(anterior.insumoId) === insumoId && anterior.snapshot;
+            const precio = usarSnapshot ? Number(anterior.precio || 0) : Number(precioUnitarioEfectivoCalculo(insumo) || 0);
+            const unidadCompra = usarSnapshot ? (anterior.unidad || insumo.unidad_compra || insumo.unidad || '') : (insumo.unidad_compra || insumo.unidad || '');
             const nombre = insumo ? insumo.nombre : ('Insumo ' + insumoId);
 filasCalculo[index] = {
-    ...filasCalculo[index],
+    ...anterior,
     insumoId: insumoId,
     precio: precio,
     unidad: unidadCompra,
     nombre: nombre,
-    precio_incluye_iva: insumo ? Boolean(insumo.precio_incluye_iva) : true
+    precio_incluye_iva: usarSnapshot ? anterior.precio_incluye_iva !== false : Boolean(insumo.precio_incluye_iva),
+    precio_compra: usarSnapshot ? Number(anterior.precio_compra || 0) : Number(insumo.precio_unitario || 0),
+    cantidad_presentacion: usarSnapshot ? Number(anterior.cantidad_presentacion || 0) : Number(insumo.cantidad_comprada || 0),
+    snapshot: true
 };
             
             const precioCompra = Number(insumo ? insumo.precio_unitario : 0);
-            const cantidadCompra = Number(insumo ? insumo.cantidad_comprada : 1);
+            const cantidadCompra = Number(insumo ? insumo.cantidad_comprada : 0);
             const divisor = (Number.isFinite(cantidadCompra) && cantidadCompra > 0) ? cantidadCompra : 1;
-            const precioEfectivo = (precioCompra > 0) ? (precioCompra / divisor) : 0;
+            const precioEfectivo = usarSnapshot ? precio : ((precioCompra > 0 && cantidadCompra > 0) ? (precioCompra / divisor) : 0);
             const warning = diagnosticoCosteoInsumo(insumo);
 
             if (precio > 0) {
                 if (infoEl) {
-                    infoEl.textContent = `Valor: $${Math.round(precioEfectivo || precio).toLocaleString('es-CL')} / ${unidadCompra || 'unidad'}`;
+                    infoEl.textContent = `Valor: ${formatearCLP(precioEfectivo || precio)} / ${unidadCompra || 'unidad'} · Cambiar`;
                     infoEl.classList.toggle('warn', Boolean(warning));
+                    infoEl.onclick = () => abrirModalPrecioCalculo(index);
+                    infoEl.setAttribute('role', 'button');
+                    infoEl.tabIndex = 0;
+                    infoEl.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); abrirModalPrecioCalculo(index); } };
+                    infoEl.title = 'Cambiar el precio o la presentación de esta línea';
                 }
             } else {
                 if (infoEl) {
@@ -5616,13 +5735,9 @@ filasCalculo[index] = {
                     infoEl.classList.add('warn');
                 }
                 // Permitir ingresar precio manual por unidad de compra
-                const precioManual = prompt(`Este insumo no tiene precio unitario registrado. Ingresa precio por ${unidadCompra || 'unidad'}:`);
-                if (precioManual && !isNaN(precioManual)) {
-                    filasCalculo[index].precio = parseFloat(precioManual);
-                    if (infoEl) {
-                        infoEl.textContent = `Valor: $${Math.round(filasCalculo[index].precio).toLocaleString('es-CL')} / ${unidadCompra || 'unidad'}`;
-                        infoEl.classList.remove('warn');
-                    }
+                if (infoEl) {
+                    infoEl.textContent = `Revisar precio · configurar`;
+                    infoEl.onclick = () => abrirModalPrecioCalculo(index);
                 }
             }
             if (warning && infoEl) {
@@ -5630,7 +5745,104 @@ filasCalculo[index] = {
             }
             
 document.getElementById('unidad-' + index).textContent = unidadCompra;
+            document.getElementById('precio-unidad-' + index).textContent = precio > 0 ? formatearCLP(precio) : 'Revisar precio';
             guardarEstadoCalculadora();
+        }
+
+        let filaModalPrecioCalculo = null;
+
+        function abrirModalPrecioCalculo(index) {
+            const fila = filasCalculo[index];
+            if (!fila || !fila.insumoId) return;
+            filaModalPrecioCalculo = index;
+            const insumo = insumosData.find(i => Number(i.id) === Number(fila.insumoId)) || {};
+            document.getElementById('modal-precio-nombre').textContent = fila.nombre || insumo.nombre || 'Insumo';
+            document.getElementById('modal-precio-compra').value = String(fila.precio_compra ?? insumo.precio_unitario ?? 0);
+            document.getElementById('modal-precio-cantidad').value = String(fila.cantidad_presentacion ?? insumo.cantidad_comprada ?? 1);
+            const unidad = String(fila.unidad || insumo.unidad_compra || insumo.unidad || 'unidad');
+            const unidadSelect = document.getElementById('modal-precio-unidad');
+            if (!Array.from(unidadSelect.options).some(opt => opt.value.toLowerCase() === unidad.toLowerCase())) {
+                unidadSelect.add(new Option(unidad, unidad.toLowerCase()));
+            }
+            unidadSelect.value = unidad.toLowerCase();
+            document.getElementById('modal-precio-incluye-iva').checked = fila.precio_incluye_iva !== false;
+            ['modal-precio-compra', 'modal-precio-cantidad', 'modal-precio-unidad'].forEach(id => {
+                document.getElementById(id).oninput = actualizarPreviewPrecioModalCalculo;
+                document.getElementById(id).onchange = actualizarPreviewPrecioModalCalculo;
+            });
+            actualizarPreviewPrecioModalCalculo();
+            document.getElementById('modal-precio-calculo').style.display = 'flex';
+        }
+
+        function actualizarPreviewPrecioModalCalculo() {
+            const precioCompra = Number(document.getElementById('modal-precio-compra').value);
+            const cantidad = Number(document.getElementById('modal-precio-cantidad').value);
+            const unidad = document.getElementById('modal-precio-unidad').value || 'unidad';
+            const fila = filasCalculo[filaModalPrecioCalculo];
+            const cantidadLista = fila ? _leerCantidadFila(filaModalPrecioCalculo) : 0;
+            const precioUnidad = precioCompra / cantidad;
+            const subtotal = cantidadLista * precioUnidad;
+            document.getElementById('modal-precio-calculo-preview').textContent =
+                !Number.isFinite(precioUnidad) || precioUnidad <= 0
+                    ? 'Ingresa un precio y contenido de presentación válidos.'
+                    : cantidadLista <= 0
+                        ? `Precio calculado: ${formatearCLP(precioUnidad)} / ${unidad}. Ingresa la cantidad para ver el subtotal.`
+                        : `${cantidadLista} ${unidad} × ${formatearCLP(precioUnidad)} / ${unidad} = ${formatearCLP(subtotal)}`;
+        }
+
+        function factorUnidadListaCompra(unidad) {
+            const u = String(unidad || '').trim().toLowerCase();
+            const unidades = {
+                mg: [0.001, 'masa'], g: [1, 'masa'], gr: [1, 'masa'], grs: [1, 'masa'], kg: [1000, 'masa'], kgs: [1000, 'masa'],
+                ml: [1, 'volumen'], cc: [1, 'volumen'], l: [1000, 'volumen'], lt: [1000, 'volumen'],
+                unidad: [1, 'conteo'], unidades: [1, 'conteo'], un: [1, 'conteo'], und: [1, 'conteo'], unid: [1, 'conteo'],
+                docena: [12, 'conteo'], docenas: [12, 'conteo']
+            };
+            return unidades[u] || [1, u ? `custom:${u}` : ''];
+        }
+
+        function convertirCantidadLista(cantidad, unidadOrigen, unidadDestino) {
+            const [factorOrigen, dimensionOrigen] = factorUnidadListaCompra(unidadOrigen);
+            const [factorDestino, dimensionDestino] = factorUnidadListaCompra(unidadDestino);
+            if (!dimensionOrigen || dimensionOrigen !== dimensionDestino) return null;
+            return Number(cantidad) * factorOrigen / factorDestino;
+        }
+
+        function cerrarModalPrecioCalculo() {
+            document.getElementById('modal-precio-calculo').style.display = 'none';
+            filaModalPrecioCalculo = null;
+        }
+
+        function aplicarPrecioModalCalculo() {
+            const index = filaModalPrecioCalculo;
+            const precioCompra = Number(document.getElementById('modal-precio-compra').value);
+            const cantidad = Number(document.getElementById('modal-precio-cantidad').value);
+            const unidad = String(document.getElementById('modal-precio-unidad').value || '').trim();
+            if (!Number.isFinite(precioCompra) || precioCompra <= 0 || !Number.isFinite(cantidad) || cantidad <= 0 || !unidad) {
+                alert('El precio y el contenido de la presentación deben ser mayores a 0.');
+                return;
+            }
+            const fila = filasCalculo[index];
+            const cantidadAnterior = _leerCantidadFila(index);
+            const cantidadConvertida = convertirCantidadLista(cantidadAnterior, fila.unidad || unidad, unidad);
+            if (cantidadConvertida === null) {
+                alert('No se puede convertir la cantidad entre esas unidades. Mantén la unidad actual o crea una línea nueva.');
+                return;
+            }
+            fila.precio = precioCompra / cantidad;
+            fila.precio_compra = precioCompra;
+            fila.cantidad_presentacion = cantidad;
+            fila.unidad = unidad;
+            fila.precio_incluye_iva = document.getElementById('modal-precio-incluye-iva').checked;
+            fila.snapshot = true;
+            const cantidadInput = document.getElementById('cantidad-' + index);
+            if (cantidadInput) cantidadInput.value = String(Math.round(cantidadConvertida * 10000) / 10000);
+            document.getElementById('unidad-' + index).textContent = unidad;
+            document.getElementById('precio-unidad-' + index).textContent = formatearCLP(fila.precio);
+            document.getElementById('precio-info-' + index).textContent = `Valor: ${formatearCLP(fila.precio)} / ${unidad} · Cambiar`;
+            calcularTotalFila(index);
+            consolidarFilaCalculo(index);
+            cerrarModalPrecioCalculo();
         }
 
         function _leerCantidadFila(index) {
@@ -5643,15 +5855,36 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
         function calcularTotalFila(index) {
             const cantidad = _leerCantidadFila(index);
             const precio = Number((filasCalculo[index] && filasCalculo[index].precio) || 0);
-            const total = cantidad * precio;
+            const total = Math.round((cantidad * precio + Number.EPSILON) * 100) / 100;
             
             filasCalculo[index].cantidad = cantidad;
             filasCalculo[index].total = total;
             
-            document.getElementById('total-' + index).textContent = '$' + total.toLocaleString();
+            const totalEl = document.getElementById('total-' + index);
+            totalEl.textContent = precio > 0 ? (cantidad > 0 ? formatearCLP(total) : 'Ingresa cantidad') : 'Revisar precio';
+            totalEl.classList.toggle('warn', !(precio > 0) || !(cantidad > 0));
             
             calcularTotales();
             guardarEstadoCalculadora();
+        }
+
+        function consolidarFilaCalculo(index) {
+            const fila = filasCalculo[index];
+            if (!fila || !fila.insumoId || !(fila.cantidad > 0)) return;
+            const destino = filasCalculo.findIndex((otra, otroIndex) => {
+                if (!otra || otroIndex === index || Number(otra.insumoId) !== Number(fila.insumoId)) return false;
+                return String(otra.unidad || '').toLowerCase() === String(fila.unidad || '').toLowerCase()
+                    && Math.abs(Number(otra.precio || 0) - Number(fila.precio || 0)) < 0.000001
+                    && Boolean(otra.precio_incluye_iva) === Boolean(fila.precio_incluye_iva);
+            });
+            if (destino < 0) return;
+            const cantidad = Number(filasCalculo[destino].cantidad || 0) + Number(fila.cantidad || 0);
+            const inputDestino = document.getElementById('cantidad-' + destino);
+            if (inputDestino) inputDestino.value = String(Math.round(cantidad * 10000) / 10000);
+            const nodo = document.getElementById('fila-calc-' + index);
+            if (nodo) nodo.remove();
+            filasCalculo[index] = null;
+            calcularTotalFila(destino);
         }
 
         function eliminarFilaCalculo(index) {
@@ -5664,7 +5897,6 @@ document.getElementById('unidad-' + index).textContent = unidadCompra;
         }
 
 function calcularTotales() {
-    const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null);
     // Recalcular totales por fila con la cantidad actual escrita por el usuario.
     for (let i = 0; i < filasCalculo.length; i += 1) {
         const f = filasCalculo[i];
@@ -5672,21 +5904,39 @@ function calcularTotales() {
         const cantidad = _leerCantidadFila(i);
         const precio = Number(f.precio || 0);
         f.cantidad = cantidad;
-        f.total = cantidad * precio;
+        f.total = Math.round((cantidad * precio + Number.EPSILON) * 100) / 100;
         const totalEl = document.getElementById('total-' + i);
-        if (totalEl) totalEl.textContent = '$' + Number(f.total || 0).toLocaleString('es-CL');
+        if (totalEl) {
+            totalEl.textContent = Number(f.precio || 0) <= 0 ? 'Revisar precio' : (cantidad <= 0 ? 'Ingresa cantidad' : formatearCLP(f.total || 0));
+            totalEl.classList.toggle('warn', Number(f.precio || 0) <= 0 || cantidad <= 0);
+        }
     }
-    // Regla visual: el total de filas mostrado en pantalla es la base (sin IVA).
-    const totalSinIva = activas.reduce((acc, f) => acc + Number(f.total || 0), 0);
-    const totalConIva = totalSinIva * 1.19;
-    
+    const activas = filasCalculo.filter(f => f && f.insumoId !== null);
+    const totales = obtenerTotalesListaCalculo(activas);
+
     document.getElementById('total-items').textContent = activas.length;
-    document.getElementById('total-sin-iva').textContent = '$' + Math.round(totalSinIva).toLocaleString();
-    document.getElementById('total-con-iva').textContent = '$' + Math.round(totalConIva).toLocaleString();
+    document.getElementById('total-sin-iva').textContent = formatearCLP(totales.sinIva);
+    document.getElementById('total-con-iva').textContent = formatearCLP(totales.conIva);
     guardarEstadoCalculadora();
 }
 
+function obtenerTotalesListaCalculo(items) {
+    return (items || []).reduce((acc, f) => {
+        const bruto = Number(f.total || 0);
+        if (f.precio_incluye_iva) {
+            acc.conIva += bruto;
+            acc.sinIva += bruto / 1.19;
+        } else {
+            acc.sinIva += bruto;
+            acc.conIva += bruto * 1.19;
+        }
+        return acc;
+    }, { sinIva: 0, conIva: 0 });
+}
+
     function imprimirLista() {
+        const error = validarListaCalculo();
+        if (error) { alert(error); return; }
         const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null);
         
         if (activas.length === 0) {
@@ -5751,8 +6001,9 @@ function calcularTotales() {
         const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null);
         
         // Calcular totales
-        const totalSinIva = activas.reduce((acc, f) => acc + Number(f.total || 0), 0);
-        const totalConIva = totalSinIva * 1.19;
+        const totales = obtenerTotalesListaCalculo(activas);
+        const totalSinIva = totales.sinIva;
+        const totalConIva = totales.conIva;
         
         // Crear contenido HTML para imprimir
         const contenido = `
@@ -5903,6 +6154,8 @@ function calcularTotales() {
     }
 
     function exportarExcel() {
+        const error = validarListaCalculo();
+        if (error) { alert(error); return; }
         const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null);
         
         if (activas.length === 0) {
@@ -5916,8 +6169,9 @@ function calcularTotales() {
             csv += `"${f.nombre}",${f.cantidad},"${f.unidad || ''}",${f.precio},${f.total}\n`;
         });
         
-        const totalSinIva = activas.reduce((acc, f) => acc + Number(f.total || 0), 0);
-        const totalConIva = totalSinIva * 1.19;
+        const totales = obtenerTotalesListaCalculo(activas);
+        const totalSinIva = totales.sinIva;
+        const totalConIva = totales.conIva;
         
         csv += `\n,,,Subtotal,${totalSinIva}\n`;
         csv += `,,,IVA (19%),${totalConIva - totalSinIva}\n`;
@@ -5931,6 +6185,8 @@ function calcularTotales() {
     }
 
     function enviarListaWhatsappInsumos() {
+        const error = validarListaCalculo();
+        if (error) { alert(error); return; }
         const activas = filasCalculo.filter(f => f !== null && f.insumoId !== null && Number(f.cantidad || 0) > 0);
         if (activas.length === 0) {
             alert('No hay insumos en la lista para enviar.');
@@ -5944,10 +6200,11 @@ function calcularTotales() {
             const cantTexto = Number.isInteger(cant) ? String(cant) : cant.toLocaleString('es-CL', { maximumFractionDigits: 3 });
             const unidad = (f.unidad || 'unidad').toString().trim();
             const nombre = (f.nombre || 'Insumo').toString().trim();
-            return `${idx + 1}. ${nombre}: ${cantTexto} ${unidad}`;
+            return `${idx + 1}. ${nombre}: ${cantTexto} ${unidad} × ${formatearCLP(f.precio || 0)} / ${unidad} = ${formatearCLP(f.total || 0)}`;
         }).join('\n');
 
-        const mensaje = `${encabezado}\n\n${detalle}`;
+        const totales = obtenerTotalesListaCalculo(activas);
+        const mensaje = `${encabezado}\n\n${detalle}\n\nSubtotal sin IVA: ${formatearCLP(totales.sinIva)}\nTotal con IVA: ${formatearCLP(totales.conIva)}`;
         const url = `https://wa.me/56964330546?text=${encodeURIComponent(mensaje)}`;
         window.open(url, '_blank');
     }

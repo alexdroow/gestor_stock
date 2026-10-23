@@ -13586,10 +13586,13 @@ def agregar_lote_compras_pendientes(items, combinar=True):
                         """
                         SELECT * FROM compras_pendientes
                         WHERE estado = 'pendiente' AND insumo_id = ?
+                          AND unidad = ?
+                          AND ABS(COALESCE(precio_unitario, 0) - ?) < 0.000001
+                          AND COALESCE(precio_incluye_iva, 1) = ?
                         ORDER BY id DESC
                         LIMIT 1
                         """,
-                        (insumo_id,),
+                        (insumo_id, unidad, precio_unitario, precio_incluye_iva),
                     )
                 else:
                     cursor.execute(
