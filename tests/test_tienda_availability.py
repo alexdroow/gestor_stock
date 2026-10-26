@@ -50,6 +50,45 @@ class TiendaAvailabilityTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_admin_catalog_reports_the_same_effective_availability_as_store(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.execute(
+            """CREATE TABLE productos (
+                id INTEGER PRIMARY KEY, nombre TEXT, eliminado INTEGER,
+                categoria_tienda TEXT, orden_tienda INTEGER
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO productos VALUES (1, 'Minitorta tres leches', 0, 'Tortas', 1)"
+        )
+        efectivo = {
+            "id": 1,
+            "nombre": "Minitorta tres leches",
+            "precio": 12500,
+            "stock": 100,
+            "unidad": "unidad",
+            "porcion_cantidad": 1,
+            "porcion_unidad": "unidad",
+            "porciones_disponibles": 100,
+            "porciones_disponibles_base": 100,
+            "activo_tienda": 1,
+        }
+        try:
+            with (
+                patch.object(app_module, "get_db", return_value=conn),
+                patch.object(app_module, "_obtener_productos_para_venta", return_value=[efectivo]),
+                patch.object(app_module, "_cargar_categorias_tienda", return_value=[]),
+            ):
+                response = app_module.app.test_client().get("/api/tienda/admin/productos")
+
+            self.assertEqual(response.status_code, 200)
+            producto = response.get_json()["productos"][0]
+            self.assertEqual(producto["max_compra"], 100)
+            self.assertEqual(producto["stock_porciones_disponibles"], 100)
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

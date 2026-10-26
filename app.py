@@ -8597,6 +8597,11 @@ def api_tienda_admin_actividad():
 def api_tienda_admin_productos():
     conn = None
     try:
+        productos_calculados = {
+            int(item.get("id") or 0): item
+            for item in _obtener_productos_para_venta(include_zero_stock=True)
+            if int(item.get("id") or 0) > 0
+        }
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
@@ -8615,10 +8620,19 @@ def api_tienda_admin_productos():
         now_local = datetime.now(ZoneInfo("America/Santiago"))
         productos = []
         for row in cursor.fetchall():
-            item = dict(row)
+            item = productos_calculados.get(int(row["id"]), dict(row))
             serial = _serializar_producto_tienda(item, categorias_map=categorias_map, now_local=now_local)
             serial["precio"] = float(item.get("precio") or 0)
             serial["stock"] = float(item.get("stock") or 0)
+            serial["stock_porciones_disponibles"] = int(item.get("porciones_disponibles") or 0)
+            serial["stock_porciones_base"] = int(item.get("porciones_disponibles_base", item.get("porciones_disponibles")) or 0)
+            serial["porcion_cantidad"] = float(item.get("porcion_cantidad") or 1)
+            serial["porcion_unidad"] = item.get("porcion_unidad") or item.get("unidad") or "unidad"
+            serial["porcion_error"] = item.get("porcion_error")
+            serial["stock_dependencia_tipo"] = item.get("stock_dependencia_tipo")
+            serial["stock_dependencia_id"] = item.get("stock_dependencia_id")
+            serial["stock_dependencia_cantidad"] = float(item.get("stock_dependencia_cantidad") or 1)
+            serial["dependencias_alerta"] = list(item.get("dependencias_alerta") or [])
             productos.append(serial)
         categorias_payload = []
         for c in categorias:
