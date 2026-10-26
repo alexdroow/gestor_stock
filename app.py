@@ -17483,13 +17483,11 @@ def _obtener_productos_para_venta(include_zero_stock=False):
     conn = get_db()
     cursor = conn.cursor()
     try:
-        filtro_stock = "" if include_zero_stock else "AND stock > 0"
         cursor.execute(
-            f"""
+            """
             SELECT *
             FROM productos
             WHERE COALESCE(eliminado, 0) = 0
-              {filtro_stock}
             ORDER BY nombre
             """
         )
@@ -17503,6 +17501,13 @@ def _obtener_productos_para_venta(include_zero_stock=False):
             item["disponible"] = estado["disponible"]
             item["advertencia"] = estado["advertencia"]
             item["bloqueado"] = estado["bloqueado"]
+        # Filter by sellable stock only after resolving stock dependencies. A
+        # product may have zero local stock while its configured dependency has stock.
+        if not include_zero_stock:
+            productos = [
+                item for item in productos
+                if int(item.get("porciones_disponibles") or 0) > 0
+            ]
         productos.sort(
             key=lambda item: (
                 0 if item.get("desactivacion_manual_requiere_confirmacion") else 1,
