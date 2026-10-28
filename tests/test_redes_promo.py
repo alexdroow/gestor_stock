@@ -87,6 +87,39 @@ class RedesWelcomePromoTests(unittest.TestCase):
     def admin_post(self, path, payload):
         return self.client.post(path, json=payload, headers={"X-CSRF-Token": self.csrf})
 
+    def test_admin_customer_directory_is_private_searchable_and_paginated(self):
+        conn = database.get_db()
+        try:
+            conn.executemany(
+                "INSERT INTO tienda_clientes(nombre,email,telefono,activo) VALUES(?,?,?,1)",
+                [
+                    ("Cliente Uno", "uno@example.cl", "+56911111111"),
+                    ("Cliente Dos", "dos@example.cl", "+56922222222"),
+                ],
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        response = self.client.get("/api/redes/admin/customers?per_page=1&page=1")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["total"], 2)
+        self.assertEqual(len(response.get_json()["clientes"]), 1)
+
+        searched = self.client.get("/api/redes/admin/customers?q=uno@example.cl")
+        self.assertEqual(searched.status_code, 200)
+        self.assertEqual(searched.get_json()["total"], 1)
+        self.assertEqual(searched.get_json()["clientes"][0]["nombre"], "Cliente Uno")
+
+        with self.client.session_transaction() as session:
+            session.pop("admin_autenticado", None)
+        self.assertEqual(self.client.get("/api/redes/admin/customers").status_code, 401)
+
+    def test_admin_page_contains_responsive_customer_directory(self):
+        html = self.client.get("/admin/redes").get_data(as_text=True)
+        self.assertIn('id="customers-panel"', html)
+        self.assertIn('id="customer-mobile-list"', html)
+
     def enable_promo(self, **overrides):
         payload = {
             "active": True,

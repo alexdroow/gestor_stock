@@ -862,6 +862,70 @@ def admin_state():
         conn.close()
 
 
+@redes_blueprint.get("/api/redes/admin/customers")
+def admin_customers():
+    denied = _admin_required()
+    if denied:
+        return denied
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+        per_page = min(100, max(1, int(request.args.get("per_page", "25"))))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Paginacion invalida."}), 400
+
+    query = str(request.args.get("q") or "").strip()[:120].lower()
+    where = ""
+    params = []
+    if query:
+        where = "WHERE LOWER(COALESCE(c.nombre,'')) LIKE ? OR LOWER(COALESCE(c.email,'')) LIKE ? OR LOWER(COALESCE(c.telefono,'')) LIKE ?"
+        term = f"%{query}%"
+        params.extend((term, term, term))
+
+    conn = _db()
+    try:
+        client_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tienda_clientes)").fetchall()}
+        created_expr = "c.creado_en" if "creado_en" in client_columns else "c.actualizado_en" if "actualizado_en" in client_columns else "NULL"
+        login_expr = "c.ultimo_login" if "ultimo_login" in client_columns else "NULL"
+        active_expr = "c.activo" if "activo" in client_columns else "1"
+        total = int(conn.execute(
+            f"SELECT COUNT(*) FROM tienda_clientes c {where}", tuple(params)
+        ).fetchone()[0])
+        rows = conn.execute(
+            f"""SELECT c.id,c.nombre,c.email,c.telefono,{active_expr} AS activo,
+                       {created_expr} AS creado_en,{login_expr} AS ultimo_login,
+                       p.codigo AS promo_codigo,p.tipo AS promo_tipo,p.expires_on AS promo_vence
+                FROM tienda_clientes c
+                LEFT JOIN redes_promo_codes p
+                  ON p.id=(SELECT MAX(p2.id) FROM redes_promo_codes p2 WHERE p2.cliente_id=c.id)
+                {where}
+                ORDER BY datetime(COALESCE({created_expr},'1970-01-01')) DESC,c.id DESC
+                LIMIT ? OFFSET ?""",
+            (*params, per_page, (page - 1) * per_page),
+        ).fetchall()
+        customers = []
+        today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
+        for row in rows:
+            item = dict(row)
+            if item.get("promo_codigo"):
+                item["origen"] = "Codigo manual" if item.get("promo_tipo") == "manual" else "Promocion Redes"
+                item["promo_estado"] = "Vencido" if str(item.get("promo_vence") or "") < today else "Con codigo"
+            else:
+                item["origen"] = "Cuenta registrada"
+                item["promo_estado"] = ""
+            item["activo"] = bool(item.get("activo"))
+            customers.append(item)
+        return jsonify({
+            "success": True,
+            "clientes": customers,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": max(1, (total + per_page - 1) // per_page),
+        })
+    finally:
+        conn.close()
+
+
 @redes_blueprint.post("/api/redes/admin/promo")
 def save_promo_config():
     denied = _admin_required(mutating=True)
