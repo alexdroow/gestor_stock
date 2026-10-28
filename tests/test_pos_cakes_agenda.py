@@ -43,6 +43,14 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'href="/admin/pos/mobile?tab=home" target="_top"', response.data)
         self.assertIn('Volver al POS'.encode(), response.data)
 
+    def test_registered_agenda_blocks_are_visible_on_month_week_and_mobile_calendars(self):
+        template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
+        self.assertIn('function bloqueosEnRangoAgenda(', template)
+        self.assertIn('...bloqueosEnRangoAgenda({ inicio: primerDia, fin: ultimoDia })', template)
+        self.assertIn("${bloqueos.length ? 'blocked' : ''}", template)
+        self.assertIn('class="mobile-week-blocked"', template)
+        self.assertIn('def guardar_evento_agenda(', (Path(__file__).resolve().parents[1] / 'database.py').read_text(encoding='utf-8'))
+
     def test_agenda_reuses_its_existing_58mm_ticket_for_native_pos_printing(self):
         template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
 

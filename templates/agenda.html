@@ -710,6 +710,11 @@
             cursor: not-allowed;
         }
 
+        .calendar-day.blocked .day-number {
+            color: #991b1b;
+            font-weight: 900;
+        }
+
         .calendar-day.blocked::after {
             content: '\26D4';
             position: absolute;
@@ -792,6 +797,10 @@
         .agenda-week-day:last-child { border-right: 0; }
         .agenda-week-day.today { background: linear-gradient(180deg, #fff7df 0%, #fff 55%); }
         .agenda-week-day.selected { box-shadow: inset 0 0 0 2px var(--sucree-orange); }
+        .agenda-week-day.blocked { background: #fff1f2; }
+        .agenda-week-day.blocked .agenda-week-head { color: #991b1b; }
+        .agenda-week-block { margin: 8px; padding: 9px; border: 1px solid #fecaca; border-radius: 10px; background: #fff1f2; color: #991b1b; font-size: 11px; font-weight: 800; }
+        .agenda-week-block small { display:block; margin-top:3px; color:#7f1d1d; font-weight:600; }
 
         .agenda-week-head {
             padding: 12px 12px 10px;
@@ -3451,6 +3460,10 @@
             .mobile-week-day em { width:5px; height:5px; margin:auto; border-radius:50%; background:#f16a13; }
             .mobile-week-day.selected { background:#f16a13; border-color:#f16a13; color:white; }
             .mobile-week-day.selected strong { color:white; }
+            .mobile-week-day.has-block { border-color:#fca5a5; background:#fff1f2; }
+            .mobile-week-day.has-block.selected { background:#f16a13; border-color:#dc2626; }
+            .mobile-week-blocked { justify-self:center; padding:1px 4px; border-radius:99px; background:#fee2e2; color:#991b1b; font-size:7px; font-weight:900; line-height:1.3; }
+            .mobile-week-day.selected .mobile-week-blocked { background:#fff; color:#991b1b; }
             .mobile-agenda-day-title { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px 6px; color:#4a2a18; font-size:13px; font-weight:900; }
             .mobile-agenda-day-title small { padding:4px 7px; border-radius:99px; background:#f1f5f9; color:#64748b; font-size:10px; white-space:nowrap; }
             .mobile-agenda-timeline { padding:4px 10px 12px; }
@@ -3462,6 +3475,11 @@
             .mobile-agenda-event-head { display:flex; justify-content:space-between; gap:6px; align-items:flex-start; }
             .mobile-agenda-event-head strong { font-size:12px; line-height:1.25; }
             .mobile-agenda-event-card p { margin-top:4px; color:#68778c; font-size:10px; line-height:1.3; }
+            .mobile-agenda-block { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 8px; margin:4px 0 8px; padding:10px; border:1px solid #fecaca; border-radius:11px; background:#fff1f2; color:#991b1b; text-align:left; }
+            .mobile-agenda-block strong { font-size:12px; }
+            .mobile-agenda-block span,.mobile-agenda-block small { color:#7f1d1d; font-size:10px; }
+            .mobile-agenda-block small { grid-column:1/-1; }
+            .mobile-agenda-block b { align-self:center; font-size:10px; }
             .mobile-agenda-event-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; color:#68778c; font-size:9px; font-weight:700; }
             .mobile-agenda-empty { padding:25px 12px; text-align:center; color:#7b8794; font-size:13px; }
             .mobile-order-row { display:grid; grid-template-columns:50px minmax(0,1fr) 18px; gap:9px; align-items:center; width:calc(100% - 20px); margin:8px 10px; padding:10px; border:1px solid #e7ebf0; border-radius:12px; background:#fff; text-align:left; color:#263548; }
@@ -4865,6 +4883,22 @@
 
         function eventosFiltradosAgenda() {
             return eventosBaseAgenda().filter(eventoPasaFiltrosAgenda);
+        }
+
+        function bloqueosEnRangoAgenda(rango = rangoVisibleAgenda()) {
+            return ordenarEventosAgenda(eventos.filter((evento) =>
+                evento && String(evento.tipo || '').trim().toLowerCase() === 'bloqueo' && eventoDentroRangoAgenda(evento, rango)
+            ));
+        }
+
+        function bloqueosAgendaEnFecha(fecha) {
+            return bloqueosEnRangoAgenda({ inicio: parseFechaISO(fecha), fin: parseFechaISO(fecha) });
+        }
+
+        function etiquetaHorarioBloqueoAgenda(evento) {
+            const inicio = String(evento.hora_inicio || '').slice(0, 5);
+            const fin = String(evento.hora_fin || '').slice(0, 5);
+            return inicio || fin ? `${inicio || '00:00'} - ${fin || 'fin del dia'}` : 'Dia completo';
         }
 
         function normalizarEstadoAgenda(estado, defaultEstado = 'pendiente') {
@@ -8177,6 +8211,7 @@
             }
             const visibles = eventosFiltradosAgenda().filter((evento) => String(evento.tipo || '').toLowerCase() !== 'bloqueo');
             const selectedDate = agendaVista === 'semana' ? fechaSeleccionada : (fechaSeleccionada || formatearFecha(new Date()));
+            const dayBlocks = bloqueosAgendaEnFecha(selectedDate);
             let weekStrip = '';
             if (agendaVista === 'semana') {
                 const start = inicioSemanaLunes(fechaActual);
@@ -8186,7 +8221,8 @@
                     const date = sumarDiasAgenda(start, index);
                     const iso = formatearFecha(date);
                     const count = visibles.filter((event) => event.fecha === iso).length;
-                    return `<button type="button" class="mobile-week-day ${iso === selectedDate ? 'selected' : ''}" role="tab" aria-selected="${iso === selectedDate}" onclick="seleccionarDiaCalendario('${iso}')"><small>${weekdays[index]}</small><strong>${date.getDate()}</strong>${count ? '<em aria-label="Tiene pedidos"></em>' : ''}</button>`;
+                    const blocked = bloqueosAgendaEnFecha(iso).length > 0;
+                    return `<button type="button" class="mobile-week-day ${iso === selectedDate ? 'selected' : ''} ${blocked ? 'has-block' : ''}" title="${blocked ? 'Este dia tiene un bloqueo registrado' : ''}" role="tab" aria-label="${weekdays[index]} ${date.getDate()}${blocked ? ', dia bloqueado' : ''}" aria-selected="${iso === selectedDate}" onclick="seleccionarDiaCalendario('${iso}')"><small>${weekdays[index]}</small><strong>${date.getDate()}</strong>${blocked ? '<span class="mobile-week-blocked">BLOQ</span>' : (count ? '<em aria-label="Tiene pedidos"></em>' : '')}</button>`;
                 }).join('')}</div>`;
             }
             const dayEvents = visibles.filter((event) => event.fecha === selectedDate).sort((a,b) => String(a.hora_entrega || a.hora_inicio || '').localeCompare(String(b.hora_entrega || b.hora_inicio || '')));
@@ -8198,7 +8234,9 @@
                 const product = _resumenCatalogoTorta(event).categoria;
                 return `<div class="mobile-agenda-event"><div class="mobile-agenda-time">${escapeHtml(time)}</div><button type="button" class="mobile-agenda-event-card ${esEventoBorrador(event) ? 'borrador' : ''}" onclick="abrirDetallePedidoAgenda(${Number(event.id || 0)})"><div class="mobile-agenda-event-head"><strong>${escapeHtml(event.cliente || 'Sin cliente')}</strong><span class="agenda-status-pill ${escapeHtml(status)}">${escapeHtml(labelEstadoOperativoAgenda(status))}</span></div><p>${escapeHtml(product && product !== '-' ? product : event.titulo || 'Pedido')}</p><div class="mobile-agenda-event-meta"><span>${agendaEsDespacho(event) ? 'Despacho' : 'Retiro'}</span>${saldo > 0 ? `<strong style="color:#c2410c">${escapeHtml(formatoMonedaCLP(saldo))} pendiente</strong>` : ''}<span>${escapeHtml(String(event.codigo_pedido || '').trim())}</span></div></button></div>`;
             }).join('');
-            grid.innerHTML = `${weekStrip}<div class="mobile-agenda-day-title"><span>${agendaVista === 'semana' ? `Pedidos del ${dayLabel}` : dayLabel}</span><small>${dayEvents.length} ${dayEvents.length === 1 ? 'pedido' : 'pedidos'}</small></div><div class="mobile-agenda-timeline">${rows || '<div class="mobile-agenda-empty">No hay pedidos agendados para este dia.</div>'}</div>`;
+            const blockRows = dayBlocks.map((block) => `<button type="button" class="mobile-agenda-block" onclick="editarEvento(${Number(block.id || 0)})"><strong>Bloqueo registrado</strong><b>${escapeHtml(etiquetaHorarioBloqueoAgenda(block))}</b><small>${escapeHtml(block.motivo || block.titulo || 'No se indicó motivo')} · Editar bloqueo</small></button>`).join('');
+            const dayContent = `${blockRows}${rows}`;
+            grid.innerHTML = `${weekStrip}<div class="mobile-agenda-day-title"><span>${agendaVista === 'semana' ? `Agenda del ${dayLabel}` : dayLabel}${dayBlocks.length ? ' · Con bloqueo' : ''}</span><small>${dayEvents.length} ${dayEvents.length === 1 ? 'pedido' : 'pedidos'}${dayBlocks.length ? ` · ${dayBlocks.length} bloqueo(s)` : ''}</small></div><div class="mobile-agenda-timeline">${dayContent || '<div class="mobile-agenda-empty">No hay pedidos agendados para este dia.</div>'}</div>`;
         }
 
         function renderizarListaAgendaMovil(orderTab = false) {
@@ -8253,7 +8291,10 @@
             const primerDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
             const ultimoDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0);
             const hoy = new Date();
-            const eventosVisiblesMes = eventosFiltradosAgenda();
+            const eventosVisiblesMes = [
+                ...eventosFiltradosAgenda(),
+                ...bloqueosEnRangoAgenda({ inicio: primerDia, fin: ultimoDia })
+            ];
 
             // Espacios vacÃ­os antes
             for (let i = 0; i < primerDia.getDay(); i++) {
@@ -8299,9 +8340,15 @@
                         span.className = `day-event ${claseCssEvento(ev)}`;
                         const prefijo = esEventoBorrador(ev) ? '\uD83D\uDCDD ' : '';
                         span.textContent = ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`;
-                        span.title = 'Click: ver resumen - Doble click: abrir resumen - Click derecho: ir directo a ficha';
+                        span.title = ev.tipo === 'bloqueo'
+                            ? `${etiquetaHorarioBloqueoAgenda(ev)} · ${ev.motivo || 'Bloqueo registrado'} · Click para editar`
+                            : 'Click: ver resumen - Doble click: abrir resumen - Click derecho: ir directo a ficha';
                         span.onclick = (event) => {
                             event.stopPropagation();
+                            if (String(ev.tipo || '').toLowerCase() === 'bloqueo') {
+                                editarEvento(Number(ev.id || 0));
+                                return;
+                            }
                             seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), false);
                         };
                         span.ondblclick = (event) => {
@@ -8377,20 +8424,24 @@
             const inicio = inicioSemanaLunes(fechaActual);
             const hoy = formatearFecha(new Date());
             const visibles = eventosFiltradosAgenda();
+            const bloqueosVisibles = bloqueosEnRangoAgenda();
             const dias = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'];
             grid.innerHTML = Array.from({ length: 7 }).map((_, idx) => {
                 const fecha = sumarDiasAgenda(inicio, idx);
                 const fechaStr = formatearFecha(fecha);
                 const pedidos = visibles.filter((ev) => ev.fecha === fechaStr);
+                const bloqueos = bloqueosVisibles.filter((ev) => ev.fecha === fechaStr);
                 const selected = fechaSeleccionada === fechaStr;
                 return `
-                    <section class="agenda-week-day ${fechaStr === hoy ? 'today' : ''} ${selected ? 'selected' : ''}" onclick="seleccionarDiaCalendario('${fechaStr}')">
+                    <section class="agenda-week-day ${fechaStr === hoy ? 'today' : ''} ${selected ? 'selected' : ''} ${bloqueos.length ? 'blocked' : ''}" onclick="seleccionarDiaCalendario('${fechaStr}')">
                         <header class="agenda-week-head">
                             <small>${dias[idx]}</small>
                             <strong>${fecha.getDate()}</strong>
                             ${fechaStr === hoy ? '<span class="agenda-today-pill">HOY</span>' : ''}
+                            ${bloqueos.length ? `<span class="badge" style="margin:5px auto 0;background:#fee2e2;color:#991b1b;">Con bloqueo</span>` : ''}
                         </header>
                         <div class="agenda-week-list">
+                            ${bloqueos.map((block) => `<div class="agenda-week-block" title="${escapeHtml(block.motivo || block.titulo || 'Bloqueo registrado')}">&#9940; ${escapeHtml(etiquetaHorarioBloqueoAgenda(block))}<small>${escapeHtml(block.motivo || block.titulo || 'Bloqueo registrado')}</small></div>`).join('')}
                             ${pedidos.map(renderizarTarjetaPedidoAgenda).join('')}
                             <button type="button" class="agenda-day-add" onclick="event.stopPropagation(); agendarTortaManual('${fechaStr}')">+ Agendar</button>
                         </div>
