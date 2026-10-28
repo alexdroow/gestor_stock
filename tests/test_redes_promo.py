@@ -332,6 +332,65 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertIn("id=\"manual-promo-form\"", admin_html)
         self.assertIn("/api/redes/admin/promo/create-code", admin_html)
 
+    def test_admin_can_assign_manual_code_to_existing_registered_customer(self):
+        conn = database.get_db()
+        try:
+            conn.execute(
+                "INSERT INTO tienda_clientes(nombre,email,telefono,activo) VALUES(?,?,?,1)",
+                ("Cliente Registrado", "manual@example.cl", "+56987654321"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        response = self.create_manual_code(alcance="agenda_torta")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(response.get_json()["alcance"], "agenda_torta")
+        conn = database.get_db()
+        try:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_clientes").fetchone()[0], 1)
+            self.assertEqual(conn.execute("SELECT alcance FROM tienda_cupones").fetchone()[0], "agenda_torta")
+            self.assertEqual(conn.execute("SELECT alcance FROM redes_promo_codes").fetchone()[0], "agenda_torta")
+        finally:
+            conn.close()
+
+    def test_manual_code_refuses_contacts_belonging_to_different_clients(self):
+        conn = database.get_db()
+        try:
+            conn.executemany(
+                "INSERT INTO tienda_clientes(nombre,email,telefono,activo) VALUES(?,?,?,1)",
+                [("Uno", "manual@example.cl", "+56911111111"), ("Dos", "otro@example.cl", "+56987654321")],
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        response = self.create_manual_code()
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("pertenecen a cuentas distintas", response.get_json()["error"])
+
+    def test_customer_directory_edit_checks_duplicates_and_delete_protects_history(self):
+        conn = database.get_db()
+        try:
+            conn.execute("INSERT INTO tienda_clientes(nombre,email,telefono,activo) VALUES('Cliente Uno','uno@example.cl','+56911111111',1)")
+            conn.execute("INSERT INTO tienda_clientes(nombre,email,telefono,activo) VALUES('Cliente Dos','dos@example.cl','+56922222222',1)")
+            conn.commit()
+            first, second = [row[0] for row in conn.execute("SELECT id FROM tienda_clientes ORDER BY id")]
+        finally:
+            conn.close()
+        duplicate = self.client.post(f"/api/redes/admin/customers/{second}", json={
+            "nombre": "Cliente Dos", "email": "uno@example.cl", "telefono": "+56933333333",
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(duplicate.status_code, 409)
+        edited = self.client.post(f"/api/redes/admin/customers/{second}", json={
+            "nombre": "Cliente Editado", "email": "nuevo@example.cl", "telefono": "+56933333333",
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(edited.status_code, 200, edited.get_json())
+        linked_code = self.create_manual_code(email="uno@example.cl", telefono="+56911111111")
+        self.assertEqual(linked_code.status_code, 200, linked_code.get_json())
+        blocked = self.client.delete(f"/api/redes/admin/customers/{first}", headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(blocked.status_code, 409)
+        removed = self.client.delete(f"/api/redes/admin/customers/{second}", headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(removed.status_code, 200, removed.get_json())
+
     def test_manual_coupon_pending_and_use_limits_are_respected(self):
         created = self.create_manual_code().get_json()
         pending = self.client.post("/api/redes/promo/pending", json={

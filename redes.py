@@ -620,12 +620,12 @@ def register_welcome_promo():
                     "remaining_days": remaining_days,
                 })
             conn.rollback()
-            return jsonify({"success": False, "error": "El correo o telefono ya esta asociado a una cuenta. Inicia sesion con tus datos registrados; no se creara otra cuenta ni otro codigo."}), 409
+            return jsonify({"success": False, "error": "Tus datos ya tienen registros. No crearemos otra cuenta ni otro código; contacta al soporte de Pastelería Sucrée para recibir ayuda."}), 409
 
         cliente_existente = _buscar_cliente_por_contacto_cursor(cursor, email, phone)
         if cliente_existente:
             conn.rollback()
-            return jsonify({"success": False, "error": "El correo o telefono ya esta asociado a una cuenta. Inicia sesion con tus datos registrados; no se creara otra cuenta ni otro codigo."}), 409
+            return jsonify({"success": False, "error": "Tu correo o teléfono ya tiene un registro. No crearemos otra cuenta; contacta al soporte de Pastelería Sucrée para recibir ayuda."}), 409
 
         cliente = _upsert_cliente_tienda_cursor(
             cursor,
@@ -926,6 +926,101 @@ def admin_customers():
         conn.close()
 
 
+@redes_blueprint.post("/api/redes/admin/customers/<int:customer_id>")
+def admin_customer_update(customer_id):
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    try:
+        name = str(data.get("nombre") or "").strip()[:120]
+        email = _normalise_promo_email(data.get("email"))
+        phone = _normalise_promo_phone(data.get("telefono"))
+        if not name:
+            raise ValueError("Ingresa el nombre del cliente.")
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+    from app import _normalizar_cliente_ref
+    conn = _db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        client = conn.execute("SELECT id FROM tienda_clientes WHERE id=?", (customer_id,)).fetchone()
+        if not client:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Cliente no encontrado."}), 404
+        phone_digits = re.sub(r"\D+", "", phone)[-8:]
+        phone_expr = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefono,''),'+',''),' ',''),'-',''),'(',''),')',''),'.','')"
+        conflict = conn.execute(
+            f"SELECT id FROM tienda_clientes WHERE id<>? AND (LOWER(TRIM(email))=? OR SUBSTR({phone_expr},-8)=?) LIMIT 1",
+            (customer_id, email, phone_digits),
+        ).fetchone()
+        if conflict:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Ese correo o teléfono ya está registrado en otra cuenta."}), 409
+        ref = _normalizar_cliente_ref(email, phone)
+        conn.execute(
+            "UPDATE tienda_clientes SET nombre=?,email=?,telefono=?,actualizado_en=CURRENT_TIMESTAMP WHERE id=?",
+            (name, email, phone, customer_id),
+        )
+        conn.execute("UPDATE redes_promo_codes SET email=?,telefono=?,cliente_ref=? WHERE cliente_id=?", (email, phone, ref, customer_id))
+        conn.execute("UPDATE tienda_cliente_cupones SET cliente_ref=? WHERE cliente_id=?", (ref, customer_id))
+        conn.commit()
+        return jsonify({"success": True})
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return jsonify({"success": False, "error": "No se pudo guardar: existe un registro duplicado."}), 409
+    except Exception:
+        conn.rollback()
+        current_app.logger.exception("No se pudo actualizar el cliente desde Redes.")
+        return jsonify({"success": False, "error": "No se pudo actualizar el cliente."}), 500
+    finally:
+        conn.close()
+
+
+@redes_blueprint.delete("/api/redes/admin/customers/<int:customer_id>")
+def admin_customer_delete(customer_id):
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    conn = _db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        client = conn.execute("SELECT email,telefono FROM tienda_clientes WHERE id=?", (customer_id,)).fetchone()
+        if not client:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Cliente no encontrado."}), 404
+        email, phone = str(client["email"] or ""), str(client["telefono"] or "")
+        blockers = []
+        for table, condition, values in (
+            ("redes_promo_codes", "cliente_id=?", (customer_id,)),
+            ("tienda_cliente_cupones", "cliente_id=?", (customer_id,)),
+            ("tienda_clientes_puntos_mov", "cliente_id=?", (customer_id,)),
+            ("ventas", "LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (email, phone)),
+            ("agenda_eventos", "LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (email, phone)),
+        ):
+            try:
+                if conn.execute(f"SELECT 1 FROM {table} WHERE {condition} LIMIT 1", values).fetchone():
+                    blockers.append(table)
+            except sqlite3.OperationalError:
+                continue
+        if blockers:
+            conn.rollback()
+            return jsonify({"success": False, "error": "No se puede eliminar: esta cuenta tiene historial o beneficios asociados. Edita sus datos para corregir el duplicado y conservar el historial."}), 409
+        conn.execute("DELETE FROM tienda_clientes WHERE id=?", (customer_id,))
+        conn.commit()
+        return jsonify({"success": True})
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return jsonify({"success": False, "error": "No se puede eliminar porque otros datos del sistema todavía dependen de esta cuenta. Edita sus datos para corregir el duplicado."}), 409
+    except Exception:
+        conn.rollback()
+        current_app.logger.exception("No se pudo eliminar cliente duplicado desde Redes.")
+        return jsonify({"success": False, "error": "No se pudo eliminar el cliente."}), 500
+    finally:
+        conn.close()
+
+
 @redes_blueprint.post("/api/redes/admin/promo")
 def save_promo_config():
     denied = _admin_required(mutating=True)
@@ -1009,14 +1104,25 @@ def create_manual_promo_code():
             conn.rollback()
             return jsonify({"success": False, "error": "Ya existe un codigo de Redes asociado a ese correo o telefono."}), 409
 
-        existing_client = _buscar_cliente_por_contacto_cursor(cursor, email, phone)
+        email_client = cursor.execute(
+            "SELECT id,email,telefono FROM tienda_clientes WHERE LOWER(TRIM(email))=? LIMIT 1", (email,)
+        ).fetchone()
+        phone_digits = re.sub(r"\D+", "", phone)[-8:]
+        phone_expr = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefono,''),'+',''),' ',''),'-',''),'(',''),')',''),'.','')"
+        phone_client = cursor.execute(
+            f"SELECT id,email,telefono FROM tienda_clientes WHERE SUBSTR({phone_expr},-8)=? LIMIT 1", (phone_digits,)
+        ).fetchone()
+        if email_client and phone_client and int(email_client["id"]) != int(phone_client["id"]):
+            conn.rollback()
+            return jsonify({"success": False, "error": "El correo y el teléfono pertenecen a cuentas distintas. Revisa la ficha del cliente y corrige los datos antes de asignar el código."}), 409
+        existing_client = email_client or phone_client
         if existing_client:
-            exact_email = _normalizar_email(existing_client.get("email")) == email
-            exact_phone = _normalizar_telefono_cl(existing_client.get("telefono")) == phone
+            exact_email = _normalizar_email(existing_client["email"]) == email
+            exact_phone = _normalizar_telefono_cl(existing_client["telefono"]) == phone
             if not (exact_email and exact_phone):
                 conn.rollback()
-                return jsonify({"success": False, "error": "El correo o telefono ya pertenece a una cuenta con otros datos."}), 409
-            cliente = _obtener_cliente_por_contacto_cursor(cursor, email, phone)
+                return jsonify({"success": False, "error": "El correo o teléfono ya pertenece a otra cuenta. Corrige la ficha existente; no se creará un cliente duplicado."}), 409
+            cliente = {"id": int(existing_client["id"])}
         else:
             cliente = _upsert_cliente_tienda_cursor(
                 cursor,
