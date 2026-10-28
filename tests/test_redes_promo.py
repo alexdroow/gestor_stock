@@ -119,6 +119,9 @@ class RedesWelcomePromoTests(unittest.TestCase):
         html = self.client.get("/admin/redes").get_data(as_text=True)
         self.assertIn('id="customers-panel"', html)
         self.assertIn('id="customer-mobile-list"', html)
+        self.assertIn('id="customer-modal"', html)
+        self.assertIn('id="customer-coupon-list"', html)
+        self.assertIn('role="dialog"', html)
 
     def enable_promo(self, **overrides):
         payload = {
@@ -390,6 +393,24 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409)
         removed = self.client.delete(f"/api/redes/admin/customers/{second}", headers={"X-CSRF-Token": self.csrf})
         self.assertEqual(removed.status_code, 200, removed.get_json())
+
+    def test_customer_profile_detail_shows_level_benefits_and_active_coupons(self):
+        created = self.create_manual_code().get_json()
+        conn = database.get_db()
+        try:
+            conn.execute("UPDATE tienda_clientes SET nivel_id=1,puntos_actual=35,puntos_total=120 WHERE email=?", (created["email"],))
+            conn.execute("UPDATE tienda_clientes_niveles SET beneficios_json=? WHERE id=1", ('{"beneficios":["Beneficio de prueba"]}',))
+            conn.commit()
+            customer_id = conn.execute("SELECT id FROM tienda_clientes WHERE email=?", (created["email"],)).fetchone()[0]
+        finally:
+            conn.close()
+        response = self.client.get(f"/api/redes/admin/customers/{customer_id}")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        detail = response.get_json()
+        self.assertEqual(detail["cliente"]["puntos_actual"], 35)
+        self.assertEqual(detail["beneficios"]["beneficios"], ["Beneficio de prueba"])
+        self.assertEqual(detail["cupones_activos"], 1)
+        self.assertEqual(detail["cupones"][0]["estado"], "Activo")
 
     def test_manual_coupon_pending_and_use_limits_are_respected(self):
         created = self.create_manual_code().get_json()

@@ -978,6 +978,87 @@ def admin_customer_update(customer_id):
         conn.close()
 
 
+@redes_blueprint.get("/api/redes/admin/customers/<int:customer_id>")
+def admin_customer_detail(customer_id):
+    denied = _admin_required()
+    if denied:
+        return denied
+    conn = _db()
+    try:
+        client_columns = {item["name"] for item in conn.execute("PRAGMA table_info(tienda_clientes)").fetchall()}
+        created_expr = "c.creado_en" if "creado_en" in client_columns else "c.actualizado_en" if "actualizado_en" in client_columns else "NULL"
+        updated_expr = "c.actualizado_en" if "actualizado_en" in client_columns else "NULL"
+        login_expr = "c.ultimo_login" if "ultimo_login" in client_columns else "NULL"
+        birth_expr = "c.fecha_nacimiento" if "fecha_nacimiento" in client_columns else "NULL"
+        confirmed_expr = "c.email_confirmado" if "email_confirmado" in client_columns else "0"
+        level_expr = "c.nivel_id" if "nivel_id" in client_columns else "NULL"
+        points_expr = "c.puntos_actual" if "puntos_actual" in client_columns else "0"
+        points_total_expr = "c.puntos_total" if "puntos_total" in client_columns else "0"
+        address_expr = "c.direccion_default" if "direccion_default" in client_columns else "NULL"
+        row = conn.execute(
+            f"""SELECT c.id,c.nombre,c.email,c.telefono,c.activo,{created_expr} AS creado_en,{updated_expr} AS actualizado_en,
+                      {login_expr} AS ultimo_login,{birth_expr} AS fecha_nacimiento,{confirmed_expr} AS email_confirmado,{level_expr} AS nivel_id,
+                      {points_expr} AS puntos_actual,{points_total_expr} AS puntos_total,{address_expr} AS direccion_default,
+                      n.nombre AS nivel_nombre,n.descuento_pct AS nivel_descuento_pct,
+                      n.beneficios_json AS nivel_beneficios_json
+               FROM tienda_clientes c
+               LEFT JOIN tienda_clientes_niveles n ON n.id={level_expr}
+               WHERE c.id=? LIMIT 1""",
+            (customer_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Cliente no encontrado."}), 404
+        customer = dict(row)
+        today = datetime.now(ZoneInfo("America/Santiago")).date().isoformat()
+        coupon_rows = conn.execute(
+            """SELECT cc.id AS asignacion_id,cc.activo AS asignacion_activa,cc.usado,
+                      cc.usos_realizados,cc.usos_max AS asignacion_usos_max,
+                      cc.nota,cc.asignado_por,cc.fecha_asignado,cc.fecha_vencimiento,
+                      c.codigo,c.nombre AS cupon_nombre,c.tipo_descuento,c.valor_descuento,
+                      c.activo AS cupon_activo,c.fecha_inicio,c.fecha_fin,
+                      COALESCE(c.alcance,'tienda') AS alcance
+               FROM tienda_cliente_cupones cc
+               JOIN tienda_cupones c ON c.id=cc.cupon_id
+               WHERE cc.cliente_id=?
+               ORDER BY datetime(cc.fecha_asignado) DESC,cc.id DESC""",
+            (customer_id,),
+        ).fetchall()
+        coupons = []
+        for coupon_row in coupon_rows:
+            coupon = dict(coupon_row)
+            expiry = str(coupon.get("fecha_vencimiento") or coupon.get("fecha_fin") or "")
+            max_uses = max(1, int(coupon.get("asignacion_usos_max") or 1))
+            used_count = int(coupon.get("usos_realizados") or 0)
+            if not coupon.get("asignacion_activa") or not coupon.get("cupon_activo"):
+                status = "Inactivo"
+            elif coupon.get("usado") or used_count >= max_uses:
+                status = "Usado"
+            elif expiry and expiry[:10] < today:
+                status = "Vencido"
+            elif coupon.get("fecha_inicio") and str(coupon["fecha_inicio"])[:10] > today:
+                status = "Aún no vigente"
+            else:
+                status = "Activo"
+            coupon["estado"] = status
+            coupon["activo"] = status == "Activo"
+            coupon["usos_realizados"] = used_count
+            coupon["usos_max"] = max_uses
+            coupons.append(coupon)
+        try:
+            benefits = json.loads(customer.pop("nivel_beneficios_json") or "{}")
+        except (TypeError, ValueError):
+            benefits = {}
+        return jsonify({
+            "success": True,
+            "cliente": customer,
+            "beneficios": benefits,
+            "cupones": coupons,
+            "cupones_activos": sum(1 for coupon in coupons if coupon["activo"]),
+        })
+    finally:
+        conn.close()
+
+
 @redes_blueprint.delete("/api/redes/admin/customers/<int:customer_id>")
 def admin_customer_delete(customer_id):
     denied = _admin_required(mutating=True)
