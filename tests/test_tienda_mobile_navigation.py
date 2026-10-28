@@ -43,6 +43,8 @@ class TiendaMobileNavigationTests(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('id="mobile-account-access"', html)
         self.assertIn('id="mobile-account-access-label">Iniciar sesi&oacute;n</span>', html)
+        self.assertIn('body.mobile-ui:not(.tienda-preview-agenda) .mobile-account-access', html)
+        self.assertNotIn('body.mobile-ui:not(.tienda-preview-agenda):not(.tienda-preview-draft) .mobile-account-access', html)
         self.assertIn('id="mobile-account-nav-label">Iniciar sesi&oacute;n</strong>', html)
         self.assertIn('id="mobile-account-nav-label"', html)
         self.assertIn('mobileAccountAccessLabelEl.textContent = logged ? "Mi cuenta" : "Iniciar sesi\\u00f3n"', html)
