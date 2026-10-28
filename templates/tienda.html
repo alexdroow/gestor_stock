@@ -24436,53 +24436,55 @@
         }
         window.aplicarCuponRegalado = aplicarCuponRegalado;
 
-        function mostrarAvisoCuponValoracion(cupones) {
-            const items = Array.isArray(cupones) ? cupones : [];
-            const cup = items.find((c) => String(c.asignado_por || "").toLowerCase() === "valoracion" || /valoracion|agradecimiento/i.test(String(c.nota || "")));
-            if (!cup) return;
-            const codigo = String(cup.codigo || "").trim();
-            if (!codigo) return;
-            const storageKey = `sucree_valoracion_cupon_aviso_${codigo}`;
-            try {
-                if (sessionStorage.getItem(storageKey) === "1") return;
-                sessionStorage.setItem(storageKey, "1");
-            } catch (_) {}
-            const tipo = String(cup.tipo_descuento || "porcentaje").trim().toLowerCase();
-            const valor = Number(cup.valor_descuento || 0);
-            const beneficio = tipo === "monto_fijo" ? money.format(valor) : `${Math.round(valor)}%`;
-            const alcance = String(cup.alcance || "tienda").trim().toLowerCase();
-            const alcanceLabel = alcance === "ambos" ? "en tienda o al agendar tortas" : (alcance === "agenda_torta" ? "al agendar tortas" : "en tienda");
-            const usableEnTienda = alcance !== "agenda_torta";
-            const old = document.getElementById("valoracion-cupon-modal");
-            if (old) old.remove();
+        let avisoCuponActivoMostradoEn = 0;
+
+        function mostrarAvisoCuponActivo(cupones) {
+            const items = (Array.isArray(cupones) ? cupones : []).filter((c) => String(c.codigo || "").trim());
+            if (!clienteRegistrado || !items.length) return;
+            const identidad = `${clienteRegistrado.email || ""}|${clienteRegistrado.telefono || ""}`.toLowerCase();
+            let hash = 2166136261;
+            for (let i = 0; i < identidad.length; i += 1) hash = Math.imul(hash ^ identidad.charCodeAt(i), 16777619);
+            const storageKey = `sucree_cupon_activo_aviso_${hash >>> 0}`;
+            const ahora = Date.now();
+            let ultimoAviso = avisoCuponActivoMostradoEn;
+            try { ultimoAviso = Number(localStorage.getItem(storageKey) || 0) || ultimoAviso; } catch (_) {}
+            if (ahora - ultimoAviso < 24 * 60 * 60 * 1000) return;
+            if (document.getElementById("cupon-activo-modal")) return;
+
+            const lista = items.slice(0, 4).map((cup) => {
+                const codigo = String(cup.codigo || "").trim();
+                const tipo = String(cup.tipo_descuento || "porcentaje").trim().toLowerCase();
+                const valor = Number(cup.valor_descuento || 0);
+                const beneficio = tipo === "monto_fijo" ? money.format(valor) : `${Math.round(valor)}%`;
+                const alcance = String(cup.alcance || "tienda").trim().toLowerCase();
+                const alcanceLabel = alcance === "ambos" ? "Tienda y agenda de tortas" : (alcance === "agenda_torta" ? "Agenda de tortas" : "Tienda");
+                const vence = String(cup.fecha_vencimiento || cup.fecha_fin || "").trim();
+                return `<li><strong>${esc(codigo)}</strong> · ${esc(beneficio)} · ${esc(alcanceLabel)}${vence ? ` · vence ${esc(vence)}` : ""}</li>`;
+            }).join("");
             const overlay = document.createElement("div");
-            overlay.id = "valoracion-cupon-modal";
+            overlay.id = "cupon-activo-modal";
             overlay.className = "modal-overlay active";
             overlay.innerHTML = `
-                <div class="modal" style="width:min(420px,94vw);border:1px solid #fed7aa;box-shadow:0 24px 70px rgba(194,65,12,.22);">
-                    <h3 style="margin:0;">Gracias por valorar</h3>
-                    <div style="border:1px solid #fed7aa;background:#fff7ed;border-radius:14px;padding:12px;color:#7c2d12;display:grid;gap:6px;">
-                        <strong>Tienes un descuento de agradecimiento disponible.</strong>
-                        <span>Cupon: <b>${esc(codigo)}</b> · Beneficio: <b>${esc(beneficio)}</b> · Uso: <b>${esc(alcanceLabel)}</b></span>
-                    </div>
+                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cupon-activo-titulo" style="width:min(440px,94vw);border:1px solid #fed7aa;box-shadow:0 24px 70px rgba(194,65,12,.22);">
+                    <h3 id="cupon-activo-titulo" style="margin:0;">Tienes un cupon activo</h3>
+                    <p style="margin:0;color:#64748b;">Aprovecha tu beneficio antes de que venza:</p>
+                    <ul style="margin:0;padding:12px 12px 12px 30px;border:1px solid #fed7aa;background:#fff7ed;border-radius:14px;color:#7c2d12;display:grid;gap:8px;">${lista}</ul>
+                    ${items.length > 4 ? `<p style="margin:0;color:#64748b;">Y ${items.length - 4} cupon(es) mas disponibles en Mi cuenta.</p>` : ""}
                     <div class="modal-actions">
-                        <button class="btn-muted" type="button" data-close-valoracion-cupon>Cerrar</button>
-                        ${usableEnTienda ? `<button class="btn-primary" type="button" data-use-valoracion-cupon>Usar descuento</button>` : `<button class="btn-primary" type="button" data-ir-agenda-cupon>Agendar torta</button>`}
+                        <button class="btn-muted" type="button" data-cerrar-aviso-cupon>Cerrar</button>
+                        <button class="btn-primary" type="button" data-ver-cupones>Ver mis cupones</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(overlay);
-            overlay.querySelector("[data-close-valoracion-cupon]")?.addEventListener("click", () => overlay.remove());
-            overlay.querySelector("[data-use-valoracion-cupon]")?.addEventListener("click", () => {
-                aplicarCuponRegalado(codigo);
+            avisoCuponActivoMostradoEn = ahora;
+            try { localStorage.setItem(storageKey, String(ahora)); } catch (_) {}
+            overlay.querySelector("[data-cerrar-aviso-cupon]")?.addEventListener("click", () => overlay.remove());
+            overlay.querySelector("[data-ver-cupones]")?.addEventListener("click", () => {
                 overlay.remove();
-            });
-            overlay.querySelector("[data-ir-agenda-cupon]")?.addEventListener("click", () => {
-                overlay.remove();
-                document.getElementById("agenda")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                abrirModalCuenta("account");
             });
         }
-
         async function registrarCuentaCliente() {
             if (cuentaModo === "login") {
                 return iniciarSesionCliente();
@@ -24633,10 +24635,7 @@
                 const cupones = Array.isArray(data.cupones_disponibles) ? data.cupones_disponibles : [];
                 renderCuponesCliente(cupones);
                 _renderAgendaCakeBuilder();
-                if (cupones.length > 0) {
-                    msg(`Tienes ${cupones.length} cupon(es) disponibles en Mi cuenta.`, false);
-                    mostrarAvisoCuponValoracion(cupones);
-                }
+                if (cupones.length > 0) mostrarAvisoCuponActivo(cupones);
                 _sincronizarPedidoActivoDesdeHistorial();
             } catch (e) {
                 historialComprasCliente = [];

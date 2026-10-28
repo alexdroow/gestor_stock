@@ -53,6 +53,16 @@ class TiendaMobileNavigationTests(unittest.TestCase):
         self.assertIn('id="cuenta-email"', html)
         self.assertIn('id="cuenta-telefono"', html)
 
+    def test_active_coupon_popup_is_limited_to_once_per_customer_every_24_hours(self):
+        response = self.client.get("/tienda")
+        html = response.get_data(as_text=True)
+        self.assertIn("function mostrarAvisoCuponActivo(cupones)", html)
+        self.assertIn("24 * 60 * 60 * 1000", html)
+        self.assertIn("localStorage.setItem(storageKey, String(ahora))", html)
+        self.assertIn('id = "cupon-activo-modal"', html)
+        self.assertIn("if (cupones.length > 0) mostrarAvisoCuponActivo(cupones)", html)
+        self.assertNotIn("mostrarAvisoCuponValoracion", html)
+
     def test_desktop_store_exposes_login_and_authenticated_account_menu(self):
         response = self.client.get("/tienda", headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130"})
         html = response.get_data(as_text=True)
