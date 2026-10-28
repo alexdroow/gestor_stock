@@ -370,7 +370,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("pertenecen a cuentas distintas", response.get_json()["error"])
 
-    def test_customer_directory_edit_checks_duplicates_and_delete_protects_history(self):
+    def test_customer_directory_edit_checks_duplicates_and_deletes_related_history(self):
         conn = database.get_db()
         try:
             conn.execute("INSERT INTO tienda_clientes(nombre,email,telefono,activo) VALUES('Cliente Uno','uno@example.cl','+56911111111',1)")
@@ -389,8 +389,41 @@ class RedesWelcomePromoTests(unittest.TestCase):
         self.assertEqual(edited.status_code, 200, edited.get_json())
         linked_code = self.create_manual_code(email="uno@example.cl", telefono="+56911111111")
         self.assertEqual(linked_code.status_code, 200, linked_code.get_json())
-        blocked = self.client.delete(f"/api/redes/admin/customers/{first}", headers={"X-CSRF-Token": self.csrf})
-        self.assertEqual(blocked.status_code, 409)
+        conn = database.get_db()
+        try:
+            for table, fields in (("ventas", {"cliente_email": "TEXT", "cliente_telefono": "TEXT"}),
+                                  ("agenda_eventos", {"cliente_email": "TEXT", "cliente_telefono": "TEXT", "seguimiento_foto": "TEXT"})):
+                columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+                for column, field_type in fields.items():
+                    if column not in columns:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {field_type}")
+            conn.execute("CREATE TABLE test_sale_children(id INTEGER PRIMARY KEY,venta_id INTEGER)")
+            conn.execute("CREATE TABLE test_event_children(id INTEGER PRIMARY KEY,evento_id INTEGER)")
+            conn.execute("INSERT INTO ventas(cliente_email,cliente_telefono) VALUES('uno@example.cl','+56911111111')")
+            sale_id = conn.execute("SELECT MAX(id) FROM ventas").fetchone()[0]
+            conn.execute("INSERT INTO test_sale_children(venta_id) VALUES(?)", (sale_id,))
+            conn.execute("INSERT INTO agenda_eventos(tipo,titulo,fecha,cliente_email,cliente_telefono,seguimiento_foto) VALUES('torta','Reserva de prueba','2026-11-05','uno@example.cl','+56911111111','')")
+            event_id = conn.execute("SELECT MAX(id) FROM agenda_eventos").fetchone()[0]
+            conn.execute("INSERT INTO test_event_children(evento_id) VALUES(?)", (event_id,))
+            conn.commit()
+        finally:
+            conn.close()
+        deleted = self.client.delete(f"/api/redes/admin/customers/{first}", headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(deleted.status_code, 200, deleted.get_json())
+        self.assertEqual(deleted.get_json()["eliminados"]["ventas"], 1)
+        self.assertEqual(deleted.get_json()["eliminados"]["reservas"], 1)
+        conn = database.get_db()
+        try:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_clientes WHERE id=?", (first,)).fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM redes_promo_codes WHERE email='uno@example.cl'").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM test_sale_children").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM test_event_children").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ventas WHERE cliente_email='uno@example.cl'").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM agenda_eventos WHERE cliente_email='uno@example.cl'").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_cliente_cupones WHERE cliente_id=?", (first,)).fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_cupones WHERE codigo=?", (linked_code.get_json()["codigo"],)).fetchone()[0], 0)
+        finally:
+            conn.close()
         removed = self.client.delete(f"/api/redes/admin/customers/{second}", headers={"X-CSRF-Token": self.csrf})
         self.assertEqual(removed.status_code, 200, removed.get_json())
 

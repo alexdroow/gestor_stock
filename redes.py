@@ -1065,6 +1065,7 @@ def admin_customer_delete(customer_id):
     if denied:
         return denied
     conn = _db()
+    photos_to_remove = []
     try:
         conn.execute("BEGIN IMMEDIATE")
         client = conn.execute("SELECT email,telefono FROM tienda_clientes WHERE id=?", (customer_id,)).fetchone()
@@ -1072,25 +1073,108 @@ def admin_customer_delete(customer_id):
             conn.rollback()
             return jsonify({"success": False, "error": "Cliente no encontrado."}), 404
         email, phone = str(client["email"] or ""), str(client["telefono"] or "")
-        blockers = []
-        for table, condition, values in (
-            ("redes_promo_codes", "cliente_id=?", (customer_id,)),
-            ("tienda_cliente_cupones", "cliente_id=?", (customer_id,)),
-            ("tienda_clientes_puntos_mov", "cliente_id=?", (customer_id,)),
-            ("ventas", "LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (email, phone)),
-            ("agenda_eventos", "LOWER(TRIM(COALESCE(cliente_email,'')))=LOWER(TRIM(?)) AND TRIM(COALESCE(cliente_telefono,''))=TRIM(?)", (email, phone)),
-        ):
-            try:
-                if conn.execute(f"SELECT 1 FROM {table} WHERE {condition} LIMIT 1", values).fetchone():
-                    blockers.append(table)
-            except sqlite3.OperationalError:
+        from app import _directorio_fotos_seguimiento, _normalizar_cliente_ref
+        client_ref = _normalizar_cliente_ref(email, phone)
+        tables = {
+            row["name"]: {column["name"] for column in conn.execute(f'PRAGMA table_info("{row["name"]}")').fetchall()}
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
+        }
+
+        def find_contact_records(table, phone_fields):
+            columns = tables.get(table, set())
+            email_field = next((field for field in ("cliente_email", "email") if field in columns), None)
+            available_phone_fields = [field for field in phone_fields if field in columns]
+            if not email_field and not available_phone_fields:
+                return []
+            digits = re.sub(r"\D+", "", phone)[-8:]
+            phone_expr = ""
+            if available_phone_fields:
+                phone_raw = ",".join(f"NULLIF(COALESCE(\"{field}\",''),'')" for field in available_phone_fields)
+                phone_expr = f"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE({phone_raw},''),'+',''),' ',''),'-',''),'(',''),')',''),'.','')"
+            if email_field and available_phone_fields:
+                where = f"(LOWER(TRIM(COALESCE(\"{email_field}\",'')))=LOWER(TRIM(?)) AND SUBSTR({phone_expr},-8)=?) OR (LOWER(TRIM(COALESCE(\"{email_field}\",'')))='' AND SUBSTR({phone_expr},-8)=?)"
+                values = (email, digits, digits)
+            elif email_field:
+                where, values = f"LOWER(TRIM(COALESCE(\"{email_field}\",'')))=LOWER(TRIM(?))", (email,)
+            else:
+                where, values = f"SUBSTR({phone_expr},-8)=?", (digits,)
+            return [int(row[0]) for row in conn.execute(f'SELECT id FROM "{table}" WHERE {where}', values).fetchall()]
+
+        sale_ids = find_contact_records("ventas", ("cliente_telefono", "telefono"))
+        event_ids = find_contact_records("agenda_eventos", ("cliente_telefono", "telefono"))
+        if event_ids and "seguimiento_foto" in tables.get("agenda_eventos", set()):
+            placeholders = ",".join("?" for _ in event_ids)
+            photos_to_remove = [str(row[0] or "") for row in conn.execute(
+                f"SELECT seguimiento_foto FROM agenda_eventos WHERE id IN ({placeholders}) AND COALESCE(seguimiento_foto,'')<>''", event_ids
+            ).fetchall()]
+
+        coupon_ids = []
+        if "tienda_cliente_cupones" in tables:
+            coupon_ids = [int(row[0]) for row in conn.execute(
+                "SELECT DISTINCT cupon_id FROM tienda_cliente_cupones WHERE cliente_id=?", (customer_id,)
+            ).fetchall()]
+        exclusive_coupon_ids = []
+        for coupon_id in coupon_ids:
+            other_assignment = conn.execute(
+                "SELECT 1 FROM tienda_cliente_cupones WHERE cupon_id=? AND cliente_id<>? LIMIT 1",
+                (coupon_id, customer_id),
+            ).fetchone()
+            if not other_assignment:
+                exclusive_coupon_ids.append(coupon_id)
+
+        def delete_by_ids(table, column, ids):
+            if not ids or table not in tables or column not in tables[table]:
+                return 0
+            placeholders = ",".join("?" for _ in ids)
+            return max(0, conn.execute(f'DELETE FROM "{table}" WHERE "{column}" IN ({placeholders})', tuple(ids)).rowcount)
+
+        deleted = {"ventas": len(sale_ids), "reservas": len(event_ids), "cupones": len(exclusive_coupon_ids)}
+        # Remove dependent sale, reservation, coupon, and account rows before their parent records.
+        for table, columns in tables.items():
+            if table in {"ventas", "agenda_eventos", "tienda_clientes", "tienda_cupones"}:
                 continue
-        if blockers:
-            conn.rollback()
-            return jsonify({"success": False, "error": "No se puede eliminar: esta cuenta tiene historial o beneficios asociados. Edita sus datos para corregir el duplicado y conservar el historial."}), 409
+            if sale_ids:
+                delete_by_ids(table, "venta_id", sale_ids)
+                if "usado_venta_id" in columns:
+                    placeholders = ",".join("?" for _ in sale_ids)
+                    conn.execute(f'UPDATE "{table}" SET usado_venta_id=NULL WHERE usado_venta_id IN ({placeholders})', tuple(sale_ids))
+            if event_ids:
+                for column in ("evento_id", "agenda_evento_id"):
+                    delete_by_ids(table, column, event_ids)
+            if customer_id and "cliente_id" in columns:
+                delete_by_ids(table, "cliente_id", [customer_id])
+            if client_ref and "cliente_ref" in columns:
+                conn.execute(f'DELETE FROM "{table}" WHERE cliente_ref=?', (client_ref,))
+        if sale_ids:
+            placeholders = ",".join("?" for _ in sale_ids)
+            for table in ("stock_movimientos", "stock_ledger"):
+                if table in tables and {"referencia_tipo", "referencia_id"}.issubset(tables[table]):
+                    conn.execute(
+                        f"DELETE FROM {table} WHERE LOWER(COALESCE(referencia_tipo,'')) IN ('venta','venta_anulada') AND referencia_id IN ({placeholders})",
+                        tuple(sale_ids),
+                    )
+            if "historial_cambios" in tables and {"recurso_tipo", "recurso_id"}.issubset(tables["historial_cambios"]):
+                conn.execute(f"DELETE FROM historial_cambios WHERE LOWER(COALESCE(recurso_tipo,''))='venta' AND recurso_id IN ({placeholders})", tuple(sale_ids))
+            delete_by_ids("ventas", "id", sale_ids)
+        if event_ids:
+            delete_by_ids("agenda_eventos", "id", event_ids)
+        if exclusive_coupon_ids:
+            placeholders = ",".join("?" for _ in exclusive_coupon_ids)
+            if "tienda_cupon_usos" in tables:
+                conn.execute(f"DELETE FROM tienda_cupon_usos WHERE cupon_id IN ({placeholders})", tuple(exclusive_coupon_ids))
+            delete_by_ids("tienda_cupones", "id", exclusive_coupon_ids)
         conn.execute("DELETE FROM tienda_clientes WHERE id=?", (customer_id,))
         conn.commit()
-        return jsonify({"success": True})
+        try:
+            photo_dir = _directorio_fotos_seguimiento()
+            for filename in photos_to_remove:
+                if re.fullmatch(r"[a-f0-9]{32}\.jpg", filename):
+                    path = os.path.join(photo_dir, filename)
+                    if os.path.isfile(path):
+                        os.remove(path)
+        except OSError:
+            current_app.logger.warning("No se pudieron eliminar todas las fotos de seguimiento del cliente eliminado.")
+        return jsonify({"success": True, "eliminados": deleted})
     except sqlite3.IntegrityError:
         conn.rollback()
         return jsonify({"success": False, "error": "No se puede eliminar porque otros datos del sistema todavía dependen de esta cuenta. Edita sus datos para corregir el duplicado."}), 409
