@@ -2784,6 +2784,27 @@
             box-shadow: 0 10px 24px rgba(0,0,0,.28);
             cursor: pointer;
         }
+        .mobile-account-access {
+            display: none;
+            position: fixed;
+            left: 14px;
+            bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+            z-index: 90;
+            min-height: 48px;
+            align-items: center;
+            gap: 8px;
+            padding: 0 14px;
+            border: 1px solid rgba(196, 91, 0, .26);
+            border-radius: 999px;
+            background: #fffdf9;
+            color: var(--store-chocolate, #4b2d20);
+            box-shadow: 0 10px 28px rgba(74, 44, 23, .16);
+            font-weight: 850;
+            font-size: .82rem;
+            cursor: pointer;
+        }
+        .mobile-account-access svg { width: 19px; height: 19px; flex: 0 0 auto; }
+        .mobile-account-access.account-disabled { display: none !important; }
         .mobile-cart-fab .badge {
             display: inline-grid;
             place-items: center;
@@ -14575,6 +14596,10 @@
                 font-size: 1.05rem;
             }
 
+            body.mobile-ui:not(.tienda-preview-agenda):not(.tienda-preview-draft) .mobile-account-access {
+                display: inline-flex !important;
+            }
+
             body.mobile-ui:not(.tienda-preview-agenda) .mobile-menu-fab,
             body.mobile-ui:not(.tienda-preview-agenda) .mobile-agenda-summary-fab {
                 display: none !important;
@@ -17066,7 +17091,7 @@
             <input id="search-input" type="search" placeholder="Buscar productos..." aria-label="Buscar productos">
         </div>
         <div class="topbar-actions">
-            <button type="button" class="menu-quick-btn" id="btn-iniciar-sesion">Iniciar sesion</button>
+            <button type="button" class="menu-quick-btn" id="btn-iniciar-sesion">Iniciar sesi&oacute;n</button>
             <button type="button" class="menu-quick-btn" id="btn-registrar-cuenta">Registrar cuenta</button>
             <button type="button" class="menu-quick-btn" id="btn-cuenta" style="display:none;">Mi cuenta</button>
             <button type="button" class="menu-quick-btn menu-logout-btn" id="btn-cerrar-sesion" style="display:none;">Cerrar sesion</button>
@@ -17077,6 +17102,10 @@
             <strong id="desktop-cart-count">0</strong>
         </button>
     </header>
+    <button type="button" class="mobile-account-access" id="mobile-account-access" aria-label="Iniciar sesi&oacute;n">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 21a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="mobile-account-access-label">Iniciar sesi&oacute;n</span>
+    </button>
 
     <main class="layout">
         <aside class="left-nav">
@@ -17369,9 +17398,9 @@
             <span aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5.5 18.5 4 22l3.8-1.3A9 9 0 1 0 3 12a9 9 0 0 0 2.5 6.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 8.5c.8 3 3 5.2 6 6l1.4-1.4c.3-.3.7-.4 1.1-.2l1.6.7c.4.2.6.6.5 1-.4 1.8-1.7 2.7-3.5 2.3-4.6-1-7.4-3.8-8.5-8.4-.4-1.8.5-3.1 2.3-3.5.4-.1.8.1 1 .5l.7 1.6c.2.4.1.8-.2 1.1L8.5 8.5Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
             <strong>Contacto</strong>
         </button>
-        <button type="button" onclick="abrirCuentaDesdeMenuMobile()" aria-label="Abrir cuenta">
+        <button type="button" id="mobile-account-nav-button" onclick="abrirCuentaDesdeMenuMobile()" aria-label="Iniciar sesi&oacute;n">
             <span aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 21a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-            <strong>Cuenta</strong>
+            <strong id="mobile-account-nav-label">Iniciar sesi&oacute;n</strong>
         </button>
     </nav>
     <div class="mobile-menu-modal" id="mobile-menu-modal">
@@ -17989,6 +18018,10 @@
         const btnRegistrarCuentaEl = document.getElementById("btn-registrar-cuenta");
         const btnCuentaEl = document.getElementById("btn-cuenta");
         const btnCerrarSesionEl = document.getElementById("btn-cerrar-sesion");
+        const mobileAccountAccessEl = document.getElementById("mobile-account-access");
+        const mobileAccountAccessLabelEl = document.getElementById("mobile-account-access-label");
+        const mobileAccountNavButtonEl = document.getElementById("mobile-account-nav-button");
+        const mobileAccountNavLabelEl = document.getElementById("mobile-account-nav-label");
         const leftNavEl = document.querySelector(".left-nav");
         const cartPanelEl = document.querySelector(".cart-panel");
         const btnMobileMenuEl = document.getElementById("btn-mobile-menu");
@@ -19510,6 +19543,8 @@
                 if (btnCerrarSesionEl) btnCerrarSesionEl.style.display = "none";
                 if (btnIniciarSesionEl) btnIniciarSesionEl.style.display = "none";
                 if (btnRegistrarCuentaEl) btnRegistrarCuentaEl.style.display = "none";
+                if (mobileAccountAccessEl) mobileAccountAccessEl.classList.add("account-disabled");
+                if (mobileAccountNavButtonEl) mobileAccountNavButtonEl.style.display = "none";
                 renderCategoriasMenu();
                 _syncPedidoChatContext();
                 return;
@@ -19517,9 +19552,7 @@
             const logged = Boolean(clienteRegistrado);
             if (btnCuentaEl) btnCuentaEl.style.display = logged ? "" : "none";
             if (btnCuentaEl) {
-                const nombreCliente = String(clienteRegistrado?.nombre || "").trim();
-                const nombreCorto = nombreCliente ? nombreCliente.split(/\s+/)[0].slice(0, 20) : "Cliente";
-                btnCuentaEl.textContent = `Bienvenido(a) ${nombreCorto}`;
+                btnCuentaEl.textContent = "Mi cuenta";
             }
             if (btnCerrarSesionEl) {
                 btnCerrarSesionEl.style.display = logged ? "" : "none";
@@ -19530,6 +19563,10 @@
             if (btnRegistrarCuentaEl) {
                 btnRegistrarCuentaEl.style.display = logged ? "none" : "";
             }
+            if (mobileAccountAccessEl) mobileAccountAccessEl.classList.remove("account-disabled");
+            if (mobileAccountAccessLabelEl) mobileAccountAccessLabelEl.textContent = logged ? "Mi cuenta" : "Iniciar sesi\u00f3n";
+            if (mobileAccountNavLabelEl) mobileAccountNavLabelEl.textContent = logged ? "Mi cuenta" : "Iniciar sesi\u00f3n";
+            if (mobileAccountNavButtonEl) mobileAccountNavButtonEl.setAttribute("aria-label", logged ? "Abrir mi cuenta" : "Iniciar sesi\u00f3n");
             if (cuentaEstadoEl) {
                 if (logged) {
                     cuentaEstadoEl.textContent = `Cuenta activa: ${clienteRegistrado.email} / ${clienteRegistrado.telefono}`;
@@ -27158,6 +27195,7 @@
         cuentaGuardarDireccionEl?.addEventListener("click", guardarDireccionCuentaCliente);
         btnCuentaEl?.addEventListener("click", () => abrirModalCuenta("account"));
         btnIniciarSesionEl?.addEventListener("click", () => abrirModalCuenta("login"));
+        mobileAccountAccessEl?.addEventListener("click", () => abrirModalCuenta(clienteRegistrado ? "account" : "login"));
         btnRegistrarCuentaEl?.addEventListener("click", () => abrirModalCuenta("register"));
         btnCerrarSesionEl?.addEventListener("click", cerrarSesionCliente);
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });
