@@ -232,6 +232,8 @@ def _ruta_es_publica(path):
         return True
     if ruta.startswith("/redes/go/"):
         return True
+    if ruta.startswith("/redes/qr/"):
+        return True
     if ruta.startswith("/downloader/apk/"):
         return True
     if ruta == "/seguimiento" or ruta.startswith("/seguimiento/"):

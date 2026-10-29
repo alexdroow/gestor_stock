@@ -223,9 +223,13 @@ class RedesTests(unittest.TestCase):
         self.assertEqual(image.mimetype, "image/png")
         self.assertIn(b"PNG", image.data[:8])
 
+        with self.client.session_transaction() as session:
+            session.pop("admin_autenticado", None)
         scan = self.client.get(item["tracking_path"], follow_redirects=False)
         self.assertEqual(scan.status_code, 302)
         self.assertEqual(scan.location, "https://pasteleriasucree.cl/tienda")
+        with self.client.session_transaction() as session:
+            session["admin_autenticado"] = True
         metrics = self.client.get(f"/api/redes/admin/qr/{item['id']}/metrics").get_json()
         self.assertEqual(metrics["total_scans"], 1)
         self.assertEqual(metrics["recent"][0]["source"], "desconocido")
