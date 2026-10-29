@@ -80,6 +80,7 @@ def _db():
             title TEXT NOT NULL,
             kind TEXT NOT NULL CHECK(kind IN ('link','whatsapp')),
             destination TEXT NOT NULL,
+            purpose TEXT NOT NULL DEFAULT 'redirect' CHECK(purpose IN ('redirect','signup')),
             created_at TEXT NOT NULL,
             active INTEGER NOT NULL DEFAULT 1
         );
@@ -105,6 +106,13 @@ def _db():
             validity_days INTEGER NOT NULL DEFAULT 30,
             starts_on TEXT NOT NULL DEFAULT '',
             ends_on TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS redes_qr_signup_config (
+            id INTEGER PRIMARY KEY CHECK(id=1),
+            active INTEGER NOT NULL DEFAULT 0,
+            discount_pct REAL NOT NULL DEFAULT 10,
+            validity_days INTEGER NOT NULL DEFAULT 30,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS redes_promo_codes (
@@ -133,6 +141,9 @@ def _db():
         conn.execute("ALTER TABLE redes_links ADD COLUMN draft_archived INTEGER NOT NULL DEFAULT 0")
     if "published_archived" not in columns:
         conn.execute("ALTER TABLE redes_links ADD COLUMN published_archived INTEGER NOT NULL DEFAULT 0")
+    qr_columns = {row["name"] for row in conn.execute("PRAGMA table_info(redes_qr_codes)").fetchall()}
+    if "purpose" not in qr_columns:
+        conn.execute("ALTER TABLE redes_qr_codes ADD COLUMN purpose TEXT NOT NULL DEFAULT 'redirect' CHECK(purpose IN ('redirect','signup'))")
     promo_columns = {row["name"] for row in conn.execute("PRAGMA table_info(redes_promo_codes)").fetchall()}
     for name, ddl in (("tipo", "TEXT NOT NULL DEFAULT 'welcome'"), ("alcance", "TEXT NOT NULL DEFAULT 'tienda'"), ("usos_max", "INTEGER NOT NULL DEFAULT 1")):
         if name not in promo_columns:
@@ -142,6 +153,7 @@ def _db():
         (json.dumps(_BRAND_PROFILE, ensure_ascii=False), json.dumps({}, ensure_ascii=False)),
     )
     conn.execute("INSERT OR IGNORE INTO redes_promo_config(id) VALUES(1)")
+    conn.execute("INSERT OR IGNORE INTO redes_qr_signup_config(id) VALUES(1)")
     conn.commit()
     return conn
 
@@ -159,6 +171,19 @@ def _promo_config(conn):
         "validity_days": max(1, min(365, int(data.get("validity_days") or 30))),
         "starts_on": str(data.get("starts_on") or ""),
         "ends_on": str(data.get("ends_on") or ""),
+        "updated_at": str(data.get("updated_at") or ""),
+    }
+
+
+def _qr_signup_config(conn):
+    row = conn.execute("SELECT * FROM redes_qr_signup_config WHERE id=1").fetchone()
+    data = dict(row) if row else {}
+    return {
+        "active": bool(data.get("active")),
+        "discount_pct": max(1.0, min(100.0, float(data.get("discount_pct") or 10))),
+        "validity_days": max(1, min(365, int(data.get("validity_days") or 30))),
+        "starts_on": "",
+        "ends_on": "",
         "updated_at": str(data.get("updated_at") or ""),
     }
 
@@ -497,7 +522,7 @@ def _stats(conn, start_utc, end_utc):
 
 def _admin_qr_codes(conn):
     rows = conn.execute(
-        """SELECT q.id,q.token,q.title,q.kind,q.destination,q.created_at,q.active,
+        """SELECT q.id,q.token,q.title,q.kind,q.destination,q.purpose,q.created_at,q.active,
                   COUNT(e.id) AS scans,MAX(e.created_at) AS last_scan
            FROM redes_qr_codes q
            LEFT JOIN redes_qr_events e ON e.qr_id=q.id
@@ -576,15 +601,23 @@ def public_page():
     try:
         profile, links = _published_state(conn)
         promo = _promo_config(conn)
+        qr_signup = _qr_signup_config(conn)
+        qr_signup_requested = bool(session.pop("redes_qr_signup_requested", False))
+        promo_for_page = qr_signup if qr_signup_requested else promo
+        promo_available = qr_signup["active"] if qr_signup_requested else _promo_window_open(promo)
         promo_token = session.setdefault("redes_promo_csrf", secrets.token_urlsafe(32))
+        qr_signup_token = session.get("redes_qr_signup_token", "") if qr_signup_requested else ""
         response = make_response(render_template(
             "redes_publica.html",
             profile=profile,
             links=links,
             preview=False,
-            promo=promo,
-            promo_available=_promo_window_open(promo),
+            promo=promo_for_page,
+            promo_available=promo_available,
+            promo_source="qr" if qr_signup_requested else "welcome",
+            force_promo_open=qr_signup_requested and promo_available,
             promo_csrf=promo_token,
+            qr_signup_token=qr_signup_token,
         ))
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
@@ -602,6 +635,12 @@ def register_welcome_promo():
     if not _promo_rate_allowed():
         return jsonify({"success": False, "error": "Demasiados intentos. Vuelve a probar más tarde."}), 429
     data = request.get_json(silent=True) or {}
+    source = "qr" if str(data.get("source") or "").strip().lower() == "qr" else "welcome"
+    if source == "qr":
+        expected_qr = str(session.get("redes_qr_signup_token") or "")
+        supplied_qr = str(request.headers.get("X-QR-Signup-Token") or "")
+        if not expected_qr or not supplied_qr or not secrets.compare_digest(expected_qr, supplied_qr):
+            return jsonify({"success": False, "error": "Abre nuevamente el enlace QR para solicitar este descuento."}), 403
     if str(data.get("website") or "").strip():
         return jsonify({"success": True})
     if not bool(data.get("consent")):
@@ -615,7 +654,7 @@ def register_welcome_promo():
     conn = _db()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        promo = _promo_config(conn)
+        promo = _qr_signup_config(conn) if source == "qr" else _promo_config(conn)
         now_local = datetime.now(ZoneInfo("America/Santiago"))
         today = now_local.date().isoformat()
         if not _promo_window_open(promo, today):
@@ -640,7 +679,7 @@ def register_welcome_promo():
                 and not existing["used_sale_id"]
                 and int(existing["coupon_active"] or 0) == 1
                 and expiry_date >= now_local.date()
-                and _promo_window_open(promo, today)
+                and (source == "qr" or _promo_window_open(promo, today))
             )
             if code_is_active:
                 conn.commit()
@@ -674,7 +713,7 @@ def register_welcome_promo():
             return jsonify({"success": False, "error": "No se pudo registrar el contacto. Intenta nuevamente."}), 500
 
         expiry = now_local.date() + timedelta(days=promo["validity_days"])
-        if promo["ends_on"]:
+        if promo.get("ends_on"):
             campaign_end = datetime.strptime(promo["ends_on"], "%Y-%m-%d").date()
             expiry = min(expiry, campaign_end)
         expiry_text = expiry.isoformat()
@@ -688,7 +727,7 @@ def register_welcome_promo():
                        (codigo,nombre,tipo_descuento,valor_descuento,activo,fecha_inicio,fecha_fin,
                         usos_max_total,usos_max_por_cliente,monto_minimo,solo_sin_oferta,alcance)
                        VALUES (?,?, 'porcentaje', ?,1,?,?,1,1,0,0,'tienda')""",
-                    (candidate, "Descuento bienvenida Redes", promo["discount_pct"], today, expiry_text),
+                    (candidate, "Descuento registro QR Sucree" if source == "qr" else "Descuento bienvenida Redes", promo["discount_pct"], today, expiry_text),
                 )
                 coupon_id = int(cursor.lastrowid or 0)
                 code = candidate
@@ -703,17 +742,19 @@ def register_welcome_promo():
         cursor.execute(
             """INSERT INTO tienda_cliente_cupones
                (cliente_id,cliente_ref,cupon_id,activo,usado,usos_realizados,usos_max,nota,asignado_por,fecha_vencimiento,fecha_asignado)
-               VALUES (?,?,?,1,0,0,1,?,'redes_promo',?,CURRENT_TIMESTAMP)""",
-            (int(cliente.get("id") or 0), client_ref, coupon_id, f"Promoción bienvenida Redes: {promo['discount_pct']:g}%", expiry_text),
+               VALUES (?,?,?,1,0,0,1,?,?,?,CURRENT_TIMESTAMP)""",
+            (int(cliente.get("id") or 0), client_ref, coupon_id, f"Descuento {'registro QR' if source == 'qr' else 'bienvenida Redes'}: {promo['discount_pct']:g}%", "redes_qr" if source == "qr" else "redes_promo", expiry_text),
         )
         cursor.execute(
             """INSERT INTO redes_promo_codes
-               (cliente_id,email,telefono,cliente_ref,codigo,cupon_id,discount_pct,created_at,expires_on,consented_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (int(cliente.get("id") or 0), email, phone, client_ref, code, coupon_id, promo["discount_pct"], _now_utc(), expiry_text, _now_utc()),
+               (cliente_id,email,telefono,cliente_ref,codigo,cupon_id,discount_pct,created_at,expires_on,consented_at,tipo)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (int(cliente.get("id") or 0), email, phone, client_ref, code, coupon_id, promo["discount_pct"], _now_utc(), expiry_text, _now_utc(), "qr_signup" if source == "qr" else "welcome"),
         )
         registration_id = int(cursor.lastrowid or 0)
         conn.commit()
+        if source == "qr":
+            session.pop("redes_qr_signup_token", None)
         session["redes_promo_registration_id"] = registration_id
         return jsonify({"success": True, "codigo": code, "discount_pct": promo["discount_pct"], "expires_on": expiry_text})
     except sqlite3.IntegrityError:
@@ -834,11 +875,17 @@ def qr_redirect(token):
     conn = _db()
     try:
         row = conn.execute(
-            "SELECT id,destination FROM redes_qr_codes WHERE token=? AND active=1",
+            "SELECT id,destination,purpose FROM redes_qr_codes WHERE token=? AND active=1",
             (str(token or "")[:64],),
         ).fetchone()
         if not row:
             return render_template("redes_no_disponible.html"), 404
+        if row["purpose"] == "signup":
+            if not _qr_signup_config(conn)["active"]:
+                return render_template("redes_no_disponible.html"), 404
+            session["redes_qr_signup_requested"] = True
+            session["redes_qr_signup_token"] = secrets.token_urlsafe(32)
+            destination = url_for("redes.public_page", qr_registro=1)
         try:
             destination = _validate_destination(row["destination"])
         except ValueError:
@@ -872,10 +919,21 @@ def admin_create_qr():
     kind = str(payload.get("kind") or "link").strip().lower()
     if not title:
         return jsonify({"success": False, "error": "El nombre del QR es obligatorio."}), 400
-    if kind not in {"link", "whatsapp"}:
+    if kind not in {"link", "whatsapp", "signup"}:
         return jsonify({"success": False, "error": "Selecciona un tipo de QR valido."}), 400
     try:
-        if kind == "link":
+        purpose = "signup" if kind == "signup" else "redirect"
+        if kind == "signup":
+            config_conn = _db()
+            try:
+                signup_config = _qr_signup_config(config_conn)
+            finally:
+                config_conn.close()
+            if not signup_config["active"]:
+                return jsonify({"success": False, "error": "Activa primero la promoción de registro QR."}), 409
+            destination = url_for("redes.public_page", _external=False, qr_registro=1)
+            kind = "link"
+        elif kind == "link":
             destination = _validate_destination(payload.get("url"))
             if len(destination) > 1000:
                 raise ValueError("El enlace es demasiado largo para generar un QR legible.")
@@ -901,12 +959,12 @@ def admin_create_qr():
         token = secrets.token_hex(12)
         now = _now_utc()
         cursor = conn.execute(
-            "INSERT INTO redes_qr_codes(token,title,kind,destination,created_at) VALUES(?,?,?,?,?)",
-            (token, title, kind, destination, now),
+            "INSERT INTO redes_qr_codes(token,title,kind,destination,purpose,created_at) VALUES(?,?,?,?,?,?)",
+            (token, title, kind, destination, purpose, now),
         )
         conn.commit()
         item = conn.execute(
-            """SELECT q.id,q.token,q.title,q.kind,q.destination,q.created_at,q.active,0 AS scans,NULL AS last_scan
+            """SELECT q.id,q.token,q.title,q.kind,q.destination,q.purpose,q.created_at,q.active,0 AS scans,NULL AS last_scan
                FROM redes_qr_codes q WHERE q.id=?""",
             (cursor.lastrowid,),
         ).fetchone()
@@ -965,6 +1023,49 @@ def qr_image(qr_id):
         conn.close()
 
 
+@redes_blueprint.post("/api/redes/admin/qr-signup")
+def admin_save_qr_signup():
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    try:
+        discount = float(data.get("discount_pct"))
+        validity = int(data.get("validity_days"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Ingresa un descuento y una vigencia válidos."}), 400
+    if not 1 <= discount <= 100 or not 1 <= validity <= 365:
+        return jsonify({"success": False, "error": "El descuento debe ser 1–100% y la vigencia 1–365 días."}), 400
+    conn = _db()
+    try:
+        conn.execute(
+            "UPDATE redes_qr_signup_config SET active=?,discount_pct=?,validity_days=?,updated_at=? WHERE id=1",
+            (int(bool(data.get("active"))), discount, validity, _now_utc()),
+        )
+        conn.commit()
+        return jsonify({"success": True, "config": _qr_signup_config(conn)})
+    finally:
+        conn.close()
+
+
+@redes_blueprint.post("/api/redes/admin/qr/<int:qr_id>/deactivate")
+def admin_deactivate_qr(qr_id):
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    conn = _db()
+    try:
+        cursor = conn.execute("UPDATE redes_qr_codes SET active=0 WHERE id=? AND active=1", (qr_id,))
+        if not cursor.rowcount:
+            exists = conn.execute("SELECT 1 FROM redes_qr_codes WHERE id=?", (qr_id,)).fetchone()
+            if not exists:
+                return jsonify({"success": False, "error": "No se encontró el QR."}), 404
+        conn.commit()
+        return jsonify({"success": True, "active": False})
+    finally:
+        conn.close()
+
+
 @redes_blueprint.get("/api/redes/admin/qr/<int:qr_id>/metrics")
 def admin_qr_metrics(qr_id):
     denied = _admin_required()
@@ -972,7 +1073,7 @@ def admin_qr_metrics(qr_id):
         return denied
     conn = _db()
     try:
-        qr = conn.execute("SELECT id,title,kind,destination,created_at FROM redes_qr_codes WHERE id=?", (qr_id,)).fetchone()
+        qr = conn.execute("SELECT id,title,kind,destination,purpose,active,created_at FROM redes_qr_codes WHERE id=?", (qr_id,)).fetchone()
         if not qr:
             return jsonify({"success": False, "error": "No se encontro el QR."}), 404
         daily = conn.execute(
@@ -1064,7 +1165,7 @@ def admin_state():
         qr_codes = _admin_qr_codes(conn)
         for link in links:
             link["clicks"] = next((item["clicks"] for item in stats["by_link"] if item["id"] == link["id"]), 0)
-        return jsonify({"success": True, "profile": profile, "published_profile": published_profile, "links": links, "qr_codes": qr_codes, "version": row["draft_version"], "published_at": row["published_at"], "updated_at": row["updated_at"], "published": bool(row["published_at"]), "has_changes": has_changes, "stats": stats, "period": period, "revisions": revisions, "promo": _promo_config(conn), "promo_codes": _promo_admin_codes(conn)})
+        return jsonify({"success": True, "profile": profile, "published_profile": published_profile, "links": links, "qr_codes": qr_codes, "qr_signup": _qr_signup_config(conn), "version": row["draft_version"], "published_at": row["published_at"], "updated_at": row["updated_at"], "published": bool(row["published_at"]), "has_changes": has_changes, "stats": stats, "period": period, "revisions": revisions, "promo": _promo_config(conn), "promo_codes": _promo_admin_codes(conn)})
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     finally:

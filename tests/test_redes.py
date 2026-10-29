@@ -235,6 +235,34 @@ class RedesTests(unittest.TestCase):
         self.assertEqual(metrics["recent"][0]["source"], "desconocido")
         state = self.client.get("/api/redes/admin/state").get_json()
         self.assertEqual(state["qr_codes"][0]["scans"], 1)
+        self.assertEqual(state["qr_codes"][0]["destination"], "https://pasteleriasucree.cl/tienda")
+        removed = self.mutate("POST", f"/api/redes/admin/qr/{item['id']}/deactivate", {})
+        self.assertEqual(removed.status_code, 200)
+        self.assertEqual(self.client.get(item["tracking_path"]).status_code, 404)
+        self.assertEqual(self.client.get(f"/api/redes/admin/qr/{item['id']}/metrics").get_json()["total_scans"], 1)
+
+    def test_qr_signup_configuration_and_scan_open_registration_popup(self):
+        saved = self.mutate("POST", "/api/redes/admin/qr-signup", {
+            "active": True, "discount_pct": 17.5, "validity_days": 21,
+        })
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.get_json()["config"]["discount_pct"], 17.5)
+        created = self.mutate("POST", "/api/redes/admin/qr", {
+            "title": "Registro QR", "kind": "signup",
+        })
+        self.assertEqual(created.status_code, 201)
+        item = created.get_json()["qr"]
+        self.assertEqual(item["purpose"], "signup")
+        self.assertEqual(item["destination"], "/redes?qr_registro=1")
+        with self.client.session_transaction() as session:
+            session.pop("admin_autenticado", None)
+        scan = self.client.get(item["tracking_path"], follow_redirects=False)
+        self.assertEqual(scan.status_code, 302)
+        page = self.client.get(scan.location)
+        html = page.get_data(as_text=True)
+        self.assertIn('name="redes-promo-source" content="qr"', html)
+        self.assertIn("17.5% de descuento", html)
+        self.assertIn("forcePromo=true", html)
 
     def test_qr_whatsapp_uses_prefilled_message_and_validation(self):
         created = self.mutate("POST", "/api/redes/admin/qr", {

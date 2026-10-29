@@ -184,6 +184,38 @@ class RedesWelcomePromoTests(unittest.TestCase):
         wrong_owner = redes_promo_validate_checkout(result["codigo"], app._normalizar_cliente_ref("otra@example.cl", "+56987654321"))
         self.assertFalse(wrong_owner["ok"])
 
+    def test_qr_signup_issues_configured_discount_and_marks_code_source(self):
+        config = self.admin_post("/api/redes/admin/qr-signup", {
+            "active": True, "discount_pct": 17, "validity_days": 21,
+        })
+        self.assertEqual(config.status_code, 200)
+        created = self.admin_post("/api/redes/admin/qr", {"title": "Alta QR", "kind": "signup"})
+        self.assertEqual(created.status_code, 201, created.get_json())
+        with self.client.session_transaction() as session:
+            session.pop("admin_autenticado", None)
+        scan = self.client.get(created.get_json()["qr"]["tracking_path"], follow_redirects=False)
+        page = self.client.get(scan.location).get_data(as_text=True)
+        token = re.search(r'<meta name="redes-promo-csrf" content="([^"]+)"', page).group(1)
+        qr_token = re.search(r'<meta name="redes-qr-signup-token" content="([^"]+)"', page).group(1)
+        response = self.client.post(
+            "/api/redes/promo/register",
+            json={"source": "qr", "email": "qrcliente@example.cl", "telefono": "+56912345678", "consent": True},
+            headers={"X-CSRF-Token": token, "X-QR-Signup-Token": qr_token},
+        )
+        self.assertEqual(response.status_code, 200, response.get_json())
+        result = response.get_json()
+        self.assertEqual(result["discount_pct"], 17)
+        conn = database.get_db()
+        try:
+            coupon = conn.execute("SELECT valor_descuento,nombre FROM tienda_cupones WHERE codigo=?", (result["codigo"],)).fetchone()
+            record = conn.execute("SELECT tipo FROM redes_promo_codes WHERE codigo=?", (result["codigo"],)).fetchone()
+            assignment = conn.execute("SELECT asignado_por,fecha_vencimiento FROM tienda_cliente_cupones WHERE cupon_id=(SELECT cupon_id FROM redes_promo_codes WHERE codigo=?)", (result["codigo"],)).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(coupon["valor_descuento"], 17)
+        self.assertEqual(record["tipo"], "qr_signup")
+        self.assertEqual(assignment["asignado_por"], "redes_qr")
+
     def test_duplicate_contact_and_missing_consent_are_rejected(self):
         self.assertEqual(self.enable_promo().status_code, 200)
         token = self.registration_token()
