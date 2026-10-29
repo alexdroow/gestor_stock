@@ -310,7 +310,8 @@ except Exception as exc:
     Manager = None
 
 from database import (
-    init_db, get_db, actualizar_stock_producto, actualizar_stock_insumo,
+    init_db, get_db, actualizar_stock_producto, fijar_stock_producto_absoluto, actualizar_stock_insumo,
+    _entero_producto,
     procesar_venta_con_insumos, actualizar_stock_insumo_con_unidad,
     obtener_historial_ventas, obtener_detalle_venta, obtener_codigo_operacion_venta, obtener_timeline_operacion, eliminar_venta,
     obtener_reporte_ventas, obtener_recetas, guardar_receta, 
@@ -766,45 +767,19 @@ def _esta_cerca_minimo(stock_actual, stock_minimo):
 
 
 def _calcular_info_porciones_producto(producto):
-    unidad_stock = _normalizar_unidad_producto(producto.get("unidad") or "unidad")
-    stock_actual = float(producto.get("stock") or 0)
-    stock_minimo = float(producto.get("stock_minimo") or 0)
-    porcion_cantidad = float(producto.get("porcion_cantidad") or 1)
-    porcion_unidad = _normalizar_unidad_producto(producto.get("porcion_unidad") or unidad_stock)
-
-    conversion = _convertir_cantidad_unidad(porcion_cantidad, porcion_unidad, unidad_stock)
-    if not conversion["success"]:
-        return {
-            "success": False,
-            "error": conversion["error"],
-            "unidad_stock": unidad_stock,
-            "stock_actual": stock_actual,
-            "stock_minimo": stock_minimo,
-            "porcion_cantidad": porcion_cantidad,
-            "porcion_unidad": porcion_unidad,
-            "porcion_stock_equivalente": None,
-            "porciones_disponibles": 0,
-            "sin_porcion_disponible": True,
-            "baja_porcion": True,
-            "bajo_minimo": stock_actual <= stock_minimo,
-            "cerca_minimo": _esta_cerca_minimo(stock_actual, stock_minimo),
-        }
-
-    porcion_stock_equivalente = float(conversion["cantidad"] or 0)
-    if porcion_stock_equivalente <= 0:
-        porciones_disponibles = 0
-    else:
-        porciones_disponibles = max(0, int(math.floor((stock_actual + 1e-9) / porcion_stock_equivalente)))
+    stock_actual = max(0, int(math.floor(float(producto.get("stock") or 0) + 1e-9)))
+    stock_minimo = max(0, int(math.ceil(float(producto.get("stock_minimo") or 0) - 1e-9)))
+    porciones_disponibles = stock_actual
 
     return {
         "success": True,
         "error": None,
-        "unidad_stock": unidad_stock,
+        "unidad_stock": "unidad",
         "stock_actual": stock_actual,
         "stock_minimo": stock_minimo,
-        "porcion_cantidad": porcion_cantidad,
-        "porcion_unidad": porcion_unidad,
-        "porcion_stock_equivalente": porcion_stock_equivalente,
+        "porcion_cantidad": 1,
+        "porcion_unidad": "unidad",
+        "porcion_stock_equivalente": 1,
         "porciones_disponibles": porciones_disponibles,
         "sin_porcion_disponible": porciones_disponibles < 1,
         "baja_porcion": porciones_disponibles <= 1,
@@ -8670,7 +8645,7 @@ def api_tienda_admin_producto_quick_update(producto_id):
     try:
         data = request.get_json(silent=True) or {}
         precio = float(data.get("precio") or 0)
-        stock = float(data.get("stock") or 0)
+        stock = _entero_producto(data.get("stock") or 0, "stock")
         oculto = 1 if bool(data.get("oculto", False)) else 0
         if precio < 0:
             return jsonify({"success": False, "error": "El precio no puede ser negativo"}), 400
@@ -8693,21 +8668,44 @@ def api_tienda_admin_producto_quick_update(producto_id):
             cur.execute(
                 """
                 UPDATE productos
-                SET precio = ?, stock = ?, activo_tienda = ?, actualizado_en = CURRENT_TIMESTAMP
+                SET precio = ?, unidad = 'unidad', porcion_cantidad = 1,
+                    porcion_unidad = 'unidad', activo_tienda = ?, actualizado_en = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (float(precio), float(stock), int(activo_tienda), int(producto_id)),
+                (float(precio), int(activo_tienda), int(producto_id)),
             )
         else:
             cur.execute(
                 """
                 UPDATE productos
-                SET precio = ?, stock = ?, activo_tienda = ?
+                SET precio = ?, unidad = 'unidad', porcion_cantidad = 1,
+                    porcion_unidad = 'unidad', activo_tienda = ?
                 WHERE id = ?
                 """,
-                (float(precio), float(stock), int(activo_tienda), int(producto_id)),
+                (float(precio), int(activo_tienda), int(producto_id)),
             )
         conn.commit()
+        fijar_stock_producto_absoluto(
+            int(producto_id), stock,
+            referencia_tipo="ajuste_catalogo_tienda",
+            detalle="Stock absoluto actualizado desde el catalogo de tienda",
+        )
+        verificacion = get_db()
+        try:
+            cur_verificacion = verificacion.cursor()
+            cur_verificacion.execute(
+                "SELECT stock, unidad FROM productos WHERE id = ?",
+                (int(producto_id),),
+            )
+            producto_guardado = cur_verificacion.fetchone()
+            if (
+                not producto_guardado
+                or _entero_producto(producto_guardado["stock"], "stock guardado") != stock
+                or str(producto_guardado["unidad"] or "").strip().lower() != "unidad"
+            ):
+                raise RuntimeError("No se pudo verificar el stock guardado. Vuelve a intentarlo.")
+        finally:
+            verificacion.close()
         crear_backup()
         return jsonify({
             "success": True,
@@ -12917,7 +12915,7 @@ def api_actualizar_producto(id):
 def actualizar_producto_stock(id):
     try:
         data = request.get_json(silent=True) or {}
-        cantidad = float(data.get('cantidad', 0) or 0)
+        cantidad = _entero_producto(data.get('cantidad', 0) or 0, "ajuste de stock", permitir_negativo=True)
         if cantidad == 0:
             return jsonify({'success': False, 'error': 'La cantidad no puede ser 0'}), 400
 
@@ -14985,12 +14983,12 @@ def agregar_producto():
         if not nombre:
             return _error_or_text("El nombre del producto es obligatorio", 400)
 
-        stock = _as_float(request.form.get('stock_producto', 0) or 0, "stock inicial", min_value=0)
-        stock_minimo = _as_float(request.form.get('stock_minimo', 2) or 2, "stock mínimo", min_value=0)
-        unidad = _normalizar_unidad_producto(request.form.get('unidad', 'unidad'))
+        stock = _as_int(request.form.get('stock_producto', 0) or 0, "stock inicial", min_value=0)
+        stock_minimo = _as_int(request.form.get('stock_minimo', 2) or 2, "stock mínimo", min_value=0)
+        unidad = "unidad"
         icono = _normalizar_icono_producto(request.form.get('icono'))
-        porcion_cantidad = _as_float(request.form.get('porcion_cantidad', 1) or 1, "porción de venta", min_value=0.0001)
-        porcion_unidad = _normalizar_unidad_producto(request.form.get('porcion_unidad', unidad))
+        porcion_cantidad = 1
+        porcion_unidad = "unidad"
         stock_dependencia_tipo = str(request.form.get('stock_dependencia_tipo') or '').strip().lower()
         if stock_dependencia_tipo in {'', 'none', 'ninguna', 'null', 'sin'}:
             stock_dependencia_tipo = None
@@ -17435,10 +17433,10 @@ def _enriquecer_productos_con_dependencias_venta(cursor, productos):
         item["stock_dependencia_cantidad"] = float(cfg.get("cantidad") or 1) if cfg else 1.0
 
         try:
-            stock_visual = float(item.get("stock") or 0)
+            stock_visual = max(0, int(math.floor(float(item.get("stock") or 0) + 1e-9)))
         except (TypeError, ValueError):
-            stock_visual = 0.0
-        stock_visual_unidad = _normalizar_unidad_producto(item.get("unidad") or "unidad")
+            stock_visual = 0
+        stock_visual_unidad = "unidad"
         stock_visual_origen = "propio"
         stock_visual_dependencia_nombre = None
 
@@ -17447,44 +17445,6 @@ def _enriquecer_productos_con_dependencias_venta(cursor, productos):
             dep_id = int(item.get("stock_dependencia_id") or 0)
         except (TypeError, ValueError):
             dep_id = 0
-
-        if tipo_dep == "producto" and dep_id > 0:
-            dep_producto = productos_todos.get(dep_id)
-            if dep_producto:
-                dep_info = info_propia.get(dep_id) or _calcular_info_porciones_producto(dep_producto)
-                try:
-                    stock_visual = float(dep_producto.get("stock") or 0)
-                except (TypeError, ValueError):
-                    stock_visual = 0.0
-                stock_visual_unidad = _normalizar_unidad_producto(
-                    dep_info.get("unidad_stock") or dep_producto.get("unidad") or "unidad"
-                )
-                stock_visual_origen = "producto"
-                stock_visual_dependencia_nombre = dep_producto.get("nombre")
-        elif tipo_dep == "insumo" and dep_id > 0:
-            dep_insumo = insumos_mapa.get(dep_id)
-            if dep_insumo:
-                try:
-                    stock_visual = float(dep_insumo.get("stock") or 0)
-                except (TypeError, ValueError):
-                    stock_visual = 0.0
-                stock_visual_unidad = _normalizar_unidad_producto(dep_insumo.get("unidad") or "unidad")
-                stock_visual_origen = "insumo"
-                stock_visual_dependencia_nombre = dep_insumo.get("nombre")
-
-        # Si el producto esta vinculado a una dependencia de stock (producto/insumo),
-        # la disponibilidad en porciones debe seguir la misma base usada en "stock_visual".
-        if tipo_dep in {"producto", "insumo"} and dep_id > 0:
-            try:
-                consumo_base = float(item.get("stock_dependencia_cantidad") or 1)
-            except (TypeError, ValueError):
-                consumo_base = 1.0
-            if consumo_base <= 0:
-                consumo_base = 1.0
-            porciones_por_dependencia = max(0, int(math.floor((float(stock_visual) + 1e-9) / consumo_base)))
-            item["porciones_disponibles"] = porciones_por_dependencia
-            item["sin_porcion_disponible"] = porciones_por_dependencia < 1
-            item["baja_porcion"] = porciones_por_dependencia <= 1
 
         item["stock_visual"] = stock_visual
         item["stock_visual_unidad"] = stock_visual_unidad

@@ -23,6 +23,19 @@ ZONA_HORARIA_CHILE = pytz.timezone('America/Santiago')
 DB_LOCK_RETRY_ATTEMPTS = 4
 DB_LOCK_RETRY_BASE_DELAY_MS = 80
 
+
+def _entero_producto(valor, campo="cantidad", permitir_negativo=False):
+    try:
+        numero = float(valor or 0)
+    except (TypeError, ValueError):
+        raise ValueError(f"{campo.capitalize()} debe ser un numero entero de unidades")
+    if not math.isfinite(numero) or abs(numero - round(numero)) > 1e-9:
+        raise ValueError(f"{campo.capitalize()} debe expresarse en unidades enteras")
+    entero = int(round(numero))
+    if not permitir_negativo and entero < 0:
+        raise ValueError(f"{campo.capitalize()} no puede ser negativo")
+    return entero
+
 def obtener_hora_chile():
     """Retorna la hora actual en Chile"""
     return datetime.now(ZONA_HORARIA_CHILE)
@@ -84,45 +97,19 @@ def _esta_cerca_minimo_db(stock_actual, stock_minimo):
 
 
 def _calcular_info_porciones_producto_db(producto):
-    unidad_stock = _normalizar_unidad_producto(producto.get("unidad") or "unidad")
-    stock_actual = float(producto.get("stock") or 0)
-    stock_minimo = float(producto.get("stock_minimo") or 0)
-    porcion_cantidad = float(producto.get("porcion_cantidad") or 1)
-    porcion_unidad = _normalizar_unidad_producto(producto.get("porcion_unidad") or unidad_stock)
-
-    conversion = _convertir_cantidad_unidad_db(porcion_cantidad, porcion_unidad, unidad_stock)
-    if not conversion["success"]:
-        return {
-            "success": False,
-            "error": conversion["error"],
-            "unidad_stock": unidad_stock,
-            "stock_actual": stock_actual,
-            "stock_minimo": stock_minimo,
-            "porcion_cantidad": porcion_cantidad,
-            "porcion_unidad": porcion_unidad,
-            "porcion_stock_equivalente": None,
-            "porciones_disponibles": 0,
-            "sin_porcion_disponible": True,
-            "baja_porcion": True,
-            "bajo_minimo": stock_actual <= stock_minimo,
-            "cerca_minimo": _esta_cerca_minimo_db(stock_actual, stock_minimo),
-        }
-
-    porcion_stock_equivalente = float(conversion["cantidad"] or 0)
-    if porcion_stock_equivalente <= 0:
-        porciones_disponibles = 0
-    else:
-        porciones_disponibles = max(0, int(math.floor((stock_actual + 1e-9) / porcion_stock_equivalente)))
+    stock_actual = max(0.0, float(producto.get("stock") or 0))
+    stock_minimo = max(0.0, float(producto.get("stock_minimo") or 0))
+    porciones_disponibles = max(0, int(math.floor(stock_actual + 1e-9)))
 
     return {
         "success": True,
         "error": None,
-        "unidad_stock": unidad_stock,
+        "unidad_stock": "unidad",
         "stock_actual": stock_actual,
         "stock_minimo": stock_minimo,
-        "porcion_cantidad": porcion_cantidad,
-        "porcion_unidad": porcion_unidad,
-        "porcion_stock_equivalente": porcion_stock_equivalente,
+        "porcion_cantidad": 1.0,
+        "porcion_unidad": "unidad",
+        "porcion_stock_equivalente": 1.0,
         "porciones_disponibles": porciones_disponibles,
         "sin_porcion_disponible": porciones_disponibles < 1,
         "baja_porcion": porciones_disponibles <= 1,
@@ -2076,17 +2063,19 @@ def actualizar_producto(producto_id, data):
         nombre = str(data.get("nombre", actual["nombre"])).strip()
         if not nombre:
             raise ValueError("El nombre del producto es obligatorio")
+        stock_objetivo = (
+            _entero_producto(data.get("stock"), "stock")
+            if "stock" in data else None
+        )
 
-        unidad = _normalizar_unidad_producto(data.get("unidad", actual["unidad"] or "unidad"))
+        unidad = "unidad"
         icono = str(data.get("icono", actual["icono"] if "icono" in actual.keys() else "cupcake") or "cupcake").strip().lower()
-        stock_minimo = float(data.get("stock_minimo", actual["stock_minimo"] or 0) or 0)
+        stock_minimo = _entero_producto(data.get("stock_minimo", actual["stock_minimo"] or 0), "stock minimo")
         alerta_dias = int(data.get("alerta_dias", actual["alerta_dias"] or 2) or 2)
         precio = float(data.get("precio", actual["precio"] or 0) or 0)
         vida_util_dias = int(data.get("vida_util_dias", actual["vida_util_dias"] or 0) or 0)
-        porcion_actual = actual["porcion_cantidad"] if "porcion_cantidad" in actual.keys() else 1
-        porcion_unidad_actual = (actual["porcion_unidad"] if "porcion_unidad" in actual.keys() else None) or unidad
-        porcion_cantidad = float(data.get("porcion_cantidad", porcion_actual) or 1)
-        porcion_unidad = _normalizar_unidad_producto(data.get("porcion_unidad", porcion_unidad_actual))
+        porcion_cantidad = 1.0
+        porcion_unidad = "unidad"
         categoria_tienda_actual = (actual["categoria_tienda"] if "categoria_tienda" in actual.keys() else None) or "General"
         descripcion_tienda_actual = (actual["descripcion_tienda"] if "descripcion_tienda" in actual.keys() else None) or ""
         descuento_tienda_actual = float(actual["descuento_tienda_pct"] or 0) if "descuento_tienda_pct" in actual.keys() else 0.0
@@ -2380,8 +2369,7 @@ def actualizar_producto(producto_id, data):
     finally:
         conn.close()
 
-    if actual is not None and "stock" in data:
-        stock_objetivo = float(data.get("stock") or 0)
+    if actual is not None and stock_objetivo is not None:
         fijar_stock_producto_absoluto(
             producto_id,
             stock_objetivo,
@@ -2401,9 +2389,7 @@ def fijar_stock_producto_absoluto(
     fecha_vencimiento=None,
 ):
     """Fija el stock exacto del producto y alinea lotes con ese valor."""
-    target = float(stock_objetivo or 0)
-    if target < 0:
-        raise ValueError("El stock no puede ser negativo")
+    target = _entero_producto(stock_objetivo or 0, "stock")
 
     conn = get_db()
     cursor = conn.cursor()
@@ -2567,7 +2553,7 @@ def actualizar_stock_producto(
     usuario=None,
 ):
     """Ajusta stock de producto manteniendo coherencia FIFO."""
-    delta = float(cantidad or 0)
+    delta = _entero_producto(cantidad or 0, "ajuste de stock", permitir_negativo=True)
     if delta == 0:
         return {"success": True, "nuevo_stock": None, "detalle_fifo": []}
 
@@ -9526,6 +9512,131 @@ def migrar_db():
             conn.execute("PRAGMA foreign_keys=ON")
         except Exception:
             pass
+        conn.close()
+
+
+def migrar_productos_a_unidades():
+    """Converts current product stock to whole sellable items and records prior values."""
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS productos_unidad_migracion (
+                producto_id INTEGER PRIMARY KEY,
+                nombre TEXT NOT NULL,
+                stock_anterior REAL NOT NULL,
+                unidad_anterior TEXT,
+                stock_minimo_anterior REAL,
+                porcion_cantidad_anterior REAL,
+                porcion_unidad_anterior TEXT,
+                stock_nuevo INTEGER NOT NULL,
+                unidades_fraccionarias_descartadas REAL NOT NULL DEFAULT 0,
+                lotes_anteriores_json TEXT,
+                migrado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            """
+            SELECT p.id, p.nombre, p.stock, p.unidad, p.stock_minimo,
+                   p.porcion_cantidad, p.porcion_unidad
+            FROM productos p
+            LEFT JOIN productos_unidad_migracion m ON m.producto_id = p.id
+            WHERE m.producto_id IS NULL
+            ORDER BY p.id
+            """
+        )
+        filas = cursor.fetchall()
+        tiene_lotes = cursor.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='producto_lotes'"
+        ).fetchone() is not None
+        migrados = 0
+        fraccionarias_descartadas = 0.0
+
+        for fila in filas:
+            producto = dict(fila)
+            stock_anterior = max(0.0, float(producto.get("stock") or 0))
+            minimo_anterior = max(0.0, float(producto.get("stock_minimo") or 0))
+            nuevo_stock = max(0, int(math.floor(stock_anterior + 1e-9)))
+            fraccion_descartada = max(0.0, stock_anterior - nuevo_stock)
+            lotes_json = None
+            if tiene_lotes:
+                cursor.execute(
+                    "SELECT id, cantidad, fecha_vencimiento FROM producto_lotes WHERE producto_id = ? ORDER BY id",
+                    (int(producto["id"]),),
+                )
+                lotes = cursor.fetchall()
+                lotes_json = json.dumps([dict(lote) for lote in lotes], ensure_ascii=True)
+                total_lotes = sum(max(0, int(lote["cantidad"] or 0)) for lote in lotes)
+                diferencia_lotes = nuevo_stock - total_lotes
+                if lotes:
+                    ultimo_lote_id = int(lotes[-1]["id"])
+                    if diferencia_lotes < 0:
+                        por_reducir = -diferencia_lotes
+                        for lote in reversed(lotes):
+                            cantidad_lote = max(0, int(lote["cantidad"] or 0))
+                            reduccion = min(cantidad_lote, por_reducir)
+                            cursor.execute(
+                                "UPDATE producto_lotes SET cantidad = ? WHERE id = ?",
+                                (cantidad_lote - reduccion, int(lote["id"])),
+                            )
+                            por_reducir -= reduccion
+                            if por_reducir <= 0:
+                                break
+                    elif diferencia_lotes > 0:
+                        cursor.execute(
+                            "UPDATE producto_lotes SET cantidad = cantidad + ? WHERE id = ?",
+                            (diferencia_lotes, ultimo_lote_id),
+                        )
+                elif nuevo_stock > 0:
+                    cursor.execute(
+                        "INSERT INTO producto_lotes (producto_id, cantidad) VALUES (?, ?)",
+                        (int(producto["id"]), nuevo_stock),
+                    )
+            cursor.execute(
+                """
+                INSERT INTO productos_unidad_migracion (
+                    producto_id, nombre, stock_anterior, unidad_anterior,
+                    stock_minimo_anterior, porcion_cantidad_anterior,
+                    porcion_unidad_anterior, stock_nuevo, unidades_fraccionarias_descartadas,
+                    lotes_anteriores_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(producto["id"]), str(producto.get("nombre") or "Producto"),
+                    stock_anterior, producto.get("unidad"), minimo_anterior,
+                    producto.get("porcion_cantidad"), producto.get("porcion_unidad"),
+                    nuevo_stock, fraccion_descartada, lotes_json,
+                ),
+            )
+            cursor.execute(
+                """
+                UPDATE productos
+                SET stock = ?, stock_minimo = ?, unidad = 'unidad',
+                    porcion_cantidad = 1, porcion_unidad = 'unidad'
+                WHERE id = ?
+                """,
+                (
+                    nuevo_stock,
+                    int(math.ceil(minimo_anterior - 1e-9)),
+                    int(producto["id"]),
+                ),
+            )
+            migrados += 1
+            fraccionarias_descartadas += fraccion_descartada
+
+        conn.commit()
+        return {
+            "success": True,
+            "productos_migrados": migrados,
+            "unidades_fraccionarias_descartadas": round(fraccionarias_descartadas, 6),
+            "auditoria": "productos_unidad_migracion",
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         conn.close()
 
 

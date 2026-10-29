@@ -844,36 +844,22 @@
                         </div>
                         <div class="form-group" style="flex: 0.5;">
                             <label>Stock inicial</label>
-                            <input type="number" name="stock_producto" value="0" min="0" required>
+                            <input type="number" name="stock_producto" value="0" min="0" step="1" required>
                         </div>
                         <div class="form-group" style="flex: 0.5;">
                             <label>Stock mínimo</label>
-                            <input type="number" name="stock_minimo" value="2" min="1" required>
+                            <input type="number" name="stock_minimo" value="2" min="0" step="1" required>
                         </div>
                         <div class="form-group" style="flex: 0.5;">
                             <label>Unidad</label>
-                            <select id="nuevo-producto-unidad" name="unidad" required>
-                                <option value="unidad">Unidad</option>
-                                <option value="kg">Kilogramos (kg)</option>
-                                <option value="gr">Gramos (gr)</option>
-                                <option value="lt">Litros (lt)</option>
-                                <option value="ml">Mililitros (ml)</option>
-                                <option value="porcion">Porcion</option>
-                            </select>
+                            <input type="text" value="Unidad" readonly>
+                            <input type="hidden" id="nuevo-producto-unidad" name="unidad" value="unidad">
                         </div>
                         <div class="form-group" style="flex: 0.7;">
                             <label>Porci&oacute;n de venta</label>
-                            <div style="display:flex; gap:8px;">
-                                <input type="number" name="porcion_cantidad" value="1" min="0.01" step="0.01" style="flex:1;" required>
-                                <select id="nuevo-producto-porcion-unidad" name="porcion_unidad" style="flex:1;">
-                                    <option value="unidad">Unidad</option>
-                                    <option value="kg">Kilogramos (kg)</option>
-                                    <option value="gr">Gramos (gr)</option>
-                                    <option value="lt">Litros (lt)</option>
-                                    <option value="ml">Mililitros (ml)</option>
-                                    <option value="porcion">Porcion</option>
-                                </select>
-                            </div>
+                            <input type="text" value="1 unidad por producto" readonly>
+                            <input type="hidden" name="porcion_cantidad" value="1">
+                            <input type="hidden" id="nuevo-producto-porcion-unidad" name="porcion_unidad" value="unidad">
                         </div>
                         <div class="form-group" style="flex: 1;">
                             <label>Disponibilidad vinculada (opcional)</label>
@@ -886,7 +872,7 @@
                                 <select id="nuevo-producto-stock-dep-producto" name="stock_dependencia_producto_id" disabled>
                                     <option value="">Selecciona producto base...</option>
                                     {% for prod in productos %}
-                                    <option value="{{ prod.id }}">{{ prod.nombre }} ({{ prod.stock }} {{ prod.unidad or 'unidad' }})</option>
+                                    <option value="{{ prod.id }}">{{ prod.nombre }} ({{ prod.stock|int }} unidades)</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -993,7 +979,7 @@
     </td>
     <td>
         <span class="badge badge-{{ 'success' if p.stock > 10 else 'warning' if p.stock > 0 else 'danger' }}">
-            {{ p.stock }} {{ p.unidad or 'unidad' }}
+            {{ p.stock|int }} unidades
         </span>
     </td>
     <td>
@@ -1090,37 +1076,26 @@
                     </div>
                     <div class="form-group">
                         <label>Unidad</label>
-                        <select id="editar-producto-unidad">
-                            <option value="unidad">Unidad</option>
-                            <option value="kg">Kg</option>
-                            <option value="gr">Gr</option>
-                            <option value="lt">Lt</option>
-                            <option value="ml">Ml</option>
-                            <option value="porcion">Porcion</option>
-                        </select>
+                        <input type="text" value="Unidad" readonly>
+                        <input type="hidden" id="editar-producto-unidad" value="unidad">
                     </div>
                     <div class="form-group">
                         <label>Stock</label>
-                        <input type="number" id="editar-producto-stock" min="0" step="0.01" required>
+                        <input type="number" id="editar-producto-stock" min="0" step="1" required>
                     </div>
                     <div class="form-group">
                         <label>Stock m&iacute;nimo</label>
-                        <input type="number" id="editar-producto-stock-min" min="0" step="0.01" required>
+                        <input type="number" id="editar-producto-stock-min" min="0" step="1" required>
                     </div>
                     <div class="form-group">
                         <label>Porci&oacute;n (cantidad)</label>
-                        <input type="number" id="editar-producto-porcion-cantidad" min="0.01" step="0.01" value="1">
+                        <input type="text" value="1 unidad por producto" readonly>
+                        <input type="hidden" id="editar-producto-porcion-cantidad" value="1">
                     </div>
                     <div class="form-group">
                         <label>Porci&oacute;n (unidad)</label>
-                        <select id="editar-producto-porcion-unidad">
-                            <option value="unidad">Unidad</option>
-                            <option value="kg">Kg</option>
-                            <option value="gr">Gr</option>
-                            <option value="lt">Lt</option>
-                            <option value="ml">Ml</option>
-                            <option value="porcion">Porcion</option>
-                        </select>
+                        <input type="text" value="Unidad" readonly>
+                        <input type="hidden" id="editar-producto-porcion-unidad" value="unidad">
                     </div>
                     <div class="form-group">
                         <label>Alerta previa (d&iacute;as)</label>
@@ -1200,7 +1175,7 @@
                     <option value="">Selecciona un producto...</option>
                     {% for p in productos %}
                     {% if (p.stock or 0) > 0 %}
-                    <option value="{{ p.id }}">{{ p.nombre }} ({{ p.stock }} {{ p.unidad or 'unidad' }})</option>
+                    <option value="{{ p.id }}">{{ p.nombre }} ({{ p.stock|int }} unidades)</option>
                     {% endif %}
                     {% endfor %}
                 </select>
@@ -2025,7 +2000,11 @@
         }
 
         function cambiarStockPersonalizado(id) {
-            const cantidad = parseFloat(document.getElementById(`cantidad-${id}`).value);
+            const cantidad = parseInt(document.getElementById(`cantidad-${id}`).value, 10);
+            if (!Number.isInteger(cantidad) || cantidad === 0) {
+                alert('Ingresa una cantidad entera de unidades distinta de 0.');
+                return;
+            }
             cambiarStock(id, cantidad);
         }
 
@@ -2149,9 +2128,9 @@
                 icono: document.getElementById('editar-producto-icono').value,
                 stock: parseFloat(document.getElementById('editar-producto-stock').value || 0),
                 stock_minimo: parseFloat(document.getElementById('editar-producto-stock-min').value || 0),
-                unidad: document.getElementById('editar-producto-unidad').value,
-                porcion_cantidad: parseFloat(document.getElementById('editar-producto-porcion-cantidad').value || 1),
-                porcion_unidad: document.getElementById('editar-producto-porcion-unidad').value,
+                unidad: 'unidad',
+                porcion_cantidad: 1,
+                porcion_unidad: 'unidad',
                 alerta_dias: parseInt(document.getElementById('editar-producto-alerta').value || '2', 10),
                 vida_util_dias: parseInt(document.getElementById('editar-producto-vida-util').value || '0', 10),
                 fecha_vencimiento: document.getElementById('editar-producto-vencimiento').value || null

@@ -6,7 +6,7 @@ import app as app_module
 
 
 class TiendaAvailabilityTests(unittest.TestCase):
-    def test_products_with_zero_local_stock_use_their_effective_dependency_stock(self):
+    def test_product_availability_uses_its_own_unit_stock_not_ingredient_quantity(self):
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
         conn.executescript(
@@ -41,12 +41,7 @@ class TiendaAvailabilityTests(unittest.TestCase):
             with patch.object(app_module, "get_db", return_value=conn):
                 productos = app_module._obtener_productos_para_venta()
 
-            self.assertEqual([p["nombre"] for p in productos], ["Minitorta cuatro leches"])
-            self.assertEqual(productos[0]["stock"], 0)
-            self.assertEqual(productos[0]["stock_visual"], 6)
-            self.assertEqual(productos[0]["porciones_disponibles"], 6)
-            serializado = app_module._serializar_producto_tienda(productos[0])
-            self.assertEqual(serializado["max_compra"], 6)
+            self.assertEqual(productos, [])
         finally:
             conn.close()
 
@@ -88,6 +83,19 @@ class TiendaAvailabilityTests(unittest.TestCase):
             self.assertEqual(producto["stock_porciones_disponibles"], 100)
         finally:
             conn.close()
+
+    def test_legacy_stock_100_kg_is_available_as_100_finished_items(self):
+        info = app_module._calcular_info_porciones_producto({
+            "stock": 100,
+            "stock_minimo": 5,
+            "unidad": "kg",
+            "porcion_cantidad": 160,
+            "porcion_unidad": "kg",
+        })
+        self.assertEqual(info["porciones_disponibles"], 100)
+        self.assertEqual(info["unidad_stock"], "unidad")
+        self.assertEqual(info["porcion_cantidad"], 1)
+        self.assertFalse(info["sin_porcion_disponible"])
 
 
 if __name__ == "__main__":
