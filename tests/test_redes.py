@@ -209,6 +209,8 @@ class RedesTests(unittest.TestCase):
         page = self.client.get("/admin/redes").get_data(as_text=True)
         self.assertIn('id="qr-form"', page)
         self.assertIn('id="qr-modal"', page)
+        self.assertIn('href="#qr-tools">Generar QR</a>', page)
+        self.assertIn('class="field wide qr-signup-toggle"', page)
         created = self.mutate("POST", "/api/redes/admin/qr", {
             "title": "Catalogo QR",
             "kind": "link",
