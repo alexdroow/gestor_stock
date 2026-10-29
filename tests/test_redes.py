@@ -205,5 +205,61 @@ class RedesTests(unittest.TestCase):
             self.assertTrue(image_file.read(3).startswith(b"\xff\xd8\xff"))
 
 
+    def test_qr_link_is_generated_downloadable_and_tracks_global_scans(self):
+        page = self.client.get("/admin/redes").get_data(as_text=True)
+        self.assertIn('id="qr-form"', page)
+        self.assertIn('id="qr-modal"', page)
+        created = self.mutate("POST", "/api/redes/admin/qr", {
+            "title": "Catalogo QR",
+            "kind": "link",
+            "url": "https://pasteleriasucree.cl/tienda",
+        })
+        self.assertEqual(created.status_code, 201)
+        item = created.get_json()["qr"]
+        self.assertTrue(item["tracking_path"].startswith("/redes/qr/"))
+
+        image = self.client.get(f"/api/redes/admin/qr/{item['id']}/image.png?download=1")
+        self.assertEqual(image.status_code, 200)
+        self.assertEqual(image.mimetype, "image/png")
+        self.assertIn(b"PNG", image.data[:8])
+
+        scan = self.client.get(item["tracking_path"], follow_redirects=False)
+        self.assertEqual(scan.status_code, 302)
+        self.assertEqual(scan.location, "https://pasteleriasucree.cl/tienda")
+        metrics = self.client.get(f"/api/redes/admin/qr/{item['id']}/metrics").get_json()
+        self.assertEqual(metrics["total_scans"], 1)
+        self.assertEqual(metrics["recent"][0]["source"], "desconocido")
+        state = self.client.get("/api/redes/admin/state").get_json()
+        self.assertEqual(state["qr_codes"][0]["scans"], 1)
+
+    def test_qr_whatsapp_uses_prefilled_message_and_validation(self):
+        created = self.mutate("POST", "/api/redes/admin/qr", {
+            "title": "WhatsApp QR",
+            "kind": "whatsapp",
+            "phone": "+56912345678",
+            "message": "Hola Sucrée, quiero consultar",
+        })
+        self.assertEqual(created.status_code, 201)
+        item = created.get_json()["qr"]
+        self.assertEqual(item["destination"], "https://wa.me/56912345678?text=Hola+Sucr%C3%A9e%2C+quiero+consultar")
+        invalid = self.mutate("POST", "/api/redes/admin/qr", {
+            "title": "Sin mensaje", "kind": "whatsapp", "phone": "+56912345678", "message": "",
+        })
+        self.assertEqual(invalid.status_code, 400)
+        too_long = self.mutate("POST", "/api/redes/admin/qr", {
+            "title": "Mensaje extenso", "kind": "whatsapp", "phone": "+56912345678", "message": "🙂" * 300,
+        })
+        self.assertEqual(too_long.status_code, 400)
+
+    def test_qr_admin_endpoints_require_auth_and_csrf_for_creation(self):
+        with self.client.session_transaction() as session:
+            session.pop("admin_autenticado", None)
+        self.assertEqual(self.client.get("/api/redes/admin/state").status_code, 401)
+        with self.client.session_transaction() as session:
+            session["admin_autenticado"] = True
+        denied = self.client.post("/api/redes/admin/qr", json={"title": "QR", "kind": "link", "url": "/tienda"})
+        self.assertEqual(denied.status_code, 403)
+
+
 if __name__ == "__main__":
     unittest.main()

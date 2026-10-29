@@ -11,10 +11,10 @@ from collections import Counter
 from datetime import datetime, time as day_time, timedelta, timezone
 from io import BytesIO
 from io import StringIO
-from urllib.parse import urlparse
+from urllib.parse import quote_plus, urlparse
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, render_template, request, send_file, session, url_for
 from werkzeug.utils import secure_filename
 
 from database import get_db
@@ -74,6 +74,23 @@ def _db():
         );
         CREATE INDEX IF NOT EXISTS idx_redes_events_time ON redes_events(event_type, created_at);
         CREATE INDEX IF NOT EXISTS idx_redes_events_link_time ON redes_events(link_id, event_type, created_at);
+        CREATE TABLE IF NOT EXISTS redes_qr_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK(kind IN ('link','whatsapp')),
+            destination TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS redes_qr_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            qr_id INTEGER NOT NULL,
+            source TEXT NOT NULL DEFAULT 'desconocido',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(qr_id) REFERENCES redes_qr_codes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_redes_qr_events_qr_time ON redes_qr_events(qr_id, created_at);
         CREATE TABLE IF NOT EXISTS redes_revisions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             profile_json TEXT NOT NULL,
@@ -478,6 +495,24 @@ def _stats(conn, start_utc, end_utc):
     }
 
 
+def _admin_qr_codes(conn):
+    rows = conn.execute(
+        """SELECT q.id,q.token,q.title,q.kind,q.destination,q.created_at,q.active,
+                  COUNT(e.id) AS scans,MAX(e.created_at) AS last_scan
+           FROM redes_qr_codes q
+           LEFT JOIN redes_qr_events e ON e.qr_id=q.id
+           GROUP BY q.id ORDER BY q.id DESC"""
+    ).fetchall()
+    return [
+        {
+            **dict(row),
+            "tracking_path": url_for("redes.qr_redirect", token=row["token"]),
+            "image_url": url_for("redes.qr_image", qr_id=row["id"]),
+        }
+        for row in rows
+    ]
+
+
 def _csv_safe(value):
     text = str(value or "")
     if text.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
@@ -794,6 +829,179 @@ def go_link(link_id):
         conn.close()
 
 
+@redes_blueprint.get("/redes/qr/<token>")
+def qr_redirect(token):
+    conn = _db()
+    try:
+        row = conn.execute(
+            "SELECT id,destination FROM redes_qr_codes WHERE token=? AND active=1",
+            (str(token or "")[:64],),
+        ).fetchone()
+        if not row:
+            return render_template("redes_no_disponible.html"), 404
+        try:
+            destination = _validate_destination(row["destination"])
+        except ValueError:
+            return render_template("redes_no_disponible.html"), 404
+        ua = (request.user_agent.string or "").lower()
+        purpose = " ".join((request.headers.get("Purpose", ""), request.headers.get("Sec-Purpose", ""))).lower()
+        automated = any(token in ua for token in ("bot", "spider", "crawler", "preview", "facebookexternalhit", "whatsapp")) or any(token in purpose for token in ("prefetch", "prerender"))
+        if not automated and _allow_analytics_event():
+            try:
+                conn.execute(
+                    "INSERT INTO redes_qr_events(qr_id,source,created_at) VALUES(?,?,?)",
+                    (int(row["id"]), _source_from_referrer(request.referrer), _now_utc()),
+                )
+                conn.commit()
+            except Exception:
+                current_app.logger.exception("No se pudo registrar el escaneo QR; se mantiene la redireccion.")
+        response = redirect(destination, code=302)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    finally:
+        conn.close()
+
+
+@redes_blueprint.post("/api/redes/admin/qr")
+def admin_create_qr():
+    denied = _admin_required(mutating=True)
+    if denied:
+        return denied
+    payload = request.get_json(silent=True) or {}
+    title = _clean_text(payload.get("title"), 90)
+    kind = str(payload.get("kind") or "link").strip().lower()
+    if not title:
+        return jsonify({"success": False, "error": "El nombre del QR es obligatorio."}), 400
+    if kind not in {"link", "whatsapp"}:
+        return jsonify({"success": False, "error": "Selecciona un tipo de QR valido."}), 400
+    try:
+        if kind == "link":
+            destination = _validate_destination(payload.get("url"))
+            if len(destination) > 1000:
+                raise ValueError("El enlace es demasiado largo para generar un QR legible.")
+        else:
+            phone = re.sub(r"\D", "", str(payload.get("phone") or ""))
+            if len(phone) == 8:
+                phone = f"569{phone}"
+            elif len(phone) == 9 and phone.startswith("9"):
+                phone = f"56{phone}"
+            if not 10 <= len(phone) <= 15 or phone.startswith("0"):
+                raise ValueError("Ingresa un numero WhatsApp internacional valido, por ejemplo +56912345678.")
+            message = _clean_text(payload.get("message"), 1000)
+            if not message:
+                raise ValueError("Escribe el mensaje que se cargara en WhatsApp.")
+            destination = f"https://wa.me/{phone}?text={quote_plus(message)}"
+        if len(destination.encode("utf-8")) > 1700:
+            raise ValueError("El destino es demasiado largo para generar un QR facil de escanear.")
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+    conn = _db()
+    try:
+        token = secrets.token_hex(12)
+        now = _now_utc()
+        cursor = conn.execute(
+            "INSERT INTO redes_qr_codes(token,title,kind,destination,created_at) VALUES(?,?,?,?,?)",
+            (token, title, kind, destination, now),
+        )
+        conn.commit()
+        item = conn.execute(
+            """SELECT q.id,q.token,q.title,q.kind,q.destination,q.created_at,q.active,0 AS scans,NULL AS last_scan
+               FROM redes_qr_codes q WHERE q.id=?""",
+            (cursor.lastrowid,),
+        ).fetchone()
+        result = dict(item)
+        result["tracking_path"] = url_for("redes.qr_redirect", token=token)
+        result["image_url"] = url_for("redes.qr_image", qr_id=cursor.lastrowid)
+        result["tracking_url"] = request.url_root.rstrip("/") + result["tracking_path"]
+        return jsonify({"success": True, "qr": result}), 201
+    finally:
+        conn.close()
+
+
+@redes_blueprint.get("/api/redes/admin/qr/<int:qr_id>/image.png")
+def qr_image(qr_id):
+    denied = _admin_required()
+    if denied:
+        return denied
+    conn = _db()
+    try:
+        row = conn.execute("SELECT token,title FROM redes_qr_codes WHERE id=?", (qr_id,)).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "No se encontro el QR."}), 404
+        target = request.url_root.rstrip("/") + url_for("redes.qr_redirect", token=row["token"])
+        import pyqrcode
+        from PIL import Image, ImageDraw
+
+        matrix = pyqrcode.create(target, error="L").code
+        scale = 8
+        quiet = 4
+        size = (len(matrix) + quiet * 2) * scale
+        image = Image.new("RGB", (size, size), "white")
+        draw = ImageDraw.Draw(image)
+        for y, line in enumerate(matrix):
+            for x, dark in enumerate(line):
+                if dark:
+                    left = (x + quiet) * scale
+                    top = (y + quiet) * scale
+                    draw.rectangle((left, top, left + scale - 1, top + scale - 1), fill="#321d12")
+        output = BytesIO()
+        image.save(output, format="PNG", optimize=True)
+        output.seek(0)
+        filename = secure_filename(str(row["title"] or "codigo-qr").lower().replace(" ", "-")) or f"codigo-qr-{qr_id}"
+        response = send_file(
+            output,
+            mimetype="image/png",
+            as_attachment=request.args.get("download") == "1",
+            download_name=f"{filename}.png",
+            max_age=0,
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except ImportError:
+        current_app.logger.exception("No estan disponibles las dependencias para generar PNG QR.")
+        return jsonify({"success": False, "error": "No se pudo generar la imagen QR. Revisa las dependencias del servidor."}), 500
+    finally:
+        conn.close()
+
+
+@redes_blueprint.get("/api/redes/admin/qr/<int:qr_id>/metrics")
+def admin_qr_metrics(qr_id):
+    denied = _admin_required()
+    if denied:
+        return denied
+    conn = _db()
+    try:
+        qr = conn.execute("SELECT id,title,kind,destination,created_at FROM redes_qr_codes WHERE id=?", (qr_id,)).fetchone()
+        if not qr:
+            return jsonify({"success": False, "error": "No se encontro el QR."}), 404
+        daily = conn.execute(
+            """SELECT date(created_at) AS day,COUNT(*) AS scans FROM redes_qr_events
+               WHERE qr_id=? AND created_at>=datetime('now','-29 days') GROUP BY date(created_at) ORDER BY day""",
+            (qr_id,),
+        ).fetchall()
+        sources = conn.execute(
+            "SELECT source,COUNT(*) AS scans FROM redes_qr_events WHERE qr_id=? GROUP BY source ORDER BY scans DESC,source LIMIT 10",
+            (qr_id,),
+        ).fetchall()
+        recent = conn.execute(
+            "SELECT source,created_at FROM redes_qr_events WHERE qr_id=? ORDER BY id DESC LIMIT 30",
+            (qr_id,),
+        ).fetchall()
+        total = int(conn.execute("SELECT COUNT(*) FROM redes_qr_events WHERE qr_id=?", (qr_id,)).fetchone()[0])
+        return jsonify({
+            "success": True,
+            "qr": dict(qr),
+            "total_scans": total,
+            "last_scan": str(recent[0]["created_at"]) if recent else None,
+            "daily": [dict(row) for row in daily],
+            "sources": [dict(row) for row in sources],
+            "recent": [dict(row) for row in recent],
+        })
+    finally:
+        conn.close()
+
+
 @redes_blueprint.post("/api/redes/view")
 def register_view():
     if _is_bot_or_prefetch() or not _allow_analytics_event():
@@ -853,9 +1061,10 @@ def admin_state():
         # Per-link click totals are scoped to the selected interval and archived links remain visible.
         stats = _stats(conn, start, end)
         revisions = [dict(item) for item in conn.execute("SELECT id,author,created_at FROM redes_revisions ORDER BY id DESC LIMIT 8").fetchall()]
+        qr_codes = _admin_qr_codes(conn)
         for link in links:
             link["clicks"] = next((item["clicks"] for item in stats["by_link"] if item["id"] == link["id"]), 0)
-        return jsonify({"success": True, "profile": profile, "published_profile": published_profile, "links": links, "version": row["draft_version"], "published_at": row["published_at"], "updated_at": row["updated_at"], "published": bool(row["published_at"]), "has_changes": has_changes, "stats": stats, "period": period, "revisions": revisions, "promo": _promo_config(conn), "promo_codes": _promo_admin_codes(conn)})
+        return jsonify({"success": True, "profile": profile, "published_profile": published_profile, "links": links, "qr_codes": qr_codes, "version": row["draft_version"], "published_at": row["published_at"], "updated_at": row["updated_at"], "published": bool(row["published_at"]), "has_changes": has_changes, "stats": stats, "period": period, "revisions": revisions, "promo": _promo_config(conn), "promo_codes": _promo_admin_codes(conn)})
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     finally:
