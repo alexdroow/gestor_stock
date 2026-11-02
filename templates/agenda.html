@@ -4117,6 +4117,7 @@
                     <label>Tipo de Evento</label>
                     <select id="evento-tipo" onchange="cambiarTipo()">
                         <option value="torta">&#127874; Torta</option>
+                        <option value="cocteleria">&#127864; Cóctelería</option>
                         <option value="pedido">&#128230; Pedido</option>
                         <option value="bloqueo">&#9940; Bloquear D&iacute;a/Horario</option>
                     </select>
@@ -9752,7 +9753,7 @@
                     statusClass = 'ocupado';
                     statusText = `Ocupado (${eventosSlot.length})`;
                     detalleHtml = eventosSlot.map(({ evento }) => {
-                        const icono = evento.tipo === 'torta' ? '&#127874;' : '&#128230;';
+                        const icono = evento.tipo === 'torta' ? '&#127874;' : (evento.tipo === 'cocteleria' ? '&#127864;' : '&#128230;');
                         const horaTxt = (evento.hora_inicio || '').slice(0, 5) || 'Sin hora';
                         const eventoId = Number(evento.id || 0);
                         const seleccionado = eventoDetalleSeleccionadoId && Number(eventoDetalleSeleccionadoId) === eventoId;
@@ -10751,7 +10752,7 @@
                     notificaciones.push({
                         urgente: minutosHasta < 180,
                         cuando: obtenerTextoTiempo(minutosHasta),
-                        texto: `${e.tipo === 'torta' ? '\uD83C\uDF82' : '\uD83D\uDCE6'} ${e.titulo} - ${e.cliente || 'Sin cliente'}`,
+                        texto: `${e.tipo === 'torta' ? '\uD83C\uDF82' : (e.tipo === 'cocteleria' ? '\uD83C\uDF78' : '\uD83D\uDCE6')} ${e.titulo} - ${e.cliente || 'Sin cliente'}`,
                         eventoId: Number(e.id || 0)
                     });
                 }

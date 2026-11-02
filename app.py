@@ -60,6 +60,8 @@ else:
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 from ready_cakes import ready_cakes, ensure_ready_cakes_schema, get_published_ready_cake
 app.register_blueprint(ready_cakes)
+from cocteleria import cocteleria, ensure_cocteleria_schema, get_published_cocktail
+app.register_blueprint(cocteleria)
 from redes import redes_blueprint, redes_promo_registration_contact, redes_promo_validate_checkout
 app.register_blueprint(redes_blueprint)
 from privacidad import privacidad_blueprint, get_privacy_state, privacy_csrf_token, tracking_allowed_from_request
@@ -230,7 +232,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/privacidad", "/privacidad/politica", "/privacidad/preferencias", "/privacidad/derechos", "/privacidad/seguimiento", "/api/privacidad/preferencias", "/api/privacidad/solicitudes", "/api/privacidad/solicitudes/consultar", "/api/redes/view", "/api/redes/promo/register", "/api/redes/promo/pending", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/cocteleria", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/privacidad", "/privacidad/politica", "/privacidad/preferencias", "/privacidad/derechos", "/privacidad/seguimiento", "/api/privacidad/preferencias", "/api/privacidad/solicitudes", "/api/privacidad/solicitudes/consultar", "/api/redes/view", "/api/redes/promo/register", "/api/redes/promo/pending", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
         return True
     if ruta.startswith("/redes/go/"):
         return True
@@ -3549,6 +3551,8 @@ def _normalizar_tipo_reserva_tienda(raw):
         return "torta"
     if tipo in {"pastel", "pasteles"}:
         return "pastel"
+    if tipo in {"cocteleria", "coctelería", "cocktail"}:
+        return "cocteleria"
     return ""
 
 
@@ -3578,6 +3582,11 @@ def _minutos_anticipacion_reserva(tipo, topper_requiere_96h=False, pastel_fuera_
         return base_min
     if t == "pastel" and bool(pastel_fuera_lista):
         return 36 * 60
+    if t == "cocteleria":
+        try:
+            return max(1, int(float(min_horas_categoria or 24))) * 60
+        except (TypeError, ValueError):
+            return 24 * 60
     # Pastel: 24h.
     return 24 * 60
 
@@ -11390,9 +11399,24 @@ def api_tienda_agenda_disponibilidad():
                     min_horas_categoria = int(categoria.get("min_lead_hours") or 0)
                 except (TypeError, ValueError):
                     min_horas_categoria = None
+        if tipo_reserva == "cocteleria":
+            product_conn = None
+            try:
+                product_id = int(request.args.get("producto_id") or 0)
+                if product_id > 0:
+                    ensure_cocteleria_schema()
+                    from cocteleria import _db as _cocteleria_db, _product as _cocteleria_product
+                    product_conn = _cocteleria_db()
+                    product = _cocteleria_product(product_conn, product_id, public=True)
+                    min_horas_categoria = int((product or {}).get("min_lead_hours") or 24)
+            except (TypeError, ValueError):
+                min_horas_categoria = 24
+            finally:
+                if product_conn:
+                    product_conn.close()
         pastel_modo = str(request.args.get("pastel_modo") or "catalogo").strip().lower()
         pastel_fuera_lista = tipo_reserva == "pastel" and pastel_modo in {"especial", "fuera_lista", "fuera-lista"}
-        if tipo_reserva not in {"torta", "pastel"}:
+        if tipo_reserva not in {"torta", "pastel", "cocteleria"}:
             return jsonify(
                 {
                     "success": True,
@@ -11590,7 +11614,9 @@ def api_tienda_agenda_reservar():
         detalle = str(data.get("detalle") or "").strip()[:400]
         catalogo_torta_payload = data.get("catalogo_torta") if isinstance(data.get("catalogo_torta"), dict) else {}
         torta_lista_payload = data.get("torta_lista") if isinstance(data.get("torta_lista"), dict) else {}
+        cocteleria_payload = data.get("cocteleria") if isinstance(data.get("cocteleria"), dict) else {}
         ready_cake_snapshot = None
+        cocteleria_snapshot = None
         ready_request_key = str(data.get("request_key") or "").strip()[:100]
         pastel_catalogo_payload = data.get("pastel_catalogo") if isinstance(data.get("pastel_catalogo"), list) else []
         pastel_especial_payload = data.get("pastel_especial") if isinstance(data.get("pastel_especial"), dict) else {}
@@ -11621,8 +11647,8 @@ def api_tienda_agenda_reservar():
             return jsonify({"success": False, "error": "Correo invalido"}), 400
         if not telefono:
             return jsonify({"success": False, "error": "Telefono invalido. Debe tener 8 digitos"}), 400
-        if tipo_pedido not in {"torta", "pastel"}:
-            return jsonify({"success": False, "error": "Selecciona tipo de pedido: Torta o Pastel"}), 400
+        if tipo_pedido not in {"torta", "pastel", "cocteleria"}:
+            return jsonify({"success": False, "error": "Selecciona un tipo de pedido válido"}), 400
 
         cfg_tienda = _obtener_tienda_personalizacion()
         shipping_quote = None
@@ -11630,7 +11656,31 @@ def api_tienda_agenda_reservar():
         pastel_catalogo_resumen = []
         pastel_especial_detalle = None
         subtotal_estimado = 0.0
-        if tipo_pedido == "torta" and tipo_reserva_original in {"torta_lista", "torta-lista", "ready_cake"}:
+        if tipo_reserva_original in {"cocteleria", "coctelería", "cocktail"}:
+            ensure_cocteleria_schema()
+            try:
+                cocktail = get_published_cocktail(cocteleria_payload.get("model_id"), cocteleria_payload.get("presentation_id"))
+                expected_price = int(cocteleria_payload.get("expected_price_clp"))
+                quantity = int(cocteleria_payload.get("quantity"))
+            except (TypeError, ValueError):
+                cocktail, expected_price, quantity = None, -1, 0
+            if not cocktail:
+                return jsonify({"success": False, "error": "El producto o la presentación ya no están disponibles"}), 409
+            if expected_price != int(cocktail["price_clp"]):
+                return jsonify({"success": False, "error": "El precio cambió. Recarga el catálogo antes de reservar."}), 409
+            if quantity < int(cocktail["min_quantity"]) or quantity > int(cocktail["max_quantity"]):
+                return jsonify({"success": False, "error": f"La cantidad debe estar entre {cocktail['min_quantity']} y {cocktail['max_quantity']}"}), 400
+            cocteleria_snapshot = {
+                "kind": "COCTELERIA", "model_id": int(cocktail["model_id"]),
+                "presentation_id": int(cocktail["presentation_id"]), "product_name": cocktail["name"],
+                "category": cocktail["category"], "presentation_label": cocktail["presentation_label"],
+                "units_per_pack": int(cocktail["units"]), "unit_label": cocktail["unit_label"],
+                "quantity": quantity, "unit_price_clp": int(cocktail["price_clp"]),
+                "total_clp": int(cocktail["price_clp"]) * quantity, "photo": cocktail.get("photo") or "",
+            }
+            subtotal_estimado = cocteleria_snapshot["total_clp"]
+            ready_request_key = str(data.get("request_key") or "").strip()[:100]
+        elif tipo_pedido == "torta" and tipo_reserva_original in {"torta_lista", "torta-lista", "ready_cake"}:
             ensure_ready_cakes_schema()
             try:
                 ready_cake = get_published_ready_cake(torta_lista_payload.get("model_id"), torta_lista_payload.get("size_id"))
@@ -11789,6 +11839,8 @@ def api_tienda_agenda_reservar():
                 min_horas_categoria = int((catalogo_torta_resumen.get("categoria") or {}).get("min_lead_hours") or 0)
             except (TypeError, ValueError):
                 min_horas_categoria = None
+        if cocteleria_snapshot:
+            min_horas_categoria = int(cocktail.get("min_lead_hours") or 24)
         if tipo_pedido == "pastel":
             pastel_fuera_lista = pastel_modo == "especial"
 
@@ -11823,8 +11875,37 @@ def api_tienda_agenda_reservar():
         conn = get_db()
         if ready_cake_snapshot:
             ensure_ready_cakes_schema(conn)
+        if cocteleria_snapshot:
+            ensure_cocteleria_schema(conn)
         cursor = conn.cursor()
         cursor.execute("BEGIN IMMEDIATE")
+        if cocteleria_snapshot:
+            current_product = cursor.execute("""SELECT m.status,m.name,m.category,m.min_quantity,m.max_quantity,m.min_lead_hours,
+                p.id presentation_id,p.active,p.label,p.units,p.unit_label,p.price_clp,i.path photo
+                FROM tienda_cocteleria m JOIN tienda_cocteleria_presentaciones p ON p.model_id=m.id
+                LEFT JOIN tienda_cocteleria_imagenes i ON i.model_id=m.id AND i.active=1 AND i.is_cover=1
+                WHERE m.id=? AND p.id=? LIMIT 1""", (cocteleria_snapshot["model_id"], cocteleria_snapshot["presentation_id"])).fetchone()
+            if not current_product or current_product["status"] != "published" or not int(current_product["active"] or 0):
+                conn.rollback()
+                return jsonify({"success": False, "error": "El producto o la presentación ya no están disponibles"}), 409
+            if int(current_product["price_clp"]) != int(cocteleria_payload.get("expected_price_clp") or -1):
+                conn.rollback()
+                return jsonify({"success": False, "error": "El precio cambió. Recarga el catálogo antes de reservar."}), 409
+            quantity = int(cocteleria_snapshot["quantity"])
+            if quantity < int(current_product["min_quantity"]) or quantity > int(current_product["max_quantity"]):
+                conn.rollback()
+                return jsonify({"success": False, "error": f"La cantidad debe estar entre {current_product['min_quantity']} y {current_product['max_quantity']}"}), 400
+            current_lead = int(current_product["min_lead_hours"] or 24)
+            if not _cumple_anticipacion_reserva(fecha, hora_inicio, "cocteleria", cfg_agenda=cfg, min_horas_categoria=current_lead):
+                conn.rollback()
+                return jsonify({"success": False, "error": f"Este producto requiere al menos {current_lead} horas de anticipación"}), 400
+            cocteleria_snapshot.update({
+                "product_name": current_product["name"], "category": current_product["category"],
+                "presentation_label": current_product["label"], "units_per_pack": int(current_product["units"]),
+                "unit_label": current_product["unit_label"], "unit_price_clp": int(current_product["price_clp"]),
+                "total_clp": int(current_product["price_clp"]) * quantity, "photo": current_product["photo"] or "",
+            })
+            subtotal_estimado = cocteleria_snapshot["total_clp"]
         if ready_cake_snapshot and ready_request_key:
             previous = cursor.execute("SELECT event_id FROM tienda_tortas_listas_reservas WHERE request_key=? LIMIT 1", (ready_request_key,)).fetchone()
             if previous:
@@ -11834,6 +11915,14 @@ def api_tienda_agenda_reservar():
                 if existing:
                     total = int(ready_cake_snapshot["unit_price_clp"])
                     return jsonify({"success": True, "idempotent": True, "reserva": {"id": event_id, "fecha": existing["fecha"], "hora_inicio": existing["hora_inicio"], "cliente": existing["cliente"], "telefono": existing["telefono"], "codigo_pedido": existing["codigo_pedido"], "torta_lista": ready_cake_snapshot, "total_estimado": total}})
+        if cocteleria_snapshot and ready_request_key:
+            previous = cursor.execute("SELECT event_id FROM tienda_cocteleria_reservas WHERE request_key=? LIMIT 1", (ready_request_key,)).fetchone()
+            if previous:
+                event_id = int(previous[0] or 0)
+                existing = cursor.execute("SELECT fecha,hora_inicio,cliente,telefono,codigo_pedido,total FROM agenda_eventos WHERE id=?", (event_id,)).fetchone()
+                conn.commit()
+                if existing:
+                    return jsonify({"success": True, "idempotent": True, "reserva": {"id": event_id, "fecha": existing["fecha"], "hora_inicio": existing["hora_inicio"], "cliente": existing["cliente"], "telefono": existing["telefono"], "codigo_pedido": existing["codigo_pedido"], "cocteleria": cocteleria_snapshot, "total_estimado": float(existing["total"] or 0)}})
         disp = _calcular_disponibilidad_agenda_tienda(cursor, cfg, fecha, fecha)
         mapa_horas = ((disp.get("mapa") or {}).get(fecha) or {})
         slot = mapa_horas.get(hora_inicio)
@@ -11847,7 +11936,9 @@ def api_tienda_agenda_reservar():
         min_ini = _hhmm_a_minutos(hora_inicio)
         min_fin = (min_ini or 0) + int(cfg["slot_minutes"])
         hora_fin = _minutos_a_hhmm(min_fin)
-        titulo = f"Torta lista - {ready_cake_snapshot['model']} ({ready_cake_snapshot['size']})" if ready_cake_snapshot else f"Reserva tienda - {tipo_pedido.capitalize()}"
+        titulo = (f"Torta lista - {ready_cake_snapshot['model']} ({ready_cake_snapshot['size']})" if ready_cake_snapshot else
+                  f"Cóctelería - {cocteleria_snapshot['product_name']} ({cocteleria_snapshot['presentation_label']} x{cocteleria_snapshot['quantity']})" if cocteleria_snapshot else
+                  f"Reserva tienda - {tipo_pedido.capitalize()}")
         def _fmt_clp(value):
             try:
                 n = int(round(float(value or 0)))
@@ -11865,6 +11956,16 @@ def api_tienda_agenda_reservar():
                 f"\nTamaño: {ready_cake_snapshot['size']}\nPorciones: {ready_cake_snapshot['servings'] or '-'}"
                 f"\nPrecio tamaño: {_fmt_clp(ready_cake_snapshot['unit_price_clp'])}"
                 f"\nMensaje de chocolate: {ready_cake_snapshot['message'] or 'Sin mensaje'}"
+            )
+        if cocteleria_snapshot:
+            ingredientes += (
+                f"\n--- Reserva de coctelería ---\nProducto: {cocteleria_snapshot['product_name']}"
+                f"\nCategoría: {cocteleria_snapshot['category']}"
+                f"\nPresentación: {cocteleria_snapshot['presentation_label']}"
+                f"\nUnidades por presentación: {cocteleria_snapshot['units_per_pack']} {cocteleria_snapshot['unit_label']}"
+                f"\nCantidad: {cocteleria_snapshot['quantity']} presentación(es)"
+                f"\nPrecio unitario: {_fmt_clp(cocteleria_snapshot['unit_price_clp'])}"
+                f"\nSubtotal productos: {_fmt_clp(cocteleria_snapshot['total_clp'])}"
             )
         if catalogo_torta_resumen:
             categoria_row = catalogo_torta_resumen.get("categoria") or {}
@@ -11994,7 +12095,7 @@ def api_tienda_agenda_reservar():
                 1 if entrega_tipo == "despacho" else 0,
                 direccion if entrega_tipo == "despacho" else None,
                 ingredientes,
-                round(max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) + float(shipping_quote.get("shipping_fee") or 0) if ready_cake_snapshot and shipping_quote else max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) if ready_cake_snapshot else 0, 2),
+                round(max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) + float(shipping_quote.get("shipping_fee") or 0) if (ready_cake_snapshot or cocteleria_snapshot) and shipping_quote else max(0.0, float(subtotal_estimado) - float(descuento_agenda_auto)) if (ready_cake_snapshot or cocteleria_snapshot) else 0, 2),
                 "Reserva cliente tienda online",
                 codigo_op,
             ),
@@ -12004,6 +12105,10 @@ def api_tienda_agenda_reservar():
             if not ready_request_key:
                 ready_request_key = f"ready-{uuid.uuid4().hex}"
             cursor.execute("INSERT INTO tienda_tortas_listas_reservas(request_key,event_id,model_id,size_id,snapshot_json) VALUES(?,?,?,?,?)", (ready_request_key, reserva_id, ready_cake_snapshot["model_id"], ready_cake_snapshot["size_id"], json.dumps(ready_cake_snapshot, ensure_ascii=False)))
+        if cocteleria_snapshot:
+            if not ready_request_key:
+                ready_request_key = f"cocteleria-{uuid.uuid4().hex}"
+            cursor.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", (ready_request_key, reserva_id, cocteleria_snapshot["model_id"], cocteleria_snapshot["presentation_id"], json.dumps(cocteleria_snapshot, ensure_ascii=False)))
         if reserva_id > 0:
             fecha_codigo = re.sub(r"[^0-9]", "", str(fecha or "").strip())[:8] or datetime.now(ZoneInfo("America/Santiago")).strftime("%Y%m%d")
             codigo_pedido = f"AGD-{fecha_codigo}-{reserva_id:06d}"
@@ -12072,6 +12177,7 @@ def api_tienda_agenda_reservar():
                     "lng": longitud if entrega_tipo == "despacho" else None,
                     "catalogo_torta": catalogo_torta_resumen,
                     "torta_lista": ready_cake_snapshot,
+                    "cocteleria": cocteleria_snapshot,
                     "pastel_modo": pastel_modo if tipo_pedido == "pastel" else "",
                     "pastel_catalogo": pastel_catalogo_resumen if tipo_pedido == "pastel" else [],
                     "pastel_especial": pastel_especial_detalle if tipo_pedido == "pastel" else None,
@@ -22371,6 +22477,8 @@ def _label_origen_evento(item):
     origen = str(item.get("origen") or "").strip().lower()
     tipo = str(item.get("tipo") or "").strip().lower()
     if fuente == "agenda":
+        if tipo == "cocteleria":
+            return "Cóctelería (tienda online)" if origen == "tienda_online" else "Cóctelería (manual)"
         if origen == "tienda_online":
             return "Agendo torta (tienda online)"
         return "Agendo torta (manual)" if tipo == "torta" else "Agenda manual"

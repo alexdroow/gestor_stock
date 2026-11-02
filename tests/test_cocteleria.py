@@ -1,0 +1,102 @@
+import os
+import sqlite3
+import tempfile
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+
+import app as app_module
+import cocteleria as cocteleria_module
+
+
+class CocteleriaCatalogTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.temp.name, "cocteleria.sqlite")
+        self.db_patch = patch.object(cocteleria_module, "DB_PATH", self.db_path)
+        self.db_patch.start()
+        self.client = app_module.app.test_client()
+
+    def tearDown(self):
+        self.db_patch.stop()
+        self.temp.cleanup()
+
+    def login_admin(self):
+        with self.client.session_transaction() as sess:
+            sess[app_module._ADMIN_SESSION_KEY] = True
+
+    def create_product(self, category="dulce"):
+        self.login_admin()
+        response = self.client.post("/api/tienda/admin/cocteleria", json={
+            "name": "Mini tartaletas",
+            "category": category,
+            "description": "Tartaletas para compartir",
+            "short_description": "Bocados artesanales",
+            "ingredients": "Harina, crema",
+            "allergens": "Gluten y lácteos",
+            "min_quantity": 1,
+            "max_quantity": 8,
+            "min_lead_hours": 48,
+            "presentations": [{"label": "Bandeja 20", "units": 20, "unit_label": "unidades", "price_clp": 18000}],
+        })
+        self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
+        return response.get_json()["item"]
+
+    def add_cover_and_publish(self, item):
+        cocteleria_module.ensure_cocteleria_schema()
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("INSERT INTO tienda_cocteleria_imagenes(model_id,path,alt,is_cover,active) VALUES(?,?,?,?,1)",
+                     (item["id"], "/static/cocteleria/test-cover.jpg", item["name"], 1))
+        conn.commit()
+        conn.close()
+        published = self.client.post(f"/api/tienda/admin/cocteleria/{item['id']}/status", json={"status": "published"})
+        self.assertEqual(published.status_code, 200, published.get_data(as_text=True))
+
+    def test_public_catalog_and_admin_are_separate_and_admin_requires_session(self):
+        self.assertEqual(self.client.get("/tienda/cocteleria").status_code, 200)
+        denied = self.client.get("/ventas/cocteleria")
+        self.assertEqual(denied.status_code, 302)
+        self.assertEqual(self.client.get("/api/tienda/admin/cocteleria").status_code, 401)
+
+        item = self.create_product("salado")
+        self.add_cover_and_publish(item)
+        public = self.client.get("/api/tienda/cocteleria").get_json()
+        self.assertTrue(public["success"])
+        self.assertEqual(len(public["items"]), 1)
+        self.assertEqual(public["items"][0]["category"], "salado")
+        self.assertEqual(public["items"][0]["presentations"][0]["price_clp"], 18000)
+
+        page = self.client.get("/tienda/cocteleria")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"Todos", page.data)
+        self.assertIn(b"Salado", page.data)
+
+    def test_admin_can_duplicate_product_as_draft_and_keep_presentation(self):
+        item = self.create_product()
+        duplicate = self.client.post(f"/api/tienda/admin/cocteleria/{item['id']}/duplicate", json={})
+        self.assertEqual(duplicate.status_code, 201)
+        copy = duplicate.get_json()["item"]
+        self.assertEqual(copy["status"], "draft")
+        self.assertEqual(copy["presentations"][0]["price_clp"], 18000)
+        self.assertNotEqual(copy["slug"], item["slug"])
+
+    def test_booking_type_and_product_price_are_authoritative(self):
+        item = self.create_product()
+        self.add_cover_and_publish(item)
+        presentation = item["presentations"][0]
+        actual = cocteleria_module.get_published_cocktail(item["id"], presentation["id"])
+        self.assertEqual(actual["price_clp"], 18000)
+        self.assertEqual(actual["min_lead_hours"], 48)
+        self.assertEqual(app_module._normalizar_tipo_reserva_tienda("cocteleria"), "cocteleria")
+        self.assertEqual(app_module._minutos_anticipacion_reserva("cocteleria", min_horas_categoria=48), 48 * 60)
+
+    def test_existing_agenda_editor_recognizes_cocktail_reservations(self):
+        template = Path(__file__).resolve().parents[1] / "templates" / "agenda.html"
+        html = template.read_text(encoding="utf-8")
+        self.assertIn('<option value="cocteleria">', html)
+        self.assertIn("evento.tipo === 'cocteleria'", html)
+        self.assertEqual(app_module._label_origen_evento({"fuente": "agenda", "tipo": "cocteleria", "origen": "tienda_online"}), "Cóctelería (tienda online)")
+
+
+if __name__ == "__main__":
+    unittest.main()

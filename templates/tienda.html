@@ -20670,11 +20670,12 @@
                     ? `<button type="button" class="mobile-cat-chip ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
                 const cakeCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/tortas-listas">Catalogo Tortas</a>`;
+                const cocktailCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/cocteleria">Cocteleria dulce y salada</a>`;
                 const storeHomeLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda">Tienda Principal</a>`;
                 const redesLink = `<a class="mobile-cat-chip menu-route-link" href="/redes">Redes Sucrée</a>`;
                 if (document.body.classList.contains("tienda-agendapedidos-oficial")) {
-                    mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink + redesLink;
-                } else mobileMenuListEl.innerHTML = cakeCatalogLink + agendaItem + all.map((c) => {
+                    mobileMenuListEl.innerHTML = cakeCatalogLink + cocktailCatalogLink + agendaItem + storeHomeLink + redesLink;
+                } else mobileMenuListEl.innerHTML = cakeCatalogLink + cocktailCatalogLink + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
@@ -20704,10 +20705,11 @@
                     ? `<button type="button" class="mobile-cat-chip agenda-entry ${categoriaActiva === "AGENDA" ? "active" : ""}" onclick="cambiarCategoria('AGENDA');cerrarPanelesMobile();">${esc(String(tiendaUiCfg.agenda_menu_label || "Agendar pedido"))}</button>`
                     : "";
                 const cakeCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/tortas-listas">Catalogo Tortas</a>`;
+                const cocktailCatalogLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda/cocteleria">Cocteleria dulce y salada</a>`;
                 const storeHomeLink = `<a class="mobile-cat-chip menu-route-link" href="/tienda">Tienda Principal</a>`;
                 if (document.body.classList.contains("tienda-agendapedidos-oficial")) {
-                    mobileCatsBubbleListEl.innerHTML = cakeCatalogLink + agendaItem + storeHomeLink;
-                } else mobileCatsBubbleListEl.innerHTML = authItems + cakeCatalogLink + agendaItem + all.map((c) => {
+                    mobileCatsBubbleListEl.innerHTML = cakeCatalogLink + cocktailCatalogLink + agendaItem + storeHomeLink;
+                } else mobileCatsBubbleListEl.innerHTML = authItems + cakeCatalogLink + cocktailCatalogLink + agendaItem + all.map((c) => {
                     const label = c === "TODOS"
                         ? "Todos"
                         : c === "DESTACADOS"
