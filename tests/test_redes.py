@@ -37,6 +37,14 @@ class RedesTests(unittest.TestCase):
     def mutate(self, method, path, data=None):
         return self.client.open(path, method=method, json=data, headers={"X-CSRF-Token": self.csrf})
 
+    def allow_analytics(self):
+        csrf = self.client.get("/api/privacidad/preferencias").get_json()["csrf_token"]
+        return self.client.post(
+            "/api/privacidad/preferencias",
+            json={"analytics_internal": True},
+            headers={"X-CSRF-Token": csrf},
+        )
+
     def create_link(self, **overrides):
         data = {"title": "Agenda tu torta", "url": "/tienda/agendapedidos", "subtitle": "Personaliza tu pedido", "layout": "featured", "status": "active"}
         data.update(overrides)
@@ -87,6 +95,7 @@ class RedesTests(unittest.TestCase):
         _, data = self.create_link(layout="quick")
         link_id = data["link"]["id"]
         self.assertEqual(self.mutate("POST", "/api/redes/admin/publish", {}).status_code, 200)
+        self.allow_analytics()
         with self.client.session_transaction() as session:
             session.pop("admin_autenticado", None)
         view = self.client.post("/api/redes/view", json={"referrer": "https://www.instagram.com/story", "utm_source": "instagram"})
@@ -121,6 +130,7 @@ class RedesTests(unittest.TestCase):
         _, data = self.create_link(layout="quick")
         link_id = data["link"]["id"]
         self.assertEqual(self.mutate("POST", "/api/redes/admin/publish", {}).status_code, 200)
+        self.allow_analytics()
         with self.client.session_transaction() as session:
             session.pop("admin_autenticado", None)
         self.client.post("/api/redes/view", json={})
@@ -225,6 +235,7 @@ class RedesTests(unittest.TestCase):
         self.assertEqual(image.mimetype, "image/png")
         self.assertIn(b"PNG", image.data[:8])
 
+        self.allow_analytics()
         with self.client.session_transaction() as session:
             session.pop("admin_autenticado", None)
         scan = self.client.get(item["tracking_path"], follow_redirects=False)

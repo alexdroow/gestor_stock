@@ -18,6 +18,7 @@ from flask import Blueprint, abort, current_app, jsonify, make_response, redirec
 from werkzeug.utils import secure_filename
 
 from database import get_db
+from privacidad import tracking_allowed_from_request
 
 
 redes_blueprint = Blueprint("redes", __name__)
@@ -552,6 +553,8 @@ def _is_bot_or_prefetch():
 
 
 def _allow_analytics_event():
+    if not tracking_allowed_from_request():
+        return False
     key = str(request.remote_addr or "unknown")
     now = time.monotonic()
     with _EVENT_RATE_LOCK:
@@ -753,10 +756,24 @@ def register_welcome_promo():
         )
         registration_id = int(cursor.lastrowid or 0)
         conn.commit()
+        from privacidad import record_registration_preferences
+        try:
+            privacy_cookie = record_registration_preferences(
+                email,
+                phone,
+                marketing_email=bool(data.get("marketing_email")),
+                marketing_whatsapp=bool(data.get("marketing_whatsapp")),
+            )
+        except Exception:
+            current_app.logger.exception("No se pudo persistir la preferencia promocional opcional; se mantiene desactivada.")
+            privacy_cookie = ""
         if source == "qr":
             session.pop("redes_qr_signup_token", None)
         session["redes_promo_registration_id"] = registration_id
-        return jsonify({"success": True, "codigo": code, "discount_pct": promo["discount_pct"], "expires_on": expiry_text})
+        response = jsonify({"success": True, "codigo": code, "discount_pct": promo["discount_pct"], "expires_on": expiry_text})
+        if privacy_cookie:
+            response.set_cookie("sucree_privacy", privacy_cookie, max_age=31536000, httponly=True, secure=request.is_secure, samesite="Lax", path="/")
+        return response
     except sqlite3.IntegrityError:
         conn.rollback()
         return jsonify({"success": False, "error": "Ya existe un registro promocional para uno de estos datos."}), 409

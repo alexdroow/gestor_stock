@@ -62,6 +62,8 @@ from ready_cakes import ready_cakes, ensure_ready_cakes_schema, get_published_re
 app.register_blueprint(ready_cakes)
 from redes import redes_blueprint, redes_promo_registration_contact, redes_promo_validate_checkout
 app.register_blueprint(redes_blueprint)
+from privacidad import privacidad_blueprint, get_privacy_state, privacy_csrf_token, tracking_allowed_from_request
+app.register_blueprint(privacidad_blueprint)
 CAMERA_HUB = CameraHub()
 app.secret_key = os.environ.get("GESTIONSTOCK_SECRET_KEY", "gestor_stock_dev_secret_change_me")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -228,7 +230,7 @@ def _ruta_es_publica(path):
         return False
     if ruta.startswith("/static/"):
         return True
-    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/api/redes/view", "/api/redes/promo/register", "/api/redes/promo/pending", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
+    if ruta in {"/tienda", "/tienda/", "/tienda/agendar", "/tienda/agendar-beta", "/tienda/agendapedidos", "/tienda/tortas-listas", "/tienda/presencial", "/tienda/presencial/", "/asistente-sucree", "/valoracion", "/redes", "/privacidad", "/privacidad/politica", "/privacidad/preferencias", "/privacidad/derechos", "/privacidad/seguimiento", "/api/privacidad/preferencias", "/api/privacidad/solicitudes", "/api/privacidad/solicitudes/consultar", "/api/redes/view", "/api/redes/promo/register", "/api/redes/promo/pending", "/admin/login", "/admin/logout", "/descargar-pos-android", "/descargas/SucreePOS-Android-prueba.apk", "/downloader/apk", "/downloader/apk/", "/favicon.ico"}:
         return True
     if ruta.startswith("/redes/go/"):
         return True
@@ -379,7 +381,11 @@ from unit_utils import (
 
 @app.context_processor
 def inject_app_globals():
-    return {"app_version": APP_VERSION}
+    return {
+        "app_version": APP_VERSION,
+        "privacy_csrf_token": privacy_csrf_token(),
+        "privacy_state": get_privacy_state(),
+    }
 
 
 RUN_BOOTSTRAP_DB_ON_START = str(os.getenv("GESTORSTOCK_BOOTSTRAP_DB", "0")).strip().lower() in {"1", "true", "yes", "on"}
@@ -8207,6 +8213,8 @@ def _parse_detalle_carrito_tienda(raw_json):
 def api_tienda_track():
     conn = None
     try:
+        if not tracking_allowed_from_request():
+            return jsonify({"success": True, "counted": False, "reason": "metricas_opcionales_desactivadas"})
         data = request.get_json(silent=True) or {}
         session_id = str(data.get("session_id") or "").strip()
         if not re.match(r"^[A-Za-z0-9._:-]{8,80}$", session_id):

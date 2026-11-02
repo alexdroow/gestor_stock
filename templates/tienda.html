@@ -1714,6 +1714,9 @@
             gap: 9px;
             background: #fff;
         }
+        .privacy-context-note { margin:8px 0 12px; padding:10px 12px; border:1px solid #f0dfca; border-radius:10px; background:#fffaf3; color:#6f5948; font-size:12px; line-height:1.45; }
+        .privacy-context-note a { color:#914b08; font-weight:700; }
+        .privacy-footer-link { display:block; padding:14px 18px max(18px,env(safe-area-inset-bottom)); text-align:center; color:#914b08; font-size:13px; font-weight:700; }
         .agenda-form .grid2 {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -17295,6 +17298,7 @@
                         <input id="agenda-orden-label" type="text" value="Reserva por agenda" disabled>
                     </div>
                     <textarea id="agenda-detalle" maxlength="400" placeholder="Detalle rapido del pedido (opcional)"></textarea>
+                    <p class="privacy-context-note">Usamos estos datos para recibir, preparar y coordinar tu reserva. <a href="/privacidad/politica">Conoce el uso de tus datos</a> · <a href="/privacidad/preferencias">Preferencias</a>.</p>
                     <div class="agenda-despacho-wrap" id="agenda-despacho-wrap">
                         <div class="agenda-shipping-warning" id="agenda-despacho-step-msg"></div>
                         <div class="agenda-map-actions">
@@ -17304,6 +17308,7 @@
                         </div>
                         <div class="agenda-map" id="agenda-map"></div>
                         <div class="agenda-map-meta" id="agenda-map-meta">Mueve el pin al punto exacto y confirma.</div>
+                        <p class="privacy-context-note">La busqueda de direccion y las capas del mapa se consultan con OpenStreetMap/Nominatim. Puedes ingresar la direccion manualmente si prefieres no usar el mapa. <a href="/privacidad/politica">Mas informacion</a>.</p>
                         <div class="agenda-shipping-note" id="agenda-shipping-note">Importante: el valor de despacho no esta incluido en esta reserva.</div>
                         <div class="agenda-shipping-quote" id="agenda-shipping-quote"></div>
                         <div class="agenda-shipping-warning" id="agenda-shipping-warning"></div>
@@ -17360,7 +17365,10 @@
                 </div>
             </div>
         </aside>
+        <a class="privacy-footer-link" href="/privacidad">Centro de privacidad y datos personales</a>
     </main>
+
+    {% include "_privacy_banner.html" %}
 
     <div class="mobile-overlay" id="mobile-overlay"></div>
     <a class="wa-fab" id="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
@@ -17533,6 +17541,7 @@
                     <div style="color:#64748b;font-size:.88rem;">Sin reservas cargadas.</div>
                 </div>
             </div>
+            <p class="privacy-context-note">Estos datos se usan para procesar tu compra, coordinar entrega/retiro y cumplir obligaciones aplicables. Las promociones son opcionales y se gestionan por separado. <a href="/privacidad/politica">Politica de datos</a> · <a href="/privacidad/preferencias">Preferencias</a>.</p>
             <div class="modal-actions">
                 <button class="btn-muted" type="button" id="modal-cuenta-cerrar">Cerrar</button>
             </div>
@@ -18368,7 +18377,8 @@
         let agendaCakeFlowFechaElegida = false;
         const AGENDA_BETA_DRAFT_KEY = "agenda_beta_cake_draft_v2";
         try { localStorage.removeItem("agenda_beta_cake_draft_v1"); } catch (_e) {}
-        const tiendaSessionId = (() => {
+        const privacyAnalyticsAllowed = {{ 'true' if privacy_state.preferences.analytics_internal else 'false' }};
+        const tiendaSessionId = privacyAnalyticsAllowed ? (() => {
             const key = "tienda_session_id";
             let value = localStorage.getItem(key);
             if (!value) {
@@ -18376,7 +18386,7 @@
                 localStorage.setItem(key, value);
             }
             return value;
-        })();
+        })() : "";
         const _urlParams = new URLSearchParams(window.location.search);
         const _agendaDebugMode = _urlParams.get("agenda_debug") === "1";
         const _ua = String(navigator.userAgent || "").toLowerCase();
@@ -20646,6 +20656,7 @@
         }
 
         function _trackTienda(evento = "heartbeat", pagina = "/tienda") {
+            if (!privacyAnalyticsAllowed || !tiendaSessionId) return;
             try {
                 const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
                 const detalleCarrito = carrito.map((it) => {
@@ -20681,6 +20692,7 @@
         }
 
         function _trackTiendaLeave() {
+            if (!privacyAnalyticsAllowed || !tiendaSessionId) return;
             try {
                 const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
                 const detalleCarrito = carrito.map((it) => {
