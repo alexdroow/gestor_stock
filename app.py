@@ -1164,24 +1164,25 @@ def descargar_pos_android():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-APK-Version'] = '1.4.2'
+    response.headers['X-POS-APK-Version'] = '1.4.3'
     return response
 
 
 @app.route('/descargas/SucreePOS-Android-prueba.apk')
 def descargar_archivo_pos_android():
-    apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk', 'SucreePOS-Android-1.4.2-debug.apk')
+    apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk', 'SucreePOS-Android-1.4.3-debug.apk')
     if not os.path.isfile(apk_path):
         return 'La APK aún no está disponible.', 404
     response = send_file(
         apk_path,
         as_attachment=True,
-        download_name='SucreePOS-Android-1.4.2-debug.apk',
+        download_name='SucreePOS-Android-1.4.3-debug.apk',
         mimetype='application/vnd.android.package-archive',
         max_age=0,
     )
     response.headers['Cache-Control'] = 'no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-POS-APK-Version'] = '1.4.3'
     return response
 
 
@@ -24973,6 +24974,12 @@ def api_agenda_evento_pdf(id):
             return jsonify({'success': False, 'error': 'Evento no encontrado'}), 404
         evento = dict(row)
         filename = _crear_pdf_reserva_agenda_tienda(evento)
+        download = str(request.args.get('download') or '').strip().lower() in {'1', 'true', 'si', 'yes'}
+        if download:
+            abs_path = os.path.join(static_dir, "tienda_pedidos_pdf", filename)
+            if not os.path.isfile(abs_path):
+                return jsonify({'success': False, 'error': 'No se pudo generar el PDF'}), 500
+            return send_file(abs_path, as_attachment=True, download_name=filename, mimetype='application/pdf')
         media_url = f"{_public_base_url(request.url_root)}/static/tienda_pedidos_pdf/{quote(filename)}"
         return jsonify({'success': True, 'media_url': media_url, 'filename': filename, 'codigo_pedido': str(evento.get('codigo_pedido') or '').strip()})
     except Exception as e:

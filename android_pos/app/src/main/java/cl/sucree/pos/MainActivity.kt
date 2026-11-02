@@ -2,6 +2,7 @@ package cl.sucree.pos
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.DownloadManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,6 +13,7 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.net.Uri
+import android.os.Environment
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
@@ -371,6 +373,37 @@ class MainActivity : Activity() {
     }
 
     private inner class PosBridge {
+        @JavascriptInterface
+        fun downloadAgendaPdf(orderId: String) {
+            runOnUiThread {
+                val page = Uri.parse(webView.url ?: "")
+                val safeId = orderId.filter(Char::isDigit).take(12)
+                if (page.scheme != "https" || page.host !in setOf("pasteleriasucree.cl", "www.pasteleriasucree.cl") ||
+                    page.path != "/admin/pos/mobile" || safeId.isBlank()
+                ) {
+                    Toast.makeText(this@MainActivity, "No se pudo validar la cotizacion.", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                try {
+                    val uri = Uri.parse("https://pasteleriasucree.cl/api/agenda/evento/$safeId/pdf?download=1")
+                    val request = DownloadManager.Request(uri)
+                        .setMimeType("application/pdf")
+                        .setTitle("Cotizacion de torta #$safeId.pdf")
+                        .setDescription("Descargando cotizacion de Sucree POS")
+                        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        .setAllowedOverMetered(true)
+                        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "cotizacion-torta-$safeId.pdf")
+                    CookieManager.getInstance().getCookie(uri.toString())?.let { request.addRequestHeader("Cookie", it) }
+                    request.addRequestHeader("User-Agent", WebSettings.getDefaultUserAgent(this@MainActivity))
+                    val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    manager.enqueue(request)
+                    Toast.makeText(this@MainActivity, "Descarga iniciada. Revisa las notificaciones o Descargas.", Toast.LENGTH_LONG).show()
+                } catch (_: Exception) {
+                    Toast.makeText(this@MainActivity, "No se pudo iniciar la descarga del PDF.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
         @JavascriptInterface
         fun printAgendaTicket(orderId: String, html: String) {
             runOnUiThread {

@@ -26,6 +26,17 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
+    def test_updated_pos_apk_is_available_as_version_143(self):
+        page = self.client.get('/descargar-pos-android')
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('1.4.3', page.get_data(as_text=True))
+        apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
+        self.assertEqual(apk.status_code, 200)
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.3')
+        self.assertTrue(apk.data.startswith(b'PK'))
+        apk.close()
+        apk.close()
+
     def test_redes_admin_can_render_embedded_inside_mobile_pos(self):
         response = self.client.get('/admin/redes?pos_embed=1')
 
@@ -59,6 +70,48 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('const ticketHtml = construirHtmlImpresion58(evento);', template)
         self.assertIn('window.SucreePosAndroid.printAgendaTicket(String(idNum), ticketHtml);', template)
         self.assertIn('win.document.write(ticketHtml);', template)
+
+    def test_mobile_pos_download_endpoint_returns_pdf_attachment(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = os.path.join(temp_dir, 'agenda.sqlite')
+            pdf_root = os.path.join(temp_dir, 'static')
+            os.makedirs(os.path.join(pdf_root, 'tienda_pedidos_pdf'))
+            conn = sqlite3.connect(db_path)
+            conn.execute('''CREATE TABLE agenda_eventos (
+                id INTEGER PRIMARY KEY, tipo TEXT, fecha TEXT, hora_inicio TEXT, hora_fin TEXT,
+                hora_entrega TEXT, cliente TEXT, telefono TEXT, direccion TEXT, ingredientes TEXT,
+                total REAL, abono REAL, codigo_operacion TEXT, codigo_pedido TEXT
+            )''')
+            conn.execute("INSERT INTO agenda_eventos VALUES (1,'torta','2026-11-10','12:00','13:00','12:00','Cliente','+56912345678','','Detalle',30000,0,'OPA-1','AGD-1')")
+            conn.commit()
+            conn.close()
+
+            def create_test_pdf(event):
+                target = os.path.join(pdf_root, 'tienda_pedidos_pdf', 'cotizacion-test.pdf')
+                with open(target, 'wb') as pdf:
+                    pdf.write(b'%PDF-1.4 test')
+                return 'cotizacion-test.pdf'
+
+            with patch.object(database, 'DB_PATH', db_path), \
+                 patch.object(app_module, 'static_dir', pdf_root), \
+                 patch.object(app_module, '_crear_pdf_reserva_agenda_tienda', side_effect=create_test_pdf):
+                response = self.client.get('/api/agenda/evento/1/pdf?download=1')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, 'application/pdf')
+            self.assertIn('attachment;', response.headers.get('Content-Disposition', ''))
+            self.assertTrue(response.data.startswith(b'%PDF-'))
+            response.close()
+
+    def test_agenda_pdf_download_uses_android_bridge_instead_of_popup(self):
+        template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
+        self.assertIn("nativeBridge.downloadAgendaPdf(String(idNum))", template)
+        self.assertIn("/api/agenda/evento/${idNum}/pdf?download=1", template)
+        self.assertIn('descargarPdfAgenda(eventoEditando.id)', template)
+        self.assertIn('descargarPdfAgenda(pedidoBusquedaActual.id)', template)
+        native = (Path(__file__).resolve().parents[1] / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'MainActivity.kt').read_text(encoding='utf-8')
+        self.assertIn('fun downloadAgendaPdf(orderId: String)', native)
+        self.assertIn('DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED', native)
 
     def test_cake_catalog_admin_has_category_and_per_category_size_order_controls(self):
         response = self.client.get('/ventas/admin-catalogo-torta')

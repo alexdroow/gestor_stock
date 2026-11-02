@@ -7946,6 +7946,22 @@
             }
         }
 
+        function descargarPdfAgenda(idEvento) {
+            const idNum = Number(idEvento || 0);
+            if (!idNum) throw new Error('No se pudo identificar el pedido para generar PDF.');
+            const nativeBridge = window.SucreePosAndroid;
+            if (nativeBridge && typeof nativeBridge.downloadAgendaPdf === 'function') {
+                nativeBridge.downloadAgendaPdf(String(idNum));
+                return;
+            }
+            const link = document.createElement('a');
+            link.href = `/api/agenda/evento/${idNum}/pdf?download=1`;
+            link.download = `cotizacion-torta-${idNum}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
         function abrirPedidoBuscadoEnAgenda() {
             if (!pedidoBusquedaActual || !Number(pedidoBusquedaActual.id || 0)) return;
             cerrarFichaPedido();
@@ -7957,10 +7973,7 @@
             if (!pedidoBusquedaActual || !Number(pedidoBusquedaActual.id || 0)) return;
             try {
                 mostrarLoading(true);
-                const res = await fetch(`/api/agenda/evento/${Number(pedidoBusquedaActual.id)}/pdf`);
-                const data = await res.json();
-                if (!res.ok || !data.success || !data.media_url) throw new Error(data.error || 'No se pudo generar el PDF');
-                window.open(String(data.media_url), '_blank', 'noopener,noreferrer');
+                descargarPdfAgenda(pedidoBusquedaActual.id);
             } catch (err) {
                 alert(String(err && err.message ? err.message : 'No se pudo generar el PDF'));
             } finally {
@@ -9599,12 +9612,7 @@
             }
             try {
                 mostrarLoading(true);
-                const res = await fetch(`/api/agenda/evento/${idNum}/pdf`);
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data.success || !data.media_url) {
-                    throw new Error(data.error || 'No se pudo generar el PDF final.');
-                }
-                window.open(String(data.media_url), '_blank', 'noopener,noreferrer');
+                descargarPdfAgenda(idNum);
             } catch (error) {
                 alert(error?.message || 'No se pudo generar el PDF final.');
             } finally {
@@ -10855,12 +10863,7 @@
             }
             try {
                 mostrarLoading(true);
-                const res = await fetch(`/api/agenda/evento/${Number(eventoEditando.id)}/pdf`);
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data.success || !data.media_url) {
-                    throw new Error(data.error || 'No se pudo generar el PDF final.');
-                }
-                window.open(String(data.media_url), '_blank', 'noopener,noreferrer');
+                descargarPdfAgenda(eventoEditando.id);
                 return;
             } catch (error) {
                 alert(error?.message || 'No se pudo generar el PDF final.');
