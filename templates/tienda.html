@@ -2806,6 +2806,8 @@
             font-size: .82rem;
             cursor: pointer;
         }
+        .mobile-store-dock { display: contents; }
+        .mobile-account-register-access { display: none; }
         .mobile-account-access svg { width: 19px; height: 19px; flex: 0 0 auto; }
         .mobile-account-access.account-disabled { display: none !important; }
         .mobile-cart-fab .badge {
@@ -14600,7 +14602,65 @@
             }
 
             body.mobile-ui:not(.tienda-preview-agenda) .mobile-account-access {
+                position: static !important;
+                left: auto !important;
+                bottom: auto !important;
+                z-index: auto !important;
                 display: inline-flex !important;
+                width: 100%;
+                min-height: 44px;
+                justify-content: center;
+                border: 1px solid var(--store-line);
+                border-radius: 15px;
+                background: #fffdf9;
+                box-shadow: none;
+                font-size: .8rem;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-store-dock {
+                position: fixed;
+                z-index: 90;
+                left: 12px;
+                right: 12px;
+                bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+                display: grid !important;
+                gap: 8px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-account-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-account-register-access {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 44px;
+                border: 1px solid rgba(239, 125, 0, .25);
+                border-radius: 15px;
+                background: #fff1dc;
+                color: var(--store-primary-dark);
+                font-size: .8rem;
+                font-weight: 900;
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-cart-fab {
+                position: relative !important;
+                left: auto !important;
+                right: auto !important;
+                bottom: auto !important;
+                transform: none !important;
+                width: 100% !important;
+                height: 56px;
+                min-height: 56px;
+                border-radius: 18px;
+                box-shadow: 0 14px 32px rgba(239, 125, 0, .30);
+            }
+
+            body.mobile-ui:not(.tienda-preview-agenda) .mobile-account-actions.account-authenticated {
+                grid-template-columns: 1fr;
             }
 
             body.mobile-ui:not(.tienda-preview-agenda) .mobile-menu-fab,
@@ -15222,7 +15282,7 @@
                 background:
                     radial-gradient(circle at 50% -40px, rgba(244, 124, 0, .12), transparent 250px),
                     linear-gradient(180deg, #fffaf3 0%, #fffdf9 45%, #fff8ef 100%) !important;
-                padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px)) !important;
+                padding-bottom: calc(154px + env(safe-area-inset-bottom, 0px)) !important;
             }
 
             body.mobile-ui:not(.tienda-preview-agenda) .topbar {
@@ -17105,11 +17165,6 @@
             <strong id="desktop-cart-count">0</strong>
         </button>
     </header>
-    <button type="button" class="mobile-account-access" id="mobile-account-access" aria-label="Iniciar sesi&oacute;n">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 21a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span id="mobile-account-access-label">Iniciar sesi&oacute;n</span>
-    </button>
-
     <main class="layout">
         <aside class="left-nav">
             <button type="button" id="agenda-quick-btn" class="agenda-quick-btn" style="display:none;">Agendar pedido</button>
@@ -17387,7 +17442,16 @@
         </div>
         <div class="mobile-cats-bubble-list" id="mobile-cats-bubble-list"></div>
     </div>
-    <button type="button" class="mobile-cart-fab" id="mobile-cart-fab" onclick="abrirCarritoMobile()">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
+    <div class="mobile-store-dock" id="mobile-store-dock">
+        <div class="mobile-account-actions" id="mobile-account-actions" aria-label="Acceso a tu cuenta">
+            <button type="button" class="mobile-account-access" id="mobile-account-access" aria-label="Iniciar sesi&oacute;n">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 21a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span id="mobile-account-access-label">Iniciar sesi&oacute;n</span>
+            </button>
+            <button type="button" class="mobile-account-register-access" id="mobile-account-register-access">Registrarme</button>
+        </div>
+        <button type="button" class="mobile-cart-fab" id="mobile-cart-fab" onclick="abrirCarritoMobile()">Ver carrito <span class="badge" id="mobile-cart-count">0</span><span class="total-chip" id="mobile-cart-total">$0</span></button>
+    </div>
     <nav class="agenda-beta-bottom-nav mobile-bottom-nav" aria-label="Navegacion agenda beta">
         <button type="button" onclick="cambiarCategoria('AGENDA')" aria-label="Ir a agendar">
             <span aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -18042,6 +18106,8 @@
         const btnCerrarSesionEl = document.getElementById("btn-cerrar-sesion");
         const mobileAccountAccessEl = document.getElementById("mobile-account-access");
         const mobileAccountAccessLabelEl = document.getElementById("mobile-account-access-label");
+        const mobileAccountRegisterAccessEl = document.getElementById("mobile-account-register-access");
+        const mobileAccountActionsEl = document.getElementById("mobile-account-actions");
         const mobileAccountNavButtonEl = document.getElementById("mobile-account-nav-button");
         const mobileAccountNavLabelEl = document.getElementById("mobile-account-nav-label");
         const leftNavEl = document.querySelector(".left-nav");
@@ -19567,6 +19633,7 @@
                 if (btnIniciarSesionEl) btnIniciarSesionEl.style.display = "none";
                 if (btnRegistrarCuentaEl) btnRegistrarCuentaEl.style.display = "none";
                 if (mobileAccountAccessEl) mobileAccountAccessEl.classList.add("account-disabled");
+                if (mobileAccountActionsEl) mobileAccountActionsEl.style.display = "none";
                 if (mobileAccountNavButtonEl) mobileAccountNavButtonEl.style.display = "none";
                 renderCategoriasMenu();
                 _syncPedidoChatContext();
@@ -19588,6 +19655,11 @@
             }
             if (mobileAccountAccessEl) mobileAccountAccessEl.classList.remove("account-disabled");
             if (mobileAccountAccessLabelEl) mobileAccountAccessLabelEl.textContent = logged ? "Mi cuenta" : "Iniciar sesi\u00f3n";
+            if (mobileAccountRegisterAccessEl) mobileAccountRegisterAccessEl.style.display = logged ? "none" : "inline-flex";
+            if (mobileAccountActionsEl) {
+                mobileAccountActionsEl.style.display = "";
+                mobileAccountActionsEl.classList.toggle("account-authenticated", logged);
+            }
             if (mobileAccountNavLabelEl) mobileAccountNavLabelEl.textContent = logged ? "Mi cuenta" : "Iniciar sesi\u00f3n";
             if (mobileAccountNavButtonEl) mobileAccountNavButtonEl.setAttribute("aria-label", logged ? "Abrir mi cuenta" : "Iniciar sesi\u00f3n");
             if (cuentaEstadoEl) {
@@ -27230,6 +27302,7 @@
         btnCuentaEl?.addEventListener("click", () => abrirModalCuenta("account"));
         btnIniciarSesionEl?.addEventListener("click", () => abrirModalCuenta("login"));
         mobileAccountAccessEl?.addEventListener("click", () => abrirModalCuenta(clienteRegistrado ? "account" : "login"));
+        mobileAccountRegisterAccessEl?.addEventListener("click", () => abrirModalCuenta("register"));
         btnRegistrarCuentaEl?.addEventListener("click", () => abrirModalCuenta("register"));
         btnCerrarSesionEl?.addEventListener("click", cerrarSesionCliente);
         modalClienteEl.addEventListener("click", (ev) => { if (ev.target === modalClienteEl) cerrarModalCliente(); });

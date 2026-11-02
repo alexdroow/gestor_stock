@@ -53,6 +53,19 @@ class TiendaMobileNavigationTests(unittest.TestCase):
         self.assertIn('id="cuenta-email"', html)
         self.assertIn('id="cuenta-telefono"', html)
 
+    def test_mobile_login_and_registration_are_integrated_above_cart_and_open_account_popup(self):
+        response = self.client.get(
+            "/tienda",
+            headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"},
+        )
+        html = response.get_data(as_text=True)
+        self.assertIn('id="mobile-store-dock"', html)
+        self.assertIn('id="mobile-account-register-access">Registrarme</button>', html)
+        self.assertLess(html.index('id="mobile-account-register-access"'), html.index('id="mobile-cart-fab"'))
+        self.assertIn('mobileAccountRegisterAccessEl?.addEventListener("click", () => abrirModalCuenta("register"))', html)
+        self.assertIn('mobileAccountAccessEl?.addEventListener("click", () => abrirModalCuenta(clienteRegistrado ? "account" : "login"))', html)
+        self.assertIn("mobile-store-dock { display: contents; }", html)
+
     def test_active_coupon_popup_is_limited_to_once_per_customer_every_24_hours(self):
         response = self.client.get("/tienda")
         html = response.get_data(as_text=True)
