@@ -11402,13 +11402,19 @@ def api_tienda_agenda_disponibilidad():
         if tipo_reserva == "cocteleria":
             product_conn = None
             try:
+                product_ids = [int(value) for value in request.args.getlist("producto_ids") if str(value).isdigit()]
                 product_id = int(request.args.get("producto_id") or 0)
                 if product_id > 0:
+                    product_ids.append(product_id)
+                product_ids = list(dict.fromkeys(pid for pid in product_ids if pid > 0))[:30]
+                if product_ids:
                     ensure_cocteleria_schema()
                     from cocteleria import _db as _cocteleria_db, _product as _cocteleria_product
                     product_conn = _cocteleria_db()
-                    product = _cocteleria_product(product_conn, product_id, public=True)
-                    min_horas_categoria = int((product or {}).get("min_lead_hours") or 24)
+                    products_for_slot = [_cocteleria_product(product_conn, pid, public=True) for pid in product_ids]
+                    if any(not product for product in products_for_slot):
+                        return jsonify({"success": False, "error": "Uno de los productos ya no está disponible"}), 400
+                    min_horas_categoria = max(int((product or {}).get("min_lead_hours") or 24) for product in products_for_slot)
             except (TypeError, ValueError):
                 min_horas_categoria = 24
             finally:
@@ -11658,27 +11664,52 @@ def api_tienda_agenda_reservar():
         subtotal_estimado = 0.0
         if tipo_reserva_original in {"cocteleria", "coctelería", "cocktail"}:
             ensure_cocteleria_schema()
-            try:
-                cocktail = get_published_cocktail(cocteleria_payload.get("model_id"), cocteleria_payload.get("presentation_id"))
-                expected_price = int(cocteleria_payload.get("expected_price_clp"))
-                quantity = int(cocteleria_payload.get("quantity"))
-            except (TypeError, ValueError):
-                cocktail, expected_price, quantity = None, -1, 0
-            if not cocktail:
-                return jsonify({"success": False, "error": "El producto o la presentación ya no están disponibles"}), 409
-            if expected_price != int(cocktail["price_clp"]):
-                return jsonify({"success": False, "error": "El precio cambió. Recarga el catálogo antes de reservar."}), 409
-            if quantity < int(cocktail["min_quantity"]) or quantity > int(cocktail["max_quantity"]):
-                return jsonify({"success": False, "error": f"La cantidad debe estar entre {cocktail['min_quantity']} y {cocktail['max_quantity']}"}), 400
-            cocteleria_snapshot = {
-                "kind": "COCTELERIA", "model_id": int(cocktail["model_id"]),
-                "presentation_id": int(cocktail["presentation_id"]), "product_name": cocktail["name"],
-                "category": cocktail["category"], "presentation_label": cocktail["presentation_label"],
-                "units_per_pack": int(cocktail["units"]), "unit_label": cocktail["unit_label"],
-                "quantity": quantity, "unit_price_clp": int(cocktail["price_clp"]),
-                "total_clp": int(cocktail["price_clp"]) * quantity, "photo": cocktail.get("photo") or "",
-            }
+            raw_lines = cocteleria_payload.get("items") if isinstance(cocteleria_payload.get("items"), list) else [cocteleria_payload]
+            if not raw_lines or len(raw_lines) > 30:
+                return jsonify({"success": False, "error": "Agrega entre 1 y 30 productos al pedido"}), 400
+            cocteleria_lines = []
+            seen_lines = set()
+            max_cocktail_lead = 24
+            for raw_line in raw_lines:
+                if not isinstance(raw_line, dict):
+                    continue
+                try:
+                    model_id = int(raw_line.get("model_id"))
+                    presentation_id = int(raw_line.get("presentation_id"))
+                    expected_price = int(raw_line.get("expected_price_clp"))
+                    quantity = int(raw_line.get("quantity"))
+                except (TypeError, ValueError):
+                    return jsonify({"success": False, "error": "Revisa los productos, presentaciones y cantidades del pedido"}), 400
+                pair = (model_id, presentation_id)
+                if pair in seen_lines:
+                    return jsonify({"success": False, "error": "Hay presentaciones repetidas en el resumen. Actualiza el pedido e inténtalo nuevamente."}), 400
+                seen_lines.add(pair)
+                cocktail = get_published_cocktail(model_id, presentation_id)
+                if not cocktail:
+                    return jsonify({"success": False, "error": "Uno de los productos o presentaciones ya no está disponible"}), 409
+                if expected_price != int(cocktail["price_clp"]):
+                    return jsonify({"success": False, "error": f"Cambió el precio de {cocktail['name']}. Recarga el catálogo antes de reservar."}), 409
+                if quantity < int(cocktail["min_quantity"]) or quantity > int(cocktail["max_quantity"]):
+                    return jsonify({"success": False, "error": f"{cocktail['name']}: la cantidad debe estar entre {cocktail['min_quantity']} y {cocktail['max_quantity']}"}), 400
+                line_total = int(cocktail["price_clp"]) * quantity
+                cocteleria_lines.append({
+                    "model_id": int(cocktail["model_id"]), "presentation_id": int(cocktail["presentation_id"]),
+                    "product_name": cocktail["name"], "category": cocktail["category"],
+                    "presentation_label": cocktail["presentation_label"], "units_per_pack": int(cocktail["units"]),
+                    "unit_label": cocktail["unit_label"], "quantity": quantity,
+                    "unit_price_clp": int(cocktail["price_clp"]), "total_clp": line_total,
+                    "expected_price_clp": expected_price, "min_quantity": int(cocktail["min_quantity"]),
+                    "max_quantity": int(cocktail["max_quantity"]), "min_lead_hours": int(cocktail["min_lead_hours"] or 24),
+                    "photo": cocktail.get("photo") or "",
+                })
+                max_cocktail_lead = max(max_cocktail_lead, int(cocktail["min_lead_hours"] or 24))
+            if not cocteleria_lines:
+                return jsonify({"success": False, "error": "Agrega al menos un producto al pedido"}), 400
+            cocteleria_snapshot = {"kind": "COCTELERIA", "items": cocteleria_lines,
+                                   "total_clp": sum(int(line["total_clp"]) for line in cocteleria_lines),
+                                   "item_count": len(cocteleria_lines)}
             subtotal_estimado = cocteleria_snapshot["total_clp"]
+            cocktail = {"min_lead_hours": max_cocktail_lead}
             ready_request_key = str(data.get("request_key") or "").strip()[:100]
         elif tipo_pedido == "torta" and tipo_reserva_original in {"torta_lista", "torta-lista", "ready_cake"}:
             ensure_ready_cakes_schema()
@@ -11880,31 +11911,36 @@ def api_tienda_agenda_reservar():
         cursor = conn.cursor()
         cursor.execute("BEGIN IMMEDIATE")
         if cocteleria_snapshot:
-            current_product = cursor.execute("""SELECT m.status,m.name,m.category,m.min_quantity,m.max_quantity,m.min_lead_hours,
-                p.id presentation_id,p.active,p.label,p.units,p.unit_label,p.price_clp,i.path photo
-                FROM tienda_cocteleria m JOIN tienda_cocteleria_presentaciones p ON p.model_id=m.id
-                LEFT JOIN tienda_cocteleria_imagenes i ON i.model_id=m.id AND i.active=1 AND i.is_cover=1
-                WHERE m.id=? AND p.id=? LIMIT 1""", (cocteleria_snapshot["model_id"], cocteleria_snapshot["presentation_id"])).fetchone()
-            if not current_product or current_product["status"] != "published" or not int(current_product["active"] or 0):
+            max_current_lead = 24
+            for line in cocteleria_snapshot["items"]:
+                current_product = cursor.execute("""SELECT m.status,m.name,m.category,m.min_quantity,m.max_quantity,m.min_lead_hours,
+                    p.id presentation_id,p.active,p.label,p.units,p.unit_label,p.price_clp,i.path photo
+                    FROM tienda_cocteleria m JOIN tienda_cocteleria_presentaciones p ON p.model_id=m.id
+                    LEFT JOIN tienda_cocteleria_imagenes i ON i.model_id=m.id AND i.active=1 AND i.is_cover=1
+                    WHERE m.id=? AND p.id=? LIMIT 1""", (line["model_id"], line["presentation_id"])).fetchone()
+                if not current_product or current_product["status"] != "published" or not int(current_product["active"] or 0):
+                    conn.rollback()
+                    return jsonify({"success": False, "error": "Uno de los productos o presentaciones ya no está disponible"}), 409
+                if int(current_product["price_clp"]) != int(line["expected_price_clp"]):
+                    conn.rollback()
+                    return jsonify({"success": False, "error": f"Cambió el precio de {current_product['name']}. Recarga el catálogo antes de reservar."}), 409
+                quantity = int(line["quantity"])
+                if quantity < int(current_product["min_quantity"]) or quantity > int(current_product["max_quantity"]):
+                    conn.rollback()
+                    return jsonify({"success": False, "error": f"{current_product['name']}: la cantidad debe estar entre {current_product['min_quantity']} y {current_product['max_quantity']}"}), 400
+                line.update({
+                    "product_name": current_product["name"], "category": current_product["category"],
+                    "presentation_label": current_product["label"], "units_per_pack": int(current_product["units"]),
+                    "unit_label": current_product["unit_label"], "unit_price_clp": int(current_product["price_clp"]),
+                    "total_clp": int(current_product["price_clp"]) * quantity,
+                    "min_lead_hours": int(current_product["min_lead_hours"] or 24), "photo": current_product["photo"] or "",
+                })
+                max_current_lead = max(max_current_lead, int(current_product["min_lead_hours"] or 24))
+            if not _cumple_anticipacion_reserva(fecha, hora_inicio, "cocteleria", cfg_agenda=cfg, min_horas_categoria=max_current_lead):
                 conn.rollback()
-                return jsonify({"success": False, "error": "El producto o la presentación ya no están disponibles"}), 409
-            if int(current_product["price_clp"]) != int(cocteleria_payload.get("expected_price_clp") or -1):
-                conn.rollback()
-                return jsonify({"success": False, "error": "El precio cambió. Recarga el catálogo antes de reservar."}), 409
-            quantity = int(cocteleria_snapshot["quantity"])
-            if quantity < int(current_product["min_quantity"]) or quantity > int(current_product["max_quantity"]):
-                conn.rollback()
-                return jsonify({"success": False, "error": f"La cantidad debe estar entre {current_product['min_quantity']} y {current_product['max_quantity']}"}), 400
-            current_lead = int(current_product["min_lead_hours"] or 24)
-            if not _cumple_anticipacion_reserva(fecha, hora_inicio, "cocteleria", cfg_agenda=cfg, min_horas_categoria=current_lead):
-                conn.rollback()
-                return jsonify({"success": False, "error": f"Este producto requiere al menos {current_lead} horas de anticipación"}), 400
-            cocteleria_snapshot.update({
-                "product_name": current_product["name"], "category": current_product["category"],
-                "presentation_label": current_product["label"], "units_per_pack": int(current_product["units"]),
-                "unit_label": current_product["unit_label"], "unit_price_clp": int(current_product["price_clp"]),
-                "total_clp": int(current_product["price_clp"]) * quantity, "photo": current_product["photo"] or "",
-            })
+                return jsonify({"success": False, "error": f"Este pedido requiere al menos {max_current_lead} horas de anticipación"}), 400
+            cocteleria_snapshot["total_clp"] = sum(int(line["total_clp"]) for line in cocteleria_snapshot["items"])
+            cocteleria_snapshot["item_count"] = len(cocteleria_snapshot["items"])
             subtotal_estimado = cocteleria_snapshot["total_clp"]
         if ready_cake_snapshot and ready_request_key:
             previous = cursor.execute("SELECT event_id FROM tienda_tortas_listas_reservas WHERE request_key=? LIMIT 1", (ready_request_key,)).fetchone()
@@ -11937,7 +11973,7 @@ def api_tienda_agenda_reservar():
         min_fin = (min_ini or 0) + int(cfg["slot_minutes"])
         hora_fin = _minutos_a_hhmm(min_fin)
         titulo = (f"Torta lista - {ready_cake_snapshot['model']} ({ready_cake_snapshot['size']})" if ready_cake_snapshot else
-                  f"Cóctelería - {cocteleria_snapshot['product_name']} ({cocteleria_snapshot['presentation_label']} x{cocteleria_snapshot['quantity']})" if cocteleria_snapshot else
+                  f"Cocteleria - {len(cocteleria_snapshot['items'])} producto(s)" if cocteleria_snapshot else
                   f"Reserva tienda - {tipo_pedido.capitalize()}")
         def _fmt_clp(value):
             try:
@@ -11958,15 +11994,14 @@ def api_tienda_agenda_reservar():
                 f"\nMensaje de chocolate: {ready_cake_snapshot['message'] or 'Sin mensaje'}"
             )
         if cocteleria_snapshot:
-            ingredientes += (
-                f"\n--- Reserva de coctelería ---\nProducto: {cocteleria_snapshot['product_name']}"
-                f"\nCategoría: {cocteleria_snapshot['category']}"
-                f"\nPresentación: {cocteleria_snapshot['presentation_label']}"
-                f"\nUnidades por presentación: {cocteleria_snapshot['units_per_pack']} {cocteleria_snapshot['unit_label']}"
-                f"\nCantidad: {cocteleria_snapshot['quantity']} presentación(es)"
-                f"\nPrecio unitario: {_fmt_clp(cocteleria_snapshot['unit_price_clp'])}"
-                f"\nSubtotal productos: {_fmt_clp(cocteleria_snapshot['total_clp'])}"
-            )
+            ingredientes += "\n--- Reserva de cocteleria ---"
+            for line in cocteleria_snapshot["items"]:
+                ingredientes += (
+                    f"\n- {line['product_name']} / {line['presentation_label']}"
+                    f" ({line['units_per_pack']} {line['unit_label']} por presentacion)"
+                    f" ? {line['quantity']} x {_fmt_clp(line['unit_price_clp'])} = {_fmt_clp(line['total_clp'])}"
+                )
+            ingredientes += f"\nTotal de productos: {_fmt_clp(cocteleria_snapshot['total_clp'])}"
         if catalogo_torta_resumen:
             categoria_row = catalogo_torta_resumen.get("categoria") or {}
             size_row = catalogo_torta_resumen.get("size") or {}
@@ -12108,7 +12143,10 @@ def api_tienda_agenda_reservar():
         if cocteleria_snapshot:
             if not ready_request_key:
                 ready_request_key = f"cocteleria-{uuid.uuid4().hex}"
-            cursor.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", (ready_request_key, reserva_id, cocteleria_snapshot["model_id"], cocteleria_snapshot["presentation_id"], json.dumps(cocteleria_snapshot, ensure_ascii=False)))
+            first_line = cocteleria_snapshot["items"][0]
+            cursor.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", (ready_request_key, reserva_id, first_line["model_id"], first_line["presentation_id"], json.dumps(cocteleria_snapshot, ensure_ascii=False)))
+            for line in cocteleria_snapshot["items"]:
+                cursor.execute("INSERT INTO tienda_cocteleria_reserva_lineas(event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?)", (reserva_id, line["model_id"], line["presentation_id"], json.dumps(line, ensure_ascii=False)))
         if reserva_id > 0:
             fecha_codigo = re.sub(r"[^0-9]", "", str(fecha or "").strip())[:8] or datetime.now(ZoneInfo("America/Santiago")).strftime("%Y%m%d")
             codigo_pedido = f"AGD-{fecha_codigo}-{reserva_id:06d}"

@@ -90,6 +90,19 @@ class CocteleriaCatalogTests(unittest.TestCase):
         self.assertEqual(app_module._normalizar_tipo_reserva_tienda("cocteleria"), "cocteleria")
         self.assertEqual(app_module._minutos_anticipacion_reserva("cocteleria", min_horas_categoria=48), 48 * 60)
 
+    def test_cart_schema_and_public_page_support_multiple_persistent_lines(self):
+        cocteleria_module.ensure_cocteleria_schema()
+        conn = sqlite3.connect(self.db_path)
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        conn.close()
+        self.assertIn("tienda_cocteleria_reserva_lineas", tables)
+
+        response = self.client.get("/tienda/cocteleria")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "localStorage", "cocteleria:{items:"):
+            self.assertIn(marker, html)
+
     def test_existing_agenda_editor_recognizes_cocktail_reservations(self):
         template = Path(__file__).resolve().parents[1] / "templates" / "agenda.html"
         html = template.read_text(encoding="utf-8")

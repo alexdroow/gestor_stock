@@ -63,6 +63,12 @@ def ensure_cocteleria_schema(conn=None):
             model_id INTEGER NOT NULL, presentation_id INTEGER NOT NULL, snapshot_json TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS tienda_cocteleria_reserva_lineas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, event_id INTEGER NOT NULL, model_id INTEGER NOT NULL,
+            presentation_id INTEGER NOT NULL, snapshot_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(event_id,model_id,presentation_id)
+        );
         CREATE INDEX IF NOT EXISTS idx_cocteleria_status_order ON tienda_cocteleria(status, sort_order);
         CREATE INDEX IF NOT EXISTS idx_cocteleria_presentations_model ON tienda_cocteleria_presentaciones(model_id, active, sort_order);
         """)
@@ -351,7 +357,10 @@ def api_admin_reservations(model_id):
     if not _admin(): return jsonify(success=False, error="Acceso no autorizado"), 401
     ensure_cocteleria_schema(); conn = _db()
     try:
-        rows = conn.execute("SELECT event_id,snapshot_json,created_at FROM tienda_cocteleria_reservas WHERE model_id=? ORDER BY id DESC LIMIT 100", (model_id,)).fetchall()
+        rows = conn.execute("""SELECT event_id,snapshot_json,created_at FROM tienda_cocteleria_reserva_lineas
+            WHERE model_id=? ORDER BY id DESC LIMIT 100""", (model_id,)).fetchall()
+        if not rows:
+            rows = conn.execute("SELECT event_id,snapshot_json,created_at FROM tienda_cocteleria_reservas WHERE model_id=? ORDER BY id DESC LIMIT 100", (model_id,)).fetchall()
         return jsonify(success=True, items=[dict(row) for row in rows])
     finally:
         conn.close()
