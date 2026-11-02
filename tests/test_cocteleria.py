@@ -100,8 +100,9 @@ class CocteleriaCatalogTests(unittest.TestCase):
         response = self.client.get("/tienda/cocteleria")
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "localStorage", "cocteleria:{items:"):
+        for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "localStorage", "cocteleria:{items:", "function syncSelectedCart()", "syncSelectedCart();"):
             self.assertIn(marker, html)
+        self.assertNotIn('id="add-to-cart"', html)
 
     def test_existing_agenda_editor_recognizes_cocktail_reservations(self):
         template = Path(__file__).resolve().parents[1] / "templates" / "agenda.html"
