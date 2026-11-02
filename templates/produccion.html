@@ -635,7 +635,8 @@
         }
         
         .receta-actions {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 8px;
         }
         
@@ -2166,6 +2167,9 @@
                                 <div class="receta-actions">
                                     <button onclick='producirReceta({{ receta.id }}, {{ receta.nombre|tojson }})' class="btn btn-success btn-sm">
                                         &#10003; Producir
+                                    </button>
+                                    <button type="button" onclick="duplicarReceta({{ receta.id }})" class="btn btn-secondary btn-sm" title="Crear una copia editable de esta receta">
+                                        &#10697; Duplicar
                                     </button>
                                     <button onclick="abrirModalEditarReceta({{ receta.id }})" class="btn btn-secondary btn-sm">
                                         &#9998; Editar
@@ -4074,6 +4078,24 @@
             .catch(() => {
                 alert('[ERROR] Error de conexión');
             });
+        }
+
+        async function duplicarReceta(id) {
+            try {
+                const response = await fetch(`/api/receta/${id}/duplicar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo duplicar la receta.');
+                }
+
+                reloadProduccionKeepingState();
+                abrirModalEditarReceta(data.receta_id);
+            } catch (error) {
+                alert('[ERROR] ' + (error.message || 'No se pudo duplicar la receta.'));
+            }
         }
 
         function construirFilaComponente(item = null) {

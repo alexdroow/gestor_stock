@@ -14185,6 +14185,50 @@ def api_detalle_receta(receta_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/receta/<int:receta_id>/duplicar', methods=['POST'])
+def api_duplicar_receta(receta_id):
+    try:
+        receta = obtener_receta_detalle(receta_id)
+        if not receta:
+            return jsonify({'success': False, 'error': 'Receta no encontrada'}), 404
+
+        componentes = []
+        for item in receta.get('items') or []:
+            recurso_id = item.get('recurso_id')
+            if recurso_id is None:
+                recurso_id = item.get('producto_id') if item.get('tipo') == 'producto' else item.get('insumo_id')
+            if recurso_id is None:
+                raise ValueError('No se pudo identificar un componente de la receta original.')
+            componentes.append({
+                'tipo': item.get('tipo') or 'insumo',
+                'id': int(recurso_id),
+                'cantidad': item.get('cantidad'),
+                'unidad': item.get('unidad') or 'unidad',
+            })
+
+        if not componentes:
+            return jsonify({'success': False, 'error': 'La receta no tiene componentes para duplicar.'}), 400
+
+        nombre_copia = f"{str(receta.get('nombre') or 'Receta').strip()} (copia)"
+        nueva_id = guardar_receta(
+            nombre_copia,
+            receta.get('producto_id'),
+            componentes,
+            rendimiento=receta.get('rendimiento') or 1,
+        )
+        crear_backup()
+        return jsonify({
+            'success': True,
+            'receta_id': int(nueva_id),
+            'nombre': nombre_copia,
+            'message': 'Receta duplicada. Edita la copia sin afectar la original.',
+        }), 201
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/receta/<int:receta_id>/actualizar', methods=['POST'])
 def api_actualizar_receta(receta_id):
     try:
