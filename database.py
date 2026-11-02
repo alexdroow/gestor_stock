@@ -4028,10 +4028,10 @@ def actualizar_insumo(insumo_id, data):
                 cantidad_comprada = ?,
                 unidad_compra = ?,
                 precio_incluye_iva = ?,
-                precio_unitario_anterior = COALESCE(?, precio_unitario_anterior),
-                cantidad_comprada_anterior = COALESCE(?, cantidad_comprada_anterior),
-                unidad_compra_anterior = COALESCE(?, unidad_compra_anterior),
-                precio_incluye_iva_anterior = COALESCE(?, precio_incluye_iva_anterior),
+                precio_unitario_anterior = CASE WHEN ? THEN ? ELSE precio_unitario_anterior END,
+                cantidad_comprada_anterior = CASE WHEN ? THEN ? ELSE cantidad_comprada_anterior END,
+                unidad_compra_anterior = CASE WHEN ? THEN ? ELSE unidad_compra_anterior END,
+                precio_incluye_iva_anterior = CASE WHEN ? THEN ? ELSE precio_incluye_iva_anterior END,
                 cantidad_por_scan = ?,
                 unidad_por_scan = ?,
                 nutricion_ref_cantidad = ?,
@@ -4054,10 +4054,10 @@ def actualizar_insumo(insumo_id, data):
                 cantidad_comprada,
                 unidad_compra,
                 precio_incluye_iva,
-                precio_unitario_anterior,
-                cantidad_comprada_anterior,
-                unidad_compra_anterior,
-                precio_incluye_iva_anterior,
+                int(hubo_cambio_precio), precio_unitario_anterior,
+                int(hubo_cambio_precio), cantidad_comprada_anterior,
+                int(hubo_cambio_precio), unidad_compra_anterior,
+                int(hubo_cambio_precio), precio_incluye_iva_anterior,
                 cantidad_por_scan,
                 unidad_por_scan,
                 nutricion_ref_cantidad,
@@ -4202,10 +4202,10 @@ def procesar_lote_rapido_insumos(items):
                         cantidad_comprada = ?,
                         unidad_compra = ?,
                         precio_incluye_iva = ?,
-                        precio_unitario_anterior = COALESCE(?, precio_unitario_anterior),
-                        cantidad_comprada_anterior = COALESCE(?, cantidad_comprada_anterior),
-                        unidad_compra_anterior = COALESCE(?, unidad_compra_anterior),
-                        precio_incluye_iva_anterior = COALESCE(?, precio_incluye_iva_anterior),
+                        precio_unitario_anterior = CASE WHEN ? THEN ? ELSE precio_unitario_anterior END,
+                        cantidad_comprada_anterior = CASE WHEN ? THEN ? ELSE cantidad_comprada_anterior END,
+                        unidad_compra_anterior = CASE WHEN ? THEN ? ELSE unidad_compra_anterior END,
+                        precio_incluye_iva_anterior = CASE WHEN ? THEN ? ELSE precio_incluye_iva_anterior END,
                         cantidad_por_scan = ?,
                         unidad_por_scan = ?
                     WHERE id = ?
@@ -4218,10 +4218,10 @@ def procesar_lote_rapido_insumos(items):
                         max(cantidad_comprada, 0.01),
                         unidad_compra or unidad_stock,
                         precio_incluye_iva,
-                        precio_actual_prev if hubo_cambio_precio else None,
-                        cantidad_actual_prev if hubo_cambio_precio else None,
-                        unidad_actual_prev if hubo_cambio_precio else None,
-                        iva_actual_prev if hubo_cambio_precio else None,
+                        int(hubo_cambio_precio), precio_actual_prev,
+                        int(hubo_cambio_precio), cantidad_actual_prev,
+                        int(hubo_cambio_precio), unidad_actual_prev,
+                        int(hubo_cambio_precio), iva_actual_prev,
                         cantidad_por_scan_actual,
                         unidad_por_scan_actual,
                         insumo["id"],
@@ -5172,6 +5172,10 @@ def obtener_recetas():
                     "componentes": componentes,
                     "insumos": insumos_legacy,
                     "costo_total": costo_info["costo_total"],
+                    "costo_total_anterior": costo_info.get("costo_total_anterior", costo_info["costo_total"]),
+                    "variacion_tipo": costo_info.get("variacion_tipo", "sin_cambio"),
+                    "variacion_monto": costo_info.get("variacion_monto", 0),
+                    "variacion_pct": costo_info.get("variacion_pct", 0),
                     "costo_detalle": costo_info["detalle"],
                 }
             )
@@ -9835,7 +9839,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
     if _visitados is None:
         _visitados = set()
     if receta_id in _visitados:
-        return {"costo_total": 0, "detalle": [{"error": "Referencia circular de receta"}]}
+        return {"costo_total": 0, "costo_total_anterior": 0, "variacion_tipo": "sin_cambio", "variacion_monto": 0, "variacion_pct": 0, "detalle": [{"error": "Referencia circular de receta"}]}
 
     _visitados = set(_visitados)
     _visitados.add(receta_id)
@@ -9846,7 +9850,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
         cursor.execute("SELECT id, rendimiento FROM recetas WHERE id = ?", (receta_id,))
         receta = cursor.fetchone()
         if not receta:
-            return {"costo_total": 0, "detalle": [{"error": "Receta no encontrada"}]}
+            return {"costo_total": 0, "costo_total_anterior": 0, "variacion_tipo": "sin_cambio", "variacion_monto": 0, "variacion_pct": 0, "detalle": [{"error": "Receta no encontrada"}]}
 
         cursor.execute(
             """
@@ -9866,6 +9870,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
         items = cursor.fetchall()
 
         costo_total = 0
+        costo_total_anterior = 0
         detalle = []
 
         for item in items:
@@ -9885,9 +9890,11 @@ def calcular_costo_receta(receta_id, _visitados=None):
                     sub = calcular_costo_receta(receta_asociada["id"], _visitados=_visitados)
                     rendimiento_sub = float(receta_asociada["rendimiento"] or 1)
                     costo_unitario = float(sub.get("costo_total", 0)) / max(rendimiento_sub, 1)
+                    costo_unitario_anterior = float(sub.get("costo_total_anterior", sub.get("costo_total", 0))) / max(rendimiento_sub, 1)
                     origen = "receta_asociada"
                 elif float(item["producto_precio"] or 0) > 0:
                     costo_unitario = float(item["producto_precio"] or 0)
+                    costo_unitario_anterior = costo_unitario
                 else:
                     detalle.append(
                         {
@@ -9903,6 +9910,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
 
                 costo_item = cantidad_receta * costo_unitario
                 costo_total += costo_item
+                costo_total_anterior += cantidad_receta * costo_unitario_anterior
                 detalle.append(
                     {
                         "tipo": "producto",
@@ -9911,6 +9919,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
                         "unidad": unidad_receta,
                         "precio_por_unidad": round(costo_unitario, 4),
                         "costo": round(costo_item, 2),
+                        "costo_anterior": round(cantidad_receta * costo_unitario_anterior, 2),
                         "origen": origen,
                     }
                 )
@@ -9954,6 +9963,7 @@ def calcular_costo_receta(receta_id, _visitados=None):
                 item["precio_incluye_iva_anterior"],
             )
             costo_item_anterior = cantidad_receta_base * precio_por_unidad_base_anterior
+            costo_total_anterior += costo_item_anterior if precio_por_unidad_base_anterior > 0 else costo_item
             variacion_monto = None
             variacion_pct = None
             variacion_tipo = "sin_historial"
@@ -9989,9 +9999,23 @@ def calcular_costo_receta(receta_id, _visitados=None):
                 }
             )
 
-        return {"costo_total": round(costo_total, 2), "detalle": detalle}
+        variacion_monto_total = costo_total - costo_total_anterior
+        if abs(variacion_monto_total) < 0.005:
+            variacion_monto_total = 0.0
+            variacion_tipo_total = "sin_cambio"
+        else:
+            variacion_tipo_total = "alza" if variacion_monto_total > 0 else "baja"
+        variacion_pct_total = (variacion_monto_total / costo_total_anterior * 100) if costo_total_anterior > 0 else 0.0
+        return {
+            "costo_total": round(costo_total, 2),
+            "costo_total_anterior": round(costo_total_anterior, 2),
+            "variacion_tipo": variacion_tipo_total,
+            "variacion_monto": round(variacion_monto_total, 2),
+            "variacion_pct": round(variacion_pct_total, 2),
+            "detalle": detalle,
+        }
     except Exception as e:
-        return {"costo_total": 0, "detalle": [], "error": str(e)}
+        return {"costo_total": 0, "costo_total_anterior": 0, "variacion_tipo": "sin_cambio", "variacion_monto": 0, "variacion_pct": 0, "detalle": [], "error": str(e)}
     finally:
         conn.close()
 
@@ -14138,10 +14162,10 @@ def finalizar_compras_pendientes_con_stock(aplicar_stock=True, factura_info=None
                             cantidad_comprada = ?,
                             unidad_compra = ?,
                             precio_incluye_iva = ?,
-                            precio_unitario_anterior = COALESCE(?, precio_unitario_anterior),
-                            cantidad_comprada_anterior = COALESCE(?, cantidad_comprada_anterior),
-                            unidad_compra_anterior = COALESCE(?, unidad_compra_anterior),
-                            precio_incluye_iva_anterior = COALESCE(?, precio_incluye_iva_anterior)
+                            precio_unitario_anterior = CASE WHEN ? THEN ? ELSE precio_unitario_anterior END,
+                            cantidad_comprada_anterior = CASE WHEN ? THEN ? ELSE cantidad_comprada_anterior END,
+                            unidad_compra_anterior = CASE WHEN ? THEN ? ELSE unidad_compra_anterior END,
+                            precio_incluye_iva_anterior = CASE WHEN ? THEN ? ELSE precio_incluye_iva_anterior END
                         WHERE id = ?
                         """,
                         (
@@ -14149,10 +14173,10 @@ def finalizar_compras_pendientes_con_stock(aplicar_stock=True, factura_info=None
                             cantidad_compra_nueva,
                             unidad_compra_nueva,
                             precio_incluye_iva_nuevo,
-                            precio_actual_prev if hubo_cambio_precio else None,
-                            cantidad_actual_prev if hubo_cambio_precio else None,
-                            unidad_actual_prev if hubo_cambio_precio else None,
-                            iva_actual_prev if hubo_cambio_precio else None,
+                            int(hubo_cambio_precio), precio_actual_prev,
+                            int(hubo_cambio_precio), cantidad_actual_prev,
+                            int(hubo_cambio_precio), unidad_actual_prev,
+                            int(hubo_cambio_precio), iva_actual_prev,
                             insumo_id,
                         ),
                     )

@@ -602,6 +602,13 @@
         .receta-card.hidden {
             display: none;
         }
+
+        .receta-costo { border-radius: 8px; padding: 12px; margin-bottom: 12px; text-align: center; border: 1px solid transparent; }
+        .receta-costo--neutro { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+        .receta-costo--alza { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+        .receta-costo--baja { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+        .receta-costo__valor { font-size: 24px; font-weight: 800; }
+        .receta-costo__estado { margin-top: 5px; font-size: 11px; font-weight: 700; }
         
         .receta-nombre {
             font-size: 18px;
@@ -2068,10 +2075,20 @@
                                 <div class="receta-producto">Rendimiento por lote: {{ receta.rendimiento }}</div>
                                 
                                 <!-- COSTO TOTAL DE LA RECETA -->
-                                <div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 8px; padding: 12px; margin-bottom: 12px; text-align: center;">
-                                    <div style="font-size: 11px; color: #065f46; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Costo Total</div>
-                                    <div style="font-size: 24px; font-weight: 800; color: #047857;">${{ "{:,.0f}".format(receta.costo_total).replace(",", ".") }}</div>
-                                    <div style="font-size: 11px; color: #059669; margin-top: 2px;">IVA incluido</div>
+                                {% set costo_estado = receta.variacion_tipo if receta.variacion_tipo in ['alza', 'baja'] else 'neutro' %}
+                                <div class="receta-costo receta-costo--{{ costo_estado }}" title="Comparación con el precio de insumos registrado antes del último cambio">
+                                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Costo Total</div>
+                                    <div class="receta-costo__valor">${{ "{:,.0f}".format(receta.costo_total).replace(",", ".") }}</div>
+                                    <div style="font-size: 11px; margin-top: 2px;">IVA incluido</div>
+                                    <div class="receta-costo__estado">
+                                        {% if costo_estado == 'alza' %}
+                                            &#9650; Subió ${{ "{:,.0f}".format(receta.variacion_monto|abs).replace(",", ".") }} ({{ "%.1f"|format(receta.variacion_pct|abs) }}%) desde el último cambio de insumos
+                                        {% elif costo_estado == 'baja' %}
+                                            &#9660; Bajó ${{ "{:,.0f}".format(receta.variacion_monto|abs).replace(",", ".") }} ({{ "%.1f"|format(receta.variacion_pct|abs) }}%) desde el último cambio de insumos
+                                        {% else %}
+                                            Sin variación desde el último cambio de insumos
+                                        {% endif %}
+                                    </div>
                                 </div>
                                 
                                 <div class="receta-insumos">
