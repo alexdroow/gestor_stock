@@ -6625,6 +6625,8 @@ def api_tienda_clientes_registrar():
     conn = None
     try:
         data = request.get_json(silent=True) or {}
+        if data.get("privacy_consent") is not True:
+            return jsonify({"success": False, "error": "Debes aceptar las condiciones de uso de la cuenta y el aviso de privacidad para registrarte."}), 400
         email = _normalizar_email(data.get("email"))
         email_confirm = _normalizar_email(data.get("email_confirm"))
         if not email:
@@ -6647,6 +6649,9 @@ def api_tienda_clientes_registrar():
         except (TypeError, ValueError):
             direccion_lat, direccion_lng = None, None
 
+        from privacidad import _ensure_schema as _ensure_privacy_schema, current_notice_version, record_account_consent
+        _ensure_privacy_schema()
+        notice_version = current_notice_version()
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("BEGIN IMMEDIATE")
@@ -6665,10 +6670,35 @@ def api_tienda_clientes_registrar():
             direccion_lat=direccion_lat,
             direccion_lng=direccion_lng,
         )
+        if not cliente or not int(cliente.get("id") or 0):
+            raise RuntimeError("No se pudo asociar la aceptacion a la cuenta creada.")
+        record_account_consent(
+            cursor,
+            int(cliente["id"]),
+            privacy_version=notice_version,
+            terms_version="2026-11-v1",
+            marketing_email=data.get("marketing_personalization") is True,
+            marketing_whatsapp=data.get("marketing_personalization") is True,
+        )
         conn.commit()
         if not cliente:
             cliente = _obtener_cliente_por_contacto_cursor(cursor, email, telefono) or {"nombre": nombre, "email": email, "telefono": telefono}
-        return jsonify({"success": True, "cliente": cliente})
+        try:
+            from privacidad import record_registration_preferences
+            privacy_cookie = record_registration_preferences(
+                email,
+                telefono,
+                marketing_email=data.get("marketing_personalization") is True,
+                marketing_whatsapp=data.get("marketing_personalization") is True,
+            )
+        except Exception:
+            app.logger.exception("No se pudo sincronizar la preferencia promocional con el navegador; la evidencia de consentimiento de cuenta permanece registrada.")
+            privacy_cookie = ""
+        response = jsonify({"success": True, "cliente": cliente})
+        if privacy_cookie:
+            response.set_cookie("sucree_privacy", privacy_cookie, max_age=31536000, httponly=True,
+                                secure=request.is_secure, samesite="Lax", path="/")
+        return response
     except Exception as e:
         if conn:
             conn.rollback()

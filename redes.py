@@ -646,7 +646,7 @@ def register_welcome_promo():
             return jsonify({"success": False, "error": "Abre nuevamente el enlace QR para solicitar este descuento."}), 403
     if str(data.get("website") or "").strip():
         return jsonify({"success": True})
-    if not bool(data.get("consent")):
+    if data.get("privacy_consent") is not True or not bool(data.get("consent")):
         return jsonify({"success": False, "error": "Debes aceptar el uso de tus datos para participar en la promoción."}), 400
     try:
         email = _normalise_promo_email(data.get("email"))
@@ -654,6 +654,9 @@ def register_welcome_promo():
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
 
+    from privacidad import _ensure_schema as _ensure_privacy_schema, current_notice_version, record_account_consent
+    _ensure_privacy_schema()
+    notice_version = current_notice_version()
     conn = _db()
     try:
         conn.execute("BEGIN IMMEDIATE")
@@ -714,6 +717,14 @@ def register_welcome_promo():
         if not cliente:
             conn.rollback()
             return jsonify({"success": False, "error": "No se pudo registrar el contacto. Intenta nuevamente."}), 500
+        record_account_consent(
+            cursor,
+            int(cliente.get("id") or 0),
+            privacy_version=notice_version,
+            terms_version="2026-11-v1",
+            marketing_email=bool(data.get("marketing_email")),
+            marketing_whatsapp=bool(data.get("marketing_whatsapp")),
+        )
 
         expiry = now_local.date() + timedelta(days=promo["validity_days"])
         if promo.get("ends_on"):

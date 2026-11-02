@@ -56,6 +56,57 @@ _POLICY_LABELS = {
     "effective_date": "Fecha de vigencia de esta version (AAAA-MM-DD)",
 }
 
+_ACCOUNT_TERMS_VERSION = "2026-11-v1"
+_ACCOUNT_PRIVACY_SCOPE = (
+    "Gestionar la cuenta; autenticarla con correo y telefono; procesar compras y reservas; mostrar historial, estado, "
+    "cupones y beneficios; coordinar entrega o retiro; atender consultas y cumplir obligaciones aplicables."
+)
+_ACCOUNT_MARKETING_SCOPE = (
+    "Enviar ofertas y novedades por correo o WhatsApp y, cuando corresponda, adaptar promociones usando compras y "
+    "reservas anteriores. Es opcional y no condiciona la creacion ni uso de la cuenta."
+)
+
+
+def _suggested_policy_draft():
+    return {
+        "responsible_name": "Pasteleria Sucree (razon social y RUT pendientes de validacion)",
+        "address": "Rubidio 1815, 9271406 Maipu, Region Metropolitana (confirmar domicilio legal)",
+        "contact_email": "pasteleria.sucree@outlook.com",
+        "privacy_contact": "Solicitudes en /privacidad/derechos; tambien pasteleria.sucree@outlook.com y WhatsApp +56964330546 (confirmar canal formal)",
+        "data_categories": "Identificacion y contacto: nombre, correo, telefono; fecha de nacimiento; domicilio y coordenadas si se ingresan; datos de compra, reserva, carrito, pagos, cupones, puntos y comunicaciones de atencion. Eventos de navegacion solo si el visitante habilita metricas internas.",
+        "data_subjects_sources": "Clientes y visitantes. Datos entregados directamente al crear cuenta, comprar, reservar o contactar; informacion de pedido y pago generada por el uso del servicio; estado de pago recibido del proveedor Flow; busqueda de direcciones mediante OpenStreetMap/Nominatim cuando se usa el mapa.",
+        "purposes_bases": "Gestion de cuenta, compras, reservas, entrega/retiro, historial y atencion: tratamiento necesario para prestar el servicio solicitado (validar base legal aplicable). Promociones por correo/WhatsApp y personalizacion comercial: solo con autorizacion opcional, separada y revocable. Analitica interna: solo cuando se habilita en Preferencias (validar base y necesidad). Obligaciones contables y legales: conservar lo exigido por normativa (plazos por validar).",
+        "recipients": "Personal autorizado de Pasteleria Sucree. El sitio integra Flow para pagos y OpenStreetMap/Nominatim para busqueda de direcciones; se usan enlaces externos de WhatsApp. Confirmar contratos, roles y proveedores tecnicos del hosting/CDN antes de publicar.",
+        "international_transfers": "Pendiente confirmar ubicacion de hosting, CDN, Flow, servicios de mapas, correo y WhatsApp, y si hay transferencias internacionales.",
+        "retention": "Los plazos por finalidad deben definirse y validarse con asesor legal y obligaciones contables. No se ejecuta borrado automatico por estas reglas de privacidad.",
+        "data_required_consequences": "Nombre, correo y telefono son requeridos para crear y recuperar la cuenta. Datos de pedido se requieren para gestionar una compra o reserva; domicilio/coordenadas solo para coordinar despacho. Sin datos necesarios no se podra prestar el flujo solicitado.",
+        "security_summary": "La aplicacion dispone de autenticacion administrativa, controles de sesion y proteccion CSRF en formularios de privacidad. Revisar y documentar controles de acceso, respaldos, cifrado, monitoreo y respuesta a incidentes antes de publicar.",
+        "rights_process": "Enviar una solicitud desde /privacidad/derechos. Se entrega un numero de caso y codigo privado para seguimiento en /privacidad/seguimiento. La identidad se verifica proporcionalmente antes de revelar o modificar datos.",
+        "withdrawal_process": "Las autorizaciones opcionales de marketing y metricas se pueden revocar desde /privacidad/preferencias. La revocacion no elimina tratamientos ya realizados ni registros que deban mantenerse por obligacion legal.",
+        "automated_decisions": "El sistema muestra historial, puntos, nivel y cupones asociados a la cuenta. Confirmar si existe perfilamiento o personalizacion automatizada antes de publicar.",
+        "agency_complaint": "Indicar mecanismo vigente de reclamacion ante la autoridad competente luego de validar su canal oficial y la fecha de entrada en vigor de la normativa.",
+    }
+
+
+def record_account_consent(cursor, customer_id, *, privacy_version, terms_version, marketing_email=False, marketing_whatsapp=False):
+    """Record the required account notice acceptance and separate optional marketing choice."""
+    cursor.execute(
+        """INSERT INTO privacy_account_consents
+           (customer_id,privacy_version,terms_version,required_scope,marketing_email_opt_in,marketing_whatsapp_opt_in,marketing_scope,source,accepted_at)
+           VALUES(?,?,?,?,?,?,?,?,?)""",
+        (
+            int(customer_id), str(privacy_version or "operativa-v1")[:40], str(terms_version or _ACCOUNT_TERMS_VERSION)[:40],
+            _ACCOUNT_PRIVACY_SCOPE, 1 if marketing_email else 0, 1 if marketing_whatsapp else 0,
+            _ACCOUNT_MARKETING_SCOPE if marketing_email or marketing_whatsapp else "",
+            "registro_tienda", _now(),
+        ),
+    )
+
+
+def current_notice_version():
+    published = _published_config()
+    return str(published.get("version") or "operativa-v1")[:40]
+
 
 def _now():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -98,6 +149,16 @@ def _ensure_schema():
                     visitor_hash TEXT PRIMARY KEY, preferences_json TEXT NOT NULL,
                     notice_version TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS privacy_account_consents (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER NOT NULL,
+                    privacy_version TEXT NOT NULL, terms_version TEXT NOT NULL,
+                    required_scope TEXT NOT NULL, marketing_email_opt_in INTEGER NOT NULL DEFAULT 0,
+                    marketing_whatsapp_opt_in INTEGER NOT NULL DEFAULT 0,
+                    marketing_scope TEXT NOT NULL DEFAULT '', source TEXT NOT NULL,
+                    accepted_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_privacy_account_consents_customer
+                    ON privacy_account_consents(customer_id, accepted_at DESC);
                 CREATE TABLE IF NOT EXISTS privacy_preference_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_hash TEXT NOT NULL,
                     preferences_json TEXT NOT NULL, notice_version TEXT NOT NULL,
@@ -274,7 +335,7 @@ def center():
 
 @privacidad_blueprint.get("/privacidad/politica")
 def policy_page():
-    return render_template("privacidad_publica.html", view="policy", policy=_published_config())
+    return render_template("privacidad_publica.html", view="policy", policy=_published_config(), operational=_suggested_policy_draft())
 
 
 @privacidad_blueprint.get("/privacidad/preferencias")
@@ -393,7 +454,9 @@ def admin_config_get():
     conn = get_db()
     try:
         row = conn.execute("SELECT draft_json,published_version,published_at FROM privacy_policy_config WHERE id=1").fetchone()
-        return jsonify({"success": True, "draft": _json_object(row["draft_json"]), "published_version": row["published_version"], "published_at": row["published_at"], "fields": _POLICY_LABELS})
+        draft = _suggested_policy_draft()
+        draft.update(_json_object(row["draft_json"]))
+        return jsonify({"success": True, "draft": draft, "published_version": row["published_version"], "published_at": row["published_at"], "fields": _POLICY_LABELS})
     finally:
         conn.close()
 

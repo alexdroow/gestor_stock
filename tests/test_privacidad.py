@@ -39,7 +39,9 @@ class PrivacyImplementationTests(unittest.TestCase):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200, path)
         policy = self.client.get("/privacidad/politica").get_data(as_text=True)
-        self.assertIn("Aun no hay una politica aprobada", policy)
+        self.assertIn("Resumen de transparencia basado en el funcionamiento actual del sitio", policy)
+        self.assertIn("pasteleria.sucree@outlook.com", policy)
+        self.assertIn("Los plazos exactos por finalidad", policy)
         self.assertNotIn("[razon social]", policy.lower())
 
     def test_optional_preferences_default_off_then_are_recorded_and_can_be_revoked(self):

@@ -143,7 +143,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
     def register(self, email="cliente@example.cl", phone="12345678"):
         return self.client.post(
             "/api/redes/promo/register",
-            json={"email": email, "telefono": "+569" + phone, "consent": True},
+            json={"email": email, "telefono": "+569" + phone, "consent": True, "privacy_consent": True},
             headers={"X-CSRF-Token": self.registration_token()},
         )
 
@@ -199,7 +199,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
         qr_token = re.search(r'<meta name="redes-qr-signup-token" content="([^"]+)"', page).group(1)
         response = self.client.post(
             "/api/redes/promo/register",
-            json={"source": "qr", "email": "qrcliente@example.cl", "telefono": "+56912345678", "consent": True},
+            json={"source": "qr", "email": "qrcliente@example.cl", "telefono": "+56912345678", "consent": True, "privacy_consent": True},
             headers={"X-CSRF-Token": token, "X-QR-Signup-Token": qr_token},
         )
         self.assertEqual(response.status_code, 200, response.get_json())
@@ -209,11 +209,16 @@ class RedesWelcomePromoTests(unittest.TestCase):
         try:
             coupon = conn.execute("SELECT valor_descuento,nombre FROM tienda_cupones WHERE codigo=?", (result["codigo"],)).fetchone()
             record = conn.execute("SELECT tipo FROM redes_promo_codes WHERE codigo=?", (result["codigo"],)).fetchone()
+            consent = conn.execute("SELECT privacy_version,required_scope,marketing_email_opt_in,marketing_whatsapp_opt_in FROM privacy_account_consents").fetchone()
             assignment = conn.execute("SELECT asignado_por,fecha_vencimiento FROM tienda_cliente_cupones WHERE cupon_id=(SELECT cupon_id FROM redes_promo_codes WHERE codigo=?)", (result["codigo"],)).fetchone()
         finally:
             conn.close()
         self.assertEqual(coupon["valor_descuento"], 17)
         self.assertEqual(record["tipo"], "qr_signup")
+        self.assertEqual(consent["privacy_version"], "operativa-v1")
+        self.assertIn("historial", consent["required_scope"])
+        self.assertEqual(consent["marketing_email_opt_in"], 0)
+        self.assertEqual(consent["marketing_whatsapp_opt_in"], 0)
         self.assertEqual(assignment["asignado_por"], "redes_qr")
 
     def test_duplicate_contact_and_missing_consent_are_rejected(self):
@@ -225,6 +230,12 @@ class RedesWelcomePromoTests(unittest.TestCase):
             headers={"X-CSRF-Token": token},
         )
         self.assertEqual(no_consent.status_code, 400)
+        privacy_missing = self.client.post(
+            "/api/redes/promo/register",
+            json={"email": "cliente@example.cl", "telefono": "+56912345678", "consent": True, "privacy_consent": False},
+            headers={"X-CSRF-Token": token},
+        )
+        self.assertEqual(privacy_missing.status_code, 400)
         first = self.register()
         self.assertEqual(first.status_code, 200)
         duplicate = self.register(email="otro@example.cl", phone="12345678")
@@ -268,7 +279,7 @@ class RedesWelcomePromoTests(unittest.TestCase):
 
         registration = self.client.post("/api/tienda/clientes/registrar", json={
             "nombre": "Otro Cliente", "email": "otro@example.cl", "email_confirm": "otro@example.cl",
-            "telefono": "+56912345678", "fecha_nacimiento": "1990-01-01",
+            "telefono": "+56912345678", "fecha_nacimiento": "1990-01-01", "privacy_consent": True,
         })
         self.assertEqual(registration.status_code, 409)
         conn = database.get_db()
@@ -277,6 +288,49 @@ class RedesWelcomePromoTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_clientes").fetchone()[0], 1)
         finally:
             conn.close()
+
+    def test_store_registration_requires_and_records_privacy_acceptance(self):
+        data = {
+            "nombre": "Cliente Consentimiento", "email": "consentimiento@example.cl",
+            "email_confirm": "consentimiento@example.cl", "telefono": "+56987654321",
+            "fecha_nacimiento": "1990-01-01",
+        }
+        denied = self.client.post("/api/tienda/clientes/registrar", json=data)
+        self.assertEqual(denied.status_code, 400)
+        conn = database.get_db()
+        try:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_clientes").fetchone()[0], 0)
+        finally:
+            conn.close()
+
+        accepted = self.client.post("/api/tienda/clientes/registrar", json={
+            **data, "privacy_consent": True, "privacy_notice_version": "fake-version",
+            "account_terms_version": "fake-version", "marketing_personalization": False,
+        })
+        self.assertEqual(accepted.status_code, 200)
+        customer_id = accepted.get_json()["cliente"]["id"]
+        conn = database.get_db()
+        try:
+            consent = conn.execute(
+                "SELECT customer_id,privacy_version,terms_version,required_scope,marketing_email_opt_in,marketing_whatsapp_opt_in,accepted_at FROM privacy_account_consents WHERE customer_id=?",
+                (customer_id,),
+            ).fetchone()
+            self.assertIsNotNone(consent)
+            self.assertEqual(consent["privacy_version"], "operativa-v1")
+            self.assertEqual(consent["terms_version"], "2026-11-v1")
+            self.assertIn("historial", consent["required_scope"])
+            self.assertEqual(consent["marketing_email_opt_in"], 0)
+            self.assertEqual(consent["marketing_whatsapp_opt_in"], 0)
+            self.assertTrue(consent["accepted_at"])
+        finally:
+            conn.close()
+
+    def test_public_store_has_no_initial_privacy_popup_and_account_disclosures_are_present(self):
+        html = self.client.get("/tienda").get_data(as_text=True)
+        self.assertNotIn('id="privacy-choice"', html)
+        self.assertNotIn("Tu privacidad en Sucr&eacute;e", html)
+        self.assertIn('id="cuenta-consent-privacidad"', html)
+        self.assertIn('id="cuenta-consent-marketing"', html)
 
     def test_pending_code_endpoint_returns_coupon_for_registered_contact(self):
         self.assertEqual(self.enable_promo().status_code, 200)

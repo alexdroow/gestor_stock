@@ -17368,7 +17368,6 @@
         <a class="privacy-footer-link" href="/privacidad">Centro de privacidad y datos personales</a>
     </main>
 
-    {% include "_privacy_banner.html" %}
 
     <div class="mobile-overlay" id="mobile-overlay"></div>
     <a class="wa-fab" id="wa-fab" href="https://wa.me/56964330546?text=Hola%20Pasteleria%20Sucree%2C%20tengo%20una%20consulta%20sobre%20la%20tienda." target="_blank" rel="noopener noreferrer" title="Escribenos por WhatsApp" aria-label="Escribenos por WhatsApp">
@@ -17523,6 +17522,17 @@
                 </div>
                 <div class="agenda-map" id="cuenta-map" style="height:220px;"></div>
                 <div class="agenda-map-meta" id="cuenta-map-meta">Mueve el pin y confirma para guardar direccion por defecto.</div>
+            </div>
+            <div id="cuenta-consent-wrap" style="display:none;padding:12px;border:1px solid #f0dfca;border-radius:12px;background:#fffaf3;">
+                <label style="display:flex;align-items:flex-start;gap:9px;font-size:.88rem;line-height:1.45;color:#382216;">
+                    <input id="cuenta-consent-privacidad" type="checkbox" style="width:18px;height:18px;flex:0 0 auto;margin-top:2px;accent-color:#ef7d00;">
+                    <span>Leí y acepto las condiciones de uso de la cuenta y el <a href="/privacidad/politica" target="_blank" rel="noopener">aviso de privacidad</a>. Autorizo el uso de mis datos necesarios para gestionar mi cuenta, compras, reservas, historial, beneficios y atencion al cliente.</span>
+                </label>
+                <p style="margin:7px 0 10px 27px;font-size:.78rem;line-height:1.4;color:#76675e;">Si no aceptas, no podremos crear la cuenta. El historial se vincula a tu perfil para mostrar compras/reservas y administrar beneficios.</p>
+                <label style="display:flex;align-items:flex-start;gap:9px;font-size:.82rem;line-height:1.4;color:#5c4737;">
+                    <input id="cuenta-consent-marketing" type="checkbox" style="width:17px;height:17px;flex:0 0 auto;margin-top:2px;accent-color:#ef7d00;">
+                    <span>Opcional: quiero recibir novedades y promociones por correo y WhatsApp, y autorizo que mi historial se use para adaptar esas ofertas si esa funcion se activa. Puedo retirarlo en Preferencias; no es necesario para crear ni usar la cuenta.</span>
+                </label>
             </div>
             <div class="modal-actions" style="justify-content:flex-start;">
                 <button class="btn-primary" type="button" id="cuenta-guardar">Registrarme / Ingresar</button>
@@ -18023,6 +18033,9 @@
         const cuentaDireccionWrapEl = document.getElementById("cuenta-direccion-wrap");
         const cuentaHistorialWrapEl = document.getElementById("cuenta-historial-wrap");
         const cuentaHistorialAgendaWrapEl = document.getElementById("cuenta-historial-agenda-wrap");
+        const cuentaConsentWrapEl = document.getElementById("cuenta-consent-wrap");
+        const cuentaConsentPrivacyEl = document.getElementById("cuenta-consent-privacidad");
+        const cuentaConsentMarketingEl = document.getElementById("cuenta-consent-marketing");
         const btnIniciarSesionEl = document.getElementById("btn-iniciar-sesion");
         const btnRegistrarCuentaEl = document.getElementById("btn-registrar-cuenta");
         const btnCuentaEl = document.getElementById("btn-cuenta");
@@ -19610,6 +19623,7 @@
             const isLogin = cuentaModo === "login";
             const isAccount = cuentaModo === "account";
             const showAdvanced = isAccount;
+            if (cuentaConsentWrapEl) cuentaConsentWrapEl.style.display = !isLogin && !isAccount ? "" : "none";
             if (cuentaModalTituloEl) {
                 cuentaModalTituloEl.textContent = isLogin ? "Iniciar sesion" : (isAccount ? "Mi cuenta" : "Registrar cuenta");
             }
@@ -24308,6 +24322,10 @@
             if (mode === "login") _setCuentaModo("login");
             else if (mode === "register") _setCuentaModo("register");
             else _setCuentaModo(clienteRegistrado ? "account" : "login");
+            if (mode === "register") {
+                if (cuentaConsentPrivacyEl) cuentaConsentPrivacyEl.checked = false;
+                if (cuentaConsentMarketingEl) cuentaConsentMarketingEl.checked = false;
+            }
             if (cuentaNombreEl) cuentaNombreEl.value = clienteRegistrado?.nombre || "";
             if (cuentaFechaNacimientoEl) cuentaFechaNacimientoEl.value = String(clienteRegistrado?.fecha_nacimiento || "");
             if (cuentaEmailEl) cuentaEmailEl.value = clienteRegistrado?.email || "";
@@ -24506,6 +24524,7 @@
             const tel8 = normalizarTelefono8(cuentaTelefonoEl?.value);
             const nombre = String(cuentaNombreEl?.value || "").trim();
             const fechaNacimiento = String(cuentaFechaNacimientoEl?.value || "").trim();
+            if (!cuentaConsentPrivacyEl?.checked) { setCuentaMsg("Para crear la cuenta debes aceptar las condiciones de uso y el aviso de privacidad.", true); return; }
             if (nombre.length < 2) { setCuentaMsg("Ingresa tu nombre completo.", true); return; }
             if (!fechaNacimiento) { setCuentaMsg("Selecciona tu fecha de nacimiento.", true); return; }
             if (!email) { setCuentaMsg("Correo invalido para registro.", true); return; }
@@ -24521,6 +24540,10 @@
                         telefono: `+569${tel8}`,
                         nombre: nombre || nombreDesdeEmail(email),
                         fecha_nacimiento: fechaNacimiento,
+                        privacy_consent: true,
+                        privacy_notice_version: "operativa-v1",
+                        account_terms_version: "2026-11-v1",
+                        marketing_personalization: Boolean(cuentaConsentMarketingEl?.checked),
                         direccion_default: String(cuentaDireccionBuscarEl?.value || "").trim(),
                         direccion_lat: cuentaDireccionConfirmada ? Number(cuentaDireccionPin.lat || 0) : null,
                         direccion_lng: cuentaDireccionConfirmada ? Number(cuentaDireccionPin.lng || 0) : null,
