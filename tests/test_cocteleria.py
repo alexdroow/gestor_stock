@@ -105,6 +105,9 @@ class CocteleriaCatalogTests(unittest.TestCase):
         html = response.get_data(as_text=True)
         for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "id=\"success-pdf\"", "Total actual del pedido", "function mergeCartLines(lines)", "localStorage", "cocteleria:{items:", "function syncSelectedCart()", "syncSelectedCart();"):
             self.assertIn(marker, html)
+        for marker in ("Variedad en la bandeja", "cocktail-variety-list", "cocktail-variety-icon", "/static/icons/cocteleria-banquet.png"):
+            self.assertIn(marker, html)
+        self.assertNotIn("Ingredientes:</b>", html)
         self.assertNotIn('id="add-to-cart"', html)
 
     def test_existing_agenda_editor_recognizes_cocktail_reservations(self):
