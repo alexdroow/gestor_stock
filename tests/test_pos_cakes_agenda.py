@@ -63,6 +63,12 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('class="mobile-week-blocked"', template)
         self.assertIn('def guardar_evento_agenda(', (Path(__file__).resolve().parents[1] / 'database.py').read_text(encoding='utf-8'))
 
+    def test_unconfirmed_orders_are_explicitly_labeled_in_calendar_views(self):
+        template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
+        self.assertIn("esPedidoPendientePorConfirmar(ev) ? '\\u23F3 POR CONFIRMAR · '", template)
+        self.assertIn('content: "Sin confirmar"', template)
+        self.assertIn('labelEstadoOperativoAgenda(status)', template)
+
     def test_agenda_reuses_its_existing_58mm_ticket_for_native_pos_printing(self):
         template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
 

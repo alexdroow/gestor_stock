@@ -920,7 +920,7 @@
         }
 
         .agenda-order-card.borrador::after {
-            content: "Requiere revision";
+            content: "Sin confirmar";
             display: block;
             width: fit-content;
             margin-top: 8px;
@@ -8456,7 +8456,7 @@
                         const span = document.createElement('span');
                         span.className = `day-event ${claseCssEvento(ev)}`;
                         if (ev.es_recordatorio_personal) span.classList.add('personal-reminder');
-                        const prefijo = esEventoBorrador(ev) ? '\uD83D\uDCDD ' : '';
+                        const prefijo = esPedidoPendientePorConfirmar(ev) ? '\u23F3 POR CONFIRMAR · ' : (esEventoBorrador(ev) ? '\uD83D\uDCDD ' : '');
                         span.textContent = ev.es_recordatorio_personal ? `\u23F0 ${ev.titulo}` : (ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`);
                         span.title = ev.tipo === 'bloqueo'
                             ? `${etiquetaHorarioBloqueoAgenda(ev)} · ${ev.motivo || 'Bloqueo registrado'} · Click para editar`
