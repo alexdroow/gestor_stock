@@ -49,4 +49,4 @@ En iMin Swift 2 se usa el SDK oficial iMin Printer v2 y papel de 58 mm. Otros An
 
 ## Avisos de pedidos
 
-Con la APK abierta, el POS consulta los pedidos y puede emitir aviso/sonido local. Las notificaciones con la app cerrada necesitan Firebase Cloud Messaging y credenciales configuradas en el servidor. Sucrée aún no tiene un proyecto Firebase configurado, por lo que esa modalidad no está habilitada en esta versión.
+La APK consulta pedidos y cotizaciones pendientes mediante alarmas nativas mientras está en segundo plano. Los avisos se repiten cada cinco minutos hasta abrir la notificación, atender el pedido o confirmar la cotización. Requiere permisos de Notificaciones y Alarmas exactas; Android puede retrasar alarmas por ahorro de batería y no ejecuta tareas si el usuario fuerza la detención de la app. El sondeo requiere que siga vigente la sesión administrativa.

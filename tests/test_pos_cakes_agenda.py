@@ -27,13 +27,13 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_144(self):
+    def test_updated_pos_apk_is_available_as_version_145(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.4', page.get_data(as_text=True))
+        self.assertIn('1.4.5', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.4')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.5')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
@@ -259,6 +259,24 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('setExactAndAllowWhileIdle', receiver)
         self.assertIn('ACTION_BOOT_COMPLETED', receiver.replace('Intent.ACTION_BOOT_COMPLETED', 'ACTION_BOOT_COMPLETED'))
         self.assertIn('android.intent.action.BOOT_COMPLETED', manifest)
+
+    def test_pos_background_alerts_cover_store_orders_and_agenda_quotes(self):
+        root = Path(__file__).resolve().parents[1]
+        native = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'OrderAlertReceiver.kt').read_text(encoding='utf-8')
+        activity = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'MainActivity.kt').read_text(encoding='utf-8')
+        pos = (root / 'templates' / 'pos_admin_mobile.html').read_text(encoding='utf-8')
+        agenda = (root / 'templates' / 'agenda.html').read_text(encoding='utf-8')
+        manifest = (root / 'android_pos' / 'app' / 'src' / 'main' / 'AndroidManifest.xml').read_text(encoding='utf-8')
+        self.assertIn('POLL_INTERVAL_MS = 5 * 60 * 1000L', native)
+        self.assertIn('/api/tienda/admin/pedidos-chat-activos', native)
+        self.assertIn('/api/agenda/eventos', native)
+        self.assertIn('scheduleRepeat(context, key, POLL_INTERVAL_MS)', native)
+        self.assertIn('putExtra("attention_key", key)', native)
+        self.assertIn('onNewAgendaQuote', activity)
+        self.assertIn('startBackgroundAlertMonitoring()', pos)
+        self.assertIn('syncActiveOrderAlerts', pos)
+        self.assertIn('syncActiveAgendaQuotes', agenda)
+        self.assertIn('cl.sucree.pos.action.POLL_NEW_ORDERS', manifest)
 
 
 if __name__ == '__main__':

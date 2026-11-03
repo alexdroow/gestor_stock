@@ -6592,6 +6592,13 @@
                         ...e,
                         es_envio: Boolean(e.es_envio) // Convertir a boolean
                     }));
+                    if (window.SucreePosAndroid) {
+                        const pendientes = obtenerReservasTiendaPendientesOrdenadas();
+                        window.SucreePosAndroid.syncActiveAgendaQuotes(JSON.stringify(pendientes.map(item => String(item.id))));
+                        if (!(options && options.fromPolling)) {
+                            pendientes.forEach(item => window.SucreePosAndroid.acknowledgeAttentionAlert('quote', String(item.id)));
+                        }
+                    }
                     if (!fechaSeleccionada) {
                         fechaSeleccionada = formatearFecha(new Date());
                     }
@@ -7373,6 +7380,11 @@
             guardarReservasTiendaSeen();
             if (desdePolling) {
                 mostrarReservaPopup(nuevos[0], nuevos.length);
+                if (window.SucreePosAndroid) {
+                    nuevos.forEach(evento => window.SucreePosAndroid.onNewAgendaQuote(
+                        String(evento.id), String(evento.cliente || 'Cliente'), String(evento.fecha || '')
+                    ));
+                }
             }
         }
 

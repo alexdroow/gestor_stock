@@ -28,5 +28,15 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <receiver
+            android:name=".OrderAlertReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="cl.sucree.pos.action.POLL_NEW_ORDERS" />
+                <action android:name="cl.sucree.pos.action.REPEAT_ORDER_ALERT" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

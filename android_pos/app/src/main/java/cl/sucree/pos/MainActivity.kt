@@ -67,6 +67,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        OrderAlertReceiver.acknowledge(this, intent.getStringExtra("attention_key"))
         window.statusBarColor = Color.rgb(255, 248, 239)
         window.navigationBarColor = Color.rgb(255, 248, 239)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -316,6 +317,7 @@ class MainActivity : Activity() {
 
     private fun posStartUrl(source: Intent): String = when {
         source.getBooleanExtra("show_orders", false) -> "${BuildConfig.POS_URL}?tab=orders"
+        source.getBooleanExtra("show_agenda_quotes", false) -> "${BuildConfig.POS_URL}?tab=tortas"
         source.getBooleanExtra("show_reminders", false) -> "${BuildConfig.POS_URL}?tab=tortas"
         else -> BuildConfig.POS_URL
     }
@@ -351,32 +353,49 @@ class MainActivity : Activity() {
     }
 
     private fun showNewOrderNotification(orderId: String, customerName: String) {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) return
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val openOrders = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("show_orders", true)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            orderId.hashCode(),
-            openOrders,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = Notification.Builder(this, ORDER_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_sucree)
-            .setContentTitle("Nuevo pedido #$orderId")
-            .setContentText(customerName.ifBlank { "Pedido nuevo en el POS" })
-            .setCategory(Notification.CATEGORY_EVENT)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .build()
-        manager.notify(orderId.hashCode(), notification)
+        OrderAlertReceiver.notifyNew(this, "order", orderId, "Nuevo pedido #$orderId", "${customerName.ifBlank { "Cliente" }} · Requiere atención")
     }
 
     private inner class PosBridge {
+        @JavascriptInterface
+        fun startBackgroundAlertMonitoring() {
+            runOnUiThread {
+                val page = Uri.parse(webView.url ?: "")
+                if (page.scheme != "https" || page.host !in setOf("pasteleriasucree.cl", "www.pasteleriasucree.cl") || page.path != "/admin/pos/mobile") return@runOnUiThread
+                OrderAlertReceiver.startMonitoring(this@MainActivity, CookieManager.getInstance().getCookie(BuildConfig.POS_URL).orEmpty())
+            }
+        }
+
+        @JavascriptInterface
+        fun onNewAgendaQuote(id: String, customer: String, date: String) {
+            runOnUiThread {
+                val page = Uri.parse(webView.url ?: "")
+                val safeId = id.filter(Char::isDigit).take(12)
+                if (page.scheme != "https" || page.host !in setOf("pasteleriasucree.cl", "www.pasteleriasucree.cl") || page.path != "/admin/pos/mobile" || safeId.isBlank()) return@runOnUiThread
+                OrderAlertReceiver.notifyNew(this@MainActivity, "quote", safeId, "Nueva cotización de torta", "${customer.take(80)} · ${date.take(20)} · Requiere confirmación")
+            }
+        }
+
+        @JavascriptInterface
+        fun syncActiveOrderAlerts(payload: String) = syncAlertIds(payload, "order")
+
+        @JavascriptInterface
+        fun syncActiveAgendaQuotes(payload: String) = syncAlertIds(payload, "quote")
+
+        @JavascriptInterface
+        fun acknowledgeAttentionAlert(type: String, id: String) {
+            val safeId = id.filter(Char::isDigit).take(12)
+            OrderAlertReceiver.acknowledge(this@MainActivity, if (type == "order" || type == "quote") "$type:$safeId" else null)
+        }
+
+        private fun syncAlertIds(payload: String, type: String) {
+            runOnUiThread {
+                val page = Uri.parse(webView.url ?: "")
+                if (page.scheme != "https" || page.host !in setOf("pasteleriasucree.cl", "www.pasteleriasucree.cl") || page.path != "/admin/pos/mobile" || payload.length > 32_000) return@runOnUiThread
+                try { OrderAlertReceiver.syncActive(this@MainActivity, type, JSONArray(payload)) } catch (_: Exception) { }
+            }
+        }
+
         @JavascriptInterface
         fun syncAgendaReminders(payload: String) {
             runOnUiThread {
@@ -470,7 +489,8 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra("show_orders", false) || intent.getBooleanExtra("show_reminders", false)) {
+        OrderAlertReceiver.acknowledge(this, intent.getStringExtra("attention_key"))
+        if (intent.getBooleanExtra("show_orders", false) || intent.getBooleanExtra("show_agenda_quotes", false) || intent.getBooleanExtra("show_reminders", false)) {
             webView.loadUrl(posStartUrl(intent))
         }
     }
@@ -494,6 +514,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        OrderAlertReceiver.startMonitoring(this, CookieManager.getInstance().getCookie(BuildConfig.POS_URL).orEmpty())
         AgendaReminderReceiver.rescheduleSaved(this)
         if (webView.url != null) uiHandler.post(saleScreenPoll)
     }
