@@ -9,6 +9,7 @@ from pathlib import Path
 
 import app as app_module
 import cocteleria as cocteleria_module
+import database as database_module
 
 
 class CocteleriaCatalogTests(unittest.TestCase):
@@ -113,6 +114,65 @@ class CocteleriaCatalogTests(unittest.TestCase):
         self.assertIn("evento.tipo === 'cocteleria'", html)
         self.assertEqual(app_module._label_origen_evento({"fuente": "agenda", "tipo": "cocteleria", "origen": "tienda_online"}), "Cóctelería (tienda online)")
 
+
+    def test_cocktail_history_is_grouped_by_reservation_and_contains_customer(self):
+        cocteleria_module.ensure_cocteleria_schema()
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("""CREATE TABLE agenda_eventos (id INTEGER PRIMARY KEY,cliente TEXT,telefono TEXT,
+            codigo_pedido TEXT,fecha TEXT,hora_inicio TEXT,estado TEXT,total REAL,es_envio INTEGER,direccion TEXT)""")
+        conn.execute("INSERT INTO agenda_eventos VALUES(?,?,?,?,?,?,?,?,?,?)", (901, "Cliente Test", "+56911112222", "AGD-901", "2026-11-03", "15:00", "pendiente", 31500, 0, ""))
+        snapshot = {"items": [
+            {"product_name": "Mini dulce", "presentation_label": "Bandeja 10", "quantity": 1, "unit_price_clp": 18000, "total_clp": 18000},
+            {"product_name": "Mini salado", "presentation_label": "Bandeja 20", "quantity": 1, "unit_price_clp": 13500, "total_clp": 13500},
+        ], "total_clp": 31500, "item_count": 2}
+        conn.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", ("history-key", 901, 7, 8, json.dumps(snapshot)))
+        for mid, pid, item in ((7, 8, snapshot["items"][0]), (9, 10, snapshot["items"][1])):
+            conn.execute("INSERT INTO tienda_cocteleria_reserva_lineas(event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?)", (901, mid, pid, json.dumps(item)))
+        conn.commit()
+        conn.close()
+        self.login_admin()
+
+        response = self.client.get("/api/tienda/admin/cocteleria/7/reservas")
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        records = response.get_json()["items"]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["cliente"], "Cliente Test")
+        self.assertEqual(records[0]["telefono"], "+56911112222")
+        self.assertEqual(len(json.loads(records[0]["snapshot_json"])["items"]), 2)
+
+        template = Path(__file__).resolve().parents[1] / "templates" / "tienda_cocteleria_admin.html"
+        html = template.read_text(encoding="utf-8")
+        self.assertIn('<details class="reservation-record">', html)
+        self.assertIn("reservation-main", html)
+
+    def test_deleting_agenda_reservation_removes_cocktail_history(self):
+        cocteleria_module.ensure_cocteleria_schema()
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("CREATE TABLE agenda_eventos (id INTEGER PRIMARY KEY, fecha TEXT)")
+        conn.execute("CREATE TABLE agenda_recordatorios_descartados (evento_id INTEGER)")
+        conn.executemany("INSERT INTO agenda_eventos(id,fecha) VALUES(?,?)", [(911, "2030-01-01"), (912, "2019-01-01")])
+        conn.executemany("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", [
+            ("delete-911", 911, 1, 1, "{}"), ("delete-912", 912, 1, 1, "{}")
+        ])
+        conn.executemany("INSERT INTO tienda_cocteleria_reserva_lineas(event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?)", [
+            (911, 1, 1, "{}"), (912, 1, 1, "{}")
+        ])
+        conn.commit()
+        conn.close()
+
+        def connect_test_db():
+            return sqlite3.connect(self.db_path)
+
+        with patch.object(database_module, "get_db", side_effect=connect_test_db):
+            self.assertTrue(database_module.eliminar_evento_agenda(911)["success"])
+            self.assertTrue(database_module.eliminar_eventos_agenda_pasados("2020-01-01")["success"])
+
+        conn = sqlite3.connect(self.db_path)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_cocteleria_reservas").fetchone()[0], 0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_cocteleria_reserva_lineas").fetchone()[0], 0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM agenda_eventos").fetchone()[0], 0)
+        conn.close()
 
     def test_cocktail_reservation_pdf_contains_each_item_and_price(self):
         if app_module.canvas is None:

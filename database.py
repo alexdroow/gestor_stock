@@ -13136,6 +13136,21 @@ def guardar_evento_agenda(evento):
     finally:
         conn.close()
 
+def _eliminar_historial_cocteleria_cursor(cursor, evento_ids):
+    ids = sorted({int(value) for value in (evento_ids or []) if int(value or 0) > 0})
+    if not ids:
+        return
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?)", (
+        "tienda_cocteleria_reservas", "tienda_cocteleria_reserva_lineas"
+    ))
+    tables = {str(row[0]) for row in cursor.fetchall()}
+    for table in ("tienda_cocteleria_reserva_lineas", "tienda_cocteleria_reservas"):
+        if table not in tables:
+            continue
+        for event_id in ids:
+            cursor.execute(f"DELETE FROM {table} WHERE event_id = ?", (event_id,))
+
+
 def eliminar_evento_agenda(evento_id):
     """Elimina un evento de la agenda"""
     conn = get_db()
@@ -13149,6 +13164,11 @@ def eliminar_evento_agenda(evento_id):
         if evento_id <= 0:
             return {'success': False, 'error': 'Evento inválido'}
 
+        cursor.execute("SELECT 1 FROM agenda_eventos WHERE id = ? LIMIT 1", (evento_id,))
+        if not cursor.fetchone():
+            conn.rollback()
+            return {'success': False, 'error': 'Evento no encontrado'}
+        _eliminar_historial_cocteleria_cursor(cursor, [evento_id])
         cursor.execute("DELETE FROM agenda_eventos WHERE id = ?", (evento_id,))
         eliminado = (cursor.rowcount or 0) > 0
         cursor.execute("DELETE FROM agenda_recordatorios_descartados WHERE evento_id = ?", (evento_id,))
@@ -13180,10 +13200,7 @@ def eliminar_eventos_agenda_pasados(fecha_hasta=None):
     cursor = conn.cursor()
     try:
         # Soporta datos en formato YYYY-MM-DD y legado DD-MM-YYYY.
-        cursor.execute(
-            """
-            DELETE FROM agenda_eventos
-            WHERE (
+        where_sql = """(
                 length(fecha) = 10
                 AND substr(fecha, 5, 1) = '-'
                 AND fecha < ?
@@ -13191,10 +13208,11 @@ def eliminar_eventos_agenda_pasados(fecha_hasta=None):
                 length(fecha) = 10
                 AND substr(fecha, 3, 1) = '-'
                 AND (substr(fecha, 7, 4) || '-' || substr(fecha, 4, 2) || '-' || substr(fecha, 1, 2)) < ?
-            )
-            """,
-            (fecha_ref, fecha_ref),
-        )
+            )"""
+        cursor.execute(f"SELECT id FROM agenda_eventos WHERE {where_sql}", (fecha_ref, fecha_ref))
+        deleted_ids = [int(row[0]) for row in cursor.fetchall()]
+        _eliminar_historial_cocteleria_cursor(cursor, deleted_ids)
+        cursor.execute(f"DELETE FROM agenda_eventos WHERE {where_sql}", (fecha_ref, fecha_ref))
         eliminados = int(cursor.rowcount or 0)
 
         # Limpia recordatorios huérfanos.

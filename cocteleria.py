@@ -357,10 +357,54 @@ def api_admin_reservations(model_id):
     if not _admin(): return jsonify(success=False, error="Acceso no autorizado"), 401
     ensure_cocteleria_schema(); conn = _db()
     try:
-        rows = conn.execute("""SELECT event_id,snapshot_json,created_at FROM tienda_cocteleria_reserva_lineas
-            WHERE model_id=? ORDER BY id DESC LIMIT 100""", (model_id,)).fetchall()
-        if not rows:
-            rows = conn.execute("SELECT event_id,snapshot_json,created_at FROM tienda_cocteleria_reservas WHERE model_id=? ORDER BY id DESC LIMIT 100", (model_id,)).fetchall()
-        return jsonify(success=True, items=[dict(row) for row in rows])
+        rows = conn.execute("""SELECT r.event_id,r.snapshot_json,r.created_at,
+                    COALESCE(NULLIF(a.cliente,''),'Cliente') AS cliente,
+                    COALESCE(a.telefono,'') AS telefono,COALESCE(a.codigo_pedido,'') AS codigo_pedido,
+                    COALESCE(a.fecha,'') AS fecha,COALESCE(a.hora_inicio,'') AS hora_inicio,
+                    COALESCE(a.estado,'') AS estado,COALESCE(a.total,0) AS total,
+                    COALESCE(a.es_envio,0) AS es_envio,COALESCE(a.direccion,'') AS direccion
+            FROM tienda_cocteleria_reservas r
+            LEFT JOIN agenda_eventos a ON a.id=r.event_id
+            WHERE r.model_id=? OR r.event_id IN (
+                SELECT DISTINCT event_id FROM tienda_cocteleria_reserva_lineas WHERE model_id=?
+            )
+            ORDER BY r.event_id DESC LIMIT 100""", (model_id, model_id)).fetchall()
+        result = [dict(row) for row in rows]
+        legacy = conn.execute("""SELECT DISTINCT l.event_id FROM tienda_cocteleria_reserva_lineas l
+            WHERE l.model_id=? AND NOT EXISTS (
+                SELECT 1 FROM tienda_cocteleria_reservas r WHERE r.event_id=l.event_id
+            ) ORDER BY l.event_id DESC LIMIT 100""", (model_id,)).fetchall()
+        for legacy_row in legacy:
+            event_id = int(legacy_row["event_id"] or 0)
+            event = conn.execute("""SELECT cliente,telefono,codigo_pedido,fecha,hora_inicio,estado,total,es_envio,direccion
+                FROM agenda_eventos WHERE id=? LIMIT 1""", (event_id,)).fetchone()
+            lines = [dict(row) for row in conn.execute(
+                "SELECT snapshot_json,created_at FROM tienda_cocteleria_reserva_lineas WHERE event_id=? ORDER BY id",
+                (event_id,),
+            ).fetchall()]
+            snapshot_items = []
+            for line in lines:
+                try:
+                    snapshot_items.append(json.loads(line.get("snapshot_json") or "{}"))
+                except (TypeError, ValueError):
+                    continue
+            total = sum(float(item.get("total_clp") or 0) for item in snapshot_items)
+            event_data = dict(event or {})
+            result.append({
+                "event_id": event_id,
+                "snapshot_json": json.dumps({"items": snapshot_items, "item_count": len(snapshot_items), "total_clp": total}),
+                "created_at": lines[0].get("created_at", "") if lines else "",
+                "cliente": event_data.get("cliente") or "Cliente",
+                "telefono": event_data.get("telefono") or "",
+                "codigo_pedido": event_data.get("codigo_pedido") or "",
+                "fecha": event_data.get("fecha") or "",
+                "hora_inicio": event_data.get("hora_inicio") or "",
+                "estado": event_data.get("estado") or "",
+                "total": event_data.get("total") or total,
+                "es_envio": event_data.get("es_envio") or 0,
+                "direccion": event_data.get("direccion") or "",
+            })
+        result.sort(key=lambda item: (str(item.get("fecha") or ""), int(item.get("event_id") or 0)), reverse=True)
+        return jsonify(success=True, items=result[:100])
     finally:
         conn.close()
