@@ -34,7 +34,7 @@ def ensure_cocteleria_schema(conn=None):
             id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE,
             name TEXT NOT NULL, category TEXT NOT NULL CHECK(category IN ('dulce','salado')),
             short_description TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '',
-            ingredients TEXT NOT NULL DEFAULT '', allergens TEXT NOT NULL DEFAULT '',
+            ingredients TEXT NOT NULL DEFAULT '', variety_summaries TEXT NOT NULL DEFAULT '[]', allergens TEXT NOT NULL DEFAULT '',
             care_text TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'draft',
             min_lead_hours INTEGER NOT NULL DEFAULT 24, min_quantity INTEGER NOT NULL DEFAULT 1,
             max_quantity INTEGER NOT NULL DEFAULT 99, sort_order INTEGER NOT NULL DEFAULT 0,
@@ -72,6 +72,9 @@ def ensure_cocteleria_schema(conn=None):
         CREATE INDEX IF NOT EXISTS idx_cocteleria_status_order ON tienda_cocteleria(status, sort_order);
         CREATE INDEX IF NOT EXISTS idx_cocteleria_presentations_model ON tienda_cocteleria_presentaciones(model_id, active, sort_order);
         """)
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(tienda_cocteleria)")}
+        if "variety_summaries" not in columns:
+            conn.execute("ALTER TABLE tienda_cocteleria ADD COLUMN variety_summaries TEXT NOT NULL DEFAULT '[]'")
         if own:
             conn.commit()
     finally:
@@ -93,6 +96,10 @@ def _product(conn, model_id, public=False):
     if not row:
         return None
     data = dict(row)
+    try:
+        data["variety_summaries"] = json.loads(data.get("variety_summaries") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        data["variety_summaries"] = []
     presentations = conn.execute("SELECT id,label,units,unit_label,price_clp,active,sort_order FROM tienda_cocteleria_presentaciones WHERE model_id=? ORDER BY sort_order,id", (model_id,)).fetchall()
     images = conn.execute("SELECT id,path,alt,sort_order,is_cover FROM tienda_cocteleria_imagenes WHERE model_id=? AND active=1 ORDER BY is_cover DESC,sort_order,id", (model_id,)).fetchall()
     data["presentations"] = [dict(x) for x in presentations if not public or int(x["active"])]
@@ -100,7 +107,7 @@ def _product(conn, model_id, public=False):
     data["cover"] = next((x["path"] for x in data["images"] if x["is_cover"]), data["images"][0]["path"] if data["images"] else "")
     data["from_price"] = min((int(x["price_clp"]) for x in data["presentations"] if int(x["active"])), default=None)
     if public:
-        keys = ("id", "slug", "name", "category", "short_description", "description", "ingredients", "allergens", "care_text", "min_lead_hours", "min_quantity", "max_quantity", "presentations", "images", "cover", "from_price")
+        keys = ("id", "slug", "name", "category", "short_description", "description", "ingredients", "variety_summaries", "allergens", "care_text", "min_lead_hours", "min_quantity", "max_quantity", "presentations", "images", "cover", "from_price")
         data = {k: data[k] for k in keys}
     return data
 
@@ -154,10 +161,19 @@ def _payload(data):
         order = int(data.get("sort_order") or 0)
     except (TypeError, ValueError):
         raise ValueError("Cantidad, anticipación y orden deben ser números válidos")
+    summaries = []
+    for item in data.get("variety_summaries", []) if isinstance(data.get("variety_summaries"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        variety = str(item.get("name") or "").strip()[:180]
+        summary = str(item.get("summary") or "").strip()[:700]
+        if variety and summary:
+            summaries.append({"name": variety, "summary": summary})
     return {"name": name, "slug": slug, "category": category,
             "short_description": str(data.get("short_description") or "")[:180],
             "description": str(data.get("description") or "")[:2000],
             "ingredients": str(data.get("ingredients") or "")[:1000],
+            "variety_summaries": summaries,
             "allergens": str(data.get("allergens") or "")[:500], "care_text": str(data.get("care_text") or "")[:1000],
             "min_quantity": min_q, "max_quantity": max_q, "min_lead_hours": lead, "sort_order": order,
             "presentations": data.get("presentations") if isinstance(data.get("presentations"), list) else []}
@@ -216,8 +232,8 @@ def api_admin_list():
         if conn.execute("SELECT 1 FROM tienda_cocteleria WHERE slug=?", (data["slug"],)).fetchone():
             return jsonify(success=False, error="Ese slug ya está en uso"), 409
         actor = str(session.get("admin_user_name") or session.get("admin_user_id") or "admin")
-        cur = conn.execute("""INSERT INTO tienda_cocteleria(slug,name,category,short_description,description,ingredients,allergens,care_text,min_lead_hours,min_quantity,max_quantity,sort_order,created_by,updated_by)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (data["slug"], data["name"], data["category"], data["short_description"], data["description"], data["ingredients"], data["allergens"], data["care_text"], data["min_lead_hours"], data["min_quantity"], data["max_quantity"], data["sort_order"], actor, actor))
+        cur = conn.execute("""INSERT INTO tienda_cocteleria(slug,name,category,short_description,description,ingredients,variety_summaries,allergens,care_text,min_lead_hours,min_quantity,max_quantity,sort_order,created_by,updated_by)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (data["slug"], data["name"], data["category"], data["short_description"], data["description"], data["ingredients"], json.dumps(data["variety_summaries"], ensure_ascii=False), data["allergens"], data["care_text"], data["min_lead_hours"], data["min_quantity"], data["max_quantity"], data["sort_order"], actor, actor))
         mid = int(cur.lastrowid)
         _save_presentations(conn, mid, data["presentations"])
         _audit(conn, mid, actor, "create", {}, data)
@@ -252,8 +268,8 @@ def api_admin_detail(model_id):
         if before["status"] == "published" and (not data["description"].strip() or not before["cover"] or not any(x.get("active", True) and int(x.get("price_clp", -1)) >= 0 for x in data["presentations"])):
             return jsonify(success=False, error="Un producto publicado necesita descripción, portada y una presentación activa con precio"), 400
         conn.execute("BEGIN IMMEDIATE")
-        conn.execute("""UPDATE tienda_cocteleria SET slug=?,name=?,category=?,short_description=?,description=?,ingredients=?,allergens=?,care_text=?,min_lead_hours=?,min_quantity=?,max_quantity=?,sort_order=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-                     (data["slug"], data["name"], data["category"], data["short_description"], data["description"], data["ingredients"], data["allergens"], data["care_text"], data["min_lead_hours"], data["min_quantity"], data["max_quantity"], data["sort_order"], actor, model_id))
+        conn.execute("""UPDATE tienda_cocteleria SET slug=?,name=?,category=?,short_description=?,description=?,ingredients=?,variety_summaries=?,allergens=?,care_text=?,min_lead_hours=?,min_quantity=?,max_quantity=?,sort_order=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                     (data["slug"], data["name"], data["category"], data["short_description"], data["description"], data["ingredients"], json.dumps(data["variety_summaries"], ensure_ascii=False), data["allergens"], data["care_text"], data["min_lead_hours"], data["min_quantity"], data["max_quantity"], data["sort_order"], actor, model_id))
         _save_presentations(conn, model_id, data["presentations"])
         after = _product(conn, model_id)
         _audit(conn, model_id, actor, "update", before, after)
@@ -305,8 +321,8 @@ def api_admin_duplicate(model_id):
         while conn.execute("SELECT 1 FROM tienda_cocteleria WHERE slug=?", (slug,)).fetchone():
             slug = f"{base}-{n}"; n += 1
         actor = str(session.get("admin_user_name") or "admin")
-        cur = conn.execute("""INSERT INTO tienda_cocteleria(slug,name,category,short_description,description,ingredients,allergens,care_text,min_lead_hours,min_quantity,max_quantity,sort_order,created_by,updated_by)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (slug, (src["name"] + " (copia)")[:120], src["category"], src["short_description"], src["description"], src["ingredients"], src["allergens"], src["care_text"], src["min_lead_hours"], src["min_quantity"], src["max_quantity"], src["sort_order"], actor, actor))
+        cur = conn.execute("""INSERT INTO tienda_cocteleria(slug,name,category,short_description,description,ingredients,variety_summaries,allergens,care_text,min_lead_hours,min_quantity,max_quantity,sort_order,created_by,updated_by)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (slug, (src["name"] + " (copia)")[:120], src["category"], src["short_description"], src["description"], src["ingredients"], json.dumps(src["variety_summaries"], ensure_ascii=False), src["allergens"], src["care_text"], src["min_lead_hours"], src["min_quantity"], src["max_quantity"], src["sort_order"], actor, actor))
         mid = int(cur.lastrowid)
         for p in src["presentations"]:
             conn.execute("INSERT INTO tienda_cocteleria_presentaciones(model_id,label,units,unit_label,price_clp,active,sort_order) VALUES(?,?,?,?,?,?,?)", (mid, p["label"], p["units"], p["unit_label"], p["price_clp"], p["active"], p["sort_order"]))

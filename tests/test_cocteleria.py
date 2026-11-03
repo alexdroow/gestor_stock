@@ -36,6 +36,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
             "description": "Tartaletas para compartir",
             "short_description": "Bocados artesanales",
             "ingredients": "Harina, crema",
+            "variety_summaries": [{"name": "Harina", "summary": "Masa horneada de textura crujiente."}],
             "allergens": "Gluten y lácteos",
             "min_quantity": 1,
             "max_quantity": 8,
@@ -68,6 +69,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         self.assertEqual(len(public["items"]), 1)
         self.assertEqual(public["items"][0]["category"], "salado")
         self.assertEqual(public["items"][0]["presentations"][0]["price_clp"], 18000)
+        self.assertEqual(public["items"][0]["variety_summaries"], [{"name": "Harina", "summary": "Masa horneada de textura crujiente."}])
 
         page = self.client.get("/tienda/cocteleria")
         self.assertEqual(page.status_code, 200)
@@ -81,6 +83,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         copy = duplicate.get_json()["item"]
         self.assertEqual(copy["status"], "draft")
         self.assertEqual(copy["presentations"][0]["price_clp"], 18000)
+        self.assertEqual(copy["variety_summaries"], [{"name": "Harina", "summary": "Masa horneada de textura crujiente."}])
         self.assertNotEqual(copy["slug"], item["slug"])
 
     def test_booking_type_and_product_price_are_authoritative(self):
@@ -105,10 +108,15 @@ class CocteleriaCatalogTests(unittest.TestCase):
         html = response.get_data(as_text=True)
         for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "id=\"success-pdf\"", "Total actual del pedido", "function mergeCartLines(lines)", "localStorage", "cocteleria:{items:", "function syncSelectedCart()", "syncSelectedCart();"):
             self.assertIn(marker, html)
-        for marker in ("Variedad en la bandeja", "cocktail-variety-list", "cocktail-variety-icon", "/static/icons/cocteleria-banquet.png", "function shuffleProducts(items)", "const randomizedProducts=shuffleProducts(products)", "randomizedProducts.filter("):
+        for marker in ("Variedad en la bandeja", "cocktail-variety-list", "cocktail-variety-icon", "cocktail-variety-bubble", "cocktail-variety-choice", "/static/icons/cocteleria-banquet.png", "function shuffleProducts(items)", "const randomizedProducts=shuffleProducts(products)", "randomizedProducts.filter("):
             self.assertIn(marker, html)
         self.assertNotIn("Ingredientes:</b>", html)
         self.assertNotIn('id="add-to-cart"', html)
+
+        admin_template = Path(__file__).resolve().parents[1] / "templates" / "tienda_cocteleria_admin.html"
+        admin_html = admin_template.read_text(encoding="utf-8")
+        for marker in ("Resumen opcional de cada variedad", "id=\"variety-summaries\"", "variety_summaries:readVarietySummaries()"):
+            self.assertIn(marker, admin_html)
 
     def test_existing_agenda_editor_recognizes_cocktail_reservations(self):
         template = Path(__file__).resolve().parents[1] / "templates" / "agenda.html"
