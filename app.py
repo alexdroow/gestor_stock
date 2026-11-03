@@ -12280,6 +12280,40 @@ def api_tienda_agenda_reservar():
             conn.close()
 
 
+@app.route('/api/tienda/cocteleria/reserva/<int:reserva_id>/comprobante', methods=['GET'])
+def api_tienda_cocteleria_comprobante(reserva_id):
+    token = str(request.args.get("token") or "").strip()
+    if not token or int(reserva_id or 0) <= 0:
+        return jsonify({"success": False, "error": "Comprobante no encontrado"}), 404
+    conn = None
+    try:
+        conn = get_db()
+        ensure_cocteleria_schema(conn)
+        row = conn.execute(
+            """SELECT e.*, r.request_key
+               FROM tienda_cocteleria_reservas r
+               JOIN agenda_eventos e ON e.id=r.event_id
+               WHERE r.event_id=? LIMIT 1""",
+            (int(reserva_id),),
+        ).fetchone()
+        if not row or not hmac.compare_digest(str(row["request_key"] or ""), token):
+            return jsonify({"success": False, "error": "Comprobante no encontrado"}), 404
+        reserva = dict(row)
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+    try:
+        filename = _crear_pdf_reserva_agenda_tienda(reserva)
+        path = os.path.join(static_dir, "tienda_pedidos_pdf", filename)
+        response = send_file(path, as_attachment=True, download_name=f"comprobante_cocteleria_{int(reserva_id)}.pdf", mimetype="application/pdf")
+        response.headers["Cache-Control"] = "private, no-store"
+        return response
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @app.route('/api/tienda/agenda/reserva/<int:reserva_id>/whatsapp-pasteleria', methods=['POST'])
 def api_tienda_agenda_reserva_whatsapp_pasteleria(reserva_id):
     conn = None

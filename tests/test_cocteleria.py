@@ -1,5 +1,6 @@
 import os
 import json
+from io import BytesIO
 import sqlite3
 import tempfile
 import unittest
@@ -101,7 +102,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         response = self.client.get("/tienda/cocteleria")
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "localStorage", "cocteleria:{items:", "function syncSelectedCart()", "syncSelectedCart();"):
+        for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "id=\"success-pdf\"", "Total actual del pedido", "function mergeCartLines(lines)", "localStorage", "cocteleria:{items:", "function syncSelectedCart()", "syncSelectedCart();"):
             self.assertIn(marker, html)
         self.assertNotIn('id="add-to-cart"', html)
 
@@ -120,6 +121,12 @@ class CocteleriaCatalogTests(unittest.TestCase):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("CREATE TABLE IF NOT EXISTS tienda_tortas_listas_reservas (event_id INTEGER, snapshot_json TEXT)")
+        conn.execute("""CREATE TABLE agenda_eventos (
+            id INTEGER PRIMARY KEY, codigo_pedido TEXT, codigo_operacion TEXT, fecha TEXT,
+            hora_entrega TEXT, hora_inicio TEXT, cliente TEXT, telefono TEXT, direccion TEXT,
+            ingredientes TEXT, motivo TEXT, total REAL, abono REAL, estado TEXT,
+            documento_tipo TEXT, titulo TEXT, es_envio INTEGER
+        )""")
         snapshot = {
             "kind": "COCTELERIA", "item_count": 2, "total_clp": 31500,
             "items": [
@@ -128,6 +135,10 @@ class CocteleriaCatalogTests(unittest.TestCase):
             ],
         }
         conn.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", ("test-cocktail-pdf", 812, 1, 1, json.dumps(snapshot)))
+        conn.execute(
+            "INSERT INTO agenda_eventos VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (812, "AGD-TEST-COCTEL", "", "2026-11-03", "15:00", "15:00", "Cliente de prueba", "+56912345678", "", "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30", "Reserva cliente tienda online", 31500, 10100, "pendiente", "cotizacion", "Cocteleria - 2 productos", 0),
+        )
         conn.commit()
         conn.close()
 
@@ -137,17 +148,16 @@ class CocteleriaCatalogTests(unittest.TestCase):
             return db
 
         with patch.object(app_module, "get_db", side_effect=connect_test_db), patch.object(app_module, "static_dir", self.temp.name):
-            filename = app_module._crear_pdf_reserva_agenda_tienda({
-                "id": 812, "codigo_pedido": "AGD-TEST-COCTEL", "fecha": "2026-11-03",
-                "hora_inicio": "15:00", "cliente": "Cliente de prueba", "telefono": "+56912345678",
-                "total": 31500, "abono": 10100, "estado": "pendiente", "motivo": "Reserva cliente tienda online",
-                "titulo": "Cocteleria - 2 productos",
-                "ingredientes": "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30",
-            })
+            denied = self.client.get("/api/tienda/cocteleria/reserva/812/comprobante?token=incorrecto")
+            self.assertEqual(denied.status_code, 404)
+            response = self.client.get("/api/tienda/cocteleria/reserva/812/comprobante?token=test-cocktail-pdf")
 
         from pypdf import PdfReader
-        pdf_path = Path(self.temp.name) / "tienda_pedidos_pdf" / filename
-        pages = PdfReader(str(pdf_path)).pages
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/pdf")
+        pdf_content = response.data
+        response.close()
+        pages = PdfReader(BytesIO(pdf_content)).pages
         self.assertEqual(len(pages), 1)
         text = "\n".join(page.extract_text() or "" for page in pages)
         for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "$18.000", "$13.500", "$31.500"):
