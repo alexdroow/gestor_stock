@@ -108,7 +108,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         html = response.get_data(as_text=True)
         for marker in ("id=\"cart-summary\"", "id=\"cart-items\"", "id=\"cart-bar\"", "id=\"success-pdf\"", "Total actual del pedido", "function mergeCartLines(lines)", "localStorage", "cocteleria:{items:", "function syncSelectedCart()", "syncSelectedCart();"):
             self.assertIn(marker, html)
-        for marker in ("Variedad en la bandeja", "cocktail-variety-list", "cocktail-variety-icon", "cocktail-variety-bubble", "cocktail-variety-choice", "/static/icons/cocteleria-banquet.png", "function shuffleProducts(items)", "const randomizedProducts=shuffleProducts(products)", "randomizedProducts.filter("):
+        for marker in ("Variedad en la bandeja", "Toca las variedades con resumen para revisar sus rellenos y detalles.", "cocktail-variety-list", "cocktail-variety-icon", "cocktail-variety-bubble", "cocktail-variety-choice", "/static/icons/cocteleria-banquet.png", "function shuffleProducts(items)", "const randomizedProducts=shuffleProducts(products)", "randomizedProducts.filter("):
             self.assertIn(marker, html)
         self.assertNotIn("Ingredientes:</b>", html)
         self.assertNotIn('id="add-to-cart"', html)
