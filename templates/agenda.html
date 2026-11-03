@@ -6901,11 +6901,11 @@
         }
 
         function recordatoriosPersonalesActivos() {
-            const now = Date.now();
+            const hoy = formatearFecha(new Date());
             return (Array.isArray(notasAgenda) ? notasAgenda : []).filter(nota => {
                 if (!nota || nota.tipo !== 'recordatorio' || nota.estado === 'completada' || !nota.recordatorio) return false;
                 const raw = formatoFechaHoraNota(nota.recordatorio);
-                return raw && new Date(raw).getTime() > now;
+                return raw && raw.slice(0, 10) >= hoy;
             }).map(nota => {
                 const raw = formatoFechaHoraNota(nota.recordatorio);
                 return {
@@ -6922,6 +6922,7 @@
         }
 
         let agendaReminderTimers = new Map();
+        let agendaReminderCleanupTimer = null;
         function sincronizarRecordatoriosPersonales() {
             const reminders = recordatoriosPersonalesActivos();
             const bridge = window.SucreePosAndroid;
@@ -6934,6 +6935,13 @@
             }
             agendaReminderTimers.forEach(timer => clearTimeout(timer));
             agendaReminderTimers.clear();
+            if (agendaReminderCleanupTimer) clearTimeout(agendaReminderCleanupTimer);
+            const proximoDia = new Date();
+            proximoDia.setHours(24, 0, 1, 0);
+            agendaReminderCleanupTimer = setTimeout(() => {
+                renderizarCalendario();
+                sincronizarRecordatoriosPersonales();
+            }, Math.max(1000, proximoDia.getTime() - Date.now()));
             if (!('Notification' in window)) return;
             reminders.forEach(reminder => {
                 const due = new Date(`${reminder.fecha}T${reminder.hora_inicio}`).getTime();
