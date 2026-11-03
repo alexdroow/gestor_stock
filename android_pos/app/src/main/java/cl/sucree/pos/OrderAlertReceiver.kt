@@ -22,7 +22,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
         when (intent?.action) {
             Intent.ACTION_BOOT_COMPLETED -> {
                 val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                if (!prefs.getString(COOKIE_KEY, null).isNullOrBlank()) schedulePoll(context, 5_000L)
+                if (prefs.getBoolean(MONITOR_KEY, false)) schedulePoll(context, 5_000L)
                 repeatSavedAlerts(context)
             }
             ACTION_POLL -> pollInBackground(context, this)
@@ -35,6 +35,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
         const val ACTION_REPEAT = "cl.sucree.pos.action.REPEAT_ORDER_ALERT"
         private const val PREFS = "pos_order_alerts"
         private const val COOKIE_KEY = "admin_cookie"
+        private const val MONITOR_KEY = "monitor_enabled"
         private const val ALERTS_KEY = "active_alerts"
         private const val ACK_KEY = "acknowledged_alerts"
         private const val ORDER_IDS_KEY = "known_order_ids"
@@ -42,11 +43,14 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private const val ORDER_BASELINE_KEY = "order_baseline_created"
         private const val QUOTE_BASELINE_KEY = "quote_baseline_created"
         private const val CHANNEL_ID = "pos_attention_alerts"
-        private const val POLL_INTERVAL_MS = 5 * 60 * 1000L
+        private const val POLL_INTERVAL_MS = 60 * 1000L
+        private const val ALERT_REPEAT_INTERVAL_MS = 5 * 60 * 1000L
 
         fun startMonitoring(context: Context, cookie: String) {
-            if (cookie.isBlank() || cookie.length > 16_000) return
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(COOKIE_KEY, cookie).apply()
+            if (cookie.length > 16_000) return
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit().putBoolean(MONITOR_KEY, true).apply()
+            if (cookie.isNotBlank()) prefs.edit().putString(COOKIE_KEY, cookie).apply()
             schedulePoll(context, 1_000L)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                 !context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
@@ -80,7 +84,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
             })
             prefs.edit().putString(ALERTS_KEY, JSONArray(alerts).toString()).apply()
             showAlert(context, key)
-            scheduleRepeat(context, key, POLL_INTERVAL_MS)
+            scheduleRepeat(context, key, ALERT_REPEAT_INTERVAL_MS)
         }
 
         fun syncActive(context: Context, type: String, activeIds: JSONArray) {
@@ -139,12 +143,13 @@ class OrderAlertReceiver : BroadcastReceiver() {
 
         private fun pollEndpoint(context: Context, path: String, kind: String) {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val cookie = prefs.getString(COOKIE_KEY, null)?.takeIf { it.isNotBlank() } ?: return
+            val cookie = prefs.getString(COOKIE_KEY, null)?.takeIf { it.isNotBlank() }
+            if (kind == "orders" && cookie == null) return
             val connection = (URL("https://pasteleriasucree.cl$path").openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 2_500
                 readTimeout = 3_500
-                setRequestProperty("Cookie", cookie)
+                if (cookie != null) setRequestProperty("Cookie", cookie)
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("User-Agent", "SucreePOS-Android")
             }
@@ -193,9 +198,13 @@ class OrderAlertReceiver : BroadcastReceiver() {
                 val event = events.optJSONObject(i) ?: continue
                 val id = event.optString("id").takeIf { it.isNotBlank() } ?: continue
                 allIds.add(id)
+                val type = event.optString("tipo").trim().lowercase()
+                val motive = event.optString("motivo")
+                val onlineReservation = motive.contains("reserva cliente tienda online", true) ||
+                    event.optString("codigo_operacion").startsWith("OPA-TI-", true)
+                val cocktailReservation = type in setOf("cocteleria", "coctelería", "cocktail") && onlineReservation
                 val pending = event.optString("estado").equals("pendiente", true) &&
-                    !event.optString("tipo").equals("bloqueo", true) &&
-                    event.optString("motivo").contains("reserva cliente tienda online", true)
+                    type != "bloqueo" && (onlineReservation || cocktailReservation)
                 if (pending) {
                     active.put(id)
                     if (baseline && id !in known) {
@@ -250,7 +259,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
                 .any { it.optString("key") == key }
             if (!exists) return
             showAlert(context, key)
-            scheduleRepeat(context, key, POLL_INTERVAL_MS)
+            scheduleRepeat(context, key, ALERT_REPEAT_INTERVAL_MS)
         }
 
         private fun repeatSavedAlerts(context: Context) {

@@ -49,4 +49,4 @@ En iMin Swift 2 se usa el SDK oficial iMin Printer v2 y papel de 58 mm. Otros An
 
 ## Avisos de pedidos
 
-La APK consulta pedidos y cotizaciones pendientes mediante alarmas nativas mientras está en segundo plano. Los avisos se repiten cada cinco minutos hasta abrir la notificación, atender el pedido o confirmar la cotización. Requiere permisos de Notificaciones y Alarmas exactas; Android puede retrasar alarmas por ahorro de batería y no ejecuta tareas si el usuario fuerza la detención de la app. El sondeo requiere que siga vigente la sesión administrativa.
+La APK consulta pedidos y cotizaciones pendientes mediante alarmas nativas cada minuto mientras está en segundo plano. Los avisos se repiten cada cinco minutos hasta abrir la notificación, atender el pedido o confirmar la cotización. La consulta de pedidos requiere una sesión administrativa vigente; Agenda también se consulta sin depender de esa cookie. Requiere permisos de Notificaciones y Alarmas exactas; Android puede retrasar alarmas por ahorro de batería y no ejecuta tareas si el usuario fuerza la detención de la app.
