@@ -4534,7 +4534,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         c.drawCentredString(center_x, band_y + band_h - 17, "TOTAL FINAL")
         c.setFillColorRGB(*orange)
         c.setFont("Helvetica-Bold", 18)
-        c.drawCentredString(center_x, band_y + band_h / 2 - 4, _fmt_money(saldo_final))
+        c.drawCentredString(center_x, band_y + band_h / 2 - 4, _fmt_money(total_final))
         c.setFillColorRGB(*muted)
         c.setFont("Helvetica", 7.2)
         c.drawCentredString(center_x, band_y + 9, "Pedido pagado" if saldo_final <= 0.5 else "Saldo pendiente por pagar")

@@ -140,7 +140,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
             filename = app_module._crear_pdf_reserva_agenda_tienda({
                 "id": 812, "codigo_pedido": "AGD-TEST-COCTEL", "fecha": "2026-11-03",
                 "hora_inicio": "15:00", "cliente": "Cliente de prueba", "telefono": "+56912345678",
-                "total": 31500, "estado": "pendiente", "motivo": "Reserva cliente tienda online",
+                "total": 31500, "abono": 10100, "estado": "pendiente", "motivo": "Reserva cliente tienda online",
                 "titulo": "Cocteleria - 2 productos",
                 "ingredientes": "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30",
             })
@@ -152,6 +152,9 @@ class CocteleriaCatalogTests(unittest.TestCase):
         text = "\n".join(page.extract_text() or "" for page in pages)
         for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "$18.000", "$13.500", "$31.500"):
             self.assertIn(expected, text)
+        total_final_pos = text.index("TOTAL FINAL")
+        self.assertIn("$31.500", text[total_final_pos:])
+        self.assertIn("$21.400", text)
 
 
 if __name__ == "__main__":
