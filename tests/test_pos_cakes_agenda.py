@@ -2,6 +2,7 @@ import unittest
 import os
 import sqlite3
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -26,13 +27,13 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_143(self):
+    def test_updated_pos_apk_is_available_as_version_144(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.3', page.get_data(as_text=True))
+        self.assertIn('1.4.4', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.3')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.4')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
@@ -211,6 +212,46 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('La fecha del pedido cambiará de', template)
         self.assertIn('confirmar_cambio_fecha: confirmarCambioFecha', template)
         self.assertIn('confirmar_cambio_fecha: fechaModificada', template)
+
+    def test_personal_agenda_reminders_save_and_reject_past_due_dates(self):
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(database, 'DB_PATH', os.path.join(temp_dir, 'agenda.sqlite')):
+            conn = sqlite3.connect(database.DB_PATH)
+            conn.execute('''CREATE TABLE agenda_notas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT NOT NULL, contenido TEXT,
+                tipo TEXT DEFAULT 'texto', checklist_json TEXT, color TEXT, fijada INTEGER,
+                recordatorio TEXT, estado TEXT, creada TEXT DEFAULT CURRENT_TIMESTAMP,
+                actualizada TEXT DEFAULT CURRENT_TIMESTAMP
+            )''')
+            conn.commit()
+            conn.close()
+
+            future = (datetime.now(database.ZONA_HORARIA_CHILE).replace(tzinfo=None) + timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M')
+            saved = database.guardar_nota_agenda({
+                'titulo': 'Revisar pedido', 'contenido': 'Confirmar decoración', 'tipo': 'recordatorio',
+                'estado': 'activa', 'recordatorio': future,
+            })
+            self.assertTrue(saved['success'])
+            notes = database.obtener_notas_agenda()
+            self.assertEqual(notes[0]['tipo'], 'recordatorio')
+            self.assertEqual(notes[0]['titulo'], 'Revisar pedido')
+
+            past = (datetime.now(database.ZONA_HORARIA_CHILE).replace(tzinfo=None) - timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M')
+            rejected = database.guardar_nota_agenda({
+                'titulo': 'Vencido', 'tipo': 'recordatorio', 'estado': 'activa', 'recordatorio': past,
+            })
+            self.assertFalse(rejected['success'])
+
+    def test_personal_reminders_render_in_calendar_and_sync_to_native_alarm_bridge(self):
+        template = (Path(__file__).resolve().parents[1] / 'templates' / 'agenda.html').read_text(encoding='utf-8')
+        receiver = (Path(__file__).resolve().parents[1] / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'AgendaReminderReceiver.kt').read_text(encoding='utf-8')
+        manifest = (Path(__file__).resolve().parents[1] / 'android_pos' / 'app' / 'src' / 'main' / 'AndroidManifest.xml').read_text(encoding='utf-8')
+        self.assertIn('function nuevoRecordatorioPersonal()', template)
+        self.assertIn('function recordatoriosPersonalesActivos()', template)
+        self.assertIn("new Date(raw).getTime() > now", template)
+        self.assertIn('syncAgendaReminders(JSON.stringify', template)
+        self.assertIn('setExactAndAllowWhileIdle', receiver)
+        self.assertIn('ACTION_BOOT_COMPLETED', receiver.replace('Intent.ACTION_BOOT_COMPLETED', 'ACTION_BOOT_COMPLETED'))
+        self.assertIn('android.intent.action.BOOT_COMPLETED', manifest)
 
 
 if __name__ == '__main__':

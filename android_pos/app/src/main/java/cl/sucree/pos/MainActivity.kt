@@ -41,6 +41,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 import android.net.http.SslError
@@ -313,8 +314,11 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun posStartUrl(source: Intent): String =
-        if (source.getBooleanExtra("show_orders", false)) "${BuildConfig.POS_URL}?tab=orders" else BuildConfig.POS_URL
+    private fun posStartUrl(source: Intent): String = when {
+        source.getBooleanExtra("show_orders", false) -> "${BuildConfig.POS_URL}?tab=orders"
+        source.getBooleanExtra("show_reminders", false) -> "${BuildConfig.POS_URL}?tab=tortas"
+        else -> BuildConfig.POS_URL
+    }
 
     private fun createOrderNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -373,6 +377,21 @@ class MainActivity : Activity() {
     }
 
     private inner class PosBridge {
+        @JavascriptInterface
+        fun syncAgendaReminders(payload: String) {
+            runOnUiThread {
+                val page = Uri.parse(webView.url ?: "")
+                if (page.scheme != "https" || page.host !in setOf("pasteleriasucree.cl", "www.pasteleriasucree.cl") ||
+                    page.path != "/admin/pos/mobile" || payload.length > 64_000
+                ) return@runOnUiThread
+                try {
+                    AgendaReminderReceiver.syncFromAgenda(this@MainActivity, JSONArray(payload))
+                } catch (_: Exception) {
+                    Toast.makeText(this@MainActivity, "No se pudieron sincronizar los recordatorios.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
         @JavascriptInterface
         fun downloadAgendaPdf(orderId: String) {
             runOnUiThread {
@@ -451,7 +470,7 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra("show_orders", false)) {
+        if (intent.getBooleanExtra("show_orders", false) || intent.getBooleanExtra("show_reminders", false)) {
             webView.loadUrl(posStartUrl(intent))
         }
     }
@@ -475,6 +494,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        AgendaReminderReceiver.rescheduleSaved(this)
         if (webView.url != null) uiHandler.post(saleScreenPoll)
     }
 

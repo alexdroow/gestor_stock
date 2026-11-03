@@ -778,6 +778,12 @@
             color: #9a3412;
             border: 1px solid #fdba74;
         }
+        .day-event.personal-reminder { background:#fff1db; color:#9a4d05; border:1px solid #f3c98d; cursor:pointer; }
+        .agenda-reminder-card { display:grid; gap:4px; width:100%; padding:9px; border:1px solid #f1c98f; border-left:4px solid #ed7900; border-radius:10px; background:#fff8e9; color:#53300e; text-align:left; cursor:pointer; }
+        .agenda-reminder-card strong { font-size:11px; }
+        .agenda-reminder-card span { font-size:12px; font-weight:750; }
+        .agenda-reminder-card small { color:#805b32; font-size:10px; }
+        .nota-badge.reminder { background:#fff0d2; color:#9a4d05; }
 
         .agenda-week-grid {
             display: grid;
@@ -3472,6 +3478,8 @@
             .mobile-agenda-time::after { content:""; position:absolute; top:17px; right:-5px; width:6px; height:6px; border-radius:50%; background:#ef6a12; box-shadow:0 0 0 3px #fff3e6; }
             .mobile-agenda-event-card { width:100%; min-width:0; border:1px solid #e7ebf0; border-radius:10px; background:#fff; padding:9px; text-align:left; color:#273548; box-shadow:0 2px 6px rgba(25,39,52,.04); }
             .mobile-agenda-event-card.selected,.mobile-agenda-event-card.borrador { border-color:#f16a13; background:#fffaf4; }
+            .mobile-agenda-event-card.personal-reminder-card { border-color:#f1c98f; background:#fff8e9; color:#70420c; }
+            .mobile-agenda-event.personal-reminder-row .mobile-agenda-time { color:#a65b0a; }
             .mobile-agenda-event-head { display:flex; justify-content:space-between; gap:6px; align-items:flex-start; }
             .mobile-agenda-event-head strong { font-size:12px; line-height:1.25; }
             .mobile-agenda-event-card p { margin-top:4px; color:#68778c; font-size:10px; line-height:1.3; }
@@ -3865,6 +3873,7 @@
                                 <button type="button" data-view="semana" onclick="cambiarVistaAgenda('semana')">Semana</button>
                                 <button type="button" data-view="lista" onclick="cambiarVistaAgenda('lista')">Lista</button>
                             </div>
+                            <button type="button" class="btn btn-primary agenda-reminder-create" onclick="nuevoRecordatorioPersonal()">+ Recordatorio</button>
                         </div>
                         <div class="agenda-toolbar">
                             <div class="agenda-search">
@@ -4575,6 +4584,7 @@
                     <select id="nota-tipo" onchange="cambiarTipoNotaUI()">
                         <option value="texto">Texto</option>
                         <option value="checklist">Checklist</option>
+                        <option value="recordatorio">Recordatorio personal</option>
                     </select>
                 </div>
                 <div class="form-group" id="nota-contenido-group">
@@ -6078,12 +6088,13 @@
         }
 
         function cambiarTipoNotaUI() {
-            const tipo = (document.getElementById('nota-tipo')?.value || 'texto') === 'checklist' ? 'checklist' : 'texto';
+            const tipoSeleccionado = document.getElementById('nota-tipo')?.value || 'texto';
+            const tipo = ['texto', 'checklist', 'recordatorio'].includes(tipoSeleccionado) ? tipoSeleccionado : 'texto';
             const contenidoGroup = document.getElementById('nota-contenido-group');
             const checklistGroup = document.getElementById('nota-checklist-group');
 
             if (contenidoGroup) {
-                contenidoGroup.style.display = tipo === 'texto' ? '' : 'none';
+                contenidoGroup.style.display = tipo !== 'checklist' ? '' : 'none';
             }
             if (checklistGroup) {
                 checklistGroup.style.display = tipo === 'checklist' ? '' : 'none';
@@ -6889,6 +6900,60 @@
             return fecha.toLocaleString('es-CL');
         }
 
+        function recordatoriosPersonalesActivos() {
+            const now = Date.now();
+            return (Array.isArray(notasAgenda) ? notasAgenda : []).filter(nota => {
+                if (!nota || nota.tipo !== 'recordatorio' || nota.estado === 'completada' || !nota.recordatorio) return false;
+                const raw = formatoFechaHoraNota(nota.recordatorio);
+                return raw && new Date(raw).getTime() > now;
+            }).map(nota => {
+                const raw = formatoFechaHoraNota(nota.recordatorio);
+                return {
+                    id: -Math.abs(Number(nota.id || 0)), nota_id: Number(nota.id || 0),
+                    tipo: 'recordatorio_personal', es_recordatorio_personal: true,
+                    titulo: nota.titulo || 'Recordatorio personal', contenido: nota.contenido || '',
+                    fecha: raw.slice(0, 10), hora_inicio: raw.slice(11, 16)
+                };
+            });
+        }
+
+        function recordatoriosPersonalesEnRango(rango = rangoVisibleAgenda()) {
+            return recordatoriosPersonalesActivos().filter(recordatorio => eventoDentroRangoAgenda(recordatorio, rango));
+        }
+
+        let agendaReminderTimers = new Map();
+        function sincronizarRecordatoriosPersonales() {
+            const reminders = recordatoriosPersonalesActivos();
+            const bridge = window.SucreePosAndroid;
+            if (bridge && typeof bridge.syncAgendaReminders === 'function') {
+                bridge.syncAgendaReminders(JSON.stringify(reminders.map(reminder => {
+                    const note = notasAgenda.find(item => Number(item.id) === Number(reminder.nota_id));
+                    const due = new Date(`${reminder.fecha}T${reminder.hora_inicio}`).getTime();
+                    return { id: reminder.nota_id, title: reminder.titulo, body: note?.contenido || '', due_at_ms: due };
+                })));
+            }
+            agendaReminderTimers.forEach(timer => clearTimeout(timer));
+            agendaReminderTimers.clear();
+            if (!('Notification' in window)) return;
+            reminders.forEach(reminder => {
+                const due = new Date(`${reminder.fecha}T${reminder.hora_inicio}`).getTime();
+                const schedule = () => {
+                    const delay = due - Date.now();
+                    if (delay <= 0) return;
+                    const timer = setTimeout(() => {
+                        if (Date.now() < due - 1000) { schedule(); return; }
+                        const note = notasAgenda.find(item => Number(item.id) === Number(reminder.nota_id));
+                        const body = note?.contenido || 'Es hora de revisar tu recordatorio.';
+                        if (Notification.permission === 'granted') new Notification(reminder.titulo, { body, tag: `agenda-reminder-${reminder.nota_id}` });
+                        else window.alert(`Recordatorio personal: ${reminder.titulo}${body ? `\\n${body}` : ''}`);
+                        renderizarCalendario();
+                    }, Math.min(delay, 2147480000));
+                    agendaReminderTimers.set(reminder.nota_id, timer);
+                };
+                schedule();
+            });
+        }
+
         async function cargarNotasAgenda() {
             try {
                 const response = await fetch('/api/agenda/notas');
@@ -6898,6 +6963,8 @@
                 }
                 notasAgenda = Array.isArray(data.notas) ? data.notas : [];
                 renderizarNotasAgenda();
+                sincronizarRecordatoriosPersonales();
+                renderizarCalendario();
                 verificarNotificaciones();
             } catch (error) {
                 const grid = document.getElementById('notas-grid');
@@ -6930,7 +6997,7 @@
                 const color = nota.color || 'amarilla';
                 const estado = nota.estado || 'activa';
                 const recordatorioTxt = textoRecordatorioNota(nota.recordatorio);
-                const tipo = (nota.tipo || 'texto') === 'checklist' ? 'checklist' : 'texto';
+                const tipo = ['checklist', 'recordatorio'].includes(nota.tipo) ? nota.tipo : 'texto';
                 const checklist = normalizarChecklistNota(nota.checklist);
                 const checklistCompletadas = checklist.filter(item => item.completada).length;
                 const contenido = (nota.contenido || '').trim();
@@ -6955,6 +7022,7 @@
                             <div class="nota-title">${escapeHtml(nota.titulo || 'Nota')}</div>
                             <div class="nota-badges">
                                 ${nota.fijada ? '<span class="nota-badge">fijada</span>' : ''}
+                                ${tipo === 'recordatorio' ? '<span class="nota-badge reminder">Recordatorio</span>' : ''}
                                 ${tipo === 'checklist' ? `<span class="nota-badge">${checklistCompletadas}/${checklist.length}</span>` : ''}
                             </div>
                         </div>
@@ -6989,6 +7057,19 @@
             document.getElementById('modal-nota').classList.add('active');
         }
 
+        function nuevoRecordatorioPersonal() {
+            nuevaNotaAgenda();
+            document.getElementById('nota-modal-title').textContent = 'Nuevo recordatorio personal';
+            document.getElementById('nota-tipo').value = 'recordatorio';
+            document.getElementById('nota-color').value = 'naranja';
+            const due = new Date();
+            due.setHours(due.getHours() + 1, 0, 0, 0);
+            const pad = value => String(value).padStart(2, '0');
+            document.getElementById('nota-recordatorio').value = `${due.getFullYear()}-${pad(due.getMonth()+1)}-${pad(due.getDate())}T${pad(due.getHours())}:${pad(due.getMinutes())}`;
+            document.getElementById('nota-contenido').placeholder = 'Detalle opcional del recordatorio';
+            cambiarTipoNotaUI();
+        }
+
         function editarNotaAgenda(id) {
             const nota = notasAgenda.find(n => Number(n.id) === Number(id));
             if (!nota) return;
@@ -6998,7 +7079,7 @@
             document.getElementById('nota-id').value = nota.id;
             document.getElementById('nota-titulo').value = nota.titulo || '';
             document.getElementById('nota-contenido').value = nota.contenido || '';
-            document.getElementById('nota-tipo').value = (nota.tipo || 'texto') === 'checklist' ? 'checklist' : 'texto';
+            document.getElementById('nota-tipo').value = ['checklist', 'recordatorio'].includes(nota.tipo) ? nota.tipo : 'texto';
             document.getElementById('nota-color').value = nota.color || 'amarilla';
             document.getElementById('nota-estado').value = nota.estado || 'activa';
             document.getElementById('nota-recordatorio').value = formatoFechaHoraNota(nota.recordatorio);
@@ -7016,8 +7097,13 @@
         }
 
         async function guardarNotaAgenda() {
-            const tipo = (document.getElementById('nota-tipo').value || 'texto') === 'checklist' ? 'checklist' : 'texto';
+            const tipoSeleccionado = document.getElementById('nota-tipo').value || 'texto';
+            const tipo = ['texto', 'checklist', 'recordatorio'].includes(tipoSeleccionado) ? tipoSeleccionado : 'texto';
             const checklist = normalizarChecklistNota(notaChecklistDraft);
+            if (tipo === 'recordatorio' && !document.getElementById('nota-recordatorio').value) {
+                alert('Selecciona el dia y la hora del recordatorio.');
+                return;
+            }
             const payload = {
                 id: document.getElementById('nota-id').value || null,
                 titulo: document.getElementById('nota-titulo').value.trim() || 'Nota',
@@ -7031,6 +7117,9 @@
             };
 
             try {
+                if (tipo === 'recordatorio' && 'Notification' in window && Notification.permission === 'default') {
+                    try { await Notification.requestPermission(); } catch (_) {}
+                }
                 const response = await fetch('/api/agenda/nota', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -7073,7 +7162,7 @@
                 id: nota.id,
                 titulo: nota.titulo || 'Nota',
                 contenido: nota.contenido || '',
-                tipo: (nota.tipo || 'texto') === 'checklist' ? 'checklist' : 'texto',
+                tipo: ['checklist', 'recordatorio'].includes(nota.tipo) ? nota.tipo : 'texto',
                 checklist: normalizarChecklistNota(nota.checklist),
                 color: nota.color || 'amarilla',
                 estado: nuevoEstado,
@@ -8226,6 +8315,7 @@
             const visibles = eventosFiltradosAgenda().filter((evento) => String(evento.tipo || '').toLowerCase() !== 'bloqueo');
             const selectedDate = agendaVista === 'semana' ? fechaSeleccionada : (fechaSeleccionada || formatearFecha(new Date()));
             const dayBlocks = bloqueosAgendaEnFecha(selectedDate);
+            const dayReminders = recordatoriosPersonalesActivos().filter(item => item.fecha === selectedDate);
             let weekStrip = '';
             if (agendaVista === 'semana') {
                 const start = inicioSemanaLunes(fechaActual);
@@ -8234,7 +8324,7 @@
                 weekStrip = `<div class="mobile-week-strip" role="tablist" aria-label="Seleccionar dia de la semana">${Array.from({ length: 7 }, (_, index) => {
                     const date = sumarDiasAgenda(start, index);
                     const iso = formatearFecha(date);
-                    const count = visibles.filter((event) => event.fecha === iso).length;
+                    const count = visibles.filter((event) => event.fecha === iso).length + recordatoriosPersonalesActivos().filter(item => item.fecha === iso).length;
                     const blocked = bloqueosAgendaEnFecha(iso).length > 0;
                     return `<button type="button" class="mobile-week-day ${iso === selectedDate ? 'selected' : ''} ${blocked ? 'has-block' : ''}" title="${blocked ? 'Este dia tiene un bloqueo registrado' : ''}" role="tab" aria-label="${weekdays[index]} ${date.getDate()}${blocked ? ', dia bloqueado' : ''}" aria-selected="${iso === selectedDate}" onclick="seleccionarDiaCalendario('${iso}')"><small>${weekdays[index]}</small><strong>${date.getDate()}</strong>${blocked ? '<span class="mobile-week-blocked">BLOQ</span>' : (count ? '<em aria-label="Tiene pedidos"></em>' : '')}</button>`;
                 }).join('')}</div>`;
@@ -8248,9 +8338,10 @@
                 const product = _resumenCatalogoTorta(event).categoria;
                 return `<div class="mobile-agenda-event"><div class="mobile-agenda-time">${escapeHtml(time)}</div><button type="button" class="mobile-agenda-event-card ${esEventoBorrador(event) ? 'borrador' : ''}" onclick="abrirDetallePedidoAgenda(${Number(event.id || 0)})"><div class="mobile-agenda-event-head"><strong>${escapeHtml(event.cliente || 'Sin cliente')}</strong><span class="agenda-status-pill ${escapeHtml(status)}">${escapeHtml(labelEstadoOperativoAgenda(status))}</span></div><p>${escapeHtml(product && product !== '-' ? product : event.titulo || 'Pedido')}</p><div class="mobile-agenda-event-meta"><span>${agendaEsDespacho(event) ? 'Despacho' : 'Retiro'}</span>${saldo > 0 ? `<strong style="color:#c2410c">${escapeHtml(formatoMonedaCLP(saldo))} pendiente</strong>` : ''}<span>${escapeHtml(String(event.codigo_pedido || '').trim())}</span></div></button></div>`;
             }).join('');
+            const reminderRows = dayReminders.map(item => `<div class="mobile-agenda-event personal-reminder-row"><div class="mobile-agenda-time">${escapeHtml(item.hora_inicio)}</div><button type="button" class="mobile-agenda-event-card personal-reminder-card" onclick="editarNotaAgenda(${item.nota_id})"><div class="mobile-agenda-event-head"><strong>Recordatorio personal</strong><span aria-hidden="true">&#128276;</span></div><p>${escapeHtml(item.titulo)}</p>${item.contenido ? `<div class="mobile-agenda-event-meta">${escapeHtml(item.contenido)}</div>` : ''}</button></div>`).join('');
             const blockRows = dayBlocks.map((block) => `<button type="button" class="mobile-agenda-block" onclick="editarEvento(${Number(block.id || 0)})"><strong>Bloqueo registrado</strong><b>${escapeHtml(etiquetaHorarioBloqueoAgenda(block))}</b><small>${escapeHtml(block.motivo || block.titulo || 'No se indicó motivo')} · Editar bloqueo</small></button>`).join('');
-            const dayContent = `${blockRows}${rows}`;
-            grid.innerHTML = `${weekStrip}<div class="mobile-agenda-day-title"><span>${agendaVista === 'semana' ? `Agenda del ${dayLabel}` : dayLabel}${dayBlocks.length ? ' · Con bloqueo' : ''}</span><small>${dayEvents.length} ${dayEvents.length === 1 ? 'pedido' : 'pedidos'}${dayBlocks.length ? ` · ${dayBlocks.length} bloqueo(s)` : ''}</small></div><div class="mobile-agenda-timeline">${dayContent || '<div class="mobile-agenda-empty">No hay pedidos agendados para este dia.</div>'}</div>`;
+            const dayContent = `${blockRows}${rows}${reminderRows}`;
+            grid.innerHTML = `${weekStrip}<div class="mobile-agenda-day-title"><span>${agendaVista === 'semana' ? `Agenda del ${dayLabel}` : dayLabel}${dayBlocks.length ? ' · Con bloqueo' : ''}</span><small>${dayEvents.length} ${dayEvents.length === 1 ? 'pedido' : 'pedidos'}${dayReminders.length ? ` · ${dayReminders.length} recordatorio(s)` : ''}${dayBlocks.length ? ` · ${dayBlocks.length} bloqueo(s)` : ''}</small></div><div class="mobile-agenda-timeline">${dayContent || '<div class="mobile-agenda-empty">No hay pedidos ni recordatorios para este dia.</div>'}</div>`;
         }
 
         function renderizarListaAgendaMovil(orderTab = false) {
@@ -8266,7 +8357,9 @@
                 });
                 document.querySelectorAll('#mobile-agenda-order-tabs [data-order-tab]').forEach((button) => button.classList.toggle('active', button.dataset.orderTab === agendaMobileOrdersTab));
             }
-            rows = rows.filter(eventoPasaFiltrosAgenda).sort((a,b) => `${a.fecha || ''} ${a.hora_entrega || a.hora_inicio || ''}`.localeCompare(`${b.fecha || ''} ${b.hora_entrega || b.hora_inicio || ''}`));
+            rows = rows.filter(eventoPasaFiltrosAgenda);
+            if (!orderTab) rows = [...rows, ...recordatoriosPersonalesEnRango()];
+            rows.sort((a,b) => `${a.fecha || ''} ${a.hora_entrega || a.hora_inicio || ''}`.localeCompare(`${b.fecha || ''} ${b.hora_entrega || b.hora_inicio || ''}`));
             if (!rows.length) {
                 grid.innerHTML = `<div class="mobile-agenda-empty">${orderTab ? 'No hay pedidos en esta lista.' : 'No hay pedidos para el periodo o los filtros seleccionados.'}</div>`;
                 return;
@@ -8274,6 +8367,7 @@
             const monthNames = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
             grid.innerHTML = rows.map((event) => {
                 const dt = parseFechaISO(event.fecha);
+                if (event.es_recordatorio_personal) return `<button type="button" class="mobile-order-row personal-reminder-list" onclick="editarNotaAgenda(${event.nota_id})"><span class="mobile-order-date">${dt ? monthNames[dt.getMonth()] : ''}<strong>${dt ? dt.getDate() : '--'}</strong>${escapeHtml(event.hora_inicio)}</span><span class="mobile-order-copy"><strong>Recordatorio personal</strong><span>${escapeHtml(event.titulo)}</span></span><span class="mobile-order-arrow">&#128276;</span></button>`;
                 const status = obtenerEstadoOperativoAgenda(event);
                 const saldo = obtenerSaldoAgenda(event);
                 const time = String(event.hora_entrega || event.hora_inicio || '--:--').slice(0,5);
@@ -8307,7 +8401,8 @@
             const hoy = new Date();
             const eventosVisiblesMes = [
                 ...eventosFiltradosAgenda(),
-                ...bloqueosEnRangoAgenda({ inicio: primerDia, fin: ultimoDia })
+                ...bloqueosEnRangoAgenda({ inicio: primerDia, fin: ultimoDia }),
+                ...recordatoriosPersonalesEnRango({ inicio: primerDia, fin: ultimoDia })
             ];
 
             // Espacios vacÃ­os antes
@@ -8352,13 +8447,15 @@
                     eventosDia.slice(0, 3).forEach(ev => {
                         const span = document.createElement('span');
                         span.className = `day-event ${claseCssEvento(ev)}`;
+                        if (ev.es_recordatorio_personal) span.classList.add('personal-reminder');
                         const prefijo = esEventoBorrador(ev) ? '\uD83D\uDCDD ' : '';
-                        span.textContent = ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`;
+                        span.textContent = ev.es_recordatorio_personal ? `\u23F0 ${ev.titulo}` : (ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`);
                         span.title = ev.tipo === 'bloqueo'
                             ? `${etiquetaHorarioBloqueoAgenda(ev)} · ${ev.motivo || 'Bloqueo registrado'} · Click para editar`
-                            : 'Click: ver resumen - Doble click: abrir resumen - Click derecho: ir directo a ficha';
+                            : (ev.es_recordatorio_personal ? `${ev.hora_inicio} · ${ev.contenido || ev.titulo} · Click para editar recordatorio` : 'Click: ver resumen - Doble click: abrir resumen - Click derecho: ir directo a ficha');
                         span.onclick = (event) => {
                             event.stopPropagation();
+                            if (ev.es_recordatorio_personal) { editarNotaAgenda(ev.nota_id); return; }
                             if (String(ev.tipo || '').toLowerCase() === 'bloqueo') {
                                 editarEvento(Number(ev.id || 0));
                                 return;
@@ -8409,6 +8506,9 @@
         }
 
         function renderizarTarjetaPedidoAgenda(evento) {
+            if (evento?.es_recordatorio_personal) {
+                return `<button type="button" class="agenda-reminder-card" onclick="event.stopPropagation(); editarNotaAgenda(${evento.nota_id})"><strong>${escapeHtml(evento.hora_inicio)} · Recordatorio</strong><span>${escapeHtml(evento.titulo)}</span>${evento.contenido ? `<small>${escapeHtml(evento.contenido)}</small>` : ''}</button>`;
+            }
             const id = Number(evento.id || 0);
             const hora = String(evento.hora_entrega || evento.hora_inicio || '').substring(0, 5) || 'Sin hora';
             const cliente = String(evento.cliente || 'Sin cliente').trim() || 'Sin cliente';
@@ -8445,6 +8545,7 @@
                 const fechaStr = formatearFecha(fecha);
                 const pedidos = visibles.filter((ev) => ev.fecha === fechaStr);
                 const bloqueos = bloqueosVisibles.filter((ev) => ev.fecha === fechaStr);
+                const reminders = recordatoriosPersonalesEnRango({ inicio: fecha, fin: fecha });
                 const selected = fechaSeleccionada === fechaStr;
                 return `
                     <section class="agenda-week-day ${fechaStr === hoy ? 'today' : ''} ${selected ? 'selected' : ''} ${bloqueos.length ? 'blocked' : ''}" onclick="seleccionarDiaCalendario('${fechaStr}')">
@@ -8456,6 +8557,7 @@
                         </header>
                         <div class="agenda-week-list">
                             ${bloqueos.map((block) => `<div class="agenda-week-block" title="${escapeHtml(block.motivo || block.titulo || 'Bloqueo registrado')}">&#9940; ${escapeHtml(etiquetaHorarioBloqueoAgenda(block))}<small>${escapeHtml(block.motivo || block.titulo || 'Bloqueo registrado')}</small></div>`).join('')}
+                            ${reminders.map(renderizarTarjetaPedidoAgenda).join('')}
                             ${pedidos.map(renderizarTarjetaPedidoAgenda).join('')}
                             <button type="button" class="agenda-day-add" onclick="event.stopPropagation(); agendarTortaManual('${fechaStr}')">+ Agendar</button>
                         </div>
@@ -8469,12 +8571,13 @@
             if (!grid) return;
             grid.className = 'agenda-list-view';
             document.getElementById('mes-actual').textContent = textoPeriodoAgenda();
-            const lista = eventosFiltradosAgenda();
+            const lista = [...eventosFiltradosAgenda(), ...recordatoriosPersonalesEnRango()].sort((a,b) => `${a.fecha || ''} ${a.hora_inicio || ''}`.localeCompare(`${b.fecha || ''} ${b.hora_inicio || ''}`));
             if (!lista.length) {
                 grid.innerHTML = '<div class="agenda-empty-state">No hay pedidos para el periodo o filtros seleccionados.</div>';
                 return;
             }
             grid.innerHTML = lista.map((evento) => {
+                if (evento.es_recordatorio_personal) return `<button type="button" class="agenda-list-row personal-reminder-list" onclick="editarNotaAgenda(${evento.nota_id})"><div><strong>${escapeHtml(evento.hora_inicio)}</strong><br><span>${escapeHtml(formatearFechaLarga(evento.fecha))}</span></div><div><strong>Recordatorio personal</strong><br><span>${escapeHtml(evento.titulo)}</span></div><span class="nota-badge reminder">Pendiente</span><span>Personal</span><strong>&#128276;</strong></button>`;
                 const id = Number(evento.id || 0);
                 const estado = obtenerEstadoOperativoAgenda(evento);
                 const saldo = obtenerSaldoAgenda(evento);
@@ -10772,7 +10875,7 @@
             });
 
             notasAgenda.forEach(nota => {
-                if (!nota || nota.estado === 'completada' || !nota.recordatorio) return;
+                if (!nota || nota.estado === 'completada' || nota.tipo === 'recordatorio' || !nota.recordatorio) return;
                 const fechaNota = new Date(formatoFechaHoraNota(nota.recordatorio));
                 if (Number.isNaN(fechaNota.getTime())) return;
                 const minutosHasta = (fechaNota - ahora) / (1000 * 60);

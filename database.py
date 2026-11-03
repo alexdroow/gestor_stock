@@ -9092,7 +9092,7 @@ def migrar_db():
             UPDATE agenda_notas
             SET tipo = CASE
                 WHEN tipo IS NULL OR TRIM(tipo) = '' THEN 'texto'
-                WHEN LOWER(TRIM(tipo)) IN ('texto', 'checklist') THEN LOWER(TRIM(tipo))
+                WHEN LOWER(TRIM(tipo)) IN ('texto', 'checklist', 'recordatorio') THEN LOWER(TRIM(tipo))
                 ELSE 'texto'
             END
             """
@@ -13262,7 +13262,10 @@ def _normalizar_estado_nota(estado):
 
 
 def _normalizar_tipo_nota(tipo):
-    return "checklist" if str(tipo or "").strip().lower() == "checklist" else "texto"
+    tipo = str(tipo or "").strip().lower()
+    if tipo in {"checklist", "recordatorio"}:
+        return tipo
+    return "texto"
 
 
 def _normalizar_checklist_nota(checklist):
@@ -14323,6 +14326,16 @@ def guardar_nota_agenda(nota):
     fijada = 1 if payload.get("fijada", False) else 0
     estado = _normalizar_estado_nota(payload.get("estado"))
     recordatorio = _to_db_datetime(payload.get("recordatorio"))
+    if tipo == "recordatorio" and estado == "activa":
+        if not recordatorio:
+            return {"success": False, "error": "Indica la fecha y hora del recordatorio"}
+        try:
+            fecha_recordatorio = datetime.fromisoformat(recordatorio)
+        except ValueError:
+            return {"success": False, "error": "La fecha y hora del recordatorio no son validas"}
+        ahora_chile = datetime.now(ZONA_HORARIA_CHILE).replace(tzinfo=None)
+        if fecha_recordatorio <= ahora_chile:
+            return {"success": False, "error": "El recordatorio debe tener una fecha futura"}
 
     conn = get_db()
     cursor = conn.cursor()
