@@ -1245,6 +1245,8 @@
             margin-bottom: 2px;
             overflow-wrap: anywhere;
         }
+        .agenda-cocktail-items { display: grid; gap: 7px; margin-top: 10px; }
+        .agenda-cocktail-item { padding: 9px 10px; border: 1px solid #ead8c5; border-radius: 8px; background: #fffaf4; color: #49301e; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
 
         .agenda-pay-row {
             display: flex;
@@ -8781,6 +8783,15 @@
             return out;
         }
 
+        function detalleCocteleriaAgenda(evento) {
+            const sections = detalleEnSecciones(String((evento && evento.ingredientes) || ''), 'Detalle pedido');
+            const section = sections.find((s) => String((s && s.titulo) || '').trim().toLowerCase() === 'reserva de cocteleria');
+            const items = (Array.isArray(section && section.items) ? section.items : [])
+                .map((line) => String(line || '').trim().replace(/^[-*]\s*/, ''))
+                .filter((line) => line && !/^total de productos:/i.test(line));
+            return { isCocktail: Boolean(section) || String((evento && evento.tipo) || '').toLowerCase() === 'cocteleria', items };
+        }
+
         function asegurarDraftEdicionRapidaAgenda(evento) {
             if (!evento) return null;
             const id = Number(evento.id || 0);
@@ -9268,6 +9279,7 @@
             asegurarDraftEdicionRapidaAgenda(eventoBase);
             const evento = eventoVistaPanelAgenda(eventoBase);
             const detalle = detalleCatalogoCompletoAgenda(evento);
+            const cocktail = detalleCocteleriaAgenda(evento);
             const estado = obtenerEstadoOperativoAgenda(evento);
             const seguimiento = normalizarEstadoSeguimientoAgenda(evento.seguimiento_estado || estado);
             const total = Number(evento.total || 0);
@@ -9321,13 +9333,13 @@
                         </div>
                     </section>
                     <section class="agenda-detail-section">
-                        <div class="agenda-detail-title">${quickEditableAgenda('titulo', evento.titulo || '', 'text', { display: detalle.categoria || evento.titulo || 'Producto' })}</div>
-                        <div class="agenda-detail-grid">
+                        <div class="agenda-detail-title">${quickEditableAgenda('titulo', evento.titulo || '', 'text', { display: cocktail.isCocktail ? 'Detalle de cocteleria' : (detalle.categoria || evento.titulo || 'Producto') })}</div>
+                        ${cocktail.isCocktail ? `<div class="agenda-cocktail-items">${cocktail.items.length ? cocktail.items.map((item) => `<div class="agenda-cocktail-item">${escapeHtml(item)}</div>`).join('') : '<div class="agenda-cocktail-item">No hay lineas de productos guardadas.</div>'}</div>` : `<div class="agenda-detail-grid">
                             <div><strong>${escapeHtml(detalle.tamano || '-')}</strong>Tamano</div>
                             <div><strong>${escapeHtml((detalle.sabores || []).join(', ') || '-')}</strong>Rellenos</div>
                             <div><strong>${escapeHtml((detalle.extras || []).join(', ') || '-')}</strong>Extras</div>
                             <div><strong>${escapeHtml(detalle.topper || 'Sin topper')}</strong>Topper</div>
-                        </div>
+                        </div>`}
                     </section>
                     <section class="agenda-detail-section">
                         <div class="agenda-detail-title">Pago</div>

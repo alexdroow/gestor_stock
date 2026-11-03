@@ -3766,14 +3766,23 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         raise RuntimeError("ReportLab no esta instalado en el entorno.")
     rid = int(reserva.get("id") or 0)
     ready_cake_snapshot = None
+    cocteleria_snapshot = None
     try:
         ready_conn = get_db()
+        ensure_ready_cakes_schema(ready_conn)
+        ensure_cocteleria_schema(ready_conn)
         ready_row = ready_conn.execute(
             "SELECT snapshot_json FROM tienda_tortas_listas_reservas WHERE event_id=? LIMIT 1",
             (rid,),
         ).fetchone()
         if ready_row:
             ready_cake_snapshot = json.loads(ready_row["snapshot_json"] or "{}")
+        cocktail_row = ready_conn.execute(
+            "SELECT snapshot_json FROM tienda_cocteleria_reservas WHERE event_id=? LIMIT 1",
+            (rid,),
+        ).fetchone()
+        if cocktail_row:
+            cocteleria_snapshot = json.loads(cocktail_row["snapshot_json"] or "{}")
     except Exception:
         ready_cake_snapshot = None
     finally:
@@ -4346,6 +4355,10 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     border = (0.88, 0.80, 0.69)
 
     motivo_raw = str(reserva.get("motivo") or "").strip().lower()
+    ingredientes_norm = _norm_text(reserva.get("ingredientes") or "")
+    cocteleria_snapshot = cocteleria_snapshot if isinstance(cocteleria_snapshot, dict) else None
+    cocteleria_items = [dict(x or {}) for x in ((cocteleria_snapshot or {}).get("items") or []) if isinstance(x, dict)]
+    es_cocteleria = bool(cocteleria_items) or "reserva de cocteleria" in ingredientes_norm or "cocteleria" in _norm_text(reserva.get("titulo"))
     documento_tipo = str(reserva.get("documento_tipo") or "").strip().lower()
     es_cotizacion = documento_tipo == "cotizacion"
     es_reserva_pendiente = "reserva cliente tienda online" in motivo_raw or str(reserva.get("estado") or "").strip().lower() == "pendiente"
@@ -4374,8 +4387,14 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         titulo_pedido = _safe_text(ready_cake_snapshot.get("model") or "Torta lista")
         tamano_txt = _safe_text(ready_cake_snapshot.get("size") or "-")
         subtitulo_pedido = "Modelo con receta y diseño definidos"
+    elif es_cocteleria:
+        categoria_txt = "Cocteleria"
+        titulo_pedido = "Pedido de cocteleria"
+        tamano_txt = f"{len(cocteleria_items)} producto(s)" if cocteleria_items else "Detalle en agenda"
+        subtitulo_pedido = "Cotizacion de productos seleccionados"
     total_reserva_db = _to_money_num(reserva.get("total"))
-    subtotal_productos = float((catalog_data or {}).get("subtotal") or _money_from_text("subtotal estimado productos") or total_reserva_db or 0)
+    cocteleria_total = sum(float(x.get("total_clp") or 0) for x in cocteleria_items)
+    subtotal_productos = float(cocteleria_total or (catalog_data or {}).get("subtotal") or _money_from_text("subtotal estimado productos") or total_reserva_db or 0)
     descuento_total = float((catalog_data or {}).get("descuento") or _money_from_text("descuento aplicado") or 0)
     despacho_total = _money_from_text("envio") if es_despacho else 0.0
     total_productos = float((catalog_data or {}).get("total_productos") or max(0.0, subtotal_productos - descuento_total))
@@ -4574,7 +4593,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.setFont("Helvetica-Bold", 20)
     c.drawString(150, 740, "COTIZACION" if es_cotizacion else "COMPROBANTE")
     c.setFillColorRGB(*orange)
-    c.drawString(150, 718, "DE TORTA" if es_cotizacion else "DE PEDIDO")
+    etiqueta_documento = "DE COCTELERIA" if es_cocteleria else ("DE TORTA" if es_cotizacion else "DE PEDIDO")
+    c.drawString(150, 718, etiqueta_documento)
     c.setStrokeColorRGB(*orange)
     c.setLineWidth(0.8)
     c.line(150, 706, 320, 706)
@@ -4647,6 +4667,10 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     _draw_round(42, 222, 300, 154, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
     _draw_section_title(56, 358, "Detalle del pedido")
     resumen_rows = ([
+        ("Productos", f"{len(cocteleria_items)} producto(s)"),
+        ("Detalle", "Listado completo en pagina siguiente"),
+        ("Subtotal", _fmt_money(cocteleria_total)),
+    ] if es_cocteleria else [
         ("Tipo", "Torta lista"),
         ("Modelo", _safe_text(ready_cake_snapshot.get("model"))),
         ("Tamano", _safe_text(ready_cake_snapshot.get("size"))),
@@ -4726,6 +4750,68 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.drawString(66, 31, "Gracias por preferir Sucree Pasteleria")
     c.drawCentredString(300, 31, "@sucreepasteleria")
     c.drawRightString(530, 31, "+56 9 7191 8626")
+
+    if es_cocteleria and cocteleria_items:
+        c.showPage()
+        c.setFillColorRGB(*paper)
+        c.rect(0, 0, width, height, stroke=0, fill=1)
+        _draw_round(22, 22, width - 44, height - 44, radius=12, stroke=(0.91, 0.84, 0.74), fill=(1, 0.995, 0.985), lw=0.8)
+        c.setFillColorRGB(*brown)
+        c.setFont("Helvetica-Bold", 19)
+        c.drawString(42, height - 58, "DETALLE DE COCTELERIA")
+        c.setFillColorRGB(*muted)
+        c.setFont("Helvetica", 9)
+        c.drawString(42, height - 77, f"Pedido {codigo_txt}  |  {cliente_txt}  |  {_fecha_larga(fecha_txt)} {hora_txt}")
+        c.setStrokeColorRGB(*orange)
+        c.setLineWidth(1.2)
+        c.line(42, height - 88, width - 42, height - 88)
+        y = height - 108
+        for index, item in enumerate(cocteleria_items, start=1):
+            name = _safe_text(item.get("product_name"), "Producto")
+            category = _safe_text(item.get("category"), "-")
+            presentation = _safe_text(item.get("presentation_label"), "Presentacion")
+            qty = int(item.get("quantity") or 0)
+            pack_units = int(item.get("units_per_pack") or 0)
+            unit_label = _safe_text(item.get("unit_label"), "unidades")
+            unit_price = float(item.get("unit_price_clp") or 0)
+            line_total = float(item.get("total_clp") or unit_price * qty)
+            if y - 57 < 55:
+                c.showPage()
+                c.setFillColorRGB(*paper)
+                c.rect(0, 0, width, height, stroke=0, fill=1)
+                _draw_round(22, 22, width - 44, height - 44, radius=12, stroke=(0.91, 0.84, 0.74), fill=(1, 0.995, 0.985), lw=0.8)
+                c.setFillColorRGB(*brown)
+                c.setFont("Helvetica-Bold", 14)
+                c.drawString(42, height - 48, f"DETALLE DE COCTELERIA - {codigo_txt}")
+                y = height - 70
+            _draw_round(42, y - 52, width - 84, 52, radius=7, stroke=border, fill=(1, 0.995, 0.985), lw=0.6)
+            c.setFillColorRGB(*brown)
+            c.setFont("Helvetica-Bold", 9.5)
+            c.drawString(53, y - 12, f"{index}. {_clip(name, 68)}")
+            c.setFillColorRGB(*muted)
+            c.setFont("Helvetica", 8)
+            c.drawString(53, y - 25, _clip(f"Categoria: {category}  |  Presentacion: {presentation}", 100))
+            c.drawString(53, y - 38, f"Cantidad: {qty} x {pack_units} {unit_label} por presentacion  |  Precio: {_fmt_money(unit_price)}")
+            c.setFillColorRGB(*green)
+            c.setFont("Helvetica-Bold", 9)
+            c.drawRightString(width - 54, y - 49, f"Subtotal: {_fmt_money(line_total)}")
+            y -= 58
+        if y - 44 < 45:
+            c.showPage()
+            c.setFillColorRGB(*paper)
+            c.rect(0, 0, width, height, stroke=0, fill=1)
+            _draw_round(22, 22, width - 44, height - 44, radius=12, stroke=(0.91, 0.84, 0.74), fill=(1, 0.995, 0.985), lw=0.8)
+            y = height - 50
+        _draw_round(42, y - 38, width - 84, 38, radius=8, stroke=(0.94, 0.82, 0.66), fill=cream, lw=0.6)
+        c.setFillColorRGB(*brown)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(55, y - 23, "TOTAL DE PRODUCTOS")
+        c.setFillColorRGB(*orange)
+        c.setFont("Helvetica-Bold", 13)
+        c.drawRightString(width - 55, y - 23, _fmt_money(cocteleria_total))
+        c.setFillColorRGB(*muted)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(42, 37, "Cotizacion sujeta a confirmacion de la pasteleria.")
 
     c.save()
     return filename
@@ -12000,7 +12086,7 @@ def api_tienda_agenda_reservar():
                 ingredientes += (
                     f"\n- {line['product_name']} / {line['presentation_label']}"
                     f" ({line['units_per_pack']} {line['unit_label']} por presentacion)"
-                    f" ? {line['quantity']} x {_fmt_clp(line['unit_price_clp'])} = {_fmt_clp(line['total_clp'])}"
+                    f" x {line['quantity']} x {_fmt_clp(line['unit_price_clp'])} = {_fmt_clp(line['total_clp'])}"
                 )
             ingredientes += f"\nTotal de productos: {_fmt_clp(cocteleria_snapshot['total_clp'])}"
         if catalogo_torta_resumen:

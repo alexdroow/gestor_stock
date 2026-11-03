@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -110,6 +111,47 @@ class CocteleriaCatalogTests(unittest.TestCase):
         self.assertIn('<option value="cocteleria">', html)
         self.assertIn("evento.tipo === 'cocteleria'", html)
         self.assertEqual(app_module._label_origen_evento({"fuente": "agenda", "tipo": "cocteleria", "origen": "tienda_online"}), "Cóctelería (tienda online)")
+
+
+    def test_cocktail_reservation_pdf_contains_each_item_and_price(self):
+        if app_module.canvas is None:
+            self.skipTest("ReportLab no esta instalado")
+        cocteleria_module.ensure_cocteleria_schema()
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("CREATE TABLE IF NOT EXISTS tienda_tortas_listas_reservas (event_id INTEGER, snapshot_json TEXT)")
+        snapshot = {
+            "kind": "COCTELERIA", "item_count": 2, "total_clp": 31500,
+            "items": [
+                {"product_name": "Mini tartaletas", "category": "dulce", "presentation_label": "Bandeja 20", "units_per_pack": 20, "unit_label": "unidades", "quantity": 1, "unit_price_clp": 18000, "total_clp": 18000},
+                {"product_name": "Empanaditas cocktail", "category": "salado", "presentation_label": "Bandeja 30", "units_per_pack": 30, "unit_label": "unidades", "quantity": 1, "unit_price_clp": 13500, "total_clp": 13500},
+            ],
+        }
+        conn.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", ("test-cocktail-pdf", 812, 1, 1, json.dumps(snapshot)))
+        conn.commit()
+        conn.close()
+
+        def connect_test_db():
+            db = sqlite3.connect(self.db_path)
+            db.row_factory = sqlite3.Row
+            return db
+
+        with patch.object(app_module, "get_db", side_effect=connect_test_db), patch.object(app_module, "static_dir", self.temp.name):
+            filename = app_module._crear_pdf_reserva_agenda_tienda({
+                "id": 812, "codigo_pedido": "AGD-TEST-COCTEL", "fecha": "2026-11-03",
+                "hora_inicio": "15:00", "cliente": "Cliente de prueba", "telefono": "+56912345678",
+                "total": 31500, "estado": "pendiente", "motivo": "Reserva cliente tienda online",
+                "titulo": "Cocteleria - 2 productos",
+                "ingredientes": "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30",
+            })
+
+        from pypdf import PdfReader
+        pdf_path = Path(self.temp.name) / "tienda_pedidos_pdf" / filename
+        pages = PdfReader(str(pdf_path)).pages
+        self.assertGreaterEqual(len(pages), 2)
+        text = "\n".join(page.extract_text() or "" for page in pages)
+        for expected in ("DE COCTELERIA", "DETALLE DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "$18.000", "$13.500", "$31.500"):
+            self.assertIn(expected, text)
 
 
 if __name__ == "__main__":
