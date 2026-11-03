@@ -148,9 +148,9 @@ class CocteleriaCatalogTests(unittest.TestCase):
         from pypdf import PdfReader
         pdf_path = Path(self.temp.name) / "tienda_pedidos_pdf" / filename
         pages = PdfReader(str(pdf_path)).pages
-        self.assertGreaterEqual(len(pages), 2)
+        self.assertEqual(len(pages), 1)
         text = "\n".join(page.extract_text() or "" for page in pages)
-        for expected in ("DE COCTELERIA", "DETALLE DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "$18.000", "$13.500", "$31.500"):
+        for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "$18.000", "$13.500", "$31.500"):
             self.assertIn(expected, text)
 
 

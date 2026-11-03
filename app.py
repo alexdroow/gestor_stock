@@ -4665,12 +4665,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
 
     # Resumen pedido y pago
     _draw_round(42, 222, 300, 154, radius=8, stroke=border, fill=(1, 0.995, 0.985), lw=0.7)
-    _draw_section_title(56, 358, "Detalle del pedido")
+    _draw_section_title(56, 358, "Productos de cocteleria" if es_cocteleria else "Detalle del pedido")
     resumen_rows = ([
-        ("Productos", f"{len(cocteleria_items)} producto(s)"),
-        ("Detalle", "Listado completo en pagina siguiente"),
-        ("Subtotal", _fmt_money(cocteleria_total)),
-    ] if es_cocteleria else [
         ("Tipo", "Torta lista"),
         ("Modelo", _safe_text(ready_cake_snapshot.get("model"))),
         ("Tamano", _safe_text(ready_cake_snapshot.get("size"))),
@@ -4687,7 +4683,29 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         ("Nota", nota_catalogo),
         ("Referencias", f"{len(refs)} archivo(s)" if refs else "-"),
     ])
-    _draw_table(resumen_rows, 50, 233, 284, 110, label_w=82, max_rows=9)
+    if es_cocteleria and cocteleria_items:
+        row_height = min(12, 110 / len(cocteleria_items))
+        for idx, item in enumerate(cocteleria_items):
+            row_y = 343 - (idx * row_height)
+            product = _safe_text(item.get("product_name"), "Producto")
+            presentation = _safe_text(item.get("presentation_label"), "Presentacion")
+            quantity = int(item.get("quantity") or 0)
+            unit_price = float(item.get("unit_price_clp") or 0)
+            line_total = float(item.get("total_clp") or unit_price * quantity)
+            item_label = f"{product} / {presentation}"
+            item_value = f"{quantity} x {_fmt_money(unit_price)} = {_fmt_money(line_total)}"
+            if idx:
+                c.setStrokeColorRGB(0.90, 0.84, 0.76)
+                c.setLineWidth(0.4)
+                c.line(58, row_y + row_height - 2, 326, row_y + row_height - 2)
+            c.setFillColorRGB(*text_dark)
+            c.setFont("Helvetica", 7.1)
+            label_lines = _fit_lines(item_label, 158, "Helvetica", 7.1, max_lines=1)
+            value_lines = _fit_lines(item_value, 105, "Helvetica", 7.1, max_lines=1)
+            c.drawString(60, row_y, label_lines[0])
+            c.drawRightString(324, row_y, value_lines[0])
+    else:
+        _draw_table(resumen_rows, 50, 233, 284, 110, label_w=82, max_rows=9)
     _draw_payment_summary(356, 222, 197, 154)
 
     # Observaciones
@@ -4750,68 +4768,6 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     c.drawString(66, 31, "Gracias por preferir Sucree Pasteleria")
     c.drawCentredString(300, 31, "@sucreepasteleria")
     c.drawRightString(530, 31, "+56 9 7191 8626")
-
-    if es_cocteleria and cocteleria_items:
-        c.showPage()
-        c.setFillColorRGB(*paper)
-        c.rect(0, 0, width, height, stroke=0, fill=1)
-        _draw_round(22, 22, width - 44, height - 44, radius=12, stroke=(0.91, 0.84, 0.74), fill=(1, 0.995, 0.985), lw=0.8)
-        c.setFillColorRGB(*brown)
-        c.setFont("Helvetica-Bold", 19)
-        c.drawString(42, height - 58, "DETALLE DE COCTELERIA")
-        c.setFillColorRGB(*muted)
-        c.setFont("Helvetica", 9)
-        c.drawString(42, height - 77, f"Pedido {codigo_txt}  |  {cliente_txt}  |  {_fecha_larga(fecha_txt)} {hora_txt}")
-        c.setStrokeColorRGB(*orange)
-        c.setLineWidth(1.2)
-        c.line(42, height - 88, width - 42, height - 88)
-        y = height - 108
-        for index, item in enumerate(cocteleria_items, start=1):
-            name = _safe_text(item.get("product_name"), "Producto")
-            category = _safe_text(item.get("category"), "-")
-            presentation = _safe_text(item.get("presentation_label"), "Presentacion")
-            qty = int(item.get("quantity") or 0)
-            pack_units = int(item.get("units_per_pack") or 0)
-            unit_label = _safe_text(item.get("unit_label"), "unidades")
-            unit_price = float(item.get("unit_price_clp") or 0)
-            line_total = float(item.get("total_clp") or unit_price * qty)
-            if y - 57 < 55:
-                c.showPage()
-                c.setFillColorRGB(*paper)
-                c.rect(0, 0, width, height, stroke=0, fill=1)
-                _draw_round(22, 22, width - 44, height - 44, radius=12, stroke=(0.91, 0.84, 0.74), fill=(1, 0.995, 0.985), lw=0.8)
-                c.setFillColorRGB(*brown)
-                c.setFont("Helvetica-Bold", 14)
-                c.drawString(42, height - 48, f"DETALLE DE COCTELERIA - {codigo_txt}")
-                y = height - 70
-            _draw_round(42, y - 52, width - 84, 52, radius=7, stroke=border, fill=(1, 0.995, 0.985), lw=0.6)
-            c.setFillColorRGB(*brown)
-            c.setFont("Helvetica-Bold", 9.5)
-            c.drawString(53, y - 12, f"{index}. {_clip(name, 68)}")
-            c.setFillColorRGB(*muted)
-            c.setFont("Helvetica", 8)
-            c.drawString(53, y - 25, _clip(f"Categoria: {category}  |  Presentacion: {presentation}", 100))
-            c.drawString(53, y - 38, f"Cantidad: {qty} x {pack_units} {unit_label} por presentacion  |  Precio: {_fmt_money(unit_price)}")
-            c.setFillColorRGB(*green)
-            c.setFont("Helvetica-Bold", 9)
-            c.drawRightString(width - 54, y - 49, f"Subtotal: {_fmt_money(line_total)}")
-            y -= 58
-        if y - 44 < 45:
-            c.showPage()
-            c.setFillColorRGB(*paper)
-            c.rect(0, 0, width, height, stroke=0, fill=1)
-            _draw_round(22, 22, width - 44, height - 44, radius=12, stroke=(0.91, 0.84, 0.74), fill=(1, 0.995, 0.985), lw=0.8)
-            y = height - 50
-        _draw_round(42, y - 38, width - 84, 38, radius=8, stroke=(0.94, 0.82, 0.66), fill=cream, lw=0.6)
-        c.setFillColorRGB(*brown)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(55, y - 23, "TOTAL DE PRODUCTOS")
-        c.setFillColorRGB(*orange)
-        c.setFont("Helvetica-Bold", 13)
-        c.drawRightString(width - 55, y - 23, _fmt_money(cocteleria_total))
-        c.setFillColorRGB(*muted)
-        c.setFont("Helvetica", 7.5)
-        c.drawString(42, 37, "Cotizacion sujeta a confirmacion de la pasteleria.")
 
     c.save()
     return filename
