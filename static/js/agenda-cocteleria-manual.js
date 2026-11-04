@@ -10,6 +10,7 @@
   let selectedDate = '';
   let selectedHour = '';
   let saving = false;
+  let savedReservation = null;
 
   function status(message, isError = false) {
     const node = $('#agenda-coct-status');
@@ -135,6 +136,60 @@
     $('#agenda-coct-total').textContent = money(productsTotal + extrasTotal);
   }
 
+  function reservationSummary(payload, code, id) {
+    const productsTotal = payload.items.reduce((sum, item) => sum + Number(item.unit_price_clp) * Number(item.quantity), 0);
+    const extrasTotal = payload.extras.reduce((sum, item) => sum + Number(item.value || 0), 0);
+    const total = productsTotal + extrasTotal;
+    const deposit = Number(payload.abono || 0);
+    const delivery = payload.entrega_tipo === 'despacho' ? 'Despacho' : 'Retiro en tienda';
+    const details = $('#agenda-coct-confirmation-details');
+    details.innerHTML = `
+      <div class="agenda-cocktail-confirmation-card"><span>Cliente</span><strong>${esc(payload.nombre)}</strong><small>${esc(payload.telefono)}${payload.email ? ` · ${esc(payload.email)}` : ''}</small></div>
+      <div class="agenda-cocktail-confirmation-card"><span>Fecha y hora</span><strong>${esc(payload.fecha)} · ${esc(payload.hora_inicio)}</strong><small>${delivery}${payload.entrega_tipo === 'despacho' && payload.direccion ? ` · ${esc(payload.direccion)}` : ''}</small></div>
+      <div class="agenda-cocktail-confirmation-card agenda-cocktail-confirmation-items"><span>Productos</span>${payload.items.map((item) => `<div><strong>${esc(item.product_name)}</strong><small>${esc(item.presentation_label)} × ${Number(item.quantity)} · ${money(Number(item.unit_price_clp) * Number(item.quantity))}</small></div>`).join('')}${payload.extras.map((item) => `<div><strong>${esc(item.description)}</strong><small>Cargo extra · ${money(item.value)}</small></div>`).join('')}</div>
+      ${payload.nota ? `<div class="agenda-cocktail-confirmation-card"><span>Nota</span><strong>${esc(payload.nota)}</strong></div>` : ''}
+      <div class="agenda-cocktail-confirmation-total"><span>Total <b>${money(total)}</b></span><span>Abono <b>${money(deposit)}</b></span><span>Saldo <b>${money(Math.max(0, total - deposit))}</b></span></div>`;
+    $('#agenda-coct-confirmation-code').textContent = `${code || `Reserva #${id}`} · ${payload.fecha} · ${payload.hora_inicio}`;
+    const message = [
+      'Hola, te compartimos el resumen de tu reserva de coctelería en Sucrée:',
+      `Reserva: ${code || `#${id}`}`,
+      `Cliente: ${payload.nombre}`,
+      `Fecha: ${payload.fecha} a las ${payload.hora_inicio}`,
+      `Entrega: ${delivery}${payload.entrega_tipo === 'despacho' && payload.direccion ? ` - ${payload.direccion}` : ''}`,
+      'Productos:',
+      ...payload.items.map((item) => `- ${item.product_name} / ${item.presentation_label} x ${item.quantity}: ${money(Number(item.unit_price_clp) * Number(item.quantity))}`),
+      ...payload.extras.map((item) => `- ${item.description}: ${money(item.value)}`),
+      `Total: ${money(total)}`, `Abono: ${money(deposit)}`, `Saldo: ${money(Math.max(0, total - deposit))}`,
+      ...(payload.nota ? [`Nota: ${payload.nota}`] : []),
+    ].join('\n');
+    const digits = String(payload.telefono || '').replace(/\D/g, '');
+    const destination = digits.startsWith('56') ? digits : `56${digits.replace(/^0+/, '')}`;
+    $('#agenda-coct-whatsapp').href = `https://wa.me/${destination}?text=${encodeURIComponent(message)}`;
+    savedReservation = { ...payload, code, id, total };
+    $('#agenda-coct-confirmation').hidden = false;
+    $('.agenda-cocktail-grid').hidden = true;
+  }
+
+  function ticketHtml(reservation) {
+    const rows = reservation.items.map((item) => `<p>${esc(item.product_name)}<br>${esc(item.presentation_label)} x ${Number(item.quantity)}<br>${money(Number(item.unit_price_clp) * Number(item.quantity))}</p>`).join('');
+    const extras = reservation.extras.map((item) => `<p>${esc(item.description)}<br>${money(item.value)}</p>`).join('');
+    const address = reservation.entrega_tipo === 'despacho' ? reservation.direccion : 'Sucrée Pastelería';
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Reserva ${esc(reservation.code)}</title><style>@page{size:58mm auto;margin:3mm}*{box-sizing:border-box}body{width:52mm;margin:0 auto;color:#111;font:11px/1.3 Arial,sans-serif;overflow-wrap:anywhere}.center{text-align:center}.brand{font:bold 17px Georgia,serif}.rule{border:0;border-top:1px dashed #111;margin:7px 0}h3{font-size:11px;margin:8px 0 4px;border-bottom:1px solid #111;padding-bottom:3px}p{margin:4px 0}.total{font-weight:bold;border-top:1px dashed #111;padding-top:6px}</style></head><body><header class="center"><div class="brand">SUCRÉE</div><div>PASTELERÍA · RESERVA CÓCTEL</div></header><hr class="rule"><p><b>${esc(reservation.code)}</b></p><p><b>Cliente:</b> ${esc(reservation.nombre)}<br><b>Teléfono:</b> ${esc(reservation.telefono)}</p><h3>FECHA Y ENTREGA</h3><p>${esc(reservation.fecha)} · ${esc(reservation.hora_inicio)}<br>${reservation.entrega_tipo === 'despacho' ? 'Despacho' : 'Retiro en tienda'}<br>${esc(address || '-')}</p><h3>DETALLE</h3>${rows}${extras ? `<h3>VALORES EXTRA</h3>${extras}` : ''}<hr class="rule"><p class="total">Total: ${money(reservation.total)}<br>Abono: ${money(reservation.abono)}<br>Saldo: ${money(Math.max(0, reservation.total - reservation.abono))}</p>${reservation.nota ? `<h3>NOTA</h3><p>${esc(reservation.nota)}</p>` : ''}<hr class="rule"><p class="center">Gracias por preferir Sucrée</p></body></html>`;
+  }
+
+  function printReservation() {
+    if (!savedReservation) return;
+    const html = ticketHtml(savedReservation);
+    if (new URLSearchParams(window.location.search).get('pos_embed') === '1' && window.SucreePosAndroid?.printAgendaTicket) {
+      window.SucreePosAndroid.printAgendaTicket(String(savedReservation.id), html);
+      return;
+    }
+    const printWindow = window.open('', '_blank', 'width=360,height=720');
+    if (!printWindow) return status('Permite las ventanas emergentes para imprimir el comprobante.', true);
+    printWindow.document.open(); printWindow.document.write(html); printWindow.document.close();
+    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 250);
+  }
+
   async function addLine() {
     const product = products.find((item) => Number(item.id) === Number($('#agenda-coct-product').value));
     const presentation = (product?.presentations || []).find((item) => Number(item.id) === Number($('#agenda-coct-presentation').value));
@@ -182,11 +237,12 @@
       const response = await fetch('/api/agenda/cocteleria/manual', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo guardar la reserva.');
+      payload.items = lines.map((item) => ({ ...item }));
+      payload.extras = extras.filter((extra) => extra.description.trim() && Number(extra.value) > 0).map((item) => ({ ...item }));
+      reservationSummary(payload, data.codigo_pedido, Number(data.id));
       const pdf = $('#agenda-coct-pdf');
       pdf.href = `/api/agenda/evento/${Number(data.id)}/pdf?download=1`;
-      pdf.hidden = false;
-      button.textContent = 'Reserva guardada';
-      status(`Reserva ${data.codigo_pedido || ''} guardada. Descarga el comprobante en PDF.`, false);
+      status('Reserva guardada correctamente.', false);
       if (typeof cargarEventos === 'function') await cargarEventos();
     } catch (error) {
       status(error.message || 'No se pudo guardar la reserva.', true);
@@ -200,9 +256,11 @@
     const modal = $('#agenda-cocteleria-modal');
     modal.classList.add('is-open'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
     lines = []; extras = []; days = []; selectedDate = ''; selectedHour = ''; dayOffset = 0; saving = false;
+    savedReservation = null;
     $('#agenda-coct-customer').value = ''; $('#agenda-coct-phone').value = ''; $('#agenda-coct-email').value = '';
     $('#agenda-coct-delivery').value = 'retiro'; $('#agenda-coct-address').value = ''; $('#agenda-coct-note').value = ''; $('#agenda-coct-deposit').value = '0';
     $('#agenda-coct-address-wrap').hidden = true; $('#agenda-coct-pdf').hidden = true;
+    $('#agenda-coct-confirmation').hidden = true; $('.agenda-cocktail-grid').hidden = false;
     const saveButton = $('#agenda-coct-save'); saveButton.disabled = false; saveButton.textContent = 'Guardar reserva';
     renderLines(); renderExtras(); status('');
     try { await loadCatalog(); await loadAvailability(); } catch (error) { status(error.message, true); }
@@ -218,6 +276,7 @@
     $('#agenda-coct-add')?.addEventListener('click', () => addLine().catch((error) => status(error.message, true)));
     $('#agenda-coct-add-extra')?.addEventListener('click', () => { extras.push({ description: '', value: 0 }); renderExtras(); });
     $('#agenda-coct-save')?.addEventListener('click', save);
+    $('#agenda-coct-print')?.addEventListener('click', printReservation);
     $('#agenda-coct-delivery')?.addEventListener('change', () => { $('#agenda-coct-address-wrap').hidden = $('#agenda-coct-delivery').value !== 'despacho'; });
     $('#agenda-coct-prev')?.addEventListener('click', () => { dayOffset = Math.max(0, dayOffset - 14); renderDays(); });
     $('#agenda-coct-next')?.addEventListener('click', () => { dayOffset = Math.min(Math.max(0, days.length - 14), dayOffset + 14); renderDays(); });

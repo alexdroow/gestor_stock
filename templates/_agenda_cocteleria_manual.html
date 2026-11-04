@@ -5,6 +5,19 @@
       <button type="button" class="agenda-cocktail-close" onclick="cerrarAgendaCocteleriaManual()" aria-label="Cerrar">×</button>
     </header>
     <div class="agenda-cocktail-body">
+      <section class="agenda-cocktail-confirmation" id="agenda-coct-confirmation" hidden>
+        <div class="agenda-cocktail-confirmation-mark" aria-hidden="true">&#10003;</div>
+        <p class="agenda-cocktail-kicker">Reserva registrada</p>
+        <h3>Resumen de coctelería</h3>
+        <p class="agenda-cocktail-confirmation-code" id="agenda-coct-confirmation-code"></p>
+        <div class="agenda-cocktail-confirmation-details" id="agenda-coct-confirmation-details"></div>
+        <div class="agenda-cocktail-confirmation-actions">
+          <a class="agenda-cocktail-button agenda-cocktail-whatsapp" id="agenda-coct-whatsapp" href="#" target="_blank" rel="noopener">Enviar resumen por WhatsApp</a>
+          <a class="agenda-cocktail-button agenda-cocktail-pdf" id="agenda-coct-pdf" href="#" target="_blank" rel="noopener">Descargar PDF</a>
+          <button type="button" class="agenda-cocktail-button agenda-cocktail-print" id="agenda-coct-print">Imprimir 58 mm</button>
+          <button type="button" class="agenda-cocktail-button agenda-cocktail-secondary" onclick="cerrarAgendaCocteleriaManual()">Cerrar</button>
+        </div>
+      </section>
       <div class="agenda-cocktail-grid">
         <section class="agenda-cocktail-section agenda-cocktail-calendar-section">
           <div class="agenda-cocktail-section-heading"><div><span class="agenda-cocktail-step">01</span><h3>Fecha y hora</h3></div><div class="agenda-cocktail-calendar-nav"><button type="button" id="agenda-coct-prev" aria-label="Fechas anteriores">‹</button><button type="button" id="agenda-coct-next" aria-label="Fechas siguientes">›</button></div></div>
@@ -37,7 +50,7 @@
             <label>Abono recibido<input id="agenda-coct-deposit" type="number" min="0" step="1" value="0"></label>
           </div>
           <p class="agenda-cocktail-hint" id="agenda-coct-status" role="status"></p>
-          <div class="agenda-cocktail-actions"><button type="button" class="agenda-cocktail-button agenda-cocktail-secondary" onclick="cerrarAgendaCocteleriaManual()">Cancelar</button><button type="button" class="agenda-cocktail-button agenda-cocktail-primary" id="agenda-coct-save">Guardar reserva</button><a class="agenda-cocktail-button agenda-cocktail-pdf" id="agenda-coct-pdf" href="#" target="_blank" rel="noopener" hidden>Descargar PDF de cóctelería</a></div>
+          <div class="agenda-cocktail-actions"><button type="button" class="agenda-cocktail-button agenda-cocktail-secondary" onclick="cerrarAgendaCocteleriaManual()">Cancelar</button><button type="button" class="agenda-cocktail-button agenda-cocktail-primary" id="agenda-coct-save">Guardar reserva</button></div>
         </section>
       </div>
     </div>
