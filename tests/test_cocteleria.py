@@ -130,10 +130,15 @@ class CocteleriaCatalogTests(unittest.TestCase):
         partial = Path(__file__).resolve().parents[1] / "templates" / "_agenda_cocteleria_manual.html"
         html = template.read_text(encoding="utf-8")
         modal = partial.read_text(encoding="utf-8")
+        script_path = Path(__file__).resolve().parents[1] / "static" / "js" / "agenda-cocteleria-manual.js"
+        script = script_path.read_text(encoding="utf-8")
         for marker in ("+ Agendar cóctelería", "abrirAgendaCocteleriaManual()", "_agenda_cocteleria_manual.html", "agenda-cocteleria-manual.js"):
             self.assertIn(marker, html)
         for marker in ("agenda-cocteleria-modal", "agenda-coct-days", "agenda-coct-hours", "agenda-coct-lines", "agenda-coct-extras", "agenda-coct-customer", "agenda-coct-pdf"):
             self.assertIn(marker, modal)
+        self.assertIn("window.cerrarAgendaCocteleriaManual()", script)
+        self.assertIn("seleccionarDiaCalendario(payload.fecha)", script)
+        self.assertIn("abrirDetallePedidoAgenda(Number(data.id))", script)
         denied = self.client.post("/api/agenda/cocteleria/manual", json={})
         self.assertEqual(denied.status_code, 401)
 

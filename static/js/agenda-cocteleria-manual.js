@@ -237,13 +237,10 @@
       const response = await fetch('/api/agenda/cocteleria/manual', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo guardar la reserva.');
-      payload.items = lines.map((item) => ({ ...item }));
-      payload.extras = extras.filter((extra) => extra.description.trim() && Number(extra.value) > 0).map((item) => ({ ...item }));
-      reservationSummary(payload, data.codigo_pedido, Number(data.id));
-      const pdf = $('#agenda-coct-pdf');
-      pdf.href = `/api/agenda/evento/${Number(data.id)}/pdf?download=1`;
-      status('Reserva guardada correctamente.', false);
       if (typeof cargarEventos === 'function') await cargarEventos();
+      window.cerrarAgendaCocteleriaManual();
+      if (typeof seleccionarDiaCalendario === 'function') seleccionarDiaCalendario(payload.fecha);
+      if (typeof abrirDetallePedidoAgenda === 'function') abrirDetallePedidoAgenda(Number(data.id));
     } catch (error) {
       status(error.message || 'No se pudo guardar la reserva.', true);
       button.disabled = false; button.textContent = 'Guardar reserva';
