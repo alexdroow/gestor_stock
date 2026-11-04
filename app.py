@@ -3783,6 +3783,19 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         ).fetchone()
         if cocktail_row:
             cocteleria_snapshot = json.loads(cocktail_row["snapshot_json"] or "{}")
+            for item in ((cocteleria_snapshot or {}).get("items") or []):
+                if not isinstance(item, dict) or int(item.get("units_per_pack") or 0) > 0:
+                    continue
+                try:
+                    presentation = ready_conn.execute(
+                        "SELECT units,unit_label FROM tienda_cocteleria_presentaciones WHERE id=? AND model_id=? LIMIT 1",
+                        (int(item.get("presentation_id") or 0), int(item.get("model_id") or 0)),
+                    ).fetchone()
+                    if presentation:
+                        item["units_per_pack"] = int(presentation["units"] or 0)
+                        item["unit_label"] = str(presentation["unit_label"] or "unidades")
+                except (TypeError, ValueError, sqlite3.Error):
+                    pass
     except Exception:
         ready_cake_snapshot = None
     finally:
@@ -4689,7 +4702,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     ])
     if es_cocteleria and cocteleria_items:
         detail_rows = [
-            (f"{_safe_text(item.get('product_name'), 'Producto')} / {_safe_text(item.get('presentation_label'), 'Presentacion')}",
+            (f"{int(item.get('units_per_pack') or 0) or int(item.get('quantity') or 0)} {_safe_text(item.get('product_name'), 'Producto')} / {_safe_text(item.get('presentation_label'), 'Presentacion')}",
              str(int(item.get('quantity') or 0)),
              f" x {_fmt_money(item.get('unit_price_clp') or 0)} = {_fmt_money(item.get('total_clp') or 0)}")
             for item in cocteleria_items

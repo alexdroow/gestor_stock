@@ -282,7 +282,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         pages = PdfReader(BytesIO(pdf_content)).pages
         self.assertEqual(len(pages), 1)
         text = "\n".join(page.extract_text() or "" for page in pages)
-        for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "3 x", "$6.000", "Empanaditas cocktail", "Montaje de mesa", "$4.200", "$18.000", "$13.500", "$31.500"):
+        for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "20 Mini tartaletas", "Bandeja 20", "3 x", "$6.000", "Empanaditas cocktail", "Montaje de mesa", "$4.200", "$18.000", "$13.500", "$31.500"):
             self.assertIn(expected, text)
         total_final_pos = text.index("TOTAL FINAL")
         self.assertIn("$35.700", text[total_final_pos:])
