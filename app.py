@@ -4358,6 +4358,8 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     ingredientes_norm = _norm_text(reserva.get("ingredientes") or "")
     cocteleria_snapshot = cocteleria_snapshot if isinstance(cocteleria_snapshot, dict) else None
     cocteleria_items = [dict(x or {}) for x in ((cocteleria_snapshot or {}).get("items") or []) if isinstance(x, dict)]
+    cocteleria_extras = [dict(x or {}) for x in ((cocteleria_snapshot or {}).get("extras") or []) if isinstance(x, dict)]
+    cocteleria_extras_total = sum(float(x.get("value_clp") or 0) for x in cocteleria_extras)
     es_cocteleria = bool(cocteleria_items) or "reserva de cocteleria" in ingredientes_norm or "cocteleria" in _norm_text(reserva.get("titulo"))
     documento_tipo = str(reserva.get("documento_tipo") or "").strip().lower()
     es_cotizacion = documento_tipo == "cotizacion"
@@ -4368,6 +4370,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     hora_txt = _safe_text(reserva.get("hora_entrega") or reserva.get("hora_inicio"))
     cliente_txt = _safe_text(reserva.get("cliente"))
     telefono_txt = _safe_text(reserva.get("telefono"))
+    email_cliente = _safe_text(reserva.get("cliente_email") or _section_value(["email"], "-"), "-")
     direccion_raw = _safe_text(reserva.get("direccion"), "")
     entrega_text_from_items = _section_value(["entrega", "modalidad"], "")
     entrega_norm = _norm_text(entrega_text_from_items or direccion_raw)
@@ -4512,6 +4515,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         _draw_section_title(x + 14, y + h - 20, "Resumen de pago")
         pay_rows = [
             ("Productos", _fmt_money(subtotal_productos)),
+            *(([("Valores extra", _fmt_money(cocteleria_extras_total))]) if es_cocteleria and cocteleria_extras_total else []),
             ("Despacho", _fmt_money(despacho_total)),
             ("Descuento", f"-{_fmt_money(descuento_total)}" if descuento_total else "$0"),
             ("Abono", f"-{_fmt_money(abono)}" if abono else "$0"),
@@ -4658,7 +4662,7 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     _draw_section_title(56, 462, "Datos del cliente")
     _draw_label_value(56, 443, "Cliente", cliente_txt, w=204)
     _draw_label_value(56, 415, "Telefono", telefono_txt, w=92)
-    _draw_label_value(166, 415, "Referencia", referencia_cliente, w=100)
+    _draw_label_value(166, 415, "Correo" if email_cliente != "-" else "Referencia", email_cliente if email_cliente != "-" else referencia_cliente, w=100)
     _draw_section_title(319, 462, "Detalles de entrega")
     _draw_label_value(319, 443, "Modalidad", modalidad_txt, w=190)
     _draw_label_value(319, 415, "Lugar", direccion_txt, w=205)
@@ -4684,24 +4688,24 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
         ("Referencias", f"{len(refs)} archivo(s)" if refs else "-"),
     ])
     if es_cocteleria and cocteleria_items:
-        row_height = min(12, 110 / len(cocteleria_items))
-        for idx, item in enumerate(cocteleria_items):
+        detail_rows = [
+            (f"{_safe_text(item.get('product_name'), 'Producto')} / {_safe_text(item.get('presentation_label'), 'Presentacion')}",
+             f"{int(item.get('quantity') or 0)} x {_fmt_money(item.get('unit_price_clp') or 0)} = {_fmt_money(item.get('total_clp') or 0)}")
+            for item in cocteleria_items
+        ]
+        detail_rows.extend((f"Cargo extra / {_safe_text(item.get('description'), 'Cargo')}", _fmt_money(item.get('value_clp') or 0)) for item in cocteleria_extras)
+        row_height = min(12, 110 / len(detail_rows))
+        row_font = max(5.2, min(7.1, row_height * 0.64))
+        for idx, (item_label, item_value) in enumerate(detail_rows):
             row_y = 343 - (idx * row_height)
-            product = _safe_text(item.get("product_name"), "Producto")
-            presentation = _safe_text(item.get("presentation_label"), "Presentacion")
-            quantity = int(item.get("quantity") or 0)
-            unit_price = float(item.get("unit_price_clp") or 0)
-            line_total = float(item.get("total_clp") or unit_price * quantity)
-            item_label = f"{product} / {presentation}"
-            item_value = f"{quantity} x {_fmt_money(unit_price)} = {_fmt_money(line_total)}"
             if idx:
                 c.setStrokeColorRGB(0.90, 0.84, 0.76)
                 c.setLineWidth(0.4)
                 c.line(58, row_y + row_height - 2, 326, row_y + row_height - 2)
             c.setFillColorRGB(*text_dark)
-            c.setFont("Helvetica", 7.1)
-            label_lines = _fit_lines(item_label, 158, "Helvetica", 7.1, max_lines=1)
-            value_lines = _fit_lines(item_value, 105, "Helvetica", 7.1, max_lines=1)
+            c.setFont("Helvetica", row_font)
+            label_lines = _fit_lines(item_label, 158, "Helvetica", row_font, max_lines=1)
+            value_lines = _fit_lines(item_value, 105, "Helvetica", row_font, max_lines=1)
             c.drawString(60, row_y, label_lines[0])
             c.drawRightString(324, row_y, value_lines[0])
     else:
@@ -24790,6 +24794,138 @@ def api_agenda_guardar():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/agenda/cocteleria/manual', methods=['POST'])
+def api_agenda_cocteleria_manual():
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({'success': False, 'error': 'Acceso no autorizado'}), 401
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        fecha = str(data.get('fecha') or '').strip()
+        hora = str(data.get('hora_inicio') or '').strip()[:5]
+        cliente = str(data.get('nombre') or '').strip()[:80]
+        telefono = str(data.get('telefono') or '').strip()[:30]
+        email = _normalizar_email(data.get('email')) if str(data.get('email') or '').strip() else ''
+        entrega = str(data.get('entrega_tipo') or 'retiro').strip().lower()
+        direccion = str(data.get('direccion') or '').strip()[:240]
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', fecha) or not _parse_hora_hhmm(hora):
+            return jsonify({'success': False, 'error': 'Selecciona una fecha y hora válidas.'}), 400
+        if len(cliente) < 2 or not telefono:
+            return jsonify({'success': False, 'error': 'Completa el nombre y teléfono del cliente.'}), 400
+        if str(data.get('email') or '').strip() and not email:
+            return jsonify({'success': False, 'error': 'El correo electrónico no es válido.'}), 400
+        if entrega not in {'retiro', 'despacho'} or (entrega == 'despacho' and not direccion):
+            return jsonify({'success': False, 'error': 'Completa la modalidad y dirección de entrega.'}), 400
+
+        raw_items = data.get('items') if isinstance(data.get('items'), list) else []
+        raw_extras = data.get('extras') if isinstance(data.get('extras'), list) else []
+        if not raw_items or len(raw_items) > 30 or len(raw_extras) > 30:
+            return jsonify({'success': False, 'error': 'Agrega entre 1 y 30 productos y hasta 30 cargos extra.'}), 400
+
+        ensure_cocteleria_schema()
+        items = []
+        seen = set()
+        max_lead = 24
+        for raw in raw_items:
+            if not isinstance(raw, dict):
+                continue
+            model_id = int(raw.get('model_id') or 0)
+            presentation_id = int(raw.get('presentation_id') or 0)
+            quantity = int(raw.get('quantity') or 0)
+            key = (model_id, presentation_id)
+            if not model_id or not presentation_id or key in seen:
+                return jsonify({'success': False, 'error': 'Revisa los productos y presentaciones; no puede haber líneas repetidas.'}), 400
+            seen.add(key)
+            current = get_published_cocktail(model_id, presentation_id)
+            if not current:
+                return jsonify({'success': False, 'error': 'Un producto o presentación ya no está publicado.'}), 409
+            if quantity < int(current['min_quantity']) or quantity > int(current['max_quantity']):
+                return jsonify({'success': False, 'error': f"{current['name']}: cantidad válida de {current['min_quantity']} a {current['max_quantity']}."}), 400
+            price = int(current['price_clp'])
+            items.append({
+                'model_id': model_id, 'presentation_id': presentation_id,
+                'product_name': current['name'], 'category': current['category'],
+                'presentation_label': current['presentation_label'], 'units_per_pack': int(current['units']),
+                'unit_label': current['unit_label'], 'quantity': quantity,
+                'unit_price_clp': price, 'expected_price_clp': price, 'total_clp': price * quantity,
+                'min_quantity': int(current['min_quantity']), 'max_quantity': int(current['max_quantity']),
+                'min_lead_hours': int(current['min_lead_hours'] or 24), 'photo': current.get('photo') or '',
+            })
+            max_lead = max(max_lead, int(current['min_lead_hours'] or 24))
+        if not items:
+            return jsonify({'success': False, 'error': 'Agrega al menos un producto válido del catálogo.'}), 400
+
+        charges = []
+        for raw in raw_extras:
+            if not isinstance(raw, dict):
+                continue
+            description = str(raw.get('description') or '').strip()[:100]
+            amount = int(raw.get('value') or 0)
+            if description and amount > 0:
+                charges.append({'description': description, 'value_clp': amount})
+        subtotal = sum(int(item['total_clp']) for item in items)
+        extras_total = sum(int(item['value_clp']) for item in charges)
+        total = subtotal + extras_total
+        deposit = max(0, int(data.get('abono') or 0))
+        if deposit > total:
+            return jsonify({'success': False, 'error': 'El abono no puede superar el total del pedido.'}), 400
+
+        cfg = _obtener_cfg_agenda_tienda()
+        if not cfg.get('enabled'):
+            return jsonify({'success': False, 'error': 'Activa la disponibilidad de agenda para usar el calendario de cóctelería.'}), 409
+        if not _cumple_anticipacion_reserva(fecha, hora, 'cocteleria', cfg_agenda=cfg, min_horas_categoria=max_lead):
+            return jsonify({'success': False, 'error': f'Este pedido requiere al menos {max_lead} horas de anticipación.'}), 409
+        conn = get_db()
+        disponibilidad = _calcular_disponibilidad_agenda_tienda(conn.cursor(), cfg, fecha, fecha)
+        slot = ((disponibilidad.get('mapa') or {}).get(fecha) or {}).get(hora)
+        if not slot or not slot.get('disponible'):
+            return jsonify({'success': False, 'error': 'Ese horario ya no está disponible. Actualiza el calendario.'}), 409
+        conn.close()
+        conn = None
+
+        ingredients = ['Reserva manual desde agenda', '--- Reserva de cocteleria ---']
+        for item in items:
+            ingredients.append(f"- {item['product_name']} / {item['presentation_label']} ({item['units_per_pack']} {item['unit_label']} por presentación) x {item['quantity']} x ${item['unit_price_clp']:,} = ${item['total_clp']:,}".replace(',', '.'))
+        ingredients.append(f'Total de productos: ${subtotal:,}'.replace(',', '.'))
+        if charges:
+            ingredients.append('--- Valores extra ---')
+            ingredients.extend(f"- {charge['description']} (${charge['value_clp']:,})".replace(',', '.') for charge in charges)
+            ingredients.append(f'Total valores extra: ${extras_total:,}'.replace(',', '.'))
+        ingredients.extend([f'Correo: {email or "-"}', f'Entrega: {"Despacho" if entrega == "despacho" else "Retiro"}'])
+        note = str(data.get('nota') or '').strip()[:500]
+        if note:
+            ingredients.append(f'Nota: {note}')
+        ingredients.append(f'Total estimado pedido: ${total:,}'.replace(',', '.'))
+        start_dt = datetime.strptime(hora, '%H:%M')
+        end_time = (start_dt + timedelta(minutes=int(cfg.get('slot_minutes') or 60))).strftime('%H:%M')
+        snapshot = {
+            'kind': 'COCTELERIA', 'source': 'agenda_manual', 'items': items,
+            'item_count': len(items), 'total_clp': subtotal, 'extras': charges,
+            'extras_total_clp': extras_total, 'total_final_clp': total,
+        }
+        event_payload = {
+            'tipo': 'cocteleria', 'titulo': f'Cóctelería - {len(items)} producto(s) - {cliente}',
+            'fecha': fecha, 'hora_inicio': hora, 'hora_fin': end_time, 'hora_entrega': hora,
+            'cliente': cliente, 'telefono': telefono, 'cliente_email': email,
+            'es_envio': entrega == 'despacho', 'direccion': direccion if entrega == 'despacho' else None,
+            'ingredientes': '\n'.join(ingredients), 'total': total, 'abono': deposit,
+            'motivo': 'Cotización de cóctelería creada desde agenda', 'alerta_minutos': 1440,
+            '_cocteleria_snapshot': snapshot, '_cocteleria_request_key': f'agenda-manual-{uuid.uuid4().hex}',
+        }
+        from database import guardar_evento_agenda
+        saved = guardar_evento_agenda(event_payload)
+        if not saved.get('success'):
+            return jsonify(saved), 409 if saved.get('requiere_confirmacion_fecha') else 400
+        return jsonify({'success': True, 'id': saved.get('id'), 'codigo_pedido': saved.get('codigo_pedido'), 'total': total})
+    except (TypeError, ValueError) as exc:
+        return jsonify({'success': False, 'error': str(exc) or 'Revisa los datos de la reserva.'}), 400
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/agenda/pedido/buscar', methods=['GET'])
 def api_agenda_buscar_pedido_por_codigo():
     try:
@@ -25036,9 +25172,11 @@ def api_agenda_evento_pdf(id):
             return jsonify({'success': False, 'error': 'ID de evento invalido'}), 400
         conn = get_db()
         cur = conn.cursor()
+        agenda_columns = {row[1] for row in cur.execute("PRAGMA table_info(agenda_eventos)")}
+        email_select = ", cliente_email" if "cliente_email" in agenda_columns else ""
         cur.execute(
-            """
-            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono, direccion, ingredientes, total, abono, codigo_operacion, codigo_pedido
+            f"""
+            SELECT id, tipo, fecha, hora_inicio, hora_fin, hora_entrega, cliente, telefono{email_select}, direccion, ingredientes, total, abono, codigo_operacion, codigo_pedido
             FROM agenda_eventos
             WHERE id = ?
             LIMIT 1

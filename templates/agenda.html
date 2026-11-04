@@ -3838,6 +3838,7 @@
                     <button onclick="agendarTortaManual()" class="btn-primary" title="Flujo dedicado para tomar pedidos de torta">
                         + Agendar torta
                     </button>
+                    <button type="button" class="agenda-cocktail-trigger" onclick="abrirAgendaCocteleriaManual()">+ Agendar cóctelería</button>
                     <div class="agenda-more-wrap">
                         <button onclick="toggleAgendaMoreMenu()" class="btn-icon" title="Mas acciones" aria-label="Mas acciones">...</button>
                         <div class="agenda-more-menu" id="agenda-more-menu">
@@ -4063,6 +4064,8 @@
             <button type="button" class="btn btn-secondary" onclick="cerrarReservaPopup()">Cerrar</button>
         </div>
     </div>
+
+    {% include "_agenda_cocteleria_manual.html" %}
 
     <!-- Modal Evento -->
     <div class="modal-overlay" id="modal-evento">
@@ -11370,6 +11373,8 @@
         });
     </script>
 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/agenda-cocteleria-manual.css') }}">
+<script src="{{ url_for('static', filename='js/agenda-cocteleria-manual.js') }}"></script>
 <script src="{{ url_for('static', filename='app-ux.js') }}"></script>
 <script src="{{ url_for('static', filename='nav-active.js') }}"></script>
 </body>

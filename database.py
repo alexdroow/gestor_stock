@@ -13125,6 +13125,32 @@ def guardar_evento_agenda(evento):
                     (codigo_pedido_evento, evento["id"]),
                 )
 
+        email_cliente = str(evento.get("cliente_email") or "").strip().lower()
+        if email_cliente:
+            columnas_agenda = {row[1] for row in cursor.execute("PRAGMA table_info(agenda_eventos)")}
+            if "cliente_email" in columnas_agenda:
+                cursor.execute("UPDATE agenda_eventos SET cliente_email=? WHERE id=?", (email_cliente, evento["id"]))
+
+        cocktail_snapshot = evento.get("_cocteleria_snapshot")
+        if tipo == "cocteleria" and isinstance(cocktail_snapshot, dict):
+            request_key = str(evento.get("_cocteleria_request_key") or uuid.uuid4().hex)[:100]
+            cocktail_items = cocktail_snapshot.get("items") if isinstance(cocktail_snapshot.get("items"), list) else []
+            if not cocktail_items:
+                conn.rollback()
+                return {"success": False, "error": "La reserva de cocteleria necesita al menos un producto."}
+            cursor.execute("DELETE FROM tienda_cocteleria_reserva_lineas WHERE event_id=?", (evento["id"],))
+            cursor.execute("DELETE FROM tienda_cocteleria_reservas WHERE event_id=?", (evento["id"],))
+            first_line = cocktail_items[0]
+            cursor.execute(
+                "INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)",
+                (request_key, evento["id"], int(first_line["model_id"]), int(first_line["presentation_id"]), json.dumps(cocktail_snapshot, ensure_ascii=False)),
+            )
+            for cocktail_line in cocktail_items:
+                cursor.execute(
+                    "INSERT INTO tienda_cocteleria_reserva_lineas(event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?)",
+                    (evento["id"], int(cocktail_line["model_id"]), int(cocktail_line["presentation_id"]), json.dumps(cocktail_line, ensure_ascii=False)),
+                )
+
         # Al editar/crear se reinician descartes para recalcular nuevos avisos.
         cursor.execute("DELETE FROM agenda_recordatorios_descartados WHERE evento_id = ?", (evento["id"],))
         

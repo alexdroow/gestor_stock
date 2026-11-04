@@ -1,0 +1,45 @@
+<div class="agenda-cocktail-overlay" id="agenda-cocteleria-modal" aria-hidden="true">
+  <section class="agenda-cocktail-dialog" role="dialog" aria-modal="true" aria-labelledby="agenda-cocteleria-title">
+    <header class="agenda-cocktail-header">
+      <div><span class="agenda-cocktail-kicker">Agenda Sucrée</span><h2 id="agenda-cocteleria-title">Agendar cóctelería</h2><p>Selecciona productos del catálogo y coordina fecha, hora y contacto.</p></div>
+      <button type="button" class="agenda-cocktail-close" onclick="cerrarAgendaCocteleriaManual()" aria-label="Cerrar">×</button>
+    </header>
+    <div class="agenda-cocktail-body">
+      <div class="agenda-cocktail-grid">
+        <section class="agenda-cocktail-section agenda-cocktail-calendar-section">
+          <div class="agenda-cocktail-section-heading"><div><span class="agenda-cocktail-step">01</span><h3>Fecha y hora</h3></div><div class="agenda-cocktail-calendar-nav"><button type="button" id="agenda-coct-prev" aria-label="Fechas anteriores">‹</button><button type="button" id="agenda-coct-next" aria-label="Fechas siguientes">›</button></div></div>
+          <p class="agenda-cocktail-hint" id="agenda-coct-calendar-message">Elige una fecha disponible.</p>
+          <div class="agenda-cocktail-days" id="agenda-coct-days"></div>
+          <div class="agenda-cocktail-hours" id="agenda-coct-hours"></div>
+        </section>
+        <section class="agenda-cocktail-section">
+          <div class="agenda-cocktail-section-heading"><div><span class="agenda-cocktail-step">02</span><h3>Catálogo</h3></div></div>
+          <div class="agenda-cocktail-product-fields">
+            <label>Producto<select id="agenda-coct-product"><option value="">Cargando catálogo...</option></select></label>
+            <label>Presentación<select id="agenda-coct-presentation" disabled><option value="">Selecciona un producto</option></select></label>
+            <label>Cantidad<input type="number" id="agenda-coct-quantity" min="1" value="1"></label>
+            <button type="button" class="agenda-cocktail-button agenda-cocktail-add" id="agenda-coct-add">Añadir al pedido</button>
+          </div>
+          <div class="agenda-cocktail-lines" id="agenda-coct-lines"><p class="agenda-cocktail-empty">Aún no agregas productos.</p></div>
+          <div class="agenda-cocktail-extra-head"><h4>Valores extra</h4><button type="button" class="agenda-cocktail-text-button" id="agenda-coct-add-extra">+ Añadir cargo</button></div>
+          <div class="agenda-cocktail-extras" id="agenda-coct-extras"></div>
+          <div class="agenda-cocktail-total"><span>Total estimado</span><strong id="agenda-coct-total">$0</strong></div>
+        </section>
+        <section class="agenda-cocktail-section agenda-cocktail-contact-section">
+          <div class="agenda-cocktail-section-heading"><div><span class="agenda-cocktail-step">03</span><h3>Contacto y entrega</h3></div></div>
+          <div class="agenda-cocktail-contact-grid">
+            <label>Nombre del cliente<input id="agenda-coct-customer" maxlength="80" autocomplete="name"></label>
+            <label>Teléfono<input id="agenda-coct-phone" type="tel" maxlength="30" autocomplete="tel"></label>
+            <label>Correo electrónico<input id="agenda-coct-email" type="email" maxlength="180" autocomplete="email"></label>
+            <label>Modalidad<select id="agenda-coct-delivery"><option value="retiro">Retiro en tienda</option><option value="despacho">Despacho</option></select></label>
+            <label class="agenda-coct-address-field" id="agenda-coct-address-wrap" hidden>Dirección de despacho<input id="agenda-coct-address" maxlength="240" autocomplete="street-address"></label>
+            <label class="agenda-coct-note-field">Nota del pedido<textarea id="agenda-coct-note" rows="2" maxlength="500" placeholder="Indicaciones adicionales (opcional)"></textarea></label>
+            <label>Abono recibido<input id="agenda-coct-deposit" type="number" min="0" step="1" value="0"></label>
+          </div>
+          <p class="agenda-cocktail-hint" id="agenda-coct-status" role="status"></p>
+          <div class="agenda-cocktail-actions"><button type="button" class="agenda-cocktail-button agenda-cocktail-secondary" onclick="cerrarAgendaCocteleriaManual()">Cancelar</button><button type="button" class="agenda-cocktail-button agenda-cocktail-primary" id="agenda-coct-save">Guardar reserva</button><a class="agenda-cocktail-button agenda-cocktail-pdf" id="agenda-coct-pdf" href="#" target="_blank" rel="noopener" hidden>Descargar PDF de cóctelería</a></div>
+        </section>
+      </div>
+    </div>
+  </section>
+</div>

@@ -125,6 +125,56 @@ class CocteleriaCatalogTests(unittest.TestCase):
         self.assertIn("evento.tipo === 'cocteleria'", html)
         self.assertEqual(app_module._label_origen_evento({"fuente": "agenda", "tipo": "cocteleria", "origen": "tienda_online"}), "Cóctelería (tienda online)")
 
+    def test_agenda_has_independent_manual_cocktail_booking_tool(self):
+        template = Path(__file__).resolve().parents[1] / "templates" / "agenda.html"
+        partial = Path(__file__).resolve().parents[1] / "templates" / "_agenda_cocteleria_manual.html"
+        html = template.read_text(encoding="utf-8")
+        modal = partial.read_text(encoding="utf-8")
+        for marker in ("+ Agendar cóctelería", "abrirAgendaCocteleriaManual()", "_agenda_cocteleria_manual.html", "agenda-cocteleria-manual.js"):
+            self.assertIn(marker, html)
+        for marker in ("agenda-cocteleria-modal", "agenda-coct-days", "agenda-coct-hours", "agenda-coct-lines", "agenda-coct-extras", "agenda-coct-customer", "agenda-coct-pdf"):
+            self.assertIn(marker, modal)
+        denied = self.client.post("/api/agenda/cocteleria/manual", json={})
+        self.assertEqual(denied.status_code, 401)
+
+    def test_manual_agenda_event_persists_cocktail_snapshot_and_email(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.executescript("""
+            CREATE TABLE agenda_eventos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, titulo TEXT, fecha TEXT,
+                hora_inicio TEXT, hora_fin TEXT, hora_entrega TEXT, cliente TEXT, telefono TEXT,
+                cliente_email TEXT, es_envio INTEGER, direccion TEXT, ingredientes TEXT, total REAL,
+                abono REAL, motivo TEXT, alerta_minutos INTEGER, estado TEXT,
+                codigo_operacion TEXT, codigo_pedido TEXT
+            );
+            CREATE TABLE agenda_recordatorios_descartados (evento_id INTEGER);
+        """)
+        cocteleria_module.ensure_cocteleria_schema(conn)
+        conn.commit()
+        conn.close()
+        snapshot = {
+            "kind": "COCTELERIA", "item_count": 1, "total_clp": 18000,
+            "extras": [{"description": "Montaje", "value_clp": 2500}], "extras_total_clp": 2500,
+            "items": [{"model_id": 5, "presentation_id": 9, "product_name": "Bocados", "presentation_label": "Bandeja 20", "quantity": 1, "unit_price_clp": 18000, "total_clp": 18000}],
+        }
+        event = {
+            "tipo": "cocteleria", "titulo": "Coctelería de prueba", "fecha": "2026-12-20",
+            "hora_inicio": "14:00", "hora_fin": "15:00", "hora_entrega": "14:00",
+            "cliente": "Cliente de prueba", "telefono": "+56912345678", "cliente_email": "cliente@example.com",
+            "ingredientes": "--- Reserva de cocteleria ---\n- Bocados / Bandeja 20",
+            "total": 20500, "abono": 0, "estado": "pendiente",
+            "_cocteleria_snapshot": snapshot, "_cocteleria_request_key": "manual-test-key",
+        }
+        with patch.object(database_module, "DB_PATH", self.db_path):
+            saved = database_module.guardar_evento_agenda(event)
+        self.assertTrue(saved["success"], saved)
+        conn = sqlite3.connect(self.db_path)
+        self.assertEqual(conn.execute("SELECT cliente_email,total FROM agenda_eventos WHERE id=?", (saved["id"],)).fetchone(), ("cliente@example.com", 20500.0))
+        stored = conn.execute("SELECT snapshot_json FROM tienda_cocteleria_reservas WHERE event_id=?", (saved["id"],)).fetchone()
+        self.assertEqual(json.loads(stored[0])["extras_total_clp"], 2500)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_cocteleria_reserva_lineas WHERE event_id=?", (saved["id"],)).fetchone()[0], 1)
+        conn.close()
+
 
     def test_cocktail_history_is_grouped_by_reservation_and_contains_customer(self):
         cocteleria_module.ensure_cocteleria_schema()
@@ -200,6 +250,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         )""")
         snapshot = {
             "kind": "COCTELERIA", "item_count": 2, "total_clp": 31500,
+            "extras": [{"description": "Montaje de mesa", "value_clp": 4200}], "extras_total_clp": 4200,
             "items": [
                 {"product_name": "Mini tartaletas", "category": "dulce", "presentation_label": "Bandeja 20", "units_per_pack": 20, "unit_label": "unidades", "quantity": 1, "unit_price_clp": 18000, "total_clp": 18000},
                 {"product_name": "Empanaditas cocktail", "category": "salado", "presentation_label": "Bandeja 30", "units_per_pack": 30, "unit_label": "unidades", "quantity": 1, "unit_price_clp": 13500, "total_clp": 13500},
@@ -208,7 +259,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         conn.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", ("test-cocktail-pdf", 812, 1, 1, json.dumps(snapshot)))
         conn.execute(
             "INSERT INTO agenda_eventos VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (812, "AGD-TEST-COCTEL", "", "2026-11-03", "15:00", "15:00", "Cliente de prueba", "+56912345678", "", "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30", "Reserva cliente tienda online", 31500, 10100, "pendiente", "cotizacion", "Cocteleria - 2 productos", 0),
+            (812, "AGD-TEST-COCTEL", "", "2026-11-03", "15:00", "15:00", "Cliente de prueba", "+56912345678", "", "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30", "Reserva cliente tienda online", 35700, 10100, "pendiente", "cotizacion", "Cocteleria - 2 productos", 0),
         )
         conn.commit()
         conn.close()
@@ -231,11 +282,11 @@ class CocteleriaCatalogTests(unittest.TestCase):
         pages = PdfReader(BytesIO(pdf_content)).pages
         self.assertEqual(len(pages), 1)
         text = "\n".join(page.extract_text() or "" for page in pages)
-        for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "$18.000", "$13.500", "$31.500"):
+        for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "Montaje de mesa", "$4.200", "$18.000", "$13.500", "$31.500"):
             self.assertIn(expected, text)
         total_final_pos = text.index("TOTAL FINAL")
-        self.assertIn("$31.500", text[total_final_pos:])
-        self.assertIn("$21.400", text)
+        self.assertIn("$35.700", text[total_final_pos:])
+        self.assertIn("$25.600", text)
 
 
 if __name__ == "__main__":
