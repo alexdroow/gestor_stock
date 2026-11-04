@@ -252,7 +252,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
             "kind": "COCTELERIA", "item_count": 2, "total_clp": 31500,
             "extras": [{"description": "Montaje de mesa", "value_clp": 4200}], "extras_total_clp": 4200,
             "items": [
-                {"product_name": "Mini tartaletas", "category": "dulce", "presentation_label": "Bandeja 20", "units_per_pack": 20, "unit_label": "unidades", "quantity": 1, "unit_price_clp": 18000, "total_clp": 18000},
+                {"product_name": "Mini tartaletas", "category": "dulce", "presentation_label": "Bandeja 20", "units_per_pack": 20, "unit_label": "unidades", "quantity": 3, "unit_price_clp": 6000, "total_clp": 18000},
                 {"product_name": "Empanaditas cocktail", "category": "salado", "presentation_label": "Bandeja 30", "units_per_pack": 30, "unit_label": "unidades", "quantity": 1, "unit_price_clp": 13500, "total_clp": 13500},
             ],
         }
@@ -282,7 +282,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         pages = PdfReader(BytesIO(pdf_content)).pages
         self.assertEqual(len(pages), 1)
         text = "\n".join(page.extract_text() or "" for page in pages)
-        for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "Empanaditas cocktail", "Montaje de mesa", "$4.200", "$18.000", "$13.500", "$31.500"):
+        for expected in ("DE COCTELERIA", "PRODUCTOS DE COCTELERIA", "Mini tartaletas", "Bandeja 20", "3 x", "$6.000", "Empanaditas cocktail", "Montaje de mesa", "$4.200", "$18.000", "$13.500", "$31.500"):
             self.assertIn(expected, text)
         total_final_pos = text.index("TOTAL FINAL")
         self.assertIn("$35.700", text[total_final_pos:])

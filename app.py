@@ -4690,13 +4690,14 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     if es_cocteleria and cocteleria_items:
         detail_rows = [
             (f"{_safe_text(item.get('product_name'), 'Producto')} / {_safe_text(item.get('presentation_label'), 'Presentacion')}",
-             f"{int(item.get('quantity') or 0)} x {_fmt_money(item.get('unit_price_clp') or 0)} = {_fmt_money(item.get('total_clp') or 0)}")
+             str(int(item.get('quantity') or 0)),
+             f" x {_fmt_money(item.get('unit_price_clp') or 0)} = {_fmt_money(item.get('total_clp') or 0)}")
             for item in cocteleria_items
         ]
-        detail_rows.extend((f"Cargo extra / {_safe_text(item.get('description'), 'Cargo')}", _fmt_money(item.get('value_clp') or 0)) for item in cocteleria_extras)
+        detail_rows.extend((f"Cargo extra / {_safe_text(item.get('description'), 'Cargo')}", "", _fmt_money(item.get('value_clp') or 0)) for item in cocteleria_extras)
         row_height = min(12, 110 / len(detail_rows))
         row_font = max(5.2, min(7.1, row_height * 0.64))
-        for idx, (item_label, item_value) in enumerate(detail_rows):
+        for idx, (item_label, item_quantity, item_value) in enumerate(detail_rows):
             row_y = 343 - (idx * row_height)
             if idx:
                 c.setStrokeColorRGB(0.90, 0.84, 0.76)
@@ -4704,10 +4705,19 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
                 c.line(58, row_y + row_height - 2, 326, row_y + row_height - 2)
             c.setFillColorRGB(*text_dark)
             c.setFont("Helvetica", row_font)
-            label_lines = _fit_lines(item_label, 158, "Helvetica", row_font, max_lines=1)
+            label_lines = _fit_lines(item_label, 146, "Helvetica", row_font, max_lines=1)
             value_lines = _fit_lines(item_value, 105, "Helvetica", row_font, max_lines=1)
             c.drawString(60, row_y, label_lines[0])
-            c.drawRightString(324, row_y, value_lines[0])
+            if item_quantity:
+                quantity_text = f"{item_quantity} x"
+                quantity_width = c.stringWidth(quantity_text, "Helvetica-Bold", row_font)
+                value_width = c.stringWidth(value_lines[0], "Helvetica", row_font)
+                c.setFont("Helvetica-Bold", row_font)
+                c.drawString(324 - quantity_width - value_width, row_y, quantity_text)
+                c.setFont("Helvetica", row_font)
+                c.drawString(324 - value_width, row_y, value_lines[0])
+            else:
+                c.drawRightString(324, row_y, value_lines[0])
     else:
         _draw_table(resumen_rows, 50, 233, 284, 110, label_w=82, max_rows=9)
     _draw_payment_summary(356, 222, 197, 154)
