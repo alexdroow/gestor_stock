@@ -12594,6 +12594,33 @@ def obtener_resumen_margen_ventas(fecha_desde=None, fecha_hasta=None):
         conn.close()
 
 
+def _total_cocteleria_manual_snapshot(snapshot):
+    if not isinstance(snapshot, dict) or str(snapshot.get("source") or "").strip().lower() != "agenda_manual":
+        return None
+    items = snapshot.get("items") if isinstance(snapshot.get("items"), list) else []
+    if not items:
+        return None
+    product_total = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        try:
+            line_total = int(item.get("total_clp") or (int(item.get("unit_price_clp") or 0) * int(item.get("quantity") or 0)))
+        except (TypeError, ValueError):
+            continue
+        product_total += max(0, line_total)
+    extras = snapshot.get("extras") if isinstance(snapshot.get("extras"), list) else []
+    extras_total = 0
+    for extra in extras:
+        if not isinstance(extra, dict):
+            continue
+        try:
+            extras_total += max(0, int(extra.get("value_clp") or 0))
+        except (TypeError, ValueError):
+            continue
+    return product_total + extras_total
+
+
 def obtener_eventos_agenda(fecha_desde=None, fecha_hasta=None):
     """Obtiene todos los eventos de la agenda"""
     conn = get_db()
@@ -12613,7 +12640,6 @@ def obtener_eventos_agenda(fecha_desde=None, fecha_hasta=None):
     
     cursor.execute(query, params)
     eventos = cursor.fetchall()
-    conn.close()
     
     resultado = []
     for e in eventos:
@@ -12621,6 +12647,44 @@ def obtener_eventos_agenda(fecha_desde=None, fecha_hasta=None):
         # Convertir es_envio de int a bool
         evento['es_envio'] = bool(evento['es_envio'])
         resultado.append(evento)
+
+    ids_cocteleria_manual = [
+        int(evento["id"]) for evento in resultado
+        if str(evento.get("tipo") or "").strip().lower() == "cocteleria"
+        and str(evento.get("ingredientes") or "").startswith("Reserva manual desde agenda")
+    ]
+    if ids_cocteleria_manual:
+        try:
+            placeholders = ",".join("?" for _ in ids_cocteleria_manual)
+            cursor.execute(
+                f"SELECT event_id,snapshot_json FROM tienda_cocteleria_reservas WHERE event_id IN ({placeholders})",
+                ids_cocteleria_manual,
+            )
+            snapshots = {int(row["event_id"]): row["snapshot_json"] for row in cursor.fetchall()}
+            for evento in resultado:
+                raw_snapshot = snapshots.get(int(evento.get("id") or 0))
+                if not raw_snapshot:
+                    continue
+                try:
+                    snapshot = json.loads(raw_snapshot or "{}")
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(snapshot, dict) and not snapshot.get("source"):
+                    snapshot["source"] = "agenda_manual"
+                authoritative_total = _total_cocteleria_manual_snapshot(snapshot)
+                if authoritative_total is not None:
+                    try:
+                        stored_total = int(float(evento.get("total") or 0))
+                    except (TypeError, ValueError):
+                        stored_total = 0
+                    if stored_total != authoritative_total:
+                        cursor.execute("UPDATE agenda_eventos SET total=? WHERE id=?", (authoritative_total, int(evento["id"])))
+                    evento["total"] = authoritative_total
+        except sqlite3.Error:
+            pass
+    if conn.in_transaction:
+        conn.commit()
+    conn.close()
     
     return resultado
 
@@ -12997,6 +13061,10 @@ def guardar_evento_agenda(evento):
     
     try:
         tipo = evento.get("tipo") or "torta"
+        cocktail_snapshot = evento.get("_cocteleria_snapshot")
+        authoritative_cocktail_total = _total_cocteleria_manual_snapshot(cocktail_snapshot)
+        if str(tipo).strip().lower() == "cocteleria" and authoritative_cocktail_total is not None:
+            evento["total"] = authoritative_cocktail_total
         evento_id = None
         try:
             evento_id_int = int(evento.get("id") or 0)
@@ -13131,7 +13199,6 @@ def guardar_evento_agenda(evento):
             if "cliente_email" in columnas_agenda:
                 cursor.execute("UPDATE agenda_eventos SET cliente_email=? WHERE id=?", (email_cliente, evento["id"]))
 
-        cocktail_snapshot = evento.get("_cocteleria_snapshot")
         if tipo == "cocteleria" and isinstance(cocktail_snapshot, dict):
             request_key = str(evento.get("_cocteleria_request_key") or uuid.uuid4().hex)[:100]
             cocktail_items = cocktail_snapshot.get("items") if isinstance(cocktail_snapshot.get("items"), list) else []

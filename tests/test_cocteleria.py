@@ -162,7 +162,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         conn.commit()
         conn.close()
         snapshot = {
-            "kind": "COCTELERIA", "item_count": 1, "total_clp": 18000,
+            "kind": "COCTELERIA", "source": "agenda_manual", "item_count": 1, "total_clp": 18000,
             "extras": [{"description": "Montaje", "value_clp": 2500}], "extras_total_clp": 2500,
             "items": [{"model_id": 5, "presentation_id": 9, "product_name": "Bocados", "presentation_label": "Bandeja 20", "quantity": 1, "unit_price_clp": 18000, "total_clp": 18000}],
         }
@@ -171,7 +171,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
             "hora_inicio": "14:00", "hora_fin": "15:00", "hora_entrega": "14:00",
             "cliente": "Cliente de prueba", "telefono": "+56912345678", "cliente_email": "cliente@example.com",
             "ingredientes": "--- Reserva de cocteleria ---\n- Bocados / Bandeja 20",
-            "total": 20500, "abono": 0, "estado": "pendiente",
+            "total": 21410, "abono": 0, "estado": "pendiente",
             "_cocteleria_snapshot": snapshot, "_cocteleria_request_key": "manual-test-key",
         }
         with patch.object(database_module, "DB_PATH", self.db_path):
@@ -182,6 +182,37 @@ class CocteleriaCatalogTests(unittest.TestCase):
         stored = conn.execute("SELECT snapshot_json FROM tienda_cocteleria_reservas WHERE event_id=?", (saved["id"],)).fetchone()
         self.assertEqual(json.loads(stored[0])["extras_total_clp"], 2500)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM tienda_cocteleria_reserva_lineas WHERE event_id=?", (saved["id"],)).fetchone()[0], 1)
+        conn.close()
+
+
+    def test_manual_cocktail_event_list_uses_snapshot_total_not_stale_agenda_total(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("CREATE TABLE agenda_eventos (id INTEGER PRIMARY KEY, tipo TEXT, fecha TEXT, hora_inicio TEXT, ingredientes TEXT, total REAL, es_envio INTEGER)")
+        cocteleria_module.ensure_cocteleria_schema(conn)
+        conn.execute(
+            "INSERT INTO agenda_eventos VALUES(?,?,?,?,?,?,?)",
+            (140, "cocteleria", "2026-11-09", "19:00", "Reserva manual desde agenda\\n--- Reserva de cocteleria ---", 21410, 0),
+        )
+        snapshot = {
+            "source": "agenda_manual",
+            "items": [
+                {"quantity": 1, "unit_price_clp": 30625, "total_clp": 30625},
+                {"quantity": 1, "unit_price_clp": 26250, "total_clp": 26250},
+                {"quantity": 1, "unit_price_clp": 92500, "total_clp": 92500},
+                {"quantity": 1, "unit_price_clp": 102500, "total_clp": 102500},
+            ],
+            "extras": [],
+        }
+        conn.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", ("manual-total", 140, 1, 1, json.dumps(snapshot)))
+        conn.commit()
+        conn.close()
+
+        with patch.object(database_module, "DB_PATH", self.db_path):
+            events = database_module.obtener_eventos_agenda()
+        self.assertEqual(events[0]["total"], 251875)
+        conn = sqlite3.connect(self.db_path)
+        self.assertEqual(conn.execute("SELECT total FROM agenda_eventos WHERE id=140").fetchone()[0], 251875)
         conn.close()
 
 
@@ -258,7 +289,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
             documento_tipo TEXT, titulo TEXT, es_envio INTEGER
         )""")
         snapshot = {
-            "kind": "COCTELERIA", "item_count": 2, "total_clp": 31500,
+            "kind": "COCTELERIA", "source": "agenda_manual", "item_count": 2, "total_clp": 31500,
             "extras": [{"description": "Montaje de mesa", "value_clp": 4200}], "extras_total_clp": 4200,
             "items": [
                 {"product_name": "Mini tartaletas", "category": "dulce", "presentation_label": "Bandeja 20", "units_per_pack": 20, "unit_label": "unidades", "quantity": 3, "unit_price_clp": 6000, "total_clp": 18000},
@@ -268,7 +299,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         conn.execute("INSERT INTO tienda_cocteleria_reservas(request_key,event_id,model_id,presentation_id,snapshot_json) VALUES(?,?,?,?,?)", ("test-cocktail-pdf", 812, 1, 1, json.dumps(snapshot)))
         conn.execute(
             "INSERT INTO agenda_eventos VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (812, "AGD-TEST-COCTEL", "", "2026-11-03", "15:00", "15:00", "Cliente de prueba", "+56912345678", "", "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30", "Reserva cliente tienda online", 35700, 10100, "pendiente", "cotizacion", "Cocteleria - 2 productos", 0),
+            (812, "AGD-TEST-COCTEL", "", "2026-11-03", "15:00", "15:00", "Cliente de prueba", "+56912345678", "", "--- Reserva de cocteleria ---\n- Mini tartaletas / Bandeja 20\n- Empanaditas cocktail / Bandeja 30", "Reserva manual desde agenda", 21410, 10100, "pendiente", "cotizacion", "Cocteleria - 2 productos", 0),
         )
         conn.commit()
         conn.close()

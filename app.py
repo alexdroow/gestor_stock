@@ -4415,6 +4415,16 @@ def _crear_pdf_reserva_agenda_tienda(reserva):
     despacho_total = _money_from_text("envio") if es_despacho else 0.0
     total_productos = float((catalog_data or {}).get("total_productos") or max(0.0, subtotal_productos - descuento_total))
     total_final = total_reserva_db or _money_from_text("total estimado pedido") or (total_productos + despacho_total)
+    es_cocteleria_agenda_manual = (
+        es_cocteleria
+        and (
+            str((cocteleria_snapshot or {}).get("source") or "").strip().lower() == "agenda_manual"
+            or str(reserva.get("ingredientes") or "").startswith("Reserva manual desde agenda")
+        )
+    )
+    if es_cocteleria_agenda_manual:
+        total_productos = cocteleria_total
+        total_final = cocteleria_total + cocteleria_extras_total
     if total_final > 0 and subtotal_productos <= 0:
         subtotal_productos = max(0.0, total_final - despacho_total + descuento_total)
         total_productos = max(0.0, subtotal_productos - descuento_total)
