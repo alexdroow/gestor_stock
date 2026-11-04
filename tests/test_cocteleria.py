@@ -132,6 +132,10 @@ class CocteleriaCatalogTests(unittest.TestCase):
         modal = partial.read_text(encoding="utf-8")
         script_path = Path(__file__).resolve().parents[1] / "static" / "js" / "agenda-cocteleria-manual.js"
         script = script_path.read_text(encoding="utf-8")
+        agenda_script_markers = ("function detalleCocteleriaAgenda(evento)", "function construirMensajeCocteleriaWhatsAppAgenda()", "tipo === 'cocteleria' ? construirMensajeCocteleriaWhatsAppAgenda() : construirMensajeWhatsAppAgenda('confirmacion')", "tipo === 'torta'")
+        agenda_html = template.read_text(encoding="utf-8")
+        for marker in agenda_script_markers:
+            self.assertIn(marker, agenda_html)
         for marker in ("+ Agendar cóctelería", "abrirAgendaCocteleriaManual()", "_agenda_cocteleria_manual.html", "agenda-cocteleria-manual.js"):
             self.assertIn(marker, html)
         for marker in ("agenda-cocteleria-modal", "agenda-coct-days", "agenda-coct-hours", "agenda-coct-lines", "agenda-coct-extras", "agenda-coct-customer", "agenda-coct-pdf"):

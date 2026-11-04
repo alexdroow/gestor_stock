@@ -5917,7 +5917,15 @@
             }
 
             const ficha = _pedidoFichaDesdeFormulario(ev);
-            const detalle = ficha.detalle || {};
+            const cocktail = detalleCocteleriaAgenda({ ...ev, ingredientes: document.getElementById('evento-ingredientes')?.value || ev.ingredientes });
+            const esCocteleria = ficha.tipo === 'cocteleria' || cocktail.isCocktail;
+            const detalleBase = ficha.detalle || {};
+            const detalle = esCocteleria ? {
+                ...detalleBase, categoria: 'Coctelería', tamano: `${cocktail.items.length} producto(s)`,
+                bizcocho: 'Productos reservados', sabores: cocktail.items.length ? cocktail.items : ['Sin productos detallados'],
+                extras: cocktail.extras.length ? cocktail.extras : ['Sin valores extra'], topper: [], otros: cocktail.extras,
+                nota: String(document.getElementById('evento-ingredientes')?.value || ev.ingredientes || '').split(/\n/).find((line) => /^nota:/i.test(line.trim()))?.split(':').slice(1).join(':').trim() || '-'
+            } : detalleBase;
             const estadoLabel = SEGUIMIENTO_ESTADOS_LABELS[ficha.seguimiento] || 'Pendiente';
             const tracking = seguimientoUrlPedido(ficha.codigo);
             const countdown = obtenerTextoCuentaRegresiva({
@@ -5964,7 +5972,7 @@
                         <div class="pedido-ficha-card pedido-ficha-product">
                             <div class="pedido-ficha-product-media">${imgHtml}</div>
                             <div class="pedido-ficha-product-body">
-                                <div class="pedido-ficha-main-title">${escapeHtml(detalle.categoria || ficha.titulo || '-')}</div>
+                                <div class="pedido-ficha-main-title">${escapeHtml(esCocteleria ? 'Cóctelería' : (detalle.categoria || ficha.titulo || '-'))}</div>
                                 <div class="pedido-ficha-subtitle">${escapeHtml(detalle.tamano || '-')}</div>
                                 <div class="pedido-ficha-pill warn" style="margin-top:10px;">${escapeHtml(detalle.bizcocho || 'Detalle torta')}</div>
                             </div>
@@ -5995,18 +6003,15 @@
                     <div class="pedido-ficha-right">
                         <div class="pedido-ficha-grid">
                             <div class="pedido-ficha-card">
-                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">i</span> Detalles del pedido</div>
-                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Categoria</span><span class="pedido-ficha-value">${escapeHtml(detalle.categoria || '-')}</span></div>
-                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Tamano</span><span class="pedido-ficha-value">${escapeHtml(detalle.tamano || '-')}</span></div>
-                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Bizcocho</span><span class="pedido-ficha-value">${escapeHtml(detalle.bizcocho || '-')}</span></div>
-                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Nota</span><span class="pedido-ficha-value">${escapeHtml(detalle.nota || '-')}</span></div>
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">i</span> ${esCocteleria ? 'Resumen de cóctelería' : 'Detalles del pedido'}</div>
+                                ${esCocteleria ? `<div class="pedido-ficha-row"><span class="pedido-ficha-label">Tipo</span><span class="pedido-ficha-value">Cóctelería</span></div><div class="pedido-ficha-row"><span class="pedido-ficha-label">Productos</span><span class="pedido-ficha-value">${cocktail.items.length}</span></div><div class="pedido-ficha-row"><span class="pedido-ficha-label">Nota</span><span class="pedido-ficha-value">${escapeHtml(detalle.nota || '-')}</span></div>` : `<div class="pedido-ficha-row"><span class="pedido-ficha-label">Categoria</span><span class="pedido-ficha-value">${escapeHtml(detalle.categoria || '-')}</span></div><div class="pedido-ficha-row"><span class="pedido-ficha-label">Tamano</span><span class="pedido-ficha-value">${escapeHtml(detalle.tamano || '-')}</span></div><div class="pedido-ficha-row"><span class="pedido-ficha-label">Bizcocho</span><span class="pedido-ficha-value">${escapeHtml(detalle.bizcocho || '-')}</span></div><div class="pedido-ficha-row"><span class="pedido-ficha-label">Nota</span><span class="pedido-ficha-value">${escapeHtml(detalle.nota || '-')}</span></div>`}
                             </div>
                             <div class="pedido-ficha-card">
-                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">&#10003;</span> Sabores y rellenos</div>
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">&#10003;</span> ${esCocteleria ? 'Productos reservados' : 'Sabores y rellenos'}</div>
                                 <div class="pedido-ficha-list">${_listaFichaHtml(detalle.sabores)}</div>
                             </div>
                             <div class="pedido-ficha-card">
-                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">+</span> Extras</div>
+                                <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">+</span> ${esCocteleria ? 'Valores extra' : 'Extras'}</div>
                                 <div class="pedido-ficha-list">${_listaFichaHtml(detalle.extras)}</div>
                             </div>
                             <div class="pedido-ficha-card">
@@ -6025,8 +6030,7 @@
                                 <div class="pedido-ficha-card-title"><span class="pedido-ficha-icon">QR</span> Seguimiento</div>
                                 <div class="pedido-ficha-row"><span class="pedido-ficha-label">Estado</span><span class="pedido-ficha-value">${escapeHtml(estadoLabel)}</span></div>
                                 <div class="pedido-ficha-row"><span class="pedido-ficha-label">Enlace</span><span class="pedido-ficha-value">${tracking ? `<a href="${escapeHtml(tracking)}" target="_blank" rel="noopener noreferrer">Ver seguimiento</a>` : '-'}</span></div>
-                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Topper</span><span class="pedido-ficha-value">${escapeHtml((detalle.topper || []).join(', ') || '-')}</span></div>
-                                <div class="pedido-ficha-row"><span class="pedido-ficha-label">Otros cargos</span><span class="pedido-ficha-value">${escapeHtml((detalle.otros || []).join(', ') || '-')}</span></div>
+                                ${esCocteleria ? '' : `<div class="pedido-ficha-row"><span class="pedido-ficha-label">Topper</span><span class="pedido-ficha-value">${escapeHtml((detalle.topper || []).join(', ') || '-')}</span></div><div class="pedido-ficha-row"><span class="pedido-ficha-label">Otros cargos</span><span class="pedido-ficha-value">${escapeHtml((detalle.otros || []).join(', ') || '-')}</span></div>`}
                             </div>
                         </div>
                     </div>
@@ -7798,7 +7802,7 @@
                 abrirSelectorCuentaTransferenciaAgenda();
                 return;
             }
-            const mensaje = construirMensajeWhatsAppAgenda('confirmacion');
+            const mensaje = tipo === 'cocteleria' ? construirMensajeCocteleriaWhatsAppAgenda() : construirMensajeWhatsAppAgenda('confirmacion');
             const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank', 'noopener,noreferrer');
         }
@@ -8787,12 +8791,46 @@
         }
 
         function detalleCocteleriaAgenda(evento) {
-            const sections = detalleEnSecciones(String((evento && evento.ingredientes) || ''), 'Detalle pedido');
-            const section = sections.find((s) => String((s && s.titulo) || '').trim().toLowerCase() === 'reserva de cocteleria');
-            const items = (Array.isArray(section && section.items) ? section.items : [])
-                .map((line) => String(line || '').trim().replace(/^[-*]\s*/, ''))
-                .filter((line) => line && !/^total de productos:/i.test(line));
-            return { isCocktail: Boolean(section) || String((evento && evento.tipo) || '').toLowerCase() === 'cocteleria', items };
+            const raw = String((evento && evento.ingredientes) || '').replace(/\r\n?/g, '\n');
+            const items = [];
+            const extras = [];
+            let mode = '';
+            raw.split('\n').forEach((rawLine) => {
+                const line = String(rawLine || '').trim();
+                const low = line.toLowerCase();
+                if (!line) return;
+                if (low.startsWith('---')) {
+                    mode = low.includes('reserva de cocteleria') ? 'items' : (low.includes('valores extra') ? 'extras' : '');
+                    return;
+                }
+                if (low.startsWith('total de productos:') || low.startsWith('total valores extra:') || low.startsWith('correo:') || low.startsWith('email:') || low.startsWith('entrega:') || low.startsWith('total estimado pedido:') || low.startsWith('nota:')) { mode = ''; return; }
+                if (mode === 'items' && line.startsWith('-')) items.push(line.replace(/^[-*]\s*/, ''));
+                if (mode === 'extras' && line.startsWith('-')) extras.push(line.replace(/^[-*]\s*/, ''));
+            });
+            return { isCocktail: items.length > 0 || extras.length > 0 || String((evento && evento.tipo) || '').toLowerCase() === 'cocteleria', items, extras };
+        }
+
+        function construirMensajeCocteleriaWhatsAppAgenda() {
+            const evento = eventoEditando || {};
+            const detalle = detalleCocteleriaAgenda({ ...evento, tipo: 'cocteleria', ingredientes: document.getElementById('evento-ingredientes')?.value || evento.ingredientes });
+            const cliente = String(document.getElementById('evento-cliente')?.value || evento.cliente || '').trim();
+            const fecha = String(document.getElementById('evento-fecha')?.value || evento.fecha || '').trim();
+            const hora = String(document.getElementById('evento-entrega')?.value || document.getElementById('evento-hora-inicio')?.value || evento.hora_entrega || evento.hora_inicio || '').slice(0, 5);
+            const envioInput = document.getElementById('evento-envio');
+            const despacho = envioInput ? Boolean(envioInput.checked) : Boolean(evento.es_envio);
+            const direccion = String(document.getElementById('evento-direccion')?.value || evento.direccion || '').trim();
+            const total = Math.max(0, Number(document.getElementById('evento-total')?.value || evento.total || 0));
+            const abono = Math.max(0, Number(document.getElementById('evento-abono')?.value || evento.abono || 0));
+            return [
+                `Hola${cliente ? ` ${cliente}` : ''}, te compartimos el resumen de tu reserva de coctelería en Pastelería Sucrée.`,
+                `Pedido: ${String(evento.codigo_pedido || evento.id || '-')} · ${fecha}${hora ? ` · ${hora}` : ''}`,
+                `Entrega: ${despacho ? `Despacho${direccion ? ` · ${direccion}` : ''}` : 'Retiro en tienda'}`,
+                '', 'Productos:',
+                ...(detalle.items.length ? detalle.items.map((item) => `• ${item}`) : ['• Sin productos detallados']),
+                ...(detalle.extras.length ? ['', 'Valores extra:', ...detalle.extras.map((item) => `• ${item}`)] : []),
+                '', `Total: ${formatoMonedaCLP(total)}`, `Abono: ${formatoMonedaCLP(abono)}`, `Saldo pendiente: ${formatoMonedaCLP(Math.max(0, total - abono))}`,
+                'Gracias por preferirnos.'
+            ].join('\n');
         }
 
         function asegurarDraftEdicionRapidaAgenda(evento) {
