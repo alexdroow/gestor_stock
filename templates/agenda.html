@@ -8811,27 +8811,19 @@
         }
 
         function totalCocteleriaManualDesdeDetalle(evento) {
-            if (String((evento && evento.tipo) || '').trim().toLowerCase() !== 'cocteleria') return null;
             const raw = String((evento && evento.ingredientes) || '').replace(/\r\n?/g, '\n');
-            if (!raw.startsWith('Reserva manual desde agenda')) return null;
-            let mode = '';
+            if (!raw.trimStart().toLowerCase().startsWith('reserva manual desde agenda')) return null;
+            const cocktail = detalleCocteleriaAgenda(evento);
+            if (!cocktail.isCocktail) return null;
             let productsTotal = 0;
             let extrasTotal = 0;
-            raw.split('\n').forEach((rawLine) => {
-                const line = String(rawLine || '').trim();
-                const low = line.toLowerCase();
-                if (!line) return;
-                if (low.startsWith('---')) {
-                    mode = low.includes('reserva de cocteleria') ? 'products' : (low.includes('valores extra') ? 'extras' : '');
-                    return;
-                }
-                if (mode === 'products' && line.startsWith('-')) {
-                    const match = line.match(/=\s*\$?\s*([\d.]+)\s*$/);
-                    if (match) productsTotal += Number(match[1].replace(/\./g, '')) || 0;
-                } else if (mode === 'extras' && line.startsWith('-')) {
-                    const match = line.match(/\(\s*\$?\s*([\d.]+)\s*\)\s*$/) || line.match(/=\s*\$?\s*([\d.]+)\s*$/);
-                    if (match) extrasTotal += Number(match[1].replace(/\./g, '')) || 0;
-                }
+            cocktail.items.forEach((line) => {
+                const match = String(line || '').match(/=\s*\$?\s*([\d.]+)\s*$/);
+                if (match) productsTotal += Number(match[1].replace(/\./g, '')) || 0;
+            });
+            cocktail.extras.forEach((line) => {
+                const match = String(line || '').match(/\(\s*\$?\s*([\d.]+)\s*\)\s*$/) || String(line || '').match(/=\s*\$?\s*([\d.]+)\s*$/);
+                if (match) extrasTotal += Number(match[1].replace(/\./g, '')) || 0;
             });
             return productsTotal > 0 ? productsTotal + extrasTotal : null;
         }
@@ -10578,9 +10570,6 @@
             const evento = eventos.find(e => Number(e.id || 0) === idNum);
             if (!evento) return;
 
-            const totalCocteleriaCorregido = totalCocteleriaManualDesdeDetalle(evento);
-            if (totalCocteleriaCorregido !== null) evento.total = totalCocteleriaCorregido;
-
             document.body.classList.remove('agenda-mobile-detail-open');
 
             eventoEditando = evento;
@@ -10606,6 +10595,15 @@
             document.getElementById('evento-ingredientes').value = evento.ingredientes || '';
             document.getElementById('evento-total').value = evento.total || '';
             document.getElementById('evento-abono').value = evento.abono || '';
+            const totalManualCocteleria = totalCocteleriaManualDesdeDetalle({
+                ...evento,
+                tipo: 'cocteleria',
+                ingredientes: document.getElementById('evento-ingredientes').value
+            });
+            if (totalManualCocteleria !== null) {
+                evento.total = totalManualCocteleria;
+                document.getElementById('evento-total').value = String(totalManualCocteleria);
+            }
             document.getElementById('bloqueo-motivo').value = evento.motivo || '';
             document.getElementById('evento-alerta').value = evento.alerta_minutos || 1440;
             limpiarCamposTortaManual();
