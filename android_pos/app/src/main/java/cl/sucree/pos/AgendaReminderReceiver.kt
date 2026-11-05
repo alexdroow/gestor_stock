@@ -9,6 +9,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -25,7 +27,8 @@ class AgendaReminderReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_FIRE = "cl.sucree.pos.action.AGENDA_REMINDER"
-        private const val CHANNEL_ID = "agenda_personal_reminders"
+        // Use a fresh channel so Android applies sound/vibration settings even on upgraded installs.
+        private const val CHANNEL_ID = "agenda_personal_reminders_v2"
         private const val PREFS = "agenda_personal_reminders"
         private const val REMINDERS_KEY = "active_reminders"
 
@@ -64,6 +67,9 @@ class AgendaReminderReceiver : BroadcastReceiver() {
                     }
                 }
             }
+            if (reminders.length() > 0 && context is MainActivity) {
+                context.ensureAgendaReminderNotificationPermission()
+            }
         }
 
         fun rescheduleSaved(context: Context) {
@@ -81,9 +87,13 @@ class AgendaReminderReceiver : BroadcastReceiver() {
             if (id <= 0 || due <= System.currentTimeMillis()) return
             val alarmManager = context.getSystemService(AlarmManager::class.java)
             val pending = pendingIntent(context, id, reminder)
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, due, pending)
-            } else {
+            try {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, due, pending)
+                } else {
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, due, pending)
+                }
+            } catch (_: SecurityException) {
                 alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, due, pending)
             }
         }
@@ -115,11 +125,18 @@ class AgendaReminderReceiver : BroadcastReceiver() {
             ) return
             val manager = context.getSystemService(NotificationManager::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                val audio = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
                 manager.createNotificationChannel(NotificationChannel(
                     CHANNEL_ID, "Recordatorios personales", NotificationManager.IMPORTANCE_HIGH,
                 ).apply {
                     description = "Avisos de recordatorios personales de Agenda Sucree POS."
                     enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 350, 180, 350)
+                    setSound(sound, audio)
                 })
             }
             val id = intent.getIntExtra("reminder_id", 0)
@@ -139,6 +156,9 @@ class AgendaReminderReceiver : BroadcastReceiver() {
                 .setContentText(body)
                 .setStyle(Notification.BigTextStyle().bigText(body))
                 .setCategory(Notification.CATEGORY_REMINDER)
+                .setDefaults(Notification.DEFAULT_SOUND or Notification.DEFAULT_VIBRATE)
+                .setVibrate(longArrayOf(0, 350, 180, 350))
+                .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(contentIntent)
                 .build())

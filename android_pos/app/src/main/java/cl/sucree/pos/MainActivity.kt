@@ -20,6 +20,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.Manifest
 import android.content.pm.PackageManager
 import android.view.Gravity
@@ -51,6 +52,7 @@ class MainActivity : Activity() {
     private lateinit var loading: ProgressBar
     private lateinit var connectionPanel: LinearLayout
     private lateinit var printButton: Button
+    private var notificationPermissionRequestPending = false
     private val uiHandler = Handler(Looper.getMainLooper())
     private val printer by lazy { AndroidSystemPrinterGateway(this) }
     private val saleScreenPoll = object : Runnable {
@@ -347,8 +349,35 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("pos_notifications", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("permission_asked", false)) {
             prefs.edit().putBoolean("permission_asked", true).apply()
+            notificationPermissionRequestPending = true
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
         }
+    }
+
+    internal fun ensureAgendaReminderNotificationPermission() {
+        if (Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED ||
+            notificationPermissionRequestPending
+        ) return
+
+        val prefs = getSharedPreferences("pos_notifications", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("permission_asked", false)) {
+            prefs.edit().putBoolean("permission_asked", true).apply()
+            notificationPermissionRequestPending = true
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+            return
+        }
+
+        Toast.makeText(this, "Activa las notificaciones de Sucree POS para recibir tus recordatorios.", Toast.LENGTH_LONG).show()
+        runCatching {
+            startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+        }
+    }
+
+    @Deprecated("Use Activity Result APIs when migrating the legacy permission flow")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) notificationPermissionRequestPending = false
     }
 
     private fun showNewOrderNotification(orderId: String, customerName: String) {
