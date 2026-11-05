@@ -58,7 +58,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private const val QUOTE_IDS_KEY = "known_quote_ids"
         private const val ORDER_BASELINE_KEY = "order_baseline_created"
         private const val QUOTE_BASELINE_KEY = "quote_baseline_created"
-        private const val CHANNEL_ID = "pos_attention_alerts_v2"
+        private const val CHANNEL_ID = "pos_attention_alerts_v3"
         private const val POLL_INTERVAL_MS = 60 * 1000L
         private const val ALERT_REPEAT_INTERVAL_MS = 5 * 60 * 1000L
         private const val RECENT_COCKTAIL_WINDOW_MS = 15 * 60 * 1000L
@@ -174,9 +174,9 @@ class OrderAlertReceiver : BroadcastReceiver() {
                 val ordersFuture: Future<JSONArray?>? = cookie?.let {
                     pollExecutor.submit<JSONArray?> { fetchEndpoint("/api/tienda/admin/pedidos-chat-activos", it, "pedidos") }
                 }
-                val agendaFuture = pollExecutor.submit<JSONArray?> { fetchEndpoint("/api/agenda/eventos", null, "eventos") }
-                val orders = ordersFuture?.let { runCatching { it.get(5, TimeUnit.SECONDS) }.getOrNull() }
-                val agenda = runCatching { agendaFuture.get(5, TimeUnit.SECONDS) }.getOrNull()
+                val agendaFuture = pollExecutor.submit<JSONArray?> { fetchEndpoint("/api/pos/monitor/agenda", cookie, "eventos") }
+                val orders = ordersFuture?.let { runCatching { it.get(10, TimeUnit.SECONDS) }.getOrNull() }
+                val agenda = runCatching { agendaFuture.get(10, TimeUnit.SECONDS) }.getOrNull()
                 var successful = false
                 if (orders != null) {
                     prefs.edit().putInt(ORDERS_COUNT_KEY, processOrders(context, orders)).apply()
@@ -214,9 +214,11 @@ class OrderAlertReceiver : BroadcastReceiver() {
             val connection = (URL("https://pasteleriasucree.cl$path").openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 2_000
-                readTimeout = 2_500
+                readTimeout = 8_000
+                useCaches = false
                 if (cookie != null) setRequestProperty("Cookie", cookie)
                 setRequestProperty("Accept", "application/json")
+                setRequestProperty("Cache-Control", "no-cache")
                 setRequestProperty("User-Agent", "SucreePOS-Android")
             }
             try {
@@ -331,15 +333,18 @@ class OrderAlertReceiver : BroadcastReceiver() {
             val title = item.optString("title", "Pedido pendiente")
             val body = item.optString("body", "Abre Sucrée POS para atenderlo.")
             manager.cancel(key.hashCode())
-            manager.notify(key.hashCode(), Notification.Builder(context, CHANNEL_ID)
+            val notification = Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_sucree)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(Notification.BigTextStyle().bigText("$body\nToca para abrir y atender. Si sigue sin abrirse, volveremos a avisarte en 5 minutos."))
                 .setCategory(Notification.CATEGORY_EVENT)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setPriority(Notification.PRIORITY_MAX)
                 .setAutoCancel(true)
                 .setContentIntent(contentIntent)
-                .build())
+                .build()
+            manager.notify(key.hashCode(), notification)
         }
 
         private fun repeatAlert(context: Context, intent: Intent) {

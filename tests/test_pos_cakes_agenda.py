@@ -27,13 +27,13 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_148(self):
+    def test_updated_pos_apk_is_available_as_version_149(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.8', page.get_data(as_text=True))
+        self.assertIn('1.4.9', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.8')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.9')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
@@ -276,7 +276,10 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('vibrationPattern = longArrayOf(0, 350, 180, 350)', native)
         self.assertIn('ALERT_REPEAT_INTERVAL_MS = 5 * 60 * 1000L', native)
         self.assertIn('/api/tienda/admin/pedidos-chat-activos', native)
-        self.assertIn('/api/agenda/eventos', native)
+        self.assertIn('/api/pos/monitor/agenda', native)
+        service = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'PosMonitoringService.kt').read_text(encoding='utf-8')
+        self.assertIn('Notification.FLAG_NO_CLEAR', service)
+        self.assertIn('pos_attention_alerts_v3', native)
         self.assertIn('scheduleRepeat(context, key, ALERT_REPEAT_INTERVAL_MS)', native)
         self.assertIn('val isCocktail = type.contains("cocteler") || type == "cocktail"', native)
         self.assertIn('event.optString("ingredientes").contains("reserva de cocteleria", true)', native)
@@ -289,6 +292,30 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('syncActiveOrderAlerts', pos)
         self.assertIn('syncActiveAgendaQuotes', agenda)
         self.assertIn('cl.sucree.pos.action.POLL_NEW_ORDERS', manifest)
+
+    def test_pos_monitor_agenda_feed_requires_admin_session(self):
+        anonymous = app_module.app.test_client().get('/api/pos/monitor/agenda')
+        self.assertEqual(anonymous.status_code, 401)
+        conn = sqlite3.connect(':memory:')
+        conn.row_factory = sqlite3.Row
+        conn.execute('''CREATE TABLE agenda_eventos (
+            id INTEGER PRIMARY KEY, tipo TEXT, fecha TEXT, cliente TEXT, motivo TEXT,
+            estado TEXT, codigo_operacion TEXT, creado TEXT, ingredientes TEXT
+        )''')
+        conn.execute(
+            '''INSERT INTO agenda_eventos
+               (id, tipo, fecha, cliente, motivo, estado, codigo_operacion, creado, ingredientes)
+               VALUES (1, 'cocteleria', '2026-11-05', 'Cliente', 'Reserva cliente tienda online',
+                       'pendiente', 'OPA-TI-TEST', '2026-11-05 12:00:00', 'Reserva de cocteleria')'''
+        )
+        with patch.object(app_module, 'get_db', return_value=conn):
+            response = self.client.get('/api/pos/monitor/agenda')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()['success'])
+        eventos = response.get_json()['eventos']
+        self.assertEqual(len(eventos), 1)
+        self.assertEqual(eventos[0]['tipo'], 'cocteleria')
+        self.assertEqual(eventos[0]['codigo_operacion'], 'OPA-TI-TEST')
 
 
 if __name__ == '__main__':

@@ -1164,25 +1164,25 @@ def descargar_pos_android():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-APK-Version'] = '1.4.8'
+    response.headers['X-POS-APK-Version'] = '1.4.9'
     return response
 
 
 @app.route('/descargas/SucreePOS-Android-prueba.apk')
 def descargar_archivo_pos_android():
-    apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk', 'SucreePOS-Android-1.4.8-debug.apk')
+    apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk', 'SucreePOS-Android-1.4.9-debug.apk')
     if not os.path.isfile(apk_path):
         return 'La APK aún no está disponible.', 404
     response = send_file(
         apk_path,
         as_attachment=True,
-        download_name='SucreePOS-Android-1.4.8-debug.apk',
+        download_name='SucreePOS-Android-1.4.9-debug.apk',
         mimetype='application/vnd.android.package-archive',
         max_age=0,
     )
     response.headers['Cache-Control'] = 'no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-POS-APK-Version'] = '1.4.8'
+    response.headers['X-POS-APK-Version'] = '1.4.9'
     return response
 
 
@@ -24802,6 +24802,36 @@ def api_agenda_eventos():
         return jsonify({'success': True, 'eventos': eventos})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/pos/monitor/agenda', methods=['GET'])
+def api_pos_monitor_agenda():
+    """Small authenticated feed for pending public reservations in the POS app."""
+    if not session.get(_ADMIN_SESSION_KEY):
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    conn = None
+    try:
+        conn = get_db()
+        rows = conn.execute(
+            """
+            SELECT id, tipo, fecha, cliente, motivo, estado, codigo_operacion, creado, ingredientes
+            FROM agenda_eventos
+            WHERE lower(trim(coalesce(estado, 'pendiente'))) = 'pendiente'
+              AND lower(trim(coalesce(tipo, ''))) <> 'bloqueo'
+              AND (
+                    lower(coalesce(motivo, '')) LIKE '%reserva cliente tienda online%'
+                    OR upper(coalesce(codigo_operacion, '')) LIKE 'OPA-TI-%'
+                  )
+            ORDER BY id DESC
+            LIMIT 500
+            """
+        ).fetchall()
+        return jsonify({"success": True, "eventos": [dict(row) for row in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "eventos": [], "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
 
 @app.route('/api/agenda/evento', methods=['POST'])
 def api_agenda_guardar():

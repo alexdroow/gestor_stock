@@ -529,7 +529,7 @@ class MainActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
-        private const val ORDER_CHANNEL_ID = "sucree_pos_orders"
+        private const val ORDER_CHANNEL_ID = "sucree_pos_orders_v2"
         private const val NOTIFICATION_PERMISSION_REQUEST = 5102
     }
 }

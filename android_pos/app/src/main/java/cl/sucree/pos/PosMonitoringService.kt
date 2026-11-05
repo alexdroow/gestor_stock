@@ -95,7 +95,9 @@ class PosMonitoringService : Service() {
             "Agenda (${status.pendingQuotes})",
             activityPendingIntent(showAgenda = true),
         ).build())
-        return builder.build()
+        return builder.build().apply {
+            flags = flags or Notification.FLAG_NO_CLEAR or Notification.FLAG_ONGOING_EVENT
+        }
     }
 
     private fun activityPendingIntent(showOrders: Boolean = false, showAgenda: Boolean = false): PendingIntent {
