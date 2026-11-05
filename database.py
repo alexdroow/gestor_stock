@@ -12621,6 +12621,48 @@ def _total_cocteleria_manual_snapshot(snapshot):
     return product_total + extras_total
 
 
+def _sincronizar_total_evento_cocteleria_snapshot(evento, cursor):
+    """Use the persisted cocktail snapshot as the source of truth for manual bookings."""
+    if not isinstance(evento, dict) or str(evento.get("tipo") or "").strip().lower() != "cocteleria":
+        return evento
+    try:
+        event_id = int(evento.get("id") or 0)
+    except (TypeError, ValueError):
+        return evento
+    if event_id <= 0:
+        return evento
+    try:
+        cursor.execute(
+            "SELECT snapshot_json FROM tienda_cocteleria_reservas WHERE event_id=? LIMIT 1",
+            (event_id,),
+        )
+        row = cursor.fetchone()
+    except sqlite3.Error:
+        return evento
+    if not row:
+        return evento
+    try:
+        snapshot = json.loads(row["snapshot_json"] if isinstance(row, sqlite3.Row) else row[0])
+    except (TypeError, ValueError, KeyError, IndexError):
+        return evento
+    if not isinstance(snapshot, dict):
+        return evento
+    # Older manual reservations may not have had `source` recorded in the snapshot.
+    if not snapshot.get("source") and "reserva manual desde agenda" in str(evento.get("ingredientes") or "").strip().lower():
+        snapshot["source"] = "agenda_manual"
+    authoritative_total = _total_cocteleria_manual_snapshot(snapshot)
+    if authoritative_total is None:
+        return evento
+    try:
+        stored_total = int(float(evento.get("total") or 0))
+    except (TypeError, ValueError):
+        stored_total = 0
+    if stored_total != authoritative_total:
+        cursor.execute("UPDATE agenda_eventos SET total=? WHERE id=?", (authoritative_total, event_id))
+    evento["total"] = authoritative_total
+    return evento
+
+
 def obtener_eventos_agenda(fecha_desde=None, fecha_hasta=None):
     """Obtiene todos los eventos de la agenda"""
     conn = get_db()
@@ -12648,40 +12690,8 @@ def obtener_eventos_agenda(fecha_desde=None, fecha_hasta=None):
         evento['es_envio'] = bool(evento['es_envio'])
         resultado.append(evento)
 
-    ids_cocteleria_manual = [
-        int(evento["id"]) for evento in resultado
-        if str(evento.get("tipo") or "").strip().lower() == "cocteleria"
-        and str(evento.get("ingredientes") or "").startswith("Reserva manual desde agenda")
-    ]
-    if ids_cocteleria_manual:
-        try:
-            placeholders = ",".join("?" for _ in ids_cocteleria_manual)
-            cursor.execute(
-                f"SELECT event_id,snapshot_json FROM tienda_cocteleria_reservas WHERE event_id IN ({placeholders})",
-                ids_cocteleria_manual,
-            )
-            snapshots = {int(row["event_id"]): row["snapshot_json"] for row in cursor.fetchall()}
-            for evento in resultado:
-                raw_snapshot = snapshots.get(int(evento.get("id") or 0))
-                if not raw_snapshot:
-                    continue
-                try:
-                    snapshot = json.loads(raw_snapshot or "{}")
-                except (TypeError, ValueError):
-                    continue
-                if isinstance(snapshot, dict) and not snapshot.get("source"):
-                    snapshot["source"] = "agenda_manual"
-                authoritative_total = _total_cocteleria_manual_snapshot(snapshot)
-                if authoritative_total is not None:
-                    try:
-                        stored_total = int(float(evento.get("total") or 0))
-                    except (TypeError, ValueError):
-                        stored_total = 0
-                    if stored_total != authoritative_total:
-                        cursor.execute("UPDATE agenda_eventos SET total=? WHERE id=?", (authoritative_total, int(evento["id"])))
-                    evento["total"] = authoritative_total
-        except sqlite3.Error:
-            pass
+    for evento in resultado:
+        _sincronizar_total_evento_cocteleria_snapshot(evento, cursor)
     if conn.in_transaction:
         conn.commit()
     conn.close()
@@ -12707,6 +12717,9 @@ def obtener_evento_agenda_por_id(evento_id):
             return None
         evento = dict(row)
         evento["es_envio"] = bool(evento.get("es_envio"))
+        _sincronizar_total_evento_cocteleria_snapshot(evento, cursor)
+        if conn.in_transaction:
+            conn.commit()
         return evento
     finally:
         conn.close()

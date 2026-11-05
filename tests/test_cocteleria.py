@@ -213,6 +213,15 @@ class CocteleriaCatalogTests(unittest.TestCase):
         self.assertEqual(events[0]["total"], 251875)
         conn = sqlite3.connect(self.db_path)
         self.assertEqual(conn.execute("SELECT total FROM agenda_eventos WHERE id=140").fetchone()[0], 251875)
+        conn.execute("UPDATE agenda_eventos SET total=21410 WHERE id=140")
+        conn.commit()
+        conn.close()
+
+        with patch.object(database_module, "DB_PATH", self.db_path):
+            event = database_module.obtener_evento_agenda_por_id(140)
+        self.assertEqual(event["total"], 251875)
+        conn = sqlite3.connect(self.db_path)
+        self.assertEqual(conn.execute("SELECT total FROM agenda_eventos WHERE id=140").fetchone()[0], 251875)
         conn.close()
 
 
