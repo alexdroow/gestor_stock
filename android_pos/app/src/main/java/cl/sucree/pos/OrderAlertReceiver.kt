@@ -16,6 +16,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
@@ -58,6 +61,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private const val CHANNEL_ID = "pos_attention_alerts_v2"
         private const val POLL_INTERVAL_MS = 60 * 1000L
         private const val ALERT_REPEAT_INTERVAL_MS = 5 * 60 * 1000L
+        private const val RECENT_COCKTAIL_WINDOW_MS = 15 * 60 * 1000L
         private const val ORDERS_COUNT_KEY = "pending_orders_count"
         private const val QUOTES_COUNT_KEY = "pending_quotes_count"
         private const val LAST_UPDATE_KEY = "monitor_last_update"
@@ -264,15 +268,18 @@ class OrderAlertReceiver : BroadcastReceiver() {
                 val motive = event.optString("motivo")
                 val onlineReservation = motive.contains("reserva cliente tienda online", true) ||
                     event.optString("codigo_operacion").startsWith("OPA-TI-", true)
-                val cocktailReservation = type in setOf("cocteleria", "coctelería", "cocktail") && onlineReservation
+                val isCocktail = type.contains("cocteler") || type == "cocktail"
+                val cocktailReservation = isCocktail && (onlineReservation || event.optString("ingredientes").contains("reserva de cocteleria", true))
                 val pending = event.optString("estado").equals("pendiente", true) &&
                     type != "bloqueo" && (onlineReservation || cocktailReservation)
                 if (pending) {
                     active.put(id)
-                    if (baseline && id !in known) {
+                    val firstPollCocktail = !baseline && isCocktail && isRecentlyCreatedCocktail(event.optString("creado"))
+                    if ((baseline && id !in known) || firstPollCocktail) {
                         val customer = event.optString("cliente", "Cliente")
                         val date = event.optString("fecha")
-                        notifyNew(context, "quote", id, "Nueva cotización de torta", "$customer · $date · Requiere confirmación")
+                        val title = if (isCocktail) "Nuevo pedido de cocteleria" else "Nueva cotizacion de torta"
+                        notifyNew(context, "quote", id, title, "$customer · $date · Requiere confirmacion")
                     }
                 }
             }
@@ -282,6 +289,18 @@ class OrderAlertReceiver : BroadcastReceiver() {
             return active.length()
         }
 
+        private fun isRecentlyCreatedCocktail(created: String): Boolean {
+            if (created.isBlank()) return false
+            return runCatching {
+                val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                    isLenient = false
+                }
+                val createdAt = format.parse(created)?.time ?: return false
+                val age = System.currentTimeMillis() - createdAt
+                age in 0..RECENT_COCKTAIL_WINDOW_MS
+            }.getOrDefault(false)
+        }
         private fun showAlert(context: Context, key: String) {
             if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
             val item = readObjectArray(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(ALERTS_KEY, "[]"))
