@@ -79,7 +79,6 @@ class MainActivity : Activity() {
 
         buildScreen()
         configureWebView()
-        createOrderNotificationChannel()
         requestNotificationPermissionIfNeeded()
         if (savedInstanceState == null) {
             webView.loadUrl(posStartUrl(intent))

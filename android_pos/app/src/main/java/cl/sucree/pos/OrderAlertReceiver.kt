@@ -9,13 +9,26 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
+data class PosMonitoringStatus(
+    val pendingOrders: Int,
+    val pendingQuotes: Int,
+    val lastUpdatedMillis: Long,
+    val connected: Boolean,
+    val ordersAvailable: Boolean,
+    val quotesAvailable: Boolean,
+)
 
 class OrderAlertReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -42,16 +55,31 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private const val QUOTE_IDS_KEY = "known_quote_ids"
         private const val ORDER_BASELINE_KEY = "order_baseline_created"
         private const val QUOTE_BASELINE_KEY = "quote_baseline_created"
-        private const val CHANNEL_ID = "pos_attention_alerts"
+        private const val CHANNEL_ID = "pos_attention_alerts_v2"
         private const val POLL_INTERVAL_MS = 60 * 1000L
         private const val ALERT_REPEAT_INTERVAL_MS = 5 * 60 * 1000L
+        private const val ORDERS_COUNT_KEY = "pending_orders_count"
+        private const val QUOTES_COUNT_KEY = "pending_quotes_count"
+        private const val LAST_UPDATE_KEY = "monitor_last_update"
+        private const val CONNECTED_KEY = "monitor_connected"
+        private const val ORDERS_AVAILABLE_KEY = "monitor_orders_available"
+        private const val QUOTES_AVAILABLE_KEY = "monitor_quotes_available"
+        private val pollInProgress = AtomicBoolean(false)
+        private val pollExecutor = Executors.newFixedThreadPool(2)
 
         fun startMonitoring(context: Context, cookie: String) {
             if (cookie.length > 16_000) return
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             prefs.edit().putBoolean(MONITOR_KEY, true).apply()
             if (cookie.isNotBlank()) prefs.edit().putString(COOKIE_KEY, cookie).apply()
-            schedulePoll(context, 1_000L)
+            val service = Intent(context, PosMonitoringService::class.java)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(service)
+                else context.startService(service)
+            } catch (_: Exception) {
+                // The scheduled poll remains available if Android rejects foreground startup.
+            }
+            schedulePoll(context, POLL_INTERVAL_MS)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                 !context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
             ) {
@@ -126,14 +154,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
             val pending = receiver.goAsync()
             Thread {
                 try {
-                    val completed = CountDownLatch(2)
-                    listOf(
-                        { pollEndpoint(context, "/api/tienda/admin/pedidos-chat-activos", "orders") },
-                        { pollEndpoint(context, "/api/agenda/eventos", "agenda") },
-                    ).forEach { poll ->
-                        Thread { try { poll() } catch (_: Exception) { } finally { completed.countDown() } }.start()
-                    }
-                    completed.await(7, TimeUnit.SECONDS)
+                    refreshStatus(context)
                 } catch (_: Exception) {
                 } finally {
                     pending.finish()
@@ -141,31 +162,71 @@ class OrderAlertReceiver : BroadcastReceiver() {
             }.start()
         }
 
-        private fun pollEndpoint(context: Context, path: String, kind: String) {
+        fun refreshStatus(context: Context): PosMonitoringStatus {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val cookie = prefs.getString(COOKIE_KEY, null)?.takeIf { it.isNotBlank() }
-            if (kind == "orders" && cookie == null) return
+            if (!pollInProgress.compareAndSet(false, true)) return readMonitoringStatus(context)
+            try {
+                val ordersFuture: Future<JSONArray?>? = cookie?.let {
+                    pollExecutor.submit<JSONArray?> { fetchEndpoint("/api/tienda/admin/pedidos-chat-activos", it, "pedidos") }
+                }
+                val agendaFuture = pollExecutor.submit<JSONArray?> { fetchEndpoint("/api/agenda/eventos", null, "eventos") }
+                val orders = ordersFuture?.let { runCatching { it.get(5, TimeUnit.SECONDS) }.getOrNull() }
+                val agenda = runCatching { agendaFuture.get(5, TimeUnit.SECONDS) }.getOrNull()
+                var successful = false
+                if (orders != null) {
+                    prefs.edit().putInt(ORDERS_COUNT_KEY, processOrders(context, orders)).apply()
+                    successful = true
+                }
+                if (agenda != null) {
+                    prefs.edit().putInt(QUOTES_COUNT_KEY, processQuotes(context, agenda)).apply()
+                    successful = true
+                }
+                prefs.edit()
+                    .putBoolean(ORDERS_AVAILABLE_KEY, orders != null)
+                    .putBoolean(QUOTES_AVAILABLE_KEY, agenda != null)
+                    .putBoolean(CONNECTED_KEY, successful)
+                    .apply()
+                if (successful) prefs.edit().putLong(LAST_UPDATE_KEY, System.currentTimeMillis()).apply()
+                return readMonitoringStatus(context)
+            } finally {
+                pollInProgress.set(false)
+            }
+        }
+
+        fun readMonitoringStatus(context: Context): PosMonitoringStatus {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            return PosMonitoringStatus(
+                pendingOrders = prefs.getInt(ORDERS_COUNT_KEY, 0),
+                pendingQuotes = prefs.getInt(QUOTES_COUNT_KEY, 0),
+                lastUpdatedMillis = prefs.getLong(LAST_UPDATE_KEY, 0L),
+                connected = prefs.getBoolean(CONNECTED_KEY, false),
+                ordersAvailable = prefs.getBoolean(ORDERS_AVAILABLE_KEY, false),
+                quotesAvailable = prefs.getBoolean(QUOTES_AVAILABLE_KEY, false),
+            )
+        }
+
+        private fun fetchEndpoint(path: String, cookie: String?, key: String): JSONArray? {
             val connection = (URL("https://pasteleriasucree.cl$path").openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 2_500
-                readTimeout = 3_500
+                connectTimeout = 2_000
+                readTimeout = 2_500
                 if (cookie != null) setRequestProperty("Cookie", cookie)
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("User-Agent", "SucreePOS-Android")
             }
             try {
-                if (connection.responseCode !in 200..299) return
+                if (connection.responseCode !in 200..299) return null
                 val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                 val root = JSONObject(body)
-                if (root.optBoolean("success", true).not()) return
-                if (kind == "orders") processOrders(context, root.optJSONArray("pedidos") ?: JSONArray())
-                else processQuotes(context, root.optJSONArray("eventos") ?: JSONArray())
+                if (!root.optBoolean("success", true)) return null
+                return root.optJSONArray(key) ?: JSONArray()
             } finally {
                 connection.disconnect()
             }
         }
 
-        private fun processOrders(context: Context, orders: JSONArray) {
+        private fun processOrders(context: Context, orders: JSONArray): Int {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val known = readSet(prefs.getString(ORDER_IDS_KEY, "[]"))
             val baseline = prefs.getBoolean(ORDER_BASELINE_KEY, false)
@@ -186,9 +247,10 @@ class OrderAlertReceiver : BroadcastReceiver() {
             syncActive(context, "order", active)
             val nextKnown = (known + allIds).toList().sorted().takeLast(2_000)
             prefs.edit().putString(ORDER_IDS_KEY, JSONArray(nextKnown.toList()).toString()).putBoolean(ORDER_BASELINE_KEY, true).apply()
+            return active.length()
         }
 
-        private fun processQuotes(context: Context, events: JSONArray) {
+        private fun processQuotes(context: Context, events: JSONArray): Int {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val known = readSet(prefs.getString(QUOTE_IDS_KEY, "[]"))
             val baseline = prefs.getBoolean(QUOTE_BASELINE_KEY, false)
@@ -217,6 +279,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
             syncActive(context, "quote", active)
             val nextKnown = (known + allIds).toList().sorted().takeLast(5_000)
             prefs.edit().putString(QUOTE_IDS_KEY, JSONArray(nextKnown.toList()).toString()).putBoolean(QUOTE_BASELINE_KEY, true).apply()
+            return active.length()
         }
 
         private fun showAlert(context: Context, key: String) {
@@ -228,8 +291,15 @@ class OrderAlertReceiver : BroadcastReceiver() {
             val manager = context.getSystemService(NotificationManager::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Pedidos y cotizaciones", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Avisos repetidos de pedidos de tienda y cotizaciones de tortas sin atender."
+                    description = "Avisos con sonido y vibración de pedidos y reservas pendientes. Puedes ajustar estos avisos en Android."
                     enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 350, 180, 350)
+                    val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    val audio = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    setSound(sound, audio)
                 })
             }
             val open = Intent(context, MainActivity::class.java).apply {
