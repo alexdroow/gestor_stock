@@ -49,5 +49,15 @@
             android:name=".MonitoringNotificationDismissedReceiver"
             android:enabled="true"
             android:exported="false" />
+        <receiver
+            android:name=".PosUpdateReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="cl.sucree.pos.action.DAILY_UPDATE_CHECK" />
+                <action android:name="cl.sucree.pos.action.DOWNLOAD_UPDATE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

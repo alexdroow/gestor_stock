@@ -1158,31 +1158,39 @@ def admin_logout():
     return redirect(url_for('admin_login'))
 
 
+POS_ANDROID_VERSION = '1.4.13'
+POS_ANDROID_APK_FILENAME = f'SucreePOS-Android-{POS_ANDROID_VERSION}-debug.apk'
+
+
 @app.route('/descargar-pos-android')
 def descargar_pos_android():
-    response = make_response(render_template('descargar_pos_android.html'))
+    response = make_response(render_template(
+        'descargar_pos_android.html',
+        pos_version=POS_ANDROID_VERSION,
+        apk_filename=POS_ANDROID_APK_FILENAME,
+    ))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    response.headers['X-POS-APK-Version'] = '1.4.12'
+    response.headers['X-POS-APK-Version'] = POS_ANDROID_VERSION
     return response
 
 
 @app.route('/descargas/SucreePOS-Android-prueba.apk')
 def descargar_archivo_pos_android():
-    apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk', 'SucreePOS-Android-1.4.12-debug.apk')
+    apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloader', 'apk', POS_ANDROID_APK_FILENAME)
     if not os.path.isfile(apk_path):
         return 'La APK aún no está disponible.', 404
     response = send_file(
         apk_path,
         as_attachment=True,
-        download_name='SucreePOS-Android-1.4.12-debug.apk',
+        download_name=POS_ANDROID_APK_FILENAME,
         mimetype='application/vnd.android.package-archive',
         max_age=0,
     )
     response.headers['Cache-Control'] = 'no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-POS-APK-Version'] = '1.4.12'
+    response.headers['X-POS-APK-Version'] = POS_ANDROID_VERSION
     return response
 
 

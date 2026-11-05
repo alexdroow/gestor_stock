@@ -357,6 +357,35 @@ class MainActivity : Activity() {
 
     private inner class PosBridge {
         @JavascriptInterface
+        fun getAppVersion(): String = BuildConfig.VERSION_NAME
+
+        @JavascriptInterface
+        fun checkForUpdates() {
+            PosUpdateManager.check(this@MainActivity, announce = false) { result ->
+                runOnUiThread {
+                    if (!isFinishing && ::webView.isInitialized) {
+                        webView.evaluateJavascript(
+                            "window.onSucreePosUpdateCheck && window.onSucreePosUpdateCheck($result)",
+                            null,
+                        )
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun downloadAvailableUpdate() {
+            val started = PosUpdateManager.downloadAvailableUpdate(this@MainActivity)
+            runOnUiThread {
+                Toast.makeText(
+                    this@MainActivity,
+                    if (started) "Descarga iniciada. Al terminar, abre su notificacion para instalarla." else "No hay una nueva version disponible para descargar.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+
+        @JavascriptInterface
         fun startBackgroundAlertMonitoring() {
             runOnUiThread {
                 val page = Uri.parse(webView.url ?: "")
@@ -513,6 +542,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        PosUpdateManager.scheduleDaily(this)
         OrderAlertReceiver.startMonitoring(this, CookieManager.getInstance().getCookie(BuildConfig.POS_URL).orEmpty())
         AgendaReminderReceiver.rescheduleSaved(this)
         if (webView.url != null) uiHandler.post(saleScreenPoll)

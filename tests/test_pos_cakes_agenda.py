@@ -27,16 +27,35 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_1412(self):
+    def test_updated_pos_apk_is_available_as_version_1413(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.12', page.get_data(as_text=True))
+        self.assertIn('1.4.13', page.get_data(as_text=True))
+        self.assertIn('name="sucree-pos-version" content="1.4.13"', page.get_data(as_text=True))
+        self.assertIn('name="sucree-pos-apk" content="/downloader/apk/SucreePOS-Android-1.4.13-debug.apk"', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.12')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.13')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
+
+    def test_pos_settings_offer_manual_and_daily_update_check(self):
+        root = Path(__file__).resolve().parents[1]
+        template = (root / 'templates' / 'pos_admin_mobile.html').read_text(encoding='utf-8')
+        manager = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'PosUpdateManager.kt').read_text(encoding='utf-8')
+        receiver = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'PosUpdateReceiver.kt').read_text(encoding='utf-8')
+        activity = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'MainActivity.kt').read_text(encoding='utf-8')
+        manifest = (root / 'android_pos' / 'app' / 'src' / 'main' / 'AndroidManifest.xml').read_text(encoding='utf-8')
+        self.assertIn('id="check-pos-update"', template)
+        self.assertIn('id="download-pos-update"', template)
+        self.assertIn('metaContent(html, "sucree-pos-version")', manager)
+        self.assertIn('Calendar.HOUR_OF_DAY, 13', manager)
+        self.assertIn('setExactAndAllowWhileIdle', manager)
+        self.assertIn('VISIBILITY_VISIBLE_NOTIFY_COMPLETED', manager)
+        self.assertIn('ACTION_DAILY_CHECK', receiver)
+        self.assertIn('PosUpdateManager.scheduleDaily(this)', activity)
+        self.assertIn('android.intent.action.BOOT_COMPLETED', manifest)
 
     def test_redes_admin_can_render_embedded_inside_mobile_pos(self):
         response = self.client.get('/admin/redes?pos_embed=1')
