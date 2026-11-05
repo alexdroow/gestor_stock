@@ -192,7 +192,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         cocteleria_module.ensure_cocteleria_schema(conn)
         conn.execute(
             "INSERT INTO agenda_eventos VALUES(?,?,?,?,?,?,?)",
-            (140, "cocteleria", "2026-11-09", "19:00", "Reserva manual desde agenda\\n--- Reserva de cocteleria ---", 21410, 0),
+            (140, "cocteleria", "2026-11-09", "19:00", "Reserva manual desde agenda\\n--- Reserva de cocteleria ---\\n- Producto A x 1 = $30.625\\n- Producto B x 1 = $26.250\\n- Producto C x 1 = $92.500\\n- Producto D x 1 = $102.500\\nTotal estimado pedido: $251.875", 21410, 0),
         )
         snapshot = {
             "source": "agenda_manual",
@@ -222,7 +222,14 @@ class CocteleriaCatalogTests(unittest.TestCase):
         self.assertEqual(event["total"], 251875)
         conn = sqlite3.connect(self.db_path)
         self.assertEqual(conn.execute("SELECT total FROM agenda_eventos WHERE id=140").fetchone()[0], 251875)
+        conn.execute("DELETE FROM tienda_cocteleria_reservas WHERE event_id=140")
+        conn.execute("UPDATE agenda_eventos SET total=21410 WHERE id=140")
+        conn.commit()
         conn.close()
+
+        with patch.object(database_module, "DB_PATH", self.db_path):
+            event = database_module.obtener_evento_agenda_por_id(140)
+        self.assertEqual(event["total"], 251875)
 
 
     def test_cocktail_history_is_grouped_by_reservation_and_contains_customer(self):

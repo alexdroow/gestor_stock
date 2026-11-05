@@ -8813,6 +8813,8 @@
         function totalCocteleriaManualDesdeDetalle(evento) {
             const raw = String((evento && evento.ingredientes) || '').replace(/\r\n?/g, '\n');
             if (!raw.trimStart().toLowerCase().startsWith('reserva manual desde agenda')) return null;
+            const savedTotal = raw.match(/total estimado pedido\s*:\s*\$?\s*([\d.]+)/i);
+            if (savedTotal) return Number(savedTotal[1].replace(/\./g, '')) || null;
             const cocktail = detalleCocteleriaAgenda(evento);
             if (!cocktail.isCocktail) return null;
             let productsTotal = 0;

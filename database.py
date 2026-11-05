@@ -12631,26 +12631,33 @@ def _sincronizar_total_evento_cocteleria_snapshot(evento, cursor):
         return evento
     if event_id <= 0:
         return evento
+    ingredients = str(evento.get("ingredientes") or "")
+    manual_booking = "reserva manual desde agenda" in ingredients.strip().lower()
+    authoritative_total = None
     try:
         cursor.execute(
             "SELECT snapshot_json FROM tienda_cocteleria_reservas WHERE event_id=? LIMIT 1",
             (event_id,),
         )
         row = cursor.fetchone()
-    except sqlite3.Error:
-        return evento
-    if not row:
-        return evento
-    try:
-        snapshot = json.loads(row["snapshot_json"] if isinstance(row, sqlite3.Row) else row[0])
-    except (TypeError, ValueError, KeyError, IndexError):
-        return evento
-    if not isinstance(snapshot, dict):
-        return evento
-    # Older manual reservations may not have had `source` recorded in the snapshot.
-    if not snapshot.get("source") and "reserva manual desde agenda" in str(evento.get("ingredientes") or "").strip().lower():
-        snapshot["source"] = "agenda_manual"
-    authoritative_total = _total_cocteleria_manual_snapshot(snapshot)
+        if row:
+            snapshot = json.loads(row["snapshot_json"] if isinstance(row, sqlite3.Row) else row[0])
+            if isinstance(snapshot, dict):
+                # Older manual reservations may not have had `source` recorded in the snapshot.
+                if not snapshot.get("source") and manual_booking:
+                    snapshot["source"] = "agenda_manual"
+                authoritative_total = _total_cocteleria_manual_snapshot(snapshot)
+    except (sqlite3.Error, TypeError, ValueError, KeyError, IndexError):
+        pass
+    # A legacy manual booking can have its snapshot missing, while its saved detail
+    # still contains the exact final total shown on the customer's quotation.
+    if authoritative_total is None and manual_booking:
+        match = re.search(r"total estimado pedido\s*:\s*\$?\s*([\d.]+)", ingredients, re.IGNORECASE)
+        if match:
+            try:
+                authoritative_total = int(match.group(1).replace(".", ""))
+            except ValueError:
+                authoritative_total = None
     if authoritative_total is None:
         return evento
     try:
