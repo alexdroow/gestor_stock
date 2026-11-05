@@ -136,6 +136,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         agenda_html = template.read_text(encoding="utf-8")
         for marker in agenda_script_markers:
             self.assertIn(marker, agenda_html)
+        self.assertLess(agenda_html.index("if (productsTotal > 0) return productsTotal + extrasTotal;"), agenda_html.index("const savedTotal = raw.match(/total estimado pedido"))
         for marker in ("+ Agendar cóctelería", "abrirAgendaCocteleriaManual()", "_agenda_cocteleria_manual.html", "agenda-cocteleria-manual.js"):
             self.assertIn(marker, html)
         for marker in ("agenda-cocteleria-modal", "agenda-coct-days", "agenda-coct-hours", "agenda-coct-lines", "agenda-coct-extras", "agenda-coct-customer", "agenda-coct-pdf"):
@@ -192,7 +193,7 @@ class CocteleriaCatalogTests(unittest.TestCase):
         cocteleria_module.ensure_cocteleria_schema(conn)
         conn.execute(
             "INSERT INTO agenda_eventos VALUES(?,?,?,?,?,?,?)",
-            (140, "cocteleria", "2026-11-09", "19:00", "Reserva manual desde agenda\\n--- Reserva de cocteleria ---\\n- Producto A x 1 = $30.625\\n- Producto B x 1 = $26.250\\n- Producto C x 1 = $92.500\\n- Producto D x 1 = $102.500\\nTotal estimado pedido: $251.875", 21410, 0),
+            (140, "cocteleria", "2026-11-09", "19:00", "Reserva manual desde agenda\n--- Reserva de cocteleria ---\n- Producto A x 1 = $30.625\n- Producto B x 1 = $26.250\n- Producto C x 1 = $92.500\n- Producto D x 1 = $102.500\nTotal estimado pedido: $21.410", 21410, 0),
         )
         snapshot = {
             "source": "agenda_manual",

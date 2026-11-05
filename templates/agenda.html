@@ -8813,8 +8813,6 @@
         function totalCocteleriaManualDesdeDetalle(evento) {
             const raw = String((evento && evento.ingredientes) || '').replace(/\r\n?/g, '\n');
             if (!raw.trimStart().toLowerCase().startsWith('reserva manual desde agenda')) return null;
-            const savedTotal = raw.match(/total estimado pedido\s*:\s*\$?\s*([\d.]+)/i);
-            if (savedTotal) return Number(savedTotal[1].replace(/\./g, '')) || null;
             const cocktail = detalleCocteleriaAgenda(evento);
             if (!cocktail.isCocktail) return null;
             let productsTotal = 0;
@@ -8827,7 +8825,9 @@
                 const match = String(line || '').match(/\(\s*\$?\s*([\d.]+)\s*\)\s*$/) || String(line || '').match(/=\s*\$?\s*([\d.]+)\s*$/);
                 if (match) extrasTotal += Number(match[1].replace(/\./g, '')) || 0;
             });
-            return productsTotal > 0 ? productsTotal + extrasTotal : null;
+            if (productsTotal > 0) return productsTotal + extrasTotal;
+            const savedTotal = raw.match(/total estimado pedido\s*:\s*\$?\s*([\d.]+)/i);
+            return savedTotal ? (Number(savedTotal[1].replace(/\./g, '')) || null) : null;
         }
 
         function construirMensajeCocteleriaWhatsAppAgenda() {

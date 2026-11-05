@@ -12650,10 +12650,32 @@ def _sincronizar_total_evento_cocteleria_snapshot(evento, cursor):
     except (sqlite3.Error, TypeError, ValueError, KeyError, IndexError):
         pass
     # A legacy manual booking can have its snapshot missing, while its saved detail
-    # still contains the exact final total shown on the customer's quotation.
+    # still contains the product lines needed to reconstruct the current total.
     if authoritative_total is None and manual_booking:
-        match = re.search(r"total estimado pedido\s*:\s*\$?\s*([\d.]+)", ingredients, re.IGNORECASE)
-        if match:
+        mode = ""
+        products_total = 0
+        extras_total = 0
+        for raw_line in ingredients.replace("\r", "").split("\n"):
+            line = raw_line.strip()
+            low = line.lower()
+            if low.startswith("---"):
+                mode = "products" if "reserva de cocteleria" in low else ("extras" if "valores extra" in low else "")
+                continue
+            if not line.startswith("-"):
+                continue
+            if mode == "products":
+                match = re.search(r"=\s*\$?\s*([\d.]+)\s*$", line)
+                if match:
+                    products_total += int(match.group(1).replace(".", ""))
+            elif mode == "extras":
+                match = re.search(r"\(\s*\$?\s*([\d.]+)\s*\)\s*$", line)
+                if match:
+                    extras_total += int(match.group(1).replace(".", ""))
+        if products_total > 0:
+            authoritative_total = products_total + extras_total
+        else:
+            match = re.search(r"total estimado pedido\s*:\s*\$?\s*([\d.]+)", ingredients, re.IGNORECASE)
+        if authoritative_total is None and match:
             try:
                 authoritative_total = int(match.group(1).replace(".", ""))
             except ValueError:
