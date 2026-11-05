@@ -71,7 +71,7 @@ class PosMonitoringService : Service() {
         val summary = if (status.connected) {
             val orders = if (status.ordersAvailable) status.pendingOrders.toString() else "--"
             val quotes = if (status.quotesAvailable) status.pendingQuotes.toString() else "--"
-            "Pedidos pendientes: $orders · Reservas: $quotes"
+            "Pedidos pendientes: $orders · Reservas por confirmar: $quotes"
         } else "Sin conexión. Se volverá a comprobar automáticamente."
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_sucree)
@@ -92,7 +92,7 @@ class PosMonitoringService : Service() {
         ).build())
         builder.addAction(Notification.Action.Builder(
             null,
-            "Agenda (${status.pendingQuotes})",
+            "Por confirmar (${status.pendingQuotes})",
             activityPendingIntent(showAgenda = true),
         ).build())
         return builder.build().apply {

@@ -27,13 +27,13 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_149(self):
+    def test_updated_pos_apk_is_available_as_version_1410(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.9', page.get_data(as_text=True))
+        self.assertIn('1.4.10', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.9')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.10')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
@@ -280,6 +280,8 @@ class PosCakesAgendaTests(unittest.TestCase):
         service = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'PosMonitoringService.kt').read_text(encoding='utf-8')
         self.assertIn('Notification.FLAG_NO_CLEAR', service)
         self.assertIn('pos_attention_alerts_v3', native)
+        self.assertIn('Reservas por confirmar: $quotes', service)
+        self.assertIn('Por confirmar (${status.pendingQuotes})', service)
         self.assertIn('scheduleRepeat(context, key, ALERT_REPEAT_INTERVAL_MS)', native)
         self.assertIn('val isCocktail = type.contains("cocteler") || type == "cocktail"', native)
         self.assertIn('event.optString("ingredientes").contains("reserva de cocteleria", true)', native)
@@ -307,6 +309,12 @@ class PosCakesAgendaTests(unittest.TestCase):
                (id, tipo, fecha, cliente, motivo, estado, codigo_operacion, creado, ingredientes)
                VALUES (1, 'cocteleria', '2026-11-05', 'Cliente', 'Reserva cliente tienda online',
                        'pendiente', 'OPA-TI-TEST', '2026-11-05 12:00:00', 'Reserva de cocteleria')'''
+        )
+        conn.execute(
+            '''INSERT INTO agenda_eventos
+               (id, tipo, fecha, cliente, motivo, estado, codigo_operacion, creado, ingredientes)
+               VALUES (2, 'cocteleria', '2026-11-05', 'Confirmado', 'Reserva cliente tienda online',
+                       'confirmado', 'OPA-TI-CONFIRMED', '2026-11-05 12:00:00', 'Reserva de cocteleria')'''
         )
         with patch.object(app_module, 'get_db', return_value=conn):
             response = self.client.get('/api/pos/monitor/agenda')
