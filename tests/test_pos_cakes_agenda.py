@@ -27,13 +27,13 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_1410(self):
+    def test_updated_pos_apk_is_available_as_version_1412(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.10', page.get_data(as_text=True))
+        self.assertIn('1.4.12', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.10')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.12')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
@@ -280,13 +280,20 @@ class PosCakesAgendaTests(unittest.TestCase):
         service = (root / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'PosMonitoringService.kt').read_text(encoding='utf-8')
         self.assertIn('Notification.FLAG_NO_CLEAR', service)
         self.assertIn('pos_attention_alerts_v3', native)
-        self.assertIn('Reservas por confirmar: $quotes', service)
-        self.assertIn('Por confirmar (${status.pendingQuotes})', service)
+        self.assertIn('Solicitudes nuevas sin confirmar: $quotes', service)
+        self.assertIn('Nuevas (${status.pendingQuotes})', service)
+        self.assertIn('UNRESOLVED_QUOTES_KEY = "new_unconfirmed_quote_ids"', native)
+        self.assertIn('unresolved.add(id)', native)
+        self.assertIn('unresolved.retainAll(activeIds)', native)
+        self.assertIn('return unresolved.size', native)
+        self.assertIn('eventState in setOf("pendiente", "borrador")', native)
+        self.assertIn('setDeleteIntent(dismissedNotificationPendingIntent())', service)
+        self.assertIn('MonitoringNotificationDismissedReceiver', manifest)
         self.assertIn('scheduleRepeat(context, key, ALERT_REPEAT_INTERVAL_MS)', native)
         self.assertIn('val isCocktail = type.contains("cocteler") || type == "cocktail"', native)
         self.assertIn('event.optString("ingredientes").contains("reserva de cocteleria", true)', native)
-        self.assertIn('!baseline && isCocktail && isRecentlyCreatedCocktail(event.optString("creado"))', native)
-        self.assertIn('RECENT_COCKTAIL_WINDOW_MS = 15 * 60 * 1000L', native)
+        self.assertIn('!baseline && onlineReservation &&', native)
+        self.assertIn('RECENT_RESERVATION_WINDOW_MS = 15 * 60 * 1000L', native)
         self.assertIn('"Nuevo pedido de cocteleria" else "Nueva cotizacion de torta"', native)
         self.assertIn('putExtra("attention_key", key)', native)
         self.assertIn('onNewAgendaQuote', activity)
@@ -316,14 +323,20 @@ class PosCakesAgendaTests(unittest.TestCase):
                VALUES (2, 'cocteleria', '2026-11-05', 'Confirmado', 'Reserva cliente tienda online',
                        'confirmado', 'OPA-TI-CONFIRMED', '2026-11-05 12:00:00', 'Reserva de cocteleria')'''
         )
+        conn.execute(
+            '''INSERT INTO agenda_eventos
+               (id, tipo, fecha, cliente, motivo, estado, codigo_operacion, creado, ingredientes)
+               VALUES (3, 'torta', '2026-11-05', 'Borrador', 'Reserva cliente tienda online',
+                       'borrador', 'OPA-TI-DRAFT', '2026-11-05 12:00:00', '')'''
+        )
         with patch.object(app_module, 'get_db', return_value=conn):
             response = self.client.get('/api/pos/monitor/agenda')
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()['success'])
         eventos = response.get_json()['eventos']
-        self.assertEqual(len(eventos), 1)
-        self.assertEqual(eventos[0]['tipo'], 'cocteleria')
-        self.assertEqual(eventos[0]['codigo_operacion'], 'OPA-TI-TEST')
+        self.assertEqual(len(eventos), 2)
+        self.assertEqual({event['estado'] for event in eventos}, {'pendiente', 'borrador'})
+        self.assertNotIn('OPA-TI-CONFIRMED', {event['codigo_operacion'] for event in eventos})
 
 
 if __name__ == '__main__':

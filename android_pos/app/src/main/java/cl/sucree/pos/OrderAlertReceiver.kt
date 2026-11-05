@@ -56,12 +56,13 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private const val ACK_KEY = "acknowledged_alerts"
         private const val ORDER_IDS_KEY = "known_order_ids"
         private const val QUOTE_IDS_KEY = "known_quote_ids"
+        private const val UNRESOLVED_QUOTES_KEY = "new_unconfirmed_quote_ids"
         private const val ORDER_BASELINE_KEY = "order_baseline_created"
         private const val QUOTE_BASELINE_KEY = "quote_baseline_created"
         private const val CHANNEL_ID = "pos_attention_alerts_v3"
         private const val POLL_INTERVAL_MS = 60 * 1000L
         private const val ALERT_REPEAT_INTERVAL_MS = 5 * 60 * 1000L
-        private const val RECENT_COCKTAIL_WINDOW_MS = 15 * 60 * 1000L
+        private const val RECENT_RESERVATION_WINDOW_MS = 15 * 60 * 1000L
         private const val ORDERS_COUNT_KEY = "pending_orders_count"
         private const val QUOTES_COUNT_KEY = "pending_quotes_count"
         private const val LAST_UPDATE_KEY = "monitor_last_update"
@@ -259,6 +260,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private fun processQuotes(context: Context, events: JSONArray): Int {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val known = readSet(prefs.getString(QUOTE_IDS_KEY, "[]"))
+            val unresolved = readSet(prefs.getString(UNRESOLVED_QUOTES_KEY, "[]"))
             val baseline = prefs.getBoolean(QUOTE_BASELINE_KEY, false)
             val active = JSONArray()
             val allIds = mutableSetOf<String>()
@@ -272,26 +274,37 @@ class OrderAlertReceiver : BroadcastReceiver() {
                     event.optString("codigo_operacion").startsWith("OPA-TI-", true)
                 val isCocktail = type.contains("cocteler") || type == "cocktail"
                 val cocktailReservation = isCocktail && (onlineReservation || event.optString("ingredientes").contains("reserva de cocteleria", true))
-                val pending = event.optString("estado").equals("pendiente", true) &&
+                val eventState = event.optString("estado").trim().lowercase()
+                val pending = eventState in setOf("pendiente", "borrador") &&
                     type != "bloqueo" && (onlineReservation || cocktailReservation)
                 if (pending) {
                     active.put(id)
-                    val firstPollCocktail = !baseline && isCocktail && isRecentlyCreatedCocktail(event.optString("creado"))
-                    if ((baseline && id !in known) || firstPollCocktail) {
+                    val firstPollRecentReservation = !baseline && onlineReservation &&
+                        isRecentlyCreatedReservation(event.optString("creado"))
+                    if ((baseline && id !in known) || firstPollRecentReservation) {
+                        unresolved.add(id)
                         val customer = event.optString("cliente", "Cliente")
                         val date = event.optString("fecha")
                         val title = if (isCocktail) "Nuevo pedido de cocteleria" else "Nueva cotizacion de torta"
                         notifyNew(context, "quote", id, title, "$customer · $date · Requiere confirmacion")
                     }
+                } else {
+                    unresolved.remove(id)
                 }
             }
             syncActive(context, "quote", active)
+            val activeIds = (0 until active.length()).map { active.optString(it) }.toSet()
+            unresolved.retainAll(activeIds)
             val nextKnown = (known + allIds).toList().sorted().takeLast(5_000)
-            prefs.edit().putString(QUOTE_IDS_KEY, JSONArray(nextKnown.toList()).toString()).putBoolean(QUOTE_BASELINE_KEY, true).apply()
-            return active.length()
+            prefs.edit()
+                .putString(QUOTE_IDS_KEY, JSONArray(nextKnown.toList()).toString())
+                .putString(UNRESOLVED_QUOTES_KEY, JSONArray(unresolved.toList()).toString())
+                .putBoolean(QUOTE_BASELINE_KEY, true)
+                .apply()
+            return unresolved.size
         }
 
-        private fun isRecentlyCreatedCocktail(created: String): Boolean {
+        private fun isRecentlyCreatedReservation(created: String): Boolean {
             if (created.isBlank()) return false
             return runCatching {
                 val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply {
@@ -300,7 +313,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
                 }
                 val createdAt = format.parse(created)?.time ?: return false
                 val age = System.currentTimeMillis() - createdAt
-                age in 0..RECENT_COCKTAIL_WINDOW_MS
+                age in 0..RECENT_RESERVATION_WINDOW_MS
             }.getOrDefault(false)
         }
         private fun showAlert(context: Context, key: String) {

@@ -71,7 +71,7 @@ class PosMonitoringService : Service() {
         val summary = if (status.connected) {
             val orders = if (status.ordersAvailable) status.pendingOrders.toString() else "--"
             val quotes = if (status.quotesAvailable) status.pendingQuotes.toString() else "--"
-            "Pedidos pendientes: $orders · Reservas por confirmar: $quotes"
+            "Pedidos pendientes: $orders · Solicitudes nuevas sin confirmar: $quotes"
         } else "Sin conexión. Se volverá a comprobar automáticamente."
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_sucree)
@@ -83,6 +83,7 @@ class PosMonitoringService : Service() {
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setDeleteIntent(dismissedNotificationPendingIntent())
             .setContentIntent(openApp)
 
         builder.addAction(Notification.Action.Builder(
@@ -92,7 +93,7 @@ class PosMonitoringService : Service() {
         ).build())
         builder.addAction(Notification.Action.Builder(
             null,
-            "Por confirmar (${status.pendingQuotes})",
+            "Nuevas (${status.pendingQuotes})",
             activityPendingIntent(showAgenda = true),
         ).build())
         return builder.build().apply {
@@ -119,6 +120,17 @@ class PosMonitoringService : Service() {
         )
     }
 
+    private fun dismissedNotificationPendingIntent(): PendingIntent {
+        val restore = Intent(this, MonitoringNotificationDismissedReceiver::class.java)
+            .setAction(MonitoringNotificationDismissedReceiver.ACTION_RESTORE)
+        return PendingIntent.getBroadcast(
+            this,
+            REQUEST_RESTORE_MONITOR,
+            restore,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
@@ -135,5 +147,6 @@ class PosMonitoringService : Service() {
         private const val REQUEST_OPEN_APP = 1410
         private const val REQUEST_OPEN_ORDERS = 1411
         private const val REQUEST_OPEN_AGENDA = 1412
+        private const val REQUEST_RESTORE_MONITOR = 1413
     }
 }
