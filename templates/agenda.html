@@ -5856,17 +5856,26 @@
 
         function _pedidoFichaDesdeFormulario(evento = null) {
             const ev = evento || eventoEditando || {};
+            const tipo = String(document.getElementById('evento-tipo')?.value || ev.tipo || '').trim().toLowerCase();
+            const ingredientes = String(document.getElementById('evento-ingredientes')?.value || ev.ingredientes || '');
+            if (tipo === 'cocteleria') {
+                const totalManualCocteleria = totalCocteleriaManualDesdeDetalle({ ...ev, tipo, ingredientes });
+                if (totalManualCocteleria !== null) {
+                    const totalInput = document.getElementById('evento-total');
+                    if (totalInput) totalInput.value = String(totalManualCocteleria);
+                    ev.total = totalManualCocteleria;
+                }
+            }
             const total = _normalizarNumero(document.getElementById('evento-total')?.value || ev.total, 0);
             const abono = _normalizarNumero(document.getElementById('evento-abono')?.value || ev.abono, 0);
             const saldo = Math.max(0, total - abono);
             const fecha = String(document.getElementById('evento-fecha')?.value || ev.fecha || '').trim();
             const hora = String(document.getElementById('evento-entrega')?.value || document.getElementById('evento-hora-inicio')?.value || ev.hora_entrega || ev.hora_inicio || '').slice(0, 5) || '-';
-            const tipo = String(document.getElementById('evento-tipo')?.value || ev.tipo || '').trim().toLowerCase();
             const esEnvio = Boolean(document.getElementById('evento-envio')?.checked || ev.es_envio);
             const detalle = _extraerFichaTortaDesdeDetalle({
                 ...ev,
                 titulo: document.getElementById('evento-titulo')?.value || ev.titulo,
-                ingredientes: document.getElementById('evento-ingredientes')?.value || ev.ingredientes,
+                ingredientes,
                 es_envio: esEnvio,
                 direccion: document.getElementById('evento-direccion')?.value || ev.direccion
             });
