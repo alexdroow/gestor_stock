@@ -89,6 +89,7 @@ class MainActivity : Activity() {
         } else {
             webView.restoreState(savedInstanceState)
         }
+        PosUpdateManager.handleInstallRequest(this, intent)
     }
 
     private fun buildScreen() {
@@ -583,6 +584,7 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (PosUpdateManager.handleInstallRequest(this, intent)) return
         OrderAlertReceiver.acknowledge(this, intent.getStringExtra("attention_key"))
         if (intent.getBooleanExtra("show_orders", false) || intent.getBooleanExtra("show_agenda_quotes", false) || intent.getBooleanExtra("show_reminders", false)) {
             webView.loadUrl(posStartUrl(intent))
@@ -592,6 +594,10 @@ class MainActivity : Activity() {
     @Deprecated("Required by the WebView file chooser callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PosUpdateReceiver.INSTALL_PERMISSION_REQUEST) {
+            PosUpdateManager.handleInstallPermissionResult(this, requestCode, resultCode)
+            return
+        }
         if (requestCode != FILE_CHOOSER_REQUEST) return
         val callback = fileChooserCallback ?: return
         fileChooserCallback = null
