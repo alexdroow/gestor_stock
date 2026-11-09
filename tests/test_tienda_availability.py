@@ -1,11 +1,40 @@
 import sqlite3
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 
 import app as app_module
 
 
 class TiendaAvailabilityTests(unittest.TestCase):
+    def test_closed_store_state_includes_next_scheduled_opening(self):
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2026, 11, 8, 20, 0, tzinfo=tz)
+
+        with patch.object(app_module, "datetime", FixedDateTime):
+            state = app_module._evaluar_estado_tienda({
+                "modo_manual": "auto",
+                "horario_habilitado": True,
+                "hora_apertura": "09:00",
+                "hora_cierre": "19:00",
+            })
+
+        self.assertFalse(state["abierta"])
+        self.assertEqual(state["proxima_apertura"], "mañana a las 09:00")
+
+    def test_manual_store_closure_discloses_regular_opening_hour(self):
+        state = app_module._evaluar_estado_tienda({
+            "modo_manual": "cerrada",
+            "horario_habilitado": True,
+            "hora_apertura": "10:30",
+            "hora_cierre": "19:00",
+        })
+
+        self.assertFalse(state["abierta"])
+        self.assertEqual(state["hora_apertura"], "10:30")
+
     def test_product_availability_uses_its_own_unit_stock_not_ingredient_quantity(self):
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row

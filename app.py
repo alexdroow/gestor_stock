@@ -6206,6 +6206,8 @@ def _evaluar_estado_tienda(config):
             "modo": "manual_cerrada",
             "mensaje": "La tienda esta cerrada por control manual del administrador.",
             "hora_actual": hora_actual,
+            "proxima_apertura": "",
+            "hora_apertura": hora_apertura,
         }
     if not horario_habilitado:
         return {
@@ -6223,6 +6225,8 @@ def _evaluar_estado_tienda(config):
             "modo": "auto_error_horario",
             "mensaje": "Horario invalido en configuracion. Se mantiene abierta.",
             "hora_actual": hora_actual,
+            "proxima_apertura": "",
+            "hora_apertura": hora_apertura,
         }
 
     min_inicio = inicio[0] * 60 + inicio[1]
@@ -6239,14 +6243,22 @@ def _evaluar_estado_tienda(config):
     if abierta:
         msg = f"Tienda abierta por horario ({hora_apertura} - {hora_cierre})."
         modo_final = "auto_horario_abierta"
+        proxima_apertura = ""
     else:
         msg = f"Tienda cerrada por horario ({hora_apertura} - {hora_cierre})."
         modo_final = "auto_horario_cerrada"
+        apertura = now_local.replace(hour=inicio[0], minute=inicio[1], second=0, microsecond=0)
+        if apertura <= now_local:
+            apertura += timedelta(days=1)
+        etiqueta_dia = "hoy" if apertura.date() == now_local.date() else "mañana"
+        proxima_apertura = f"{etiqueta_dia} a las {apertura.strftime('%H:%M')}"
     return {
         "abierta": bool(abierta),
         "modo": modo_final,
         "mensaje": msg,
         "hora_actual": hora_actual,
+        "proxima_apertura": proxima_apertura,
+        "hora_apertura": hora_apertura,
     }
 
 

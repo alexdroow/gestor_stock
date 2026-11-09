@@ -14955,8 +14955,13 @@
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-estado-banner.cerrada {
             color: #b91c1c;
-            background: transparent;
-            border: 0;
+            background: #fff1f2;
+            border: 1px solid #fecaca;
+            padding: 9px 14px;
+            max-width: min(100%, 560px);
+            white-space: normal;
+            line-height: 1.35;
+            text-align: left;
         }
 
         body:not(.mobile-ui):not(.tienda-preview-agenda) .tienda-estado-banner.cerrada::before {
@@ -19844,12 +19849,23 @@
             } catch (_) {}
         }
 
-        function setEstadoTienda(abierta, mensaje) {
+        function setEstadoTienda(abierta, mensaje, detalle = {}) {
             tiendaAbierta = Boolean(abierta);
             tiendaEstadoMensaje = String(mensaje || "").trim();
             if (tiendaEstadoBannerEl) {
                 tiendaEstadoBannerEl.classList.toggle("cerrada", !tiendaAbierta);
-                tiendaEstadoBannerEl.textContent = tiendaAbierta ? "Tienda abierta" : "Tienda cerrada";
+                if (tiendaAbierta) {
+                    tiendaEstadoBannerEl.textContent = "Tienda abierta";
+                } else {
+                    const apertura = String(detalle.proxima_apertura || "").trim();
+                    const habitual = String(detalle.hora_apertura || "").trim();
+                    const cierreManual = String(detalle.modo || "") === "manual_cerrada";
+                    const avisoApertura = cierreManual
+                        ? (habitual ? `Horario habitual de apertura: ${habitual}.` : "La hora de reapertura no está definida.")
+                        : (apertura ? `Podrás agregar productos ${apertura}.` : "La hora de reapertura aún no está disponible.");
+                    tiendaEstadoBannerEl.textContent = `Tienda cerrada. Puedes revisar el catálogo, pero no agregar productos al carrito. ${avisoApertura}`;
+                }
+                tiendaEstadoBannerEl.setAttribute("aria-live", "polite");
             }
             const checkoutBtn = document.getElementById("btn-checkout");
             if (checkoutBtn) {
@@ -23951,7 +23967,7 @@
                     if (_catalogoTortaConDatos(data?.personalizacion?.catalogo_torta)) {
                         _setAgendaCakeCatalog(data.personalizacion.catalogo_torta);
                     }
-                    setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
+                    setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""), data.estado_tienda || {});
                     mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                     tiendaAdminMode = Boolean(data.admin_mode);
                     _adminSetPillVisible();
@@ -24367,7 +24383,7 @@
                 if (_catalogoTortaConDatos(data?.personalizacion?.catalogo_torta)) {
                     _setAgendaCakeCatalog(data.personalizacion.catalogo_torta);
                 }
-                setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""));
+                setEstadoTienda(Boolean(data.tienda_abierta !== false), String((data.estado_tienda || {}).mensaje || ""), data.estado_tienda || {});
                 mensajePostPedido = String(data.mensaje_post_pedido || "").trim() || mensajePostPedido;
                 flowPagoHabilitado = Boolean(data.flow_enabled);
                 flowSimAdminEnabled = Boolean(data.admin_flow_sim_enabled);
@@ -24903,6 +24919,7 @@
         }
 
         function repetirCompraVenta(ventaId) {
+            if (!tiendaAbierta) return msg("La tienda esta cerrada. Puedes revisar el catalogo y repetir la compra cuando vuelva a abrir.", true);
             const venta = (historialComprasCliente || []).find((v) => Number(v.id || 0) === Number(ventaId || 0));
             if (!venta) return;
             let agregados = 0;
