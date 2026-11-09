@@ -27,18 +27,27 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_1413(self):
+    def test_updated_pos_apk_is_available_as_version_1415(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.14', page.get_data(as_text=True))
-        self.assertIn('name="sucree-pos-version" content="1.4.14"', page.get_data(as_text=True))
-        self.assertIn('name="sucree-pos-apk" content="/downloader/apk/SucreePOS-Android-1.4.14-debug.apk"', page.get_data(as_text=True))
+        self.assertIn('1.4.15', page.get_data(as_text=True))
+        self.assertIn('name="sucree-pos-version" content="1.4.15"', page.get_data(as_text=True))
+        self.assertIn('name="sucree-pos-apk" content="/downloader/apk/SucreePOS-Android-1.4.15-debug.apk"', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.14')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.15')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
+
+    def test_pos_webview_supports_single_and_multiple_file_uploads(self):
+        activity = (Path(__file__).resolve().parents[1] / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'MainActivity.kt').read_text(encoding='utf-8')
+        self.assertIn('override fun onShowFileChooser(', activity)
+        self.assertIn('fileChooserParams?.createIntent()', activity)
+        self.assertIn('FileChooserParams.parseResult', activity)
+        self.assertIn('allowContentAccess = true', activity)
+        self.assertIn('FILE_CHOOSER_REQUEST', activity)
+        self.assertIn('callback.onReceiveValue(selected)', activity)
 
     def test_pos_settings_offer_manual_and_daily_update_check(self):
         root = Path(__file__).resolve().parents[1]

@@ -30,6 +30,7 @@ import android.webkit.CookieManager
 import android.webkit.SafeBrowsingResponse
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
+import android.webkit.ValueCallback
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -52,6 +53,7 @@ class MainActivity : Activity() {
     private lateinit var loading: ProgressBar
     private lateinit var connectionPanel: LinearLayout
     private lateinit var printButton: Button
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var notificationPermissionRequestPending = false
     private val uiHandler = Handler(Looper.getMainLooper())
     private val printer by lazy { AndroidSystemPrinterGateway(this) }
@@ -156,7 +158,8 @@ class MainActivity : Activity() {
             cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             allowFileAccess = false
-            allowContentAccess = false
+            // Android's document picker returns content:// URIs used by HTML file inputs.
+            allowContentAccess = true
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
             builtInZoomControls = false
@@ -169,6 +172,40 @@ class MainActivity : Activity() {
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, progress: Int) {
                 loading.visibility = if (progress in 1..99) View.VISIBLE else View.GONE
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?,
+            ): Boolean {
+                fileChooserCallback?.onReceiveValue(null)
+                fileChooserCallback = filePathCallback
+                if (filePathCallback == null || !isTrustedUploadPage(webView?.url)) {
+                    fileChooserCallback = null
+                    filePathCallback?.onReceiveValue(null)
+                    return false
+                }
+
+                return try {
+                    val pickerIntent = fileChooserParams?.createIntent()
+                        ?: Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                        }
+                    startActivityForResult(Intent.createChooser(pickerIntent, "Seleccionar archivo"), FILE_CHOOSER_REQUEST)
+                    true
+                } catch (_: ActivityNotFoundException) {
+                    fileChooserCallback?.onReceiveValue(null)
+                    fileChooserCallback = null
+                    Toast.makeText(this@MainActivity, "No se encontró un selector de archivos en el dispositivo.", Toast.LENGTH_LONG).show()
+                    false
+                } catch (_: Exception) {
+                    fileChooserCallback?.onReceiveValue(null)
+                    fileChooserCallback = null
+                    Toast.makeText(this@MainActivity, "No se pudo abrir el selector de archivos.", Toast.LENGTH_LONG).show()
+                    false
+                }
             }
         }
         webView.webViewClient = object : WebViewClient() {
@@ -552,6 +589,21 @@ class MainActivity : Activity() {
         }
     }
 
+    @Deprecated("Required by the WebView file chooser callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != FILE_CHOOSER_REQUEST) return
+        val callback = fileChooserCallback ?: return
+        fileChooserCallback = null
+        val selected = if (resultCode == RESULT_OK) {
+            WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                ?.filter { it.scheme == "content" || it.scheme == "file" }
+                ?.distinct()
+                ?.toTypedArray()
+        } else null
+        callback.onReceiveValue(selected)
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         webView.saveState(outState)
         super.onSaveInstanceState(outState)
@@ -578,6 +630,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        fileChooserCallback?.onReceiveValue(null)
+        fileChooserCallback = null
         uiHandler.removeCallbacksAndMessages(null)
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.stopLoading()
@@ -587,8 +641,14 @@ class MainActivity : Activity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    private fun isTrustedUploadPage(rawUrl: String?): Boolean {
+        val uri = rawUrl?.let(Uri::parse) ?: return false
+        return uri.scheme == "https" && uri.host in setOf("pasteleriasucree.cl", "www.pasteleriasucree.cl")
+    }
+
     companion object {
         private const val ORDER_CHANNEL_ID = "sucree_pos_orders_v2"
         private const val NOTIFICATION_PERMISSION_REQUEST = 5102
+        private const val FILE_CHOOSER_REQUEST = 5103
     }
 }
