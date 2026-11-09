@@ -8340,33 +8340,35 @@ def _parse_detalle_carrito_tienda(raw_json):
 def api_tienda_track():
     conn = None
     try:
-        if not tracking_allowed_from_request():
-            return jsonify({"success": True, "counted": False, "reason": "metricas_opcionales_desactivadas"})
+        analytics_allowed = tracking_allowed_from_request()
         data = request.get_json(silent=True) or {}
         session_id = str(data.get("session_id") or "").strip()
         if not re.match(r"^[A-Za-z0-9._:-]{8,80}$", session_id):
             return jsonify({"success": False, "error": "session_id invalido"}), 400
-        pagina = str(data.get("pagina") or "/tienda").strip()[:120] or "/tienda"
+        evento = str(data.get("evento") or "heartbeat").strip().lower()
+        operational_events = {"heartbeat", "cart", "leave", "close", "salida"}
+        if not analytics_allowed and evento not in operational_events:
+            return jsonify({"success": True, "counted": False, "reason": "metricas_opcionales_desactivadas"})
+        pagina = (str(data.get("pagina") or "/tienda").strip()[:120] or "/tienda") if analytics_allowed else "/tienda"
         carrito_items = int(data.get("carrito_items") or 0)
         if carrito_items < 0:
             carrito_items = 0
         carrito_total = float(data.get("carrito_total") or 0)
         if carrito_total < 0:
             carrito_total = 0
-        evento = str(data.get("evento") or "heartbeat").strip().lower()
-        checkout_delta = 1 if evento == "checkout" else 0
-        user_agent = str(request.headers.get("User-Agent") or "")[:260]
-        ip_address = _obtener_ip_cliente()
-        cliente_email = _normalizar_email(data.get("cliente_email"))
-        cliente_telefono = str(data.get("cliente_telefono") or "").strip()[:24]
-        cliente_registrado = 1 if bool(data.get("cliente_registrado")) and bool(cliente_email) else 0
+        checkout_delta = 1 if analytics_allowed and evento == "checkout" else 0
+        user_agent = str(request.headers.get("User-Agent") or "")[:260] if analytics_allowed else ""
+        ip_address = _obtener_ip_cliente() if analytics_allowed else ""
+        cliente_email = _normalizar_email(data.get("cliente_email")) if analytics_allowed else ""
+        cliente_telefono = str(data.get("cliente_telefono") or "").strip()[:24] if analytics_allowed else ""
+        cliente_registrado = 1 if analytics_allowed and bool(data.get("cliente_registrado")) and bool(cliente_email) else 0
         carrito_detalle = _normalizar_detalle_carrito_tienda(data.get("carrito_detalle") or data.get("carrito_items_detalle") or [])
         carrito_detalle_json = json.dumps(carrito_detalle, ensure_ascii=False, separators=(",", ":")) if carrito_detalle else ""
 
         conn = get_db()
         cursor = conn.cursor()
         _ensure_column_cursor(cursor, "tienda_visitas", "carrito_detalle_json", "TEXT")
-        if evento in {"view", "enter", "checkout"}:
+        if analytics_allowed and evento in {"view", "enter", "checkout"}:
             try:
                 cursor.execute(
                     """
@@ -8393,7 +8395,7 @@ def api_tienda_track():
                 (pagina, session_id),
             )
             conn.commit()
-            return jsonify({"success": True, "left": True})
+            return jsonify({"success": True, "counted": True, "left": True, "operational_only": not analytics_allowed})
         try:
             cursor.execute(
                 """
@@ -8439,7 +8441,7 @@ def api_tienda_track():
                 (session_id, pagina, carrito_items, carrito_total, carrito_detalle_json, checkout_delta, checkout_delta, user_agent),
             )
         conn.commit()
-        return jsonify({"success": True})
+        return jsonify({"success": True, "counted": True, "operational_only": not analytics_allowed})
     except Exception as e:
         if conn:
             conn.rollback()
@@ -8587,18 +8589,9 @@ def api_tienda_admin_actividad():
         conn = get_db()
         cursor = conn.cursor()
         _ensure_column_cursor(cursor, "tienda_visitas", "carrito_detalle_json", "TEXT")
-        cursor.execute(
-            """
-            UPDATE tienda_visitas
-            SET carrito_items = 0,
-                carrito_total = 0,
-                carrito_detalle_json = ''
-            WHERE carrito_items > 0
-              AND datetime(ultima_actividad) < datetime('now', '-30 seconds')
-            """
-        )
+        cursor.execute("DELETE FROM tienda_visitas WHERE datetime(ultima_actividad) < datetime('now', '-24 hours')")
         conn.commit()
-        cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-15 seconds')")
+        cursor.execute("SELECT COUNT(*) AS total FROM tienda_visitas WHERE datetime(ultima_actividad) >= datetime('now', '-30 seconds')")
         conectados = int(cursor.fetchone()["total"] or 0)
         cursor.execute(
             """
@@ -8650,8 +8643,8 @@ def api_tienda_admin_actividad():
             """
             SELECT COUNT(*) AS total
             FROM ventas
-            WHERE canal_venta = 'tienda_online'
-              AND COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') = 'preparando'
+            WHERE canal_venta LIKE 'tienda_online%'
+              AND LOWER(TRIM(COALESCE(NULLIF(pedido_estado, ''), 'recibido'))) = 'preparando'
             """
         )
         pedidos_preparando = int(cursor.fetchone()["total"] or 0)
@@ -8659,8 +8652,8 @@ def api_tienda_admin_actividad():
             """
             SELECT COUNT(*) AS total
             FROM ventas
-            WHERE canal_venta = 'tienda_online'
-              AND COALESCE(NULLIF(TRIM(pedido_estado), ''), 'recibido') = 'recibido'
+            WHERE canal_venta LIKE 'tienda_online%'
+              AND LOWER(TRIM(COALESCE(NULLIF(pedido_estado, ''), 'recibido'))) = 'recibido'
             """
         )
         pedidos_recibidos = int(cursor.fetchone()["total"] or 0)
@@ -8672,7 +8665,8 @@ def api_tienda_admin_actividad():
                     COUNT(*) AS sesiones,
                     MAX(ultima_actividad) AS ultima_actividad
                 FROM tienda_visitas
-                WHERE datetime(ultima_actividad) >= datetime('now', '-15 seconds')
+                WHERE datetime(ultima_actividad) >= datetime('now', '-30 seconds')
+                  AND COALESCE(TRIM(ip_address), '') <> ''
                 GROUP BY COALESCE(NULLIF(TRIM(ip_address), ''), 'desconocida')
                 ORDER BY sesiones DESC, datetime(ultima_actividad) DESC
                 LIMIT 5

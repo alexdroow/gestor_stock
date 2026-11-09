@@ -18457,15 +18457,19 @@
         const AGENDA_BETA_DRAFT_KEY = "agenda_beta_cake_draft_v2";
         try { localStorage.removeItem("agenda_beta_cake_draft_v1"); } catch (_e) {}
         const privacyAnalyticsAllowed = {{ 'true' if privacy_state.preferences.analytics_internal else 'false' }};
-        const tiendaSessionId = privacyAnalyticsAllowed ? (() => {
-            const key = "tienda_session_id";
-            let value = localStorage.getItem(key);
-            if (!value) {
-                value = `ts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-                localStorage.setItem(key, value);
+        const tiendaSessionId = (() => {
+            const key = "sucree_tienda_live_session";
+            try {
+                let value = sessionStorage.getItem(key);
+                if (!value) {
+                    value = `ts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`;
+                    sessionStorage.setItem(key, value);
+                }
+                return value;
+            } catch (_) {
+                return `ts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`;
             }
-            return value;
-        })() : "";
+        })();
         const _urlParams = new URLSearchParams(window.location.search);
         const _agendaDebugMode = _urlParams.get("agenda_debug") === "1";
         const _ua = String(navigator.userAgent || "").toLowerCase();
@@ -20744,7 +20748,9 @@
         }
 
         function _trackTienda(evento = "heartbeat", pagina = "/tienda") {
-            if (!privacyAnalyticsAllowed || !tiendaSessionId) return;
+            const operationalEvents = ["heartbeat", "cart", "leave", "close", "salida"];
+            const operational = operationalEvents.includes(String(evento || "").toLowerCase());
+            if (!tiendaSessionId || (!operational && !privacyAnalyticsAllowed)) return;
             try {
                 const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
                 const detalleCarrito = carrito.map((it) => {
@@ -20762,13 +20768,13 @@
                 const payload = {
                     session_id: tiendaSessionId,
                     evento,
-                    pagina: String(pagina || "/tienda"),
+                    pagina: privacyAnalyticsAllowed ? String(pagina || "/tienda") : "/tienda",
                     carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
                     carrito_total: Math.max(0, Number(total || 0)),
                     carrito_detalle: detalleCarrito,
-                    cliente_registrado: Boolean(clienteRegistrado && clienteRegistrado.email),
-                    cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
-                    cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
+                    cliente_registrado: privacyAnalyticsAllowed && Boolean(clienteRegistrado && clienteRegistrado.email),
+                    cliente_email: privacyAnalyticsAllowed ? String(clienteRegistrado?.email || "").trim().toLowerCase() : "",
+                    cliente_telefono: privacyAnalyticsAllowed ? String(clienteRegistrado?.telefono || "").trim() : "",
                 };
                 fetch("/api/tienda/track", {
                     method: "POST",
@@ -20780,7 +20786,7 @@
         }
 
         function _trackTiendaLeave() {
-            if (!privacyAnalyticsAllowed || !tiendaSessionId) return;
+            if (!tiendaSessionId) return;
             try {
                 const total = carrito.reduce((acc, it) => acc + (Number(it.cantidad || 0) * Number(it.precio_unitario || 0)), 0);
                 const detalleCarrito = carrito.map((it) => {
@@ -20802,9 +20808,9 @@
                     carrito_items: carrito.reduce((acc, it) => acc + Number(it.cantidad || 0), 0),
                     carrito_total: Math.max(0, Number(total || 0)),
                     carrito_detalle: detalleCarrito,
-                    cliente_registrado: Boolean(clienteRegistrado && clienteRegistrado.email),
-                    cliente_email: String(clienteRegistrado?.email || "").trim().toLowerCase(),
-                    cliente_telefono: String(clienteRegistrado?.telefono || "").trim(),
+                    cliente_registrado: privacyAnalyticsAllowed && Boolean(clienteRegistrado && clienteRegistrado.email),
+                    cliente_email: privacyAnalyticsAllowed ? String(clienteRegistrado?.email || "").trim().toLowerCase() : "",
+                    cliente_telefono: privacyAnalyticsAllowed ? String(clienteRegistrado?.telefono || "").trim() : "",
                 };
                 if (navigator.sendBeacon) {
                     const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });

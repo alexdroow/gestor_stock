@@ -72,6 +72,21 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('FILE_CHOOSER_REQUEST', activity)
         self.assertIn('callback.onReceiveValue(selected)', activity)
 
+    def test_live_store_metrics_use_operational_heartbeat_and_shared_preparing_count(self):
+        root = Path(__file__).resolve().parents[1]
+        storefront = (root / 'templates' / 'tienda.html').read_text(encoding='utf-8')
+        web_sales = (root / 'templates' / 'ventas.html').read_text(encoding='utf-8')
+        mobile_pos = (root / 'templates' / 'pos_admin_mobile.html').read_text(encoding='utf-8')
+        backend = (root / 'app.py').read_text(encoding='utf-8')
+        self.assertIn('sessionStorage.getItem(key)', storefront)
+        self.assertIn('const operationalEvents = ["heartbeat", "cart", "leave", "close", "salida"]', storefront)
+        self.assertIn('setInterval(() => _trackTienda("heartbeat"), 5000)', storefront)
+        self.assertIn('setInterval(_pollActividadTiendaEnVentas, 5000)', web_sales)
+        self.assertIn("setInterval(()=>{if(navigator.onLine){loadOrders();loadActivity()}},5000)", mobile_pos)
+        self.assertIn("$('metric-preparing').textContent=Number(s.pedidos_preparando||0)", mobile_pos)
+        self.assertIn("DELETE FROM tienda_visitas WHERE datetime(ultima_actividad) < datetime('now', '-24 hours')", backend)
+        self.assertIn("WHERE canal_venta LIKE 'tienda_online%'", backend)
+
     def test_pos_settings_offer_manual_and_daily_update_check(self):
         root = Path(__file__).resolve().parents[1]
         template = (root / 'templates' / 'pos_admin_mobile.html').read_text(encoding='utf-8')

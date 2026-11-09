@@ -41,7 +41,11 @@ class PrivacyImplementationTests(unittest.TestCase):
         policy = self.client.get("/privacidad/politica").get_data(as_text=True)
         self.assertIn("Resumen de transparencia basado en el funcionamiento actual del sitio", policy)
         self.assertIn("pasteleria.sucree@outlook.com", policy)
-        self.assertIn("Los plazos exactos por finalidad", policy)
+        self.assertIn("sus plazos exactos deben definirse", policy)
+        self.assertIn("Monitoreo operativo de la tienda", policy)
+        preferences = self.client.get("/privacidad/preferencias").get_data(as_text=True)
+        self.assertIn("Monitoreo operativo siempre activo", preferences)
+        self.assertIn("La casilla de abajo controla solo visitas y clics adicionales", preferences)
         self.assertNotIn("[razon social]", policy.lower())
 
     def test_optional_preferences_default_off_then_are_recorded_and_can_be_revoked(self):
@@ -110,15 +114,85 @@ class PrivacyImplementationTests(unittest.TestCase):
         history = self.client.get("/api/admin/privacidad/versiones")
         self.assertEqual(history.get_json()["versions"][0]["version"], "0.1")
 
-    def test_analytics_without_preference_does_not_write_visit_data(self):
-        response = self.client.post("/api/tienda/track", json={"session_id": "session-test-123", "evento": "view"})
+    def test_operational_store_tracking_runs_without_optional_analytics_and_omits_pii(self):
+        conn = self.connect_db()
+        conn.executescript("""
+            CREATE TABLE tienda_visitas (
+                session_id TEXT PRIMARY KEY, primera_visita TEXT DEFAULT CURRENT_TIMESTAMP,
+                ultima_actividad TEXT DEFAULT CURRENT_TIMESTAMP, pagina TEXT DEFAULT '/tienda',
+                carrito_items INTEGER DEFAULT 0, carrito_total REAL DEFAULT 0,
+                carrito_detalle_json TEXT, checkouts INTEGER DEFAULT 0, ultimo_checkout TEXT,
+                user_agent TEXT, ip_address TEXT
+            );
+            CREATE TABLE tienda_visitas_eventos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, evento TEXT, pagina TEXT,
+                ip_address TEXT, cliente_email TEXT, cliente_telefono TEXT, cliente_registrado INTEGER,
+                creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        conn.close()
+
+        with patch.object(app_module, "get_db", side_effect=self.connect_db):
+            optional_event = self.client.post("/api/tienda/track", json={
+                "session_id": "session-test-123", "evento": "view", "pagina": "/tienda/tortas",
+            })
+            self.assertFalse(optional_event.get_json()["counted"])
+            response = self.client.post("/api/tienda/track", json={
+                "session_id": "session-test-123", "evento": "cart", "pagina": "/tienda/tortas",
+                "carrito_items": 2, "carrito_total": 18000,
+                "carrito_detalle": [{"id": 7, "nombre": "Torta prueba", "cantidad": 2, "precio_unitario": 9000}],
+                "cliente_email": "cliente@example.cl", "cliente_telefono": "+56912345678",
+                "cliente_registrado": True,
+            })
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.get_json()["counted"])
+        self.assertTrue(response.get_json()["counted"])
+        self.assertTrue(response.get_json()["operational_only"])
         conn = self.connect_db()
         try:
-            self.assertIsNone(conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tienda_visitas'").fetchone())
+            visit = conn.execute("SELECT * FROM tienda_visitas WHERE session_id='session-test-123'").fetchone()
+            self.assertIsNotNone(visit)
+            self.assertEqual(visit["carrito_items"], 2)
+            self.assertEqual(visit["carrito_total"], 18000)
+            self.assertEqual(visit["user_agent"], "")
+            self.assertEqual(visit["ip_address"], "")
+            self.assertEqual(visit["pagina"], "/tienda")
+            self.assertIn("Torta prueba", visit["carrito_detalle_json"])
+            events = conn.execute("SELECT COUNT(*) FROM tienda_visitas_eventos").fetchone()[0]
+            self.assertEqual(events, 0)
         finally:
             conn.close()
+
+    def test_live_store_activity_counts_operational_cart_and_preparing_orders(self):
+        conn = self.connect_db()
+        conn.executescript("""
+            CREATE TABLE tienda_visitas (
+                session_id TEXT PRIMARY KEY, primera_visita TEXT DEFAULT CURRENT_TIMESTAMP,
+                ultima_actividad TEXT DEFAULT CURRENT_TIMESTAMP, pagina TEXT DEFAULT '/tienda',
+                carrito_items INTEGER DEFAULT 0, carrito_total REAL DEFAULT 0,
+                carrito_detalle_json TEXT, checkouts INTEGER DEFAULT 0, ultimo_checkout TEXT,
+                user_agent TEXT, ip_address TEXT
+            );
+            CREATE TABLE ventas (canal_venta TEXT, pedido_estado TEXT);
+            INSERT INTO ventas(canal_venta,pedido_estado) VALUES ('tienda_online_flow_pendiente','Preparando');
+        """)
+        conn.commit()
+        conn.close()
+
+        with patch.object(app_module, "get_db", side_effect=self.connect_db):
+            tracked = self.client.post("/api/tienda/track", json={
+                "session_id": "live-test-123", "evento": "cart", "carrito_items": 1,
+                "carrito_total": 5000, "carrito_detalle": [{"id": 1, "nombre": "Torta", "cantidad": 1}],
+            })
+            self.assertEqual(tracked.status_code, 200)
+            with self.client.session_transaction() as session:
+                session[app_module._ADMIN_SESSION_KEY] = True
+            response = self.client.get("/api/tienda/admin/actividad")
+        self.assertEqual(response.status_code, 200)
+        summary = response.get_json()["resumen"]
+        self.assertEqual(summary["conectados"], 1)
+        self.assertEqual(summary["carritos_activos"], 1)
+        self.assertEqual(summary["pedidos_preparando"], 1)
 
 
 if __name__ == "__main__":
