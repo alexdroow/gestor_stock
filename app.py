@@ -1158,7 +1158,7 @@ def admin_logout():
     return redirect(url_for('admin_login'))
 
 
-POS_ANDROID_VERSION = '1.4.16'
+POS_ANDROID_VERSION = '1.4.17'
 POS_ANDROID_APK_FILENAME = f'SucreePOS-Android-{POS_ANDROID_VERSION}-debug.apk'
 
 
@@ -25060,6 +25060,7 @@ AGENDA_WHATSAPP_DEFAULTS = {
         "Fecha: {fecha} {hora_entrega}",
         "PDF: {pdf_url}",
     ]),
+    "reactivacion": "Hola {cliente}, esperamos que estes muy bien. Hace un ano, para esta fecha, preparamos {producto} para ti. Queremos contarte que ya puedes agendar nuevamente con Pasteleria Sucree. Si tienes una celebracion en mente, estaremos felices de atenderte.\n\nUn abrazo,\nPasteleria Sucree",
 }
 
 AGENDA_WHATSAPP_DEFAULT_BANK_ACCOUNTS = [{
@@ -25075,18 +25076,20 @@ def _ensure_agenda_whatsapp_config(cursor):
             id INTEGER PRIMARY KEY CHECK (id = 1),
             mensaje_confirmacion TEXT NOT NULL,
             mensaje_pdf TEXT NOT NULL,
+            mensaje_reactivacion TEXT NOT NULL DEFAULT '',
             cuentas_transferencia TEXT NOT NULL DEFAULT '[]',
             actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
     _ensure_column_cursor(cursor, "agenda_whatsapp_config", "cuentas_transferencia", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column_cursor(cursor, "agenda_whatsapp_config", "mensaje_reactivacion", "TEXT NOT NULL DEFAULT ''")
     cursor.execute(
         """
-        INSERT OR IGNORE INTO agenda_whatsapp_config (id, mensaje_confirmacion, mensaje_pdf, actualizado_en)
-        VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+        INSERT OR IGNORE INTO agenda_whatsapp_config (id, mensaje_confirmacion, mensaje_pdf, mensaje_reactivacion, actualizado_en)
+        VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
         """,
-        (AGENDA_WHATSAPP_DEFAULTS["confirmacion"], AGENDA_WHATSAPP_DEFAULTS["pdf"]),
+        (AGENDA_WHATSAPP_DEFAULTS["confirmacion"], AGENDA_WHATSAPP_DEFAULTS["pdf"], AGENDA_WHATSAPP_DEFAULTS["reactivacion"]),
     )
     cursor.execute(
         """
@@ -25149,7 +25152,7 @@ def _obtener_agenda_whatsapp_templates():
         _ensure_agenda_whatsapp_config(cursor)
         cursor.execute(
             """
-            SELECT mensaje_confirmacion, mensaje_pdf, cuentas_transferencia
+            SELECT mensaje_confirmacion, mensaje_pdf, mensaje_reactivacion, cuentas_transferencia
             FROM agenda_whatsapp_config
             WHERE id = 1
             LIMIT 1
@@ -25168,6 +25171,7 @@ def _obtener_agenda_whatsapp_templates():
         return {
             "confirmacion": str(row["mensaje_confirmacion"] or "").strip() or AGENDA_WHATSAPP_DEFAULTS["confirmacion"],
             "pdf": str(row["mensaje_pdf"] or "").strip() or AGENDA_WHATSAPP_DEFAULTS["pdf"],
+            "reactivacion": str(row["mensaje_reactivacion"] or "").strip() or AGENDA_WHATSAPP_DEFAULTS["reactivacion"],
             "cuentas_transferencia": cuentas,
         }
     finally:
@@ -25196,8 +25200,11 @@ def api_agenda_whatsapp_mensajes():
         data = request.get_json(silent=True) or {}
         if isinstance(data.get('cuentas_transferencia'), list) and not session.get(_ADMIN_SESSION_KEY):
             return jsonify({'success': False, 'error': 'No autorizado para modificar cuentas bancarias.'}), 401
+        if 'reactivacion' in data and not session.get(_ADMIN_SESSION_KEY):
+            return jsonify({'success': False, 'error': 'No autorizado para modificar el mensaje de reactivacion.'}), 401
         confirmacion = str(data.get('confirmacion') or '').strip()[:6000] or AGENDA_WHATSAPP_DEFAULTS["confirmacion"]
         pdf = str(data.get('pdf') or '').strip()[:3000] or AGENDA_WHATSAPP_DEFAULTS["pdf"]
+        reactivacion = str(data.get('reactivacion') or '').strip()[:3000] or AGENDA_WHATSAPP_DEFAULTS["reactivacion"]
 
         conn = get_db()
         cursor = conn.cursor()
@@ -25218,13 +25225,20 @@ def api_agenda_whatsapp_mensajes():
                 "UPDATE agenda_whatsapp_config SET cuentas_transferencia = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = 1",
                 (json.dumps(cuentas_norm, ensure_ascii=False),),
             )
-        cursor.execute(
-            "UPDATE agenda_whatsapp_config SET mensaje_confirmacion = ?, mensaje_pdf = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = 1",
-            (confirmacion, pdf),
-        )
+        if 'reactivacion' in data:
+            cursor.execute(
+                "UPDATE agenda_whatsapp_config SET mensaje_confirmacion = ?, mensaje_pdf = ?, mensaje_reactivacion = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = 1",
+                (confirmacion, pdf, reactivacion),
+            )
+        else:
+            cursor.execute(
+                "UPDATE agenda_whatsapp_config SET mensaje_confirmacion = ?, mensaje_pdf = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = 1",
+                (confirmacion, pdf),
+            )
         conn.commit()
         crear_backup()
-        return jsonify({'success': True, 'templates': {'confirmacion': confirmacion, 'pdf': pdf}, 'cuentas_transferencia': _obtener_agenda_whatsapp_templates().get('cuentas_transferencia', [])})
+        templates_updated = _obtener_agenda_whatsapp_templates()
+        return jsonify({'success': True, 'templates': {'confirmacion': confirmacion, 'pdf': pdf, 'reactivacion': templates_updated.get('reactivacion', reactivacion)}, 'cuentas_transferencia': templates_updated.get('cuentas_transferencia', [])})
     except Exception as e:
         if conn:
             conn.rollback()

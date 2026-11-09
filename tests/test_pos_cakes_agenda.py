@@ -27,23 +27,41 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn(b'data-src="/admin/redes?pos_embed=1"', response.data)
         self.assertIn(b"frame.dataset.loaded!=='1'", response.data)
 
-    def test_updated_pos_apk_is_available_as_version_1416(self):
+    def test_updated_pos_apk_is_available_as_version_1417(self):
         page = self.client.get('/descargar-pos-android')
         self.assertEqual(page.status_code, 200)
-        self.assertIn('1.4.16', page.get_data(as_text=True))
-        self.assertIn('name="sucree-pos-version" content="1.4.16"', page.get_data(as_text=True))
-        self.assertIn('name="sucree-pos-apk" content="/downloader/apk/SucreePOS-Android-1.4.16-debug.apk"', page.get_data(as_text=True))
+        self.assertIn('1.4.17', page.get_data(as_text=True))
+        self.assertIn('name="sucree-pos-version" content="1.4.17"', page.get_data(as_text=True))
+        self.assertIn('name="sucree-pos-apk" content="/downloader/apk/SucreePOS-Android-1.4.17-debug.apk"', page.get_data(as_text=True))
         apk = self.client.get('/descargas/SucreePOS-Android-prueba.apk')
         self.assertEqual(apk.status_code, 200)
-        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.16')
+        self.assertEqual(apk.headers.get('X-POS-APK-Version'), '1.4.17')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
         apk.close()
-        apk = self.client.get('/downloader/apk/SucreePOS-Android-1.4.16-debug.apk')
+        apk = self.client.get('/downloader/apk/SucreePOS-Android-1.4.17-debug.apk')
         self.assertEqual(apk.status_code, 200)
         self.assertEqual(apk.mimetype, 'application/vnd.android.package-archive')
         self.assertTrue(apk.data.startswith(b'PK'))
         apk.close()
+
+    def test_agenda_exposes_past_customer_anniversary_and_configurable_whatsapp(self):
+        page = self.client.get('/agenda')
+        self.assertEqual(page.status_code, 200)
+        html = page.get_data(as_text=True)
+        self.assertIn('Clientes de años anteriores', html)
+        self.assertIn('AGENDA_CLIENTE_PASADO_DIAS_AVISO = 7', html)
+        self.assertIn('mostrarClientePasadoRecordatorio', html)
+        self.assertIn('abrirWhatsAppClientePasado', html)
+        self.assertIn('whatsapp-template-reactivacion', html)
+        self.assertIn('recordatoriosClientesPasadosEnRango', html)
+        self.assertIn('syncAgendaReminders', html)
+
+    def test_native_agenda_reminders_accept_negative_ids_for_client_anniversaries(self):
+        receiver = (Path(__file__).resolve().parents[1] / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'AgendaReminderReceiver.kt').read_text(encoding='utf-8')
+        self.assertIn('if (id == 0 || due <= System.currentTimeMillis()) continue', receiver)
+        self.assertIn('private fun schedule(context: Context, reminder: JSONObject)', receiver)
+        self.assertNotIn('id < 0', receiver)
 
     def test_pos_webview_supports_single_and_multiple_file_uploads(self):
         activity = (Path(__file__).resolve().parents[1] / 'android_pos' / 'app' / 'src' / 'main' / 'java' / 'cl' / 'sucree' / 'pos' / 'MainActivity.kt').read_text(encoding='utf-8')

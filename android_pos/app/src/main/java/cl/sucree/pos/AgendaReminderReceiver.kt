@@ -40,12 +40,12 @@ class AgendaReminderReceiver : BroadcastReceiver() {
                 val item = reminders.optJSONObject(i) ?: continue
                 val id = item.optInt("id", 0)
                 val due = item.optLong("due_at_ms", 0L)
-                if (id <= 0 || due <= System.currentTimeMillis()) continue
+                if (id == 0 || due <= System.currentTimeMillis()) continue
                 currentIds.add(id)
             }
             for (i in 0 until previous.length()) {
                 val oldId = previous.optJSONObject(i)?.optInt("id", 0) ?: 0
-                if (oldId > 0 && oldId !in currentIds) cancel(context, oldId)
+                if (oldId != 0 && oldId !in currentIds) cancel(context, oldId)
             }
             prefs.edit().putString(REMINDERS_KEY, reminders.toString()).apply()
             for (i in 0 until reminders.length()) {
@@ -84,7 +84,7 @@ class AgendaReminderReceiver : BroadcastReceiver() {
         private fun schedule(context: Context, reminder: JSONObject) {
             val id = reminder.optInt("id", 0)
             val due = reminder.optLong("due_at_ms", 0L)
-            if (id <= 0 || due <= System.currentTimeMillis()) return
+            if (id == 0 || due <= System.currentTimeMillis()) return
             val alarmManager = context.getSystemService(AlarmManager::class.java)
             val pending = pendingIntent(context, id, reminder)
             try {

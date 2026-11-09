@@ -779,6 +779,20 @@
             border: 1px solid #fdba74;
         }
         .day-event.personal-reminder { background:#fff1db; color:#9a4d05; border:1px solid #f3c98d; cursor:pointer; }
+        .day-event.past-client-anniversary { background:#fff3df; color:#8b4a0d; border:1px solid #f3d3a5; cursor:pointer; font-size:10px; }
+        .past-client-tools { display:grid; gap:12px; }
+        .past-client-controls { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; }
+        .past-client-list { display:grid; gap:8px; }
+        .past-client-item { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px 12px; align-items:center; padding:11px 12px; border:1px solid #ead8c5; border-radius:12px; background:#fffaf3; }
+        .past-client-item strong { color:#422214; font-size:14px; }
+        .past-client-item small { display:block; color:#806d5e; font-size:12px; margin-top:3px; }
+        .past-client-item .btn-whatsapp { grid-row:1/3; grid-column:2; }
+        .past-client-alert-card { display:grid; gap:12px; }
+        .past-client-alert-row { padding:10px 12px; border:1px solid #f3d3a5; border-radius:11px; background:#fff8ec; }
+        .past-client-alert-row strong { display:block; color:#422214; }
+        .past-client-alert-row small { display:block; color:#806d5e; margin-top:3px; }
+        .past-client-anniversary-card { border-color:#f3d3a5; background:#fff8ec; }
+        @media(max-width:700px) { .past-client-controls { grid-template-columns:40px minmax(0,1fr) 40px; } .past-client-item { grid-template-columns:minmax(0,1fr); } .past-client-item .btn-whatsapp { grid-row:auto; grid-column:auto; width:100%; } }
         .agenda-reminder-card { display:grid; gap:4px; width:100%; padding:9px; border:1px solid #f1c98f; border-left:4px solid #ed7900; border-radius:10px; background:#fff8e9; color:#53300e; text-align:left; cursor:pointer; }
         .agenda-reminder-card strong { font-size:11px; }
         .agenda-reminder-card span { font-size:12px; font-weight:750; }
@@ -3844,6 +3858,7 @@
                         <div class="agenda-more-menu" id="agenda-more-menu">
                             <button type="button" onclick="abrirBuscadorPedidos(); cerrarAgendaMoreMenu();">Buscar pedido</button>
                             <button type="button" onclick="abrirModalRellenosMes(); cerrarAgendaMoreMenu();">Rellenos del mes</button>
+                            <button type="button" onclick="abrirClientesPasados(); cerrarAgendaMoreMenu();">Clientes de años anteriores</button>
                             <button type="button" onclick="nuevoEvento(); cerrarAgendaMoreMenu();">Nuevo evento</button>
                             <button type="button" onclick="abrirConfig(); cerrarAgendaMoreMenu();">Configuracion</button>
                             <button type="button" onclick="eliminarEventosPasados(); cerrarAgendaMoreMenu();">Limpiar pasados</button>
@@ -4441,6 +4456,42 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-clientes-pasados">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Proximas fechas de clientes</h3>
+                <button type="button" onclick="cerrarClientesPasados()" class="modal-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body past-client-tools">
+                <p>Fechas aniversario de pedidos de tortas anteriores. El calendario marca la fecha y el aviso aparece una semana antes.</p>
+                <div class="past-client-controls">
+                    <button type="button" class="btn btn-secondary" onclick="moverPeriodoClientesPasados(-1)" aria-label="Periodo anterior">&larr;</button>
+                    <select id="clientes-pasados-periodo" onchange="cambiarPeriodoClientesPasados(this.value)">
+                        <option value="semana">Semana</option><option value="mes" selected>Mes</option><option value="ano">Año</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary" onclick="moverPeriodoClientesPasados(1)" aria-label="Periodo siguiente">&rarr;</button>
+                </div>
+                <strong id="clientes-pasados-rango"></strong>
+                <div id="clientes-pasados-lista" class="past-client-list"></div>
+            </div>
+            <div class="modal-footer"><button type="button" onclick="cerrarClientesPasados()" class="btn btn-secondary">Cerrar</button></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-alerta-clientes-pasados">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Fechas para contactar clientes</h3>
+                <button type="button" onclick="cerrarAlertaClientesPasados()" class="modal-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body past-client-alert-card">
+                <p>Estos clientes reservaron una torta para una fecha cercana en años anteriores. Puedes saludarlos e invitarlos a agendar nuevamente.</p>
+                <div id="alerta-clientes-pasados-lista" class="past-client-list"></div>
+            </div>
+            <div class="modal-footer"><button type="button" onclick="cerrarAlertaClientesPasados()" class="btn btn-secondary">Cerrar</button></div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-whatsapp-mensajes">
         <div class="modal">
             <div class="modal-header">
@@ -4452,6 +4503,12 @@
                     Variables disponibles: {cliente}, {saludo}, {telefono}, {codigo_pedido}, {tipo}, {fecha},
                     {hora_entrega}, {modalidad_entrega}, {tamano_torta}, {rellenos}, {extras}, {total},
                     {abono_50}, {pdf_url}.
+                </div>
+                <div class="whatsapp-editor-card">
+                    <h4>Mensaje para clientes de años anteriores</h4>
+                    <p>Variables disponibles: {cliente}, {producto}, {fecha_aniversario}, {fecha_pedido_anterior}.</p>
+                    <textarea id="whatsapp-template-reactivacion" rows="5" oninput="actualizarPreviewMensajesWhatsApp()"></textarea>
+                    <div class="whatsapp-preview" id="whatsapp-preview-reactivacion"></div>
                 </div>
                 <div class="whatsapp-editor-grid">
                     <div class="whatsapp-editor-card">
@@ -4648,6 +4705,8 @@
         let fechaActual = new Date();
         let eventos = [];
         let notasAgenda = [];
+        let agendaEventosCargados = false;
+        let agendaNotasCargadas = false;
         let eventoEditando = null;
         let fechaOriginalEventoEdicion = '';
         let modoAgendarTorta = false;
@@ -4672,6 +4731,8 @@
         let loadingTimer = null;
         let loadingVisible = false;
         let agendaVista = 'semana';
+        let clientesPasadosPeriodo = 'mes';
+        let clientesPasadosOffset = 0;
         let agendaMobileMode = 'agenda';
         let agendaMobileOrdersTab = 'proximos';
         let agendaMobileLastView = 'dia';
@@ -6610,6 +6671,7 @@
                         ...e,
                         es_envio: Boolean(e.es_envio) // Convertir a boolean
                     }));
+                    agendaEventosCargados = true;
                     if (window.SucreePosAndroid) {
                         const pendientes = obtenerReservasTiendaPendientesOrdenadas();
                         window.SucreePosAndroid.syncActiveAgendaQuotes(JSON.stringify(pendientes.map(item => String(item.id))));
@@ -6627,6 +6689,9 @@
                     renderizarBorradores();
                     renderizarEventosPasados();
                     renderizarBloqueosActivos();
+                    if (agendaNotasCargadas) sincronizarRecordatoriosPersonales();
+                    if (document.getElementById('modal-clientes-pasados')?.classList.contains('active')) renderizarClientesPasados();
+                    verificarAlertasClientesPasados();
                     if (document.getElementById('modal-rellenos-mes')?.classList.contains('active')) {
                         renderizarRellenosMes();
                     }
@@ -6942,6 +7007,198 @@
             });
         }
 
+        const AGENDA_CLIENTE_PASADO_DIAS_AVISO = 7;
+        const AGENDA_CLIENTE_PASADO_KEY = 'agenda_clientes_anteriores_v1';
+        function fechaAniversarioLocal(fechaOriginal, year) {
+            const original = parseFechaISO(fechaOriginal);
+            if (!original) return null;
+            const day = original.getDate();
+            const month = original.getMonth();
+            const date = new Date(year, month, day);
+            if (date.getMonth() !== month) date.setDate(0); // Feb. 29th anniversaries fall on Feb. 28th in common years.
+            date.setHours(0, 0, 0, 0);
+            return date;
+        }
+
+        function sumarDiasFechaLocal(fecha, dias) {
+            const result = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+            result.setDate(result.getDate() + Number(dias || 0));
+            return result;
+        }
+
+        function obtenerClientesPasadosProximos() {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayIso = formatearFecha(today);
+            const booked = new Set((Array.isArray(eventos) ? eventos : []).filter(event =>
+                event && String(event.tipo || '').toLowerCase() === 'torta' && String(event.fecha || '') >= todayIso &&
+                !['cancelado', 'cancelada', 'cancelled', 'borrador'].includes(String(event.estado || '').toLowerCase())
+            ).map(event => `${normalizarTelefonoWhatsApp(event.telefono)}:${String(event.fecha || '')}`));
+            const bestByClientDate = new Map();
+            (Array.isArray(eventos) ? eventos : []).forEach(event => {
+                if (!event || String(event.tipo || '').toLowerCase() !== 'torta') return;
+                const originalDate = parseFechaISO(event.fecha);
+                if (!originalDate || originalDate >= today) return;
+                const state = String(event.estado || '').toLowerCase();
+                if (['cancelado', 'cancelada', 'cancelled', 'borrador'].includes(state) || esEventoBorrador(event)) return;
+                const phone = normalizarTelefonoWhatsApp(event.telefono);
+                if (!phone) return;
+                const monthDay = `${String(originalDate.getMonth() + 1).padStart(2, '0')}-${String(originalDate.getDate()).padStart(2, '0')}`;
+                const key = `${phone}:${monthDay}`;
+                const current = bestByClientDate.get(key);
+                if (!current || String(event.fecha) > String(current.evento.fecha)) bestByClientDate.set(key, { evento: event, phone, originalDate, key });
+            });
+
+            const result = [];
+            bestByClientDate.forEach(item => {
+                let year = Math.max(today.getFullYear(), item.originalDate.getFullYear() + 1);
+                let anniversary = fechaAniversarioLocal(item.evento.fecha, year);
+                if (!anniversary || anniversary < today) {
+                    year += 1;
+                    anniversary = fechaAniversarioLocal(item.evento.fecha, year);
+                }
+                const anniversaryIso = formatearFecha(anniversary);
+                if (booked.has(`${item.phone}:${anniversaryIso}`)) return;
+                const alertDate = sumarDiasFechaLocal(anniversary, -AGENDA_CLIENTE_PASADO_DIAS_AVISO);
+                const product = String(item.evento.titulo || _resumenCatalogoTorta(item.evento).categoria || 'una torta').trim();
+                result.push({
+                    ...item,
+                    year,
+                    anniversary,
+                    anniversaryIso,
+                    alertDate,
+                    alertDateIso: formatearFecha(alertDate),
+                    client: String(item.evento.cliente || 'Cliente').trim(),
+                    product: product || 'una torta',
+                    originalIso: String(item.evento.fecha || ''),
+                    reminderId: -1000000000 - Math.abs(Number(item.evento.id || 1) % 1000000000)
+                });
+            });
+            return result.sort((a, b) => a.anniversary - b.anniversary || a.client.localeCompare(b.client, 'es'));
+        }
+
+        function claveContactoClientePasado(item) { return `contactado_${Number(item?.evento?.id || 0)}_${Number(item?.year || 0)}`; }
+        function estadoContactoClientePasado(item) {
+            try { return String(JSON.parse(localStorage.getItem(AGENDA_CLIENTE_PASADO_KEY) || '{}')[claveContactoClientePasado(item)] || ''); }
+            catch (_) { return ''; }
+        }
+        function clientePasadoYaContactado(item) {
+            return estadoContactoClientePasado(item) === 'contactado';
+        }
+        function marcarClientePasadoContactado(item, alertado = false) {
+            try {
+                const saved = JSON.parse(localStorage.getItem(AGENDA_CLIENTE_PASADO_KEY) || '{}');
+                saved[claveContactoClientePasado(item)] = alertado ? 'alertado' : 'contactado';
+                localStorage.setItem(AGENDA_CLIENTE_PASADO_KEY, JSON.stringify(saved));
+            } catch (_) {}
+        }
+
+        function fechaNotificacionClientePasado(item) {
+            const key = `agenda_cliente_pasado_alarm_${Number(item.evento.id)}_${Number(item.year)}`;
+            try {
+                const cached = Number(localStorage.getItem(key) || 0);
+                if (cached > 0) return cached;
+                const due = new Date(`${item.alertDateIso}T09:00:00`).getTime();
+                const stableDue = due > Date.now() ? due : Date.now() + 5000;
+                localStorage.setItem(key, String(stableDue));
+                return stableDue;
+            } catch (_) {
+                return new Date(`${item.alertDateIso}T09:00:00`).getTime();
+            }
+        }
+
+        function obtenerTextoWhatsAppClientePasado(item) {
+            const template = obtenerPlantillasWhatsAppAgenda().reactivacion || AGENDA_WHATSAPP_DEFAULTS.reactivacion;
+            const context = {
+                cliente: item.client,
+                producto: item.product,
+                fecha_aniversario: formatearFechaLarga(item.anniversaryIso),
+                fecha_pedido_anterior: formatearFechaLarga(item.originalIso)
+            };
+            return String(template).replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => Object.prototype.hasOwnProperty.call(context, key) ? context[key] : match);
+        }
+
+        function abrirWhatsAppClientePasado(eventId, year) {
+            const item = obtenerClientesPasadosProximos().find(candidate => Number(candidate.evento.id) === Number(eventId) && Number(candidate.year) === Number(year));
+            if (!item || !item.phone) return;
+            const text = obtenerTextoWhatsAppClientePasado(item);
+            marcarClientePasadoContactado(item, false);
+            const bridge = window.SucreePosAndroid;
+            if (bridge && typeof bridge.syncAgendaReminders === 'function') sincronizarRecordatoriosPersonales();
+            window.open(`https://wa.me/${item.phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        }
+
+        function abrirClientesPasados() {
+            clientesPasadosPeriodo = 'mes';
+            clientesPasadosOffset = 0;
+            const select = document.getElementById('clientes-pasados-periodo');
+            if (select) select.value = clientesPasadosPeriodo;
+            renderizarClientesPasados();
+            document.getElementById('modal-clientes-pasados')?.classList.add('active');
+        }
+        function cerrarClientesPasados() { document.getElementById('modal-clientes-pasados')?.classList.remove('active'); }
+        function cambiarPeriodoClientesPasados(periodo) {
+            clientesPasadosPeriodo = ['semana', 'mes', 'ano'].includes(periodo) ? periodo : 'mes';
+            clientesPasadosOffset = 0;
+            renderizarClientesPasados();
+        }
+        function moverPeriodoClientesPasados(delta) { clientesPasadosOffset += Number(delta || 0); renderizarClientesPasados(); }
+
+        function rangoClientesPasados() {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            if (clientesPasadosPeriodo === 'semana') {
+                const start = inicioSemanaLunes(today); start.setDate(start.getDate() + clientesPasadosOffset * 7);
+                return { inicio: start, fin: sumarDiasAgenda(start, 6) };
+            }
+            if (clientesPasadosPeriodo === 'ano') {
+                const start = new Date(today.getFullYear() + clientesPasadosOffset, 0, 1);
+                return { inicio: start, fin: new Date(start.getFullYear(), 11, 31) };
+            }
+            const start = new Date(today.getFullYear(), today.getMonth() + clientesPasadosOffset, 1);
+            return { inicio: start, fin: new Date(start.getFullYear(), start.getMonth() + 1, 0) };
+        }
+
+        function recordatoriosClientesPasadosEnRango(rango = rangoVisibleAgenda()) {
+            return obtenerClientesPasadosProximos()
+                .filter(item => eventoDentroRangoAgenda({ fecha: item.anniversaryIso }, rango))
+                .map(item => ({ ...item, fecha: item.anniversaryIso, hora_inicio: '09:00', titulo: item.client, tipo: 'recordatorio_cliente_pasado', es_recordatorio_cliente_pasado: true }));
+        }
+
+        function mostrarClientePasadoRecordatorio(eventId, year) {
+            const item = obtenerClientesPasadosProximos().find(candidate => Number(candidate.evento.id) === Number(eventId) && Number(candidate.year) === Number(year));
+            if (!item) return;
+            const list = document.getElementById('alerta-clientes-pasados-lista');
+            if (list) list.innerHTML = htmlFilaClientePasado(item, true);
+            document.getElementById('modal-alerta-clientes-pasados')?.classList.add('active');
+        }
+
+        function htmlFilaClientePasado(item, alertRow = false) {
+            const button = `<button type="button" class="btn btn-whatsapp" onclick="abrirWhatsAppClientePasado(${Number(item.evento.id)},${Number(item.year)})">WhatsApp</button>`;
+            return `<div class="${alertRow ? 'past-client-alert-row' : 'past-client-item'}"><strong>${escapeHtml(item.client)}</strong><small>${alertRow ? 'Fecha para contactar: ' : 'Aniversario: '}${escapeHtml(formatearFechaLarga(item.anniversaryIso))} · Pedido anterior: ${escapeHtml(formatearFechaLarga(item.originalIso))}</small><small>${escapeHtml(item.product)}</small>${button}</div>`;
+        }
+
+        function renderizarClientesPasados() {
+            const range = rangoClientesPasados();
+            const rangeLabel = `${formatearFechaLarga(formatearFecha(range.inicio))} - ${formatearFechaLarga(formatearFecha(range.fin))}`;
+            const label = document.getElementById('clientes-pasados-rango');
+            if (label) label.textContent = rangeLabel;
+            const list = document.getElementById('clientes-pasados-lista');
+            if (!list) return;
+            const matches = recordatoriosClientesPasadosEnRango(range);
+            list.innerHTML = matches.length ? matches.map(item => htmlFilaClientePasado(item)).join('') : '<div class="mobile-agenda-empty">No hay fechas aniversario de clientes en este periodo.</div>';
+        }
+
+        function verificarAlertasClientesPasados() {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const due = obtenerClientesPasadosProximos().filter(item => item.alertDate <= today && item.anniversary >= today && !estadoContactoClientePasado(item));
+            if (!due.length) return;
+            due.forEach(item => marcarClientePasadoContactado(item, true));
+            const list = document.getElementById('alerta-clientes-pasados-lista');
+            if (list) list.innerHTML = due.map(item => htmlFilaClientePasado(item, true)).join('');
+            document.getElementById('modal-alerta-clientes-pasados')?.classList.add('active');
+        }
+        function cerrarAlertaClientesPasados() { document.getElementById('modal-alerta-clientes-pasados')?.classList.remove('active'); }
+
         function recordatoriosPersonalesEnRango(rango = rangoVisibleAgenda()) {
             return recordatoriosPersonalesActivos().filter(recordatorio => eventoDentroRangoAgenda(recordatorio, rango));
         }
@@ -6951,12 +7208,21 @@
         function sincronizarRecordatoriosPersonales() {
             const reminders = recordatoriosPersonalesActivos();
             const bridge = window.SucreePosAndroid;
-            if (bridge && typeof bridge.syncAgendaReminders === 'function') {
-                bridge.syncAgendaReminders(JSON.stringify(reminders.map(reminder => {
+            if (bridge && typeof bridge.syncAgendaReminders === 'function' && agendaEventosCargados && agendaNotasCargadas) {
+                const personal = reminders.map(reminder => {
                     const note = notasAgenda.find(item => Number(item.id) === Number(reminder.nota_id));
                     const due = new Date(`${reminder.fecha}T${reminder.hora_inicio}`).getTime();
                     return { id: reminder.nota_id, title: reminder.titulo, body: note?.contenido || '', due_at_ms: due };
-                })));
+                });
+                const customerReminders = obtenerClientesPasadosProximos().filter(item => !clientePasadoYaContactado(item)).map(item => {
+                    return {
+                        id: item.reminderId,
+                        title: `Escribir a ${item.client}`.slice(0, 100),
+                        body: `Hace un año agendó ${item.product}. Fecha aniversario: ${item.anniversaryIso}.`,
+                        due_at_ms: fechaNotificacionClientePasado(item)
+                    };
+                });
+                bridge.syncAgendaReminders(JSON.stringify([...personal, ...customerReminders]));
             }
             agendaReminderTimers.forEach(timer => clearTimeout(timer));
             agendaReminderTimers.clear();
@@ -6995,6 +7261,7 @@
                     throw new Error(data.error || 'No se pudieron cargar las notas');
                 }
                 notasAgenda = Array.isArray(data.notas) ? data.notas : [];
+                agendaNotasCargadas = true;
                 renderizarNotasAgenda();
                 sincronizarRecordatoriosPersonales();
                 renderizarCalendario();
@@ -7429,6 +7696,7 @@
 
         const AGENDA_WHATSAPP_TEMPLATES_KEY = 'agenda_whatsapp_templates_v1';
         const AGENDA_WHATSAPP_DEFAULTS = {
+            reactivacion: 'Hola {cliente}, esperamos que estes muy bien. Hace un ano, para esta fecha, preparamos {producto} para ti. Queremos contarte que ya puedes agendar nuevamente con Pasteleria Sucree. Si tienes una celebracion en mente, estaremos felices de atenderte.\n\nUn abrazo,\nPasteleria Sucree',
             confirmacion: [
                 '{saludo}',
                 'Somos de Pasteleria Sucree, te informamos que tu pedido quedo agendado exitosamente.',
@@ -7477,6 +7745,7 @@
                 return {
                     confirmacion: String(parsed.confirmacion || AGENDA_WHATSAPP_DEFAULTS.confirmacion),
                     pdf: String(parsed.pdf || AGENDA_WHATSAPP_DEFAULTS.pdf),
+                    reactivacion: String(parsed.reactivacion || AGENDA_WHATSAPP_DEFAULTS.reactivacion),
                 };
             } catch (_) {
                 return { ...AGENDA_WHATSAPP_DEFAULTS };
@@ -7491,6 +7760,7 @@
                 agendaWhatsAppTemplates = {
                     confirmacion: String(data.templates?.confirmacion || AGENDA_WHATSAPP_DEFAULTS.confirmacion),
                     pdf: String(data.templates?.pdf || AGENDA_WHATSAPP_DEFAULTS.pdf),
+                    reactivacion: String(data.templates?.reactivacion || AGENDA_WHATSAPP_DEFAULTS.reactivacion),
                 };
                 agendaCuentasTransferencia = Array.isArray(data.templates?.cuentas_transferencia) ? data.templates.cuentas_transferencia : [];
                 try {
@@ -7708,8 +7978,10 @@
             const plantillas = obtenerPlantillasWhatsAppAgenda();
             const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
             const inputPdf = document.getElementById('whatsapp-template-pdf');
+            const inputReactivacion = document.getElementById('whatsapp-template-reactivacion');
             if (inputConfirmacion) inputConfirmacion.value = plantillas.confirmacion;
             if (inputPdf) inputPdf.value = plantillas.pdf;
+            if (inputReactivacion) inputReactivacion.value = plantillas.reactivacion;
             actualizarPreviewMensajesWhatsApp();
             document.getElementById('modal-whatsapp-mensajes')?.classList.add('active');
         }
@@ -7721,19 +7993,24 @@
         function actualizarPreviewMensajesWhatsApp() {
             const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
             const inputPdf = document.getElementById('whatsapp-template-pdf');
+            const inputReactivacion = document.getElementById('whatsapp-template-reactivacion');
             const previewConfirmacion = document.getElementById('whatsapp-preview-confirmacion');
             const previewPdf = document.getElementById('whatsapp-preview-pdf');
             const ctx = obtenerContextoWhatsAppAgenda({ pdf_url: 'https://pasteleriasucree.cl/static/tienda_pedidos_pdf/ejemplo.pdf' });
             if (previewConfirmacion && inputConfirmacion) previewConfirmacion.textContent = aplicarPlantillaWhatsAppAgenda(inputConfirmacion.value, ctx);
             if (previewPdf && inputPdf) previewPdf.textContent = aplicarPlantillaWhatsAppAgenda(inputPdf.value, ctx);
+            const previewReactivacion = document.getElementById('whatsapp-preview-reactivacion');
+            if (previewReactivacion && inputReactivacion) previewReactivacion.textContent = inputReactivacion.value.replace(/\{cliente\}/g, 'Alexis').replace(/\{producto\}/g, 'Torta de cumpleaños').replace(/\{fecha_aniversario\}/g, '16 de noviembre de 2026').replace(/\{fecha_pedido_anterior\}/g, '16 de noviembre de 2025');
         }
 
         async function guardarMensajesWhatsApp() {
             const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
             const inputPdf = document.getElementById('whatsapp-template-pdf');
+            const inputReactivacion = document.getElementById('whatsapp-template-reactivacion');
             const data = {
                 confirmacion: String(inputConfirmacion?.value || '').trim() || AGENDA_WHATSAPP_DEFAULTS.confirmacion,
                 pdf: String(inputPdf?.value || '').trim() || AGENDA_WHATSAPP_DEFAULTS.pdf,
+                reactivacion: String(inputReactivacion?.value || '').trim() || AGENDA_WHATSAPP_DEFAULTS.reactivacion,
             };
             try {
                 const response = await fetch('/api/agenda/whatsapp-mensajes', {
@@ -7748,6 +8025,7 @@
                 agendaWhatsAppTemplates = {
                     confirmacion: String(result.templates?.confirmacion || data.confirmacion),
                     pdf: String(result.templates?.pdf || data.pdf),
+                    reactivacion: String(result.templates?.reactivacion || data.reactivacion),
                 };
                 try {
                     localStorage.setItem(AGENDA_WHATSAPP_TEMPLATES_KEY, JSON.stringify(agendaWhatsAppTemplates));
@@ -7762,8 +8040,10 @@
         function restaurarMensajesWhatsAppDefault() {
             const inputConfirmacion = document.getElementById('whatsapp-template-confirmacion');
             const inputPdf = document.getElementById('whatsapp-template-pdf');
+            const inputReactivacion = document.getElementById('whatsapp-template-reactivacion');
             if (inputConfirmacion) inputConfirmacion.value = AGENDA_WHATSAPP_DEFAULTS.confirmacion;
             if (inputPdf) inputPdf.value = AGENDA_WHATSAPP_DEFAULTS.pdf;
+            if (inputReactivacion) inputReactivacion.value = AGENDA_WHATSAPP_DEFAULTS.reactivacion;
             actualizarPreviewMensajesWhatsApp();
         }
 
@@ -8354,6 +8634,7 @@
             const selectedDate = agendaVista === 'semana' ? fechaSeleccionada : (fechaSeleccionada || formatearFecha(new Date()));
             const dayBlocks = bloqueosAgendaEnFecha(selectedDate);
             const dayReminders = recordatoriosPersonalesActivos().filter(item => item.fecha === selectedDate);
+            const dayPastClients = recordatoriosClientesPasadosEnRango({ inicio: parseFechaISO(selectedDate), fin: parseFechaISO(selectedDate) });
             let weekStrip = '';
             if (agendaVista === 'semana') {
                 const start = inicioSemanaLunes(fechaActual);
@@ -8362,7 +8643,7 @@
                 weekStrip = `<div class="mobile-week-strip" role="tablist" aria-label="Seleccionar dia de la semana">${Array.from({ length: 7 }, (_, index) => {
                     const date = sumarDiasAgenda(start, index);
                     const iso = formatearFecha(date);
-                    const count = visibles.filter((event) => event.fecha === iso).length + recordatoriosPersonalesActivos().filter(item => item.fecha === iso).length;
+                    const count = visibles.filter((event) => event.fecha === iso).length + recordatoriosPersonalesActivos().filter(item => item.fecha === iso).length + recordatoriosClientesPasadosEnRango({ inicio: date, fin: date }).length;
                     const blocked = bloqueosAgendaEnFecha(iso).length > 0;
                     return `<button type="button" class="mobile-week-day ${iso === selectedDate ? 'selected' : ''} ${blocked ? 'has-block' : ''}" title="${blocked ? 'Este dia tiene un bloqueo registrado' : ''}" role="tab" aria-label="${weekdays[index]} ${date.getDate()}${blocked ? ', dia bloqueado' : ''}" aria-selected="${iso === selectedDate}" onclick="seleccionarDiaCalendario('${iso}')"><small>${weekdays[index]}</small><strong>${date.getDate()}</strong>${blocked ? '<span class="mobile-week-blocked">BLOQ</span>' : (count ? '<em aria-label="Tiene pedidos"></em>' : '')}</button>`;
                 }).join('')}</div>`;
@@ -8377,9 +8658,10 @@
                 return `<div class="mobile-agenda-event"><div class="mobile-agenda-time">${escapeHtml(time)}</div><button type="button" class="mobile-agenda-event-card ${esEventoBorrador(event) ? 'borrador' : ''}" onclick="abrirDetallePedidoAgenda(${Number(event.id || 0)})"><div class="mobile-agenda-event-head"><strong>${escapeHtml(event.cliente || 'Sin cliente')}</strong><span class="agenda-status-pill ${escapeHtml(status)}">${escapeHtml(labelEstadoOperativoAgenda(status))}</span></div><p>${escapeHtml(product && product !== '-' ? product : event.titulo || 'Pedido')}</p><div class="mobile-agenda-event-meta"><span>${agendaEsDespacho(event) ? 'Despacho' : 'Retiro'}</span>${saldo > 0 ? `<strong style="color:#c2410c">${escapeHtml(formatoMonedaCLP(saldo))} pendiente</strong>` : ''}<span>${escapeHtml(String(event.codigo_pedido || '').trim())}</span></div></button></div>`;
             }).join('');
             const reminderRows = dayReminders.map(item => `<div class="mobile-agenda-event personal-reminder-row"><div class="mobile-agenda-time">${escapeHtml(item.hora_inicio)}</div><button type="button" class="mobile-agenda-event-card personal-reminder-card" onclick="editarNotaAgenda(${item.nota_id})"><div class="mobile-agenda-event-head"><strong>Recordatorio personal</strong><span aria-hidden="true">&#128276;</span></div><p>${escapeHtml(item.titulo)}</p>${item.contenido ? `<div class="mobile-agenda-event-meta">${escapeHtml(item.contenido)}</div>` : ''}</button></div>`).join('');
+            const pastClientRows = dayPastClients.map(item => `<div class="mobile-agenda-event past-client-anniversary-row"><div class="mobile-agenda-time">09:00</div><button type="button" class="mobile-agenda-event-card" onclick="mostrarClientePasadoRecordatorio(${Number(item.evento.id)},${Number(item.year)})"><div class="mobile-agenda-event-head"><strong>Cliente anterior</strong><span aria-hidden="true">&#8635;</span></div><p>${escapeHtml(item.client)} · ${escapeHtml(item.product)}</p><div class="mobile-agenda-event-meta">Contactar por aniversario</div></button></div>`).join('');
             const blockRows = dayBlocks.map((block) => `<button type="button" class="mobile-agenda-block" onclick="editarEvento(${Number(block.id || 0)})"><strong>Bloqueo registrado</strong><b>${escapeHtml(etiquetaHorarioBloqueoAgenda(block))}</b><small>${escapeHtml(block.motivo || block.titulo || 'No se indicó motivo')} · Editar bloqueo</small></button>`).join('');
-            const dayContent = `${blockRows}${rows}${reminderRows}`;
-            grid.innerHTML = `${weekStrip}<div class="mobile-agenda-day-title"><span>${agendaVista === 'semana' ? `Agenda del ${dayLabel}` : dayLabel}${dayBlocks.length ? ' · Con bloqueo' : ''}</span><small>${dayEvents.length} ${dayEvents.length === 1 ? 'pedido' : 'pedidos'}${dayReminders.length ? ` · ${dayReminders.length} recordatorio(s)` : ''}${dayBlocks.length ? ` · ${dayBlocks.length} bloqueo(s)` : ''}</small></div><div class="mobile-agenda-timeline">${dayContent || '<div class="mobile-agenda-empty">No hay pedidos ni recordatorios para este dia.</div>'}</div>`;
+            const dayContent = `${blockRows}${rows}${reminderRows}${pastClientRows}`;
+            grid.innerHTML = `${weekStrip}<div class="mobile-agenda-day-title"><span>${agendaVista === 'semana' ? `Agenda del ${dayLabel}` : dayLabel}${dayBlocks.length ? ' · Con bloqueo' : ''}</span><small>${dayEvents.length} ${dayEvents.length === 1 ? 'pedido' : 'pedidos'}${dayReminders.length ? ` · ${dayReminders.length} recordatorio(s)` : ''}${dayPastClients.length ? ` · ${dayPastClients.length} cliente(s) anterior(es)` : ''}${dayBlocks.length ? ` · ${dayBlocks.length} bloqueo(s)` : ''}</small></div><div class="mobile-agenda-timeline">${dayContent || '<div class="mobile-agenda-empty">No hay pedidos ni recordatorios para este dia.</div>'}</div>`;
         }
 
         function renderizarListaAgendaMovil(orderTab = false) {
@@ -8396,7 +8678,7 @@
                 document.querySelectorAll('#mobile-agenda-order-tabs [data-order-tab]').forEach((button) => button.classList.toggle('active', button.dataset.orderTab === agendaMobileOrdersTab));
             }
             rows = rows.filter(eventoPasaFiltrosAgenda);
-            if (!orderTab) rows = [...rows, ...recordatoriosPersonalesEnRango()];
+            if (!orderTab) rows = [...rows, ...recordatoriosPersonalesEnRango(), ...recordatoriosClientesPasadosEnRango()];
             rows.sort((a,b) => `${a.fecha || ''} ${a.hora_entrega || a.hora_inicio || ''}`.localeCompare(`${b.fecha || ''} ${b.hora_entrega || b.hora_inicio || ''}`));
             if (!rows.length) {
                 grid.innerHTML = `<div class="mobile-agenda-empty">${orderTab ? 'No hay pedidos en esta lista.' : 'No hay pedidos para el periodo o los filtros seleccionados.'}</div>`;
@@ -8406,6 +8688,7 @@
             grid.innerHTML = rows.map((event) => {
                 const dt = parseFechaISO(event.fecha);
                 if (event.es_recordatorio_personal) return `<button type="button" class="mobile-order-row personal-reminder-list" onclick="editarNotaAgenda(${event.nota_id})"><span class="mobile-order-date">${dt ? monthNames[dt.getMonth()] : ''}<strong>${dt ? dt.getDate() : '--'}</strong>${escapeHtml(event.hora_inicio)}</span><span class="mobile-order-copy"><strong>Recordatorio personal</strong><span>${escapeHtml(event.titulo)}</span></span><span class="mobile-order-arrow">&#128276;</span></button>`;
+                if (event.es_recordatorio_cliente_pasado) return `<button type="button" class="mobile-order-row personal-reminder-list" onclick="mostrarClientePasadoRecordatorio(${Number(event.evento.id)},${Number(event.year)})"><span class="mobile-order-date">${dt ? monthNames[dt.getMonth()] : ''}<strong>${dt ? dt.getDate() : '--'}</strong>09:00</span><span class="mobile-order-copy"><strong>Cliente anterior · ${escapeHtml(event.client)}</strong><span>${escapeHtml(event.product)} · aniversario de reserva</span></span><span class="mobile-order-arrow">&#8635;</span></button>`;
                 const status = obtenerEstadoOperativoAgenda(event);
                 const saldo = obtenerSaldoAgenda(event);
                 const time = String(event.hora_entrega || event.hora_inicio || '--:--').slice(0,5);
@@ -8440,7 +8723,8 @@
             const eventosVisiblesMes = [
                 ...eventosFiltradosAgenda(),
                 ...bloqueosEnRangoAgenda({ inicio: primerDia, fin: ultimoDia }),
-                ...recordatoriosPersonalesEnRango({ inicio: primerDia, fin: ultimoDia })
+                ...recordatoriosPersonalesEnRango({ inicio: primerDia, fin: ultimoDia }),
+                ...recordatoriosClientesPasadosEnRango({ inicio: primerDia, fin: ultimoDia })
             ];
 
             // Espacios vacÃ­os antes
@@ -8486,13 +8770,15 @@
                         const span = document.createElement('span');
                         span.className = `day-event ${claseCssEvento(ev)}`;
                         if (ev.es_recordatorio_personal) span.classList.add('personal-reminder');
+                        if (ev.es_recordatorio_cliente_pasado) span.classList.add('past-client-anniversary');
                         const prefijo = esPedidoPendientePorConfirmar(ev) ? '\u23F3 POR CONFIRMAR · ' : (esEventoBorrador(ev) ? '\uD83D\uDCDD ' : '');
-                        span.textContent = ev.es_recordatorio_personal ? `\u23F0 ${ev.titulo}` : (ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`);
+                        span.textContent = ev.es_recordatorio_cliente_pasado ? `↻ ${ev.client}` : (ev.es_recordatorio_personal ? `\u23F0 ${ev.titulo}` : (ev.tipo === 'bloqueo' ? '\u26D4 Bloqueado' : `${prefijo}${ev.titulo}`));
                         span.title = ev.tipo === 'bloqueo'
                             ? `${etiquetaHorarioBloqueoAgenda(ev)} · ${ev.motivo || 'Bloqueo registrado'} · Click para editar`
-                            : (ev.es_recordatorio_personal ? `${ev.hora_inicio} · ${ev.contenido || ev.titulo} · Click para editar recordatorio` : 'Click: ver resumen - Doble click: abrir resumen - Click derecho: ir directo a ficha');
+                            : (ev.es_recordatorio_cliente_pasado ? `Aniversario de reserva anterior · ${ev.product} · Click para preparar WhatsApp` : (ev.es_recordatorio_personal ? `${ev.hora_inicio} · ${ev.contenido || ev.titulo} · Click para editar recordatorio` : 'Click: ver resumen - Doble click: abrir resumen - Click derecho: ir directo a ficha'));
                         span.onclick = (event) => {
                             event.stopPropagation();
+                            if (ev.es_recordatorio_cliente_pasado) { mostrarClientePasadoRecordatorio(ev.evento.id, ev.year); return; }
                             if (ev.es_recordatorio_personal) { editarNotaAgenda(ev.nota_id); return; }
                             if (String(ev.tipo || '').toLowerCase() === 'bloqueo') {
                                 editarEvento(Number(ev.id || 0));
@@ -8502,11 +8788,13 @@
                         };
                         span.ondblclick = (event) => {
                             event.stopPropagation();
+                            if (ev.es_recordatorio_cliente_pasado) { mostrarClientePasadoRecordatorio(ev.evento.id, ev.year); return; }
                             seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), true);
                         };
                         span.oncontextmenu = (event) => {
                             event.preventDefault();
                             event.stopPropagation();
+                            if (ev.es_recordatorio_cliente_pasado) { mostrarClientePasadoRecordatorio(ev.evento.id, ev.year); return; }
                             seleccionarEventoAgenda(fechaStr, Number(ev.id || 0), false, { directEdit: true });
                         };
                         contenedor.appendChild(span);
@@ -8584,6 +8872,7 @@
                 const pedidos = visibles.filter((ev) => ev.fecha === fechaStr);
                 const bloqueos = bloqueosVisibles.filter((ev) => ev.fecha === fechaStr);
                 const reminders = recordatoriosPersonalesEnRango({ inicio: fecha, fin: fecha });
+                const pastClients = recordatoriosClientesPasadosEnRango({ inicio: fecha, fin: fecha });
                 const selected = fechaSeleccionada === fechaStr;
                 return `
                     <section class="agenda-week-day ${fechaStr === hoy ? 'today' : ''} ${selected ? 'selected' : ''} ${bloqueos.length ? 'blocked' : ''}" onclick="seleccionarDiaCalendario('${fechaStr}')">
@@ -8596,6 +8885,7 @@
                         <div class="agenda-week-list">
                             ${bloqueos.map((block) => `<div class="agenda-week-block" title="${escapeHtml(block.motivo || block.titulo || 'Bloqueo registrado')}">&#9940; ${escapeHtml(etiquetaHorarioBloqueoAgenda(block))}<small>${escapeHtml(block.motivo || block.titulo || 'Bloqueo registrado')}</small></div>`).join('')}
                             ${reminders.map(renderizarTarjetaPedidoAgenda).join('')}
+                            ${pastClients.map(item => `<button type="button" class="agenda-reminder-card past-client-anniversary-card" onclick="event.stopPropagation(); mostrarClientePasadoRecordatorio(${Number(item.evento.id)},${Number(item.year)})"><strong>09:00 · Cliente anterior</strong><span>${escapeHtml(item.client)} · ${escapeHtml(item.product)}</span><small>Recordatorio de aniversario</small></button>`).join('')}
                             ${pedidos.map(renderizarTarjetaPedidoAgenda).join('')}
                             <button type="button" class="agenda-day-add" onclick="event.stopPropagation(); agendarTortaManual('${fechaStr}')">+ Agendar</button>
                         </div>
@@ -8609,13 +8899,14 @@
             if (!grid) return;
             grid.className = 'agenda-list-view';
             document.getElementById('mes-actual').textContent = textoPeriodoAgenda();
-            const lista = [...eventosFiltradosAgenda(), ...recordatoriosPersonalesEnRango()].sort((a,b) => `${a.fecha || ''} ${a.hora_inicio || ''}`.localeCompare(`${b.fecha || ''} ${b.hora_inicio || ''}`));
+            const lista = [...eventosFiltradosAgenda(), ...recordatoriosPersonalesEnRango(), ...recordatoriosClientesPasadosEnRango()].sort((a,b) => `${a.fecha || ''} ${a.hora_inicio || ''}`.localeCompare(`${b.fecha || ''} ${b.hora_inicio || ''}`));
             if (!lista.length) {
                 grid.innerHTML = '<div class="agenda-empty-state">No hay pedidos para el periodo o filtros seleccionados.</div>';
                 return;
             }
             grid.innerHTML = lista.map((evento) => {
                 if (evento.es_recordatorio_personal) return `<button type="button" class="agenda-list-row personal-reminder-list" onclick="editarNotaAgenda(${evento.nota_id})"><div><strong>${escapeHtml(evento.hora_inicio)}</strong><br><span>${escapeHtml(formatearFechaLarga(evento.fecha))}</span></div><div><strong>Recordatorio personal</strong><br><span>${escapeHtml(evento.titulo)}</span></div><span class="nota-badge reminder">Pendiente</span><span>Personal</span><strong>&#128276;</strong></button>`;
+                if (evento.es_recordatorio_cliente_pasado) return `<button type="button" class="agenda-list-row personal-reminder-list" onclick="mostrarClientePasadoRecordatorio(${Number(evento.evento.id)},${Number(evento.year)})"><div><strong>09:00</strong><br><span>${escapeHtml(formatearFechaLarga(evento.fecha))}</span></div><div><strong>Cliente anterior · ${escapeHtml(evento.client)}</strong><br><span>${escapeHtml(evento.product)} · Pedido anterior: ${escapeHtml(formatearFechaLarga(evento.originalIso))}</span></div><span class="nota-badge reminder">Aniversario</span><span>WhatsApp</span><strong>&#8635;</strong></button>`;
                 const id = Number(evento.id || 0);
                 const estado = obtenerEstadoOperativoAgenda(evento);
                 const saldo = obtenerSaldoAgenda(evento);
