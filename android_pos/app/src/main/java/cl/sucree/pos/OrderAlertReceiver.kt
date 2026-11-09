@@ -31,6 +31,9 @@ data class PosMonitoringStatus(
     val connected: Boolean,
     val ordersAvailable: Boolean,
     val quotesAvailable: Boolean,
+    val connectedCustomers: Int = 0,
+    val activeStoreCarts: Int = 0,
+    val storeActivityAvailable: Boolean = false,
 )
 
 class OrderAlertReceiver : BroadcastReceiver() {
@@ -56,10 +59,16 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private const val ACK_KEY = "acknowledged_alerts"
         private const val ORDER_IDS_KEY = "known_order_ids"
         private const val QUOTE_IDS_KEY = "known_quote_ids"
+        private const val STORE_CART_IDS_KEY = "known_active_store_cart_ids"
+        private const val STORE_CART_BASELINE_KEY = "store_cart_baseline_created"
+        private const val STORE_CONNECTED_KEY = "store_connected_customers"
+        private const val STORE_CART_COUNT_KEY = "store_active_cart_count"
+        private const val STORE_ACTIVITY_AVAILABLE_KEY = "store_activity_available"
         private const val UNRESOLVED_QUOTES_KEY = "new_unconfirmed_quote_ids"
         private const val ORDER_BASELINE_KEY = "order_baseline_created"
         private const val QUOTE_BASELINE_KEY = "quote_baseline_created"
         private const val CHANNEL_ID = "pos_attention_alerts_v3"
+        private const val STORE_ACTIVITY_CHANNEL_ID = "pos_store_activity_v1"
         private const val POLL_INTERVAL_MS = 60 * 1000L
         private const val ALERT_REPEAT_INTERVAL_MS = 5 * 60 * 1000L
         private const val RECENT_RESERVATION_WINDOW_MS = 15 * 60 * 1000L
@@ -70,7 +79,7 @@ class OrderAlertReceiver : BroadcastReceiver() {
         private const val ORDERS_AVAILABLE_KEY = "monitor_orders_available"
         private const val QUOTES_AVAILABLE_KEY = "monitor_quotes_available"
         private val pollInProgress = AtomicBoolean(false)
-        private val pollExecutor = Executors.newFixedThreadPool(2)
+        private val pollExecutor = Executors.newFixedThreadPool(3)
 
         fun startMonitoring(context: Context, cookie: String) {
             if (cookie.length > 16_000) return
@@ -176,8 +185,12 @@ class OrderAlertReceiver : BroadcastReceiver() {
                     pollExecutor.submit<JSONArray?> { fetchEndpoint("/api/tienda/admin/pedidos-chat-activos", it, "pedidos") }
                 }
                 val agendaFuture = pollExecutor.submit<JSONArray?> { fetchEndpoint("/api/pos/monitor/agenda", cookie, "eventos") }
+                val activityFuture: Future<JSONObject?>? = cookie?.let {
+                    pollExecutor.submit<JSONObject?> { fetchActivityEndpoint(it) }
+                }
                 val orders = ordersFuture?.let { runCatching { it.get(10, TimeUnit.SECONDS) }.getOrNull() }
                 val agenda = runCatching { agendaFuture.get(10, TimeUnit.SECONDS) }.getOrNull()
+                val activity = activityFuture?.let { runCatching { it.get(10, TimeUnit.SECONDS) }.getOrNull() }
                 var successful = false
                 if (orders != null) {
                     prefs.edit().putInt(ORDERS_COUNT_KEY, processOrders(context, orders)).apply()
@@ -186,6 +199,18 @@ class OrderAlertReceiver : BroadcastReceiver() {
                 if (agenda != null) {
                     prefs.edit().putInt(QUOTES_COUNT_KEY, processQuotes(context, agenda)).apply()
                     successful = true
+                }
+                if (activity != null) {
+                    val summary = activity.optJSONObject("resumen") ?: JSONObject()
+                    processStoreActivity(context, activity)
+                    prefs.edit()
+                        .putInt(STORE_CONNECTED_KEY, summary.optInt("conectados", 0).coerceAtLeast(0))
+                        .putInt(STORE_CART_COUNT_KEY, summary.optInt("carritos_activos", 0).coerceAtLeast(0))
+                        .putBoolean(STORE_ACTIVITY_AVAILABLE_KEY, true)
+                        .apply()
+                    successful = true
+                } else {
+                    prefs.edit().putBoolean(STORE_ACTIVITY_AVAILABLE_KEY, false).apply()
                 }
                 prefs.edit()
                     .putBoolean(ORDERS_AVAILABLE_KEY, orders != null)
@@ -208,7 +233,98 @@ class OrderAlertReceiver : BroadcastReceiver() {
                 connected = prefs.getBoolean(CONNECTED_KEY, false),
                 ordersAvailable = prefs.getBoolean(ORDERS_AVAILABLE_KEY, false),
                 quotesAvailable = prefs.getBoolean(QUOTES_AVAILABLE_KEY, false),
+                connectedCustomers = prefs.getInt(STORE_CONNECTED_KEY, 0),
+                activeStoreCarts = prefs.getInt(STORE_CART_COUNT_KEY, 0),
+                storeActivityAvailable = prefs.getBoolean(STORE_ACTIVITY_AVAILABLE_KEY, false),
             )
+        }
+
+        private fun fetchActivityEndpoint(cookie: String): JSONObject? {
+            val connection = (URL("https://pasteleriasucree.cl/api/tienda/admin/actividad").openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 2_000
+                readTimeout = 8_000
+                useCaches = false
+                setRequestProperty("Cookie", cookie)
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Cache-Control", "no-cache")
+                setRequestProperty("User-Agent", "SucreePOS-Android")
+            }
+            try {
+                if (connection.responseCode !in 200..299) return null
+                val root = JSONObject(connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
+                if (!root.optBoolean("success", false)) return null
+                return root
+            } finally {
+                connection.disconnect()
+            }
+        }
+
+        private fun processStoreActivity(context: Context, activity: JSONObject) {
+            val sessions = activity.optJSONArray("carritos_detalle") ?: JSONArray()
+            val activeIds = linkedSetOf<String>()
+            for (i in 0 until sessions.length()) {
+                val session = sessions.optJSONObject(i) ?: continue
+                session.optString("session_id").takeIf { it.isNotBlank() }?.let(activeIds::add)
+            }
+
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val previouslyActive = readSet(prefs.getString(STORE_CART_IDS_KEY, "[]"))
+            val baselineCreated = prefs.getBoolean(STORE_CART_BASELINE_KEY, false)
+            val summary = activity.optJSONObject("resumen") ?: JSONObject()
+            val connected = summary.optInt("conectados", 0).coerceAtLeast(0)
+            val activeCarts = summary.optInt("carritos_activos", 0).coerceAtLeast(0)
+            if (baselineCreated) {
+                (activeIds - previouslyActive).forEach { sessionId ->
+                    notifyStoreCartStarted(context, sessionId, connected, activeCarts)
+                }
+            }
+            prefs.edit()
+                .putString(STORE_CART_IDS_KEY, JSONArray(activeIds.toList()).toString())
+                .putBoolean(STORE_CART_BASELINE_KEY, true)
+                .apply()
+        }
+
+        private fun notifyStoreCartStarted(context: Context, sessionId: String, connected: Int, activeCarts: Int) {
+            if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+            val notificationKey = "store_cart:$sessionId:${System.currentTimeMillis()}"
+
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.createNotificationChannel(NotificationChannel(
+                    STORE_ACTIVITY_CHANNEL_ID,
+                    "Actividad de la tienda",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = "Aviso cuando un cliente empieza a preparar un carrito en la tienda."
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 250, 120, 250)
+                    val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    val audio = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    setSound(sound, audio)
+                })
+            }
+            val open = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val contentIntent = PendingIntent.getActivity(
+                context, notificationKey.hashCode(), open,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val notification = Notification.Builder(context, STORE_ACTIVITY_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_sucree)
+                .setContentTitle("Cliente preparando un carrito")
+                .setContentText("$connected conectado(s) · $activeCarts carrito(s) activo(s) en tienda.")
+                .setStyle(Notification.BigTextStyle().bigText("Un cliente empezó a preparar su carrito en la tienda. Hay $connected cliente(s) conectado(s) y $activeCarts carrito(s) activo(s). Abre Sucrée POS para revisar la actividad."))
+                .setCategory(Notification.CATEGORY_EVENT)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setAutoCancel(true)
+                .setContentIntent(contentIntent)
+                .build()
+            manager.notify(notificationKey.hashCode(), notification)
         }
 
         private fun fetchEndpoint(path: String, cookie: String?, key: String): JSONArray? {

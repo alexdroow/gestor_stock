@@ -1158,7 +1158,7 @@ def admin_logout():
     return redirect(url_for('admin_login'))
 
 
-POS_ANDROID_VERSION = '1.4.17'
+POS_ANDROID_VERSION = '1.4.18'
 POS_ANDROID_APK_FILENAME = f'SucreePOS-Android-{POS_ANDROID_VERSION}-debug.apk'
 
 

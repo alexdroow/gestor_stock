@@ -68,6 +68,9 @@ class PosMonitoringService : Service() {
         } else {
             "Esperando primera actualización"
         }
+        val storeConnected = if (status.storeActivityAvailable) status.connectedCustomers.toString() else "--"
+        val storeCarts = if (status.storeActivityAvailable) status.activeStoreCarts.toString() else "--"
+        val activitySummary = "Tienda: $storeConnected cliente(s) conectado(s) · $storeCarts carrito(s) activo(s)"
         val summary = if (status.connected) {
             val orders = if (status.ordersAvailable) status.pendingOrders.toString() else "--"
             val quotes = if (status.quotesAvailable) status.pendingQuotes.toString() else "--"
@@ -76,7 +79,7 @@ class PosMonitoringService : Service() {
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_sucree)
             .setContentTitle("SucréePOS · monitoreo activo")
-            .setContentText(summary)
+            .setContentText(if (status.storeActivityAvailable) activitySummary else summary)
             .setSubText(lastUpdate)
             .setStyle(Notification.BigTextStyle().bigText("$summary\n$lastUpdate\nActualización automática cada 5 segundos."))
             .setCategory(Notification.CATEGORY_SERVICE)
