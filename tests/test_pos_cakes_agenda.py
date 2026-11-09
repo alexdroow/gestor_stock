@@ -84,6 +84,11 @@ class PosCakesAgendaTests(unittest.TestCase):
         self.assertIn('setInterval(_pollActividadTiendaEnVentas, 5000)', web_sales)
         self.assertIn("setInterval(()=>{if(navigator.onLine){loadOrders();loadActivity()}},5000)", mobile_pos)
         self.assertIn("$('metric-preparing').textContent=Number(s.pedidos_preparando||0)", mobile_pos)
+        self.assertIn('id="store-carts-open"', mobile_pos)
+        self.assertIn('id="store-carts-modal"', mobile_pos)
+        self.assertIn('state.storeCarts=Array.isArray(d.carritos_detalle)?d.carritos_detalle:[]', mobile_pos)
+        self.assertIn("esc(item.nombre||'Producto')", mobile_pos)
+        self.assertIn('id="refresh-store-carts"', mobile_pos)
         self.assertIn("DELETE FROM tienda_visitas WHERE datetime(ultima_actividad) < datetime('now', '-24 hours')", backend)
         self.assertIn("WHERE canal_venta LIKE 'tienda_online%'", backend)
 

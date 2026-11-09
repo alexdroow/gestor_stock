@@ -182,7 +182,7 @@ class PrivacyImplementationTests(unittest.TestCase):
         with patch.object(app_module, "get_db", side_effect=self.connect_db):
             tracked = self.client.post("/api/tienda/track", json={
                 "session_id": "live-test-123", "evento": "cart", "carrito_items": 1,
-                "carrito_total": 5000, "carrito_detalle": [{"id": 1, "nombre": "Torta", "cantidad": 1}],
+                "carrito_total": 5000, "carrito_detalle": [{"id": 1, "nombre": "Torta", "cantidad": 1, "precio_unitario": 5000}],
             })
             self.assertEqual(tracked.status_code, 200)
             with self.client.session_transaction() as session:
@@ -193,6 +193,10 @@ class PrivacyImplementationTests(unittest.TestCase):
         self.assertEqual(summary["conectados"], 1)
         self.assertEqual(summary["carritos_activos"], 1)
         self.assertEqual(summary["pedidos_preparando"], 1)
+        carts = response.get_json()["carritos_detalle"]
+        self.assertEqual(carts[0]["items"][0]["nombre"], "Torta")
+        self.assertEqual(carts[0]["items"][0]["cantidad"], 1)
+        self.assertEqual(carts[0]["items"][0]["subtotal"], 5000)
 
 
 if __name__ == "__main__":
