@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}APKS | SucreeStock{% endblock %}
+
+{% block content %}
+<style>
+    .apks-page{max-width:1120px;margin:0 auto;padding:24px;color:#3b2418}
+    .apks-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:20px}
+    .apks-heading h1{font-size:30px;line-height:1.1;color:#422414}
+    .apks-heading p{margin-top:7px;color:#78665c}
+    .apks-card{background:#fff;border:1px solid #ead8c5;border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(76,45,22,.05)}
+    .apks-card h2{font-size:19px;margin-bottom:7px}
+    .apks-muted{color:#78665c;font-size:13px;line-height:1.5}
+    .apks-upload{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end;margin-top:16px}
+    .apks-upload label{display:grid;gap:7px;font-size:13px;font-weight:700}
+    .apks-upload input[type=file]{width:100%;min-height:44px;padding:9px;border:1px solid #e5cfb8;border-radius:10px;background:#fffdf9;color:#432818}
+    .apks-button{display:inline-flex;min-height:42px;align-items:center;justify-content:center;padding:0 16px;border:0;border-radius:10px;background:#ef7900;color:white;font-weight:800;text-decoration:none;cursor:pointer}
+    .apks-button:hover{background:#d96800}
+    .apks-button.secondary{background:#fff4e6;border:1px solid #ead8c5;color:#794014}
+    .apks-notice{margin:0 0 14px;padding:12px 14px;border-radius:10px;background:#fff4df;border:1px solid #f3d29e;color:#714416;font-weight:700}
+    .apks-list{display:grid;gap:10px;margin-top:14px}
+    .apks-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid #eee2d6;border-radius:13px;background:#fffdfa}
+    .apks-file{min-width:0}.apks-file strong{display:block;overflow-wrap:anywhere;font-size:15px}.apks-file small{display:block;margin-top:5px;color:#817064}
+    .apks-actions{display:flex;gap:8px;align-items:center}.apks-actions form{margin:0}
+    .apks-empty{padding:22px;text-align:center;border:1px dashed #e5cfb8;border-radius:12px;color:#817064}
+    @media(max-width:640px){.apks-page{padding:15px}.apks-heading{align-items:flex-start;flex-direction:column}.apks-upload{grid-template-columns:1fr}.apks-upload .apks-button{width:100%}.apks-row{grid-template-columns:1fr}.apks-actions>*{flex:1}.apks-actions form{display:flex}.apks-actions form button{width:100%}}
+</style>
+<main class="apks-page">
+    <header class="apks-heading">
+        <div><h1>APKS</h1><p>Biblioteca interna para almacenar y administrar APKs externos a Sucrée.</p></div>
+        <span class="apks-muted">{{ apks|length }} archivo(s)</span>
+    </header>
+
+    {% if notice %}<div class="apks-notice" role="status">{{ notice }}</div>{% endif %}
+
+    <section class="apks-card" aria-labelledby="apks-upload-title">
+        <h2 id="apks-upload-title">Subir un APK</h2>
+        <p class="apks-muted">Los archivos quedan en almacenamiento privado y solo los administradores pueden verlos o descargarlos. Formato APK, máximo 300 MB.</p>
+        <form class="apks-upload" action="{{ url_for('apks_upload') }}" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label for="apks-file">Selecciona el archivo
+                <input id="apks-file" type="file" name="archivo" accept=".apk,application/vnd.android.package-archive" required>
+            </label>
+            <button class="apks-button" type="submit">Subir APK</button>
+        </form>
+    </section>
+
+    <section class="apks-card" aria-labelledby="apks-list-title">
+        <h2 id="apks-list-title">Archivos disponibles</h2>
+        <p class="apks-muted">Las versiones originales del inventario no se pueden borrar desde el panel. Los archivos que agregues después sí se pueden retirar.</p>
+        {% if apks %}
+        <div class="apks-list">
+            {% for item in apks %}
+            <article class="apks-row">
+                <div class="apks-file">
+                    <strong>{{ item.name }}</strong>
+                    <small>{{ (item.size / 1048576)|round(1) }} MB · {{ item.modified }}{% if item.storage == 'seed' %} · Inicial{% endif %}</small>
+                </div>
+                <div class="apks-actions">
+                    <a class="apks-button secondary" href="{{ url_for('apks_download', storage=item.storage, filename=item.name) }}">Descargar</a>
+                    {% if item.removable %}
+                    <form action="{{ url_for('apks_delete', filename=item.name) }}" method="post" onsubmit="return confirm('¿Eliminar {{ item.name }}? Esta acción no se puede deshacer.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="apks-button secondary" type="submit">Eliminar</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}<div class="apks-empty">Todavía no hay APKs. Carga el primero desde el formulario superior.</div>{% endif %}
+    </section>
+</main>
+{% endblock %}

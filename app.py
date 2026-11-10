@@ -1238,6 +1238,156 @@ def downloader_apk(filename):
     return response
 
 
+def _apks_seed_dir():
+    return str(app.config.get("APKS_SEED_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "private_apks"))
+
+
+def _apks_upload_dir():
+    folder = str(app.config.get("APKS_UPLOAD_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads", "apks"))
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def _apks_list_files():
+    items = []
+    for storage, folder, removable in (
+        ("seed", _apks_seed_dir(), False),
+        ("uploaded", _apks_upload_dir(), True),
+    ):
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            names = []
+        for name in names:
+            if not name.lower().endswith(".apk") or secure_filename(name) != name:
+                continue
+            path = os.path.join(folder, name)
+            if not os.path.isfile(path):
+                continue
+            stat = os.stat(path)
+            items.append({
+                "name": name,
+                "storage": storage,
+                "removable": removable,
+                "size": stat.st_size,
+                "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%d-%m-%Y %H:%M"),
+            })
+    return sorted(items, key=lambda item: (item["modified"], item["name"]), reverse=True)
+
+
+def _apks_csrf_token():
+    token = str(session.get("apks_csrf") or "").strip()
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["apks_csrf"] = token
+    return token
+
+
+def _apks_valid_csrf():
+    expected = str(session.get("apks_csrf") or "")
+    provided = str(request.form.get("csrf_token") or request.headers.get("X-CSRF-Token") or "")
+    return bool(expected and provided and hmac.compare_digest(expected, provided))
+
+
+@app.route('/apks', methods=['GET'])
+def apks_admin():
+    notice = str(request.args.get("notice") or "").strip()[:240]
+    return render_template("apks_admin.html", apks=_apks_list_files(), csrf_token=_apks_csrf_token(), notice=notice)
+
+
+@app.route('/admin/apks/subir', methods=['POST'])
+def apks_upload():
+    if not _apks_valid_csrf():
+        return redirect(url_for("apks_admin", notice="La sesión del formulario venció. Intenta nuevamente."))
+    upload = request.files.get("archivo")
+    if not upload or not upload.filename:
+        return redirect(url_for("apks_admin", notice="Selecciona un archivo APK."))
+    original = os.path.basename(str(upload.filename).replace("\\", "/"))
+    filename = secure_filename(original)
+    if not filename or not filename.lower().endswith(".apk"):
+        return redirect(url_for("apks_admin", notice="Solo se permiten archivos con extensión .apk."))
+
+    max_bytes = 300 * 1024 * 1024
+    if request.content_length and request.content_length > max_bytes + 1024 * 1024:
+        return redirect(url_for("apks_admin", notice="El APK supera el límite de 300 MB."))
+
+    folder = _apks_upload_dir()
+    temp_path = os.path.join(folder, f".upload-{uuid.uuid4().hex}.tmp")
+    total = 0
+    signature = b""
+    try:
+        with open(temp_path, "xb") as target:
+            while True:
+                chunk = upload.stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                if not signature:
+                    signature = chunk[:4]
+                total += len(chunk)
+                if total > max_bytes:
+                    raise ValueError("El APK supera el límite de 300 MB.")
+                target.write(chunk)
+        if total < 8 or not signature.startswith(b"PK"):
+            raise ValueError("El archivo no parece ser un paquete APK válido.")
+
+        base, ext = os.path.splitext(filename)
+        destination = os.path.join(folder, filename)
+        suffix = 2
+        while os.path.exists(destination):
+            destination = os.path.join(folder, f"{base}-{suffix}{ext}")
+            suffix += 1
+        os.replace(temp_path, destination)
+        return redirect(url_for("apks_admin", notice=f"APK cargado: {os.path.basename(destination)}"))
+    except ValueError as exc:
+        return redirect(url_for("apks_admin", notice=str(exc)))
+    except OSError:
+        return redirect(url_for("apks_admin", notice="No se pudo guardar el APK. Revisa el espacio disponible."))
+    finally:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except OSError:
+            pass
+
+
+@app.route('/admin/apks/archivo/<string:storage>/<path:filename>', methods=['GET'])
+def apks_download(storage, filename):
+    safe_name = secure_filename(os.path.basename(filename))
+    if safe_name != filename or not safe_name.lower().endswith(".apk"):
+        return "Archivo APK no encontrado.", 404
+    if storage == "seed":
+        folder = _apks_seed_dir()
+    elif storage == "uploaded":
+        folder = _apks_upload_dir()
+    else:
+        return "Archivo APK no encontrado.", 404
+    path = os.path.join(folder, safe_name)
+    if not os.path.isfile(path):
+        return "Archivo APK no encontrado.", 404
+    response = send_file(path, as_attachment=True, download_name=safe_name, mimetype="application/vnd.android.package-archive", max_age=0)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.route('/admin/apks/eliminar/<path:filename>', methods=['POST'])
+def apks_delete(filename):
+    if not _apks_valid_csrf():
+        return redirect(url_for("apks_admin", notice="La sesión del formulario venció. Intenta nuevamente."))
+    safe_name = secure_filename(os.path.basename(filename))
+    if safe_name != filename or not safe_name.lower().endswith(".apk"):
+        return redirect(url_for("apks_admin", notice="Archivo no válido."))
+    path = os.path.join(_apks_upload_dir(), safe_name)
+    try:
+        os.remove(path)
+        notice = f"APK eliminado: {safe_name}"
+    except FileNotFoundError:
+        notice = "No se encontró ese APK cargado."
+    except OSError:
+        notice = "No se pudo eliminar el APK."
+    return redirect(url_for("apks_admin", notice=notice))
+
+
 def _request_is_phone_mobile():
     ua = str(request.headers.get("User-Agent") or "").lower()
     if not ua:
